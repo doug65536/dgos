@@ -159,7 +159,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 
         assert(by_size.key >= size);
 
-        free_addr_by_size.delete_at(place);
+        free_addr_by_size.__delete_at(place);
 
         // Delete corresponding entry by address
         bool did_del = free_addr_by_addr.delete_item(by_size.val, by_size.key);
@@ -291,7 +291,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);
 
             // Delete the address entry
-            free_addr_by_addr.delete_at(by_addr_place);
+            free_addr_by_addr.__delete_at(by_addr_place);
 
             // Free space up to beginning of hole
             new_before = {
@@ -333,8 +333,8 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             return false;
         } else if (by_addr.key >= end) {
             // Ran off the end of relevant range, therefore done
-            dump("Nothing to do, allocating addr=%#zx, size=%#zx\n",
-                 addr, size);
+//            dump("Nothing to do, allocating addr=%#zx, size=%#zx\n",
+//                 addr, size);
             return true;
         } else if (by_addr.key < addr && by_addr.key + by_addr.val > addr) {
             //
@@ -346,7 +346,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);
 
             // Delete the address entry
-            free_addr_by_addr.delete_at(by_addr_place);
+            free_addr_by_addr.__delete_at(by_addr_place);
 
             // Create a smaller block that does not overlap taken range
             // Chop off size so that range ends at addr
@@ -369,7 +369,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             free_addr_by_size.delete_item(
                         by_addr.val, by_addr.key);
 
-            free_addr_by_addr.delete_at(by_addr_place);
+            free_addr_by_addr.__delete_at(by_addr_place);
 
             // Keep going...
             continue;
@@ -380,7 +380,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             next_place = free_addr_by_addr.next(by_addr_place);
 
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);
-            free_addr_by_addr.delete_at(by_addr_place);
+            free_addr_by_addr.__delete_at(by_addr_place);
 
             size_t removed = end - by_addr.val;
 
@@ -446,14 +446,14 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     if (coalesce_pred) {
         addr -= pred.val;
         size += pred.val;
-        free_addr_by_addr.delete_at(pred_it);
+        free_addr_by_addr.__delete_at(pred_it);
 
         free_addr_by_size.delete_item(pred.val, pred.key);
     }
 
     if (coalesce_succ) {
         size += succ.val;
-        free_addr_by_addr.delete_at(succ_it);
+        free_addr_by_addr.__delete_at(succ_it);
 
         free_addr_by_size.delete_item(succ.val, succ.key);
     }

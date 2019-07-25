@@ -590,13 +590,8 @@ static void virtio_gpu_startup(void*)
     virtio_gpu_factory.detect();
 }
 
-//REGISTER_CALLOUT(virtio_gpu_startup, nullptr,
-//                 callout_type_t::driver_base, "000");
-
 int virtio_gpu_factory_t::detect()
 {
-    // hack, disabled for now
-    //return 0;
     return detect_virtio(PCI_DEV_CLASS_DISPLAY, VIRTIO_DEVICE_GPU,
                          "virtio-gpu");
 }

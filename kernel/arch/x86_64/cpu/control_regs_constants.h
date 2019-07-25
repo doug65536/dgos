@@ -397,8 +397,13 @@
 #define CPU_EFLAGS_VIP      (1U << CPU_EFLAGS_VIP_BIT)
 #define CPU_EFLAGS_ID       (1U << CPU_EFLAGS_ID_BIT)
 
-// Always set bits
+// Always set
 #define CPU_EFLAGS_ALWAYS   2
+
+// Never set (only for debugging)
+
+// Bits 1, 3, 5, 15, and 22 through 31 of eflags are reserved
+#define CPU_EFLAGS_NEVER    ((1<<3)|(1<<5)|(1<<15)|-(1<<22))
 
 #define CPU_EFLAGS_IOPL_BITS    2
 #define CPU_EFLAGS_IOPL_MASK    ((1 << CPU_EFLAGS_IOPL_BITS)-1)
@@ -584,6 +589,25 @@
 #define GDT_SEL_TSS_HI          0x88
 
 #define GDT_SEL_END             0xC0
+
+#define GDT_SEL_RPL_OF(sel)     ((sel) & 3)
+
+// Selector is a 32 or 64 bit kernel or user code segment
+#define GDT_SEL_IS_CSEG(sel)    (((sel) >= 0x40+3) && \
+                                    ((sel) <= 0x60) && \
+                                    !((sel) & 8))
+
+// Selector is a kernel or user data segment
+#define GDT_SEL_IS_DSEG(sel)    (((sel) >= 0x48+3) && \
+                                    ((sel) <= 0x68) && \
+                                    ((sel) & 8))
+
+#define GDT_SEL_IS_C64(sel)     (((sel) >= 0x50+3) && \
+                                    ((sel) <= 0x60) && \
+                                    !((sel) & 8))
+
+#define GDT_SEL_RPL_IS_KERNEL(sel)  (GDT_SEL_RPL_OF((sel)) == 0)
+#define GDT_SEL_RPL_IS_USER(sel)    (GDT_SEL_RPL_OF((sel)) == 3)
 
 #define GDT_TYPE_TSS            0x09
 

@@ -51,7 +51,7 @@ struct device_t
     fs_base_t *fs;
 };
 
-#include <rbtree.h>
+#include "basic_set.h"
 
 struct dev_fs_t final
         : public fs_base_t

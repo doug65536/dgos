@@ -46,14 +46,17 @@ struct gdt_entry_t {
 
     constexpr gdt_entry_t& set_limit(uint32_t limit)
     {
-        if (limit >= (1U << 22)) {
+        if (limit >= (1U << 20)) {
             limit >>= 12;
-            limit_low = limit & 0xFFFF;
-            limit >>= 16;
-            flags_limit_high &= 0xF0;
-            limit &= 0xF;
-            flags_limit_high = (flags_limit_high & 0xF0) | limit;
+            flags_limit_high |= GDT_FLAGS_GRAN;
+        } else {
+            flags_limit_high &= ~GDT_FLAGS_GRAN;
         }
+        limit_low = limit & 0xFFFF;
+        limit >>= 16;
+        flags_limit_high &= 0xF0;
+        limit &= 0xF;
+        flags_limit_high = (flags_limit_high & 0xF0) | limit;
         return *this;
     }
 
@@ -237,7 +240,7 @@ C_ASSERT(offsetof(tss_t, rsp) == TSS_RSP0_OFS);
 extern tss_t tss_list[];
 
 void gdt_init(int ap);
-void gdt_init_tss(int cpu_count);
+void gdt_init_tss(size_t cpu_count);
 void gdt_load_tr(int cpu_number);
 
 extern "C" gdt_entry_combined_t gdt[];

@@ -14,7 +14,7 @@
 //  dl = drive number
 //  ds:si -> partition table entry
 
-.section .early, "wx"
+.section .early, "wx", @progbits
 .global entry
 entry:
     mov %dl,boot_drive

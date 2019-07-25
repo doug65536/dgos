@@ -59,7 +59,7 @@
 
 #define DEBUG_APIC  1
 #if DEBUG_APIC
-#define APIC_TRACE(...) printk("lapic: " __VA_ARGS__)
+#define APIC_TRACE(...) printdbg("lapic: " __VA_ARGS__)
 #else
 #define APIC_TRACE(...) ((void)0)
 #endif
@@ -2137,8 +2137,10 @@ static void apic_calibrate()
     //APIC_TRACE("clk_to_ns_numer: %" PRId64 "\n", clk_to_ns_numer);
     //APIC_TRACE("clk_to_ns_denom: %" PRId64 "\n", clk_to_ns_denom);
 
-    if (cpuid_has_inrdtsc()) {
+    if (cpuid_is_hypervisor() || cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
+        if (!cpuid_has_inrdtsc())
+            APIC_TRACE("Using RDTSC overriding cpuid because hyperivisor\n");
         time_ns_set_handler(apic_rdtsc_time_ns_handler, nullptr, true);
         nsleep_set_handler(apic_rdtsc_nsleep_handler, nullptr, true);
     }
@@ -2349,6 +2351,9 @@ void apic_config_cpu()
 _hot
 isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
+    //APIC_TRACE("Dispatching IRQ %d\n", intr);
+    //intr_handler_names(intr);
+
     uint64_t st = cpu_rdtsc();
 
     assert(intr >= INTR_APIC_DSP_BASE);
@@ -2366,13 +2371,13 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     if (!irq_manual_eoi[irq])
         apic_eoi(intr);
 
-    if (likely(ctx == orig_ctx))
-        ctx = thread_schedule_postirq(ctx);
-
     uint64_t en = cpu_rdtsc();
     en -= st;
 
     thread_add_cpu_irq_time(en);
+
+    if (likely(ctx == orig_ctx))
+        ctx = thread_schedule_postirq(ctx);
 
     return ctx;
 }

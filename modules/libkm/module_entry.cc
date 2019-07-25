@@ -6,6 +6,12 @@ extern "C" void __register_frame(char const *frames);
 
 extern void const * const __dso_handle;
 
+__attribute__((__visibility__("default")))
+extern void const * const * __dso_handle_export;
+
+__attribute__((__visibility__("default"),__used__))
+void const * const * __dso_handle_export = &__dso_handle;
+
 extern "C"
 __attribute__((__section__(".entry")))
 int module_entry(int argc, char **argv)

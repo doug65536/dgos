@@ -41,7 +41,7 @@
 
 kernel_params_t *kernel_params;
 
-size_t constexpr kernel_stack_size = 16384;
+size_t constexpr kernel_stack_size = 65536;
 char kernel_stack[kernel_stack_size] _section(".bspstk");
 
 #define TEST_FORMAT(f, t, v) \
@@ -381,94 +381,6 @@ static int mprotect_test(void *)
 #if ENABLE_REGISTER_THREAD
 static int register_check(void *p)
 {
-    (void)p;
-    __asm__ __volatile__ (
-        "cli\n\t"
-        "movabs $0x0123456789ABCDEF,%%rbx\n\t"
-        "movabs $0xF0123456789ABCDE,%%rcx\n\t"
-        "movabs $0xEF0123456789ABCD,%%rdx\n\t"
-        "movabs $0xDEF0123456789ABC,%%rsi\n\t"
-        "movabs $0xCDEF0123456789AB,%%rdi\n\t"
-        "movabs $0xBCDEF0123456789A,%%rbp\n\t"
-        "movabs $0xABCDEF0123456789,%%r8 \n\t"
-        "movabs $0x9ABCDEF012345678,%%r9 \n\t"
-        "movabs $0x89ABCDEF01234567,%%r10\n\t"
-        "movabs $0x789ABCDEF0123456,%%r11\n\t"
-        "movabs $0x6789ABCDEF012345,%%r12\n\t"
-        "movabs $0x56789ABCDEF01234,%%r13\n\t"
-        "movabs $0x456789ABCDEF0123,%%r14\n\t"
-        "movabs $0x3456789ABCDEF012,%%r15\n\t"
-        "xor %%rax,%%rbx\n\t"
-        "xor %%rax,%%rcx\n\t"
-        "xor %%rax,%%rdx\n\t"
-        "xor %%rax,%%rsi\n\t"
-        "xor %%rax,%%rdi\n\t"
-        "xor %%rax,%%rbp\n\t"
-        "xor %%rax,%%r8 \n\t"
-        "xor %%rax,%%r9 \n\t"
-        "xor %%rax,%%r10\n\t"
-        "xor %%rax,%%r11\n\t"
-        "xor %%rax,%%r12\n\t"
-        "xor %%rax,%%r13\n\t"
-        "xor %%rax,%%r14\n\t"
-        "xor %%rax,%%r15\n\t"
-        "andq $-16,%%rsp\n\t"
-        "push %%rax\n\t"
-        "push %%rbx\n\t"
-        "push %%rcx\n\t"
-        "push %%rdx\n\t"
-        "push %%rsi\n\t"
-        "push %%rdi\n\t"
-        "push %%rbp\n\t"
-        "push %%r8 \n\t"
-        "push %%r9 \n\t"
-        "push %%r10\n\t"
-        "push %%r11\n\t"
-        "push %%r12\n\t"
-        "push %%r13\n\t"
-        "push %%r14\n\t"
-        "push %%r15\n\t"
-        "sti\n\t"
-        "0:\n\t"
-        "cmp 0*8(%%rsp),%%r15\n\t"
-        "jnz 0f\n\t"
-        "cmp 1*8(%%rsp),%%r14\n\t"
-        "jnz 0f\n\t"
-        "cmp 2*8(%%rsp),%%r13\n\t"
-        "jnz 0f\n\t"
-        "cmp 3*8(%%rsp),%%r12\n\t"
-        "jnz 0f\n\t"
-        "cmp 4*8(%%rsp),%%r11\n\t"
-        "jnz 0f\n\t"
-        "cmp 5*8(%%rsp),%%r10\n\t"
-        "jnz 0f\n\t"
-        "cmp 6*8(%%rsp),%%r9\n\t"
-        "jnz 0f\n\t"
-        "cmp 7*8(%%rsp),%%r8\n\t"
-        "jnz 0f\n\t"
-        "cmp 8*8(%%rsp),%%rbp\n\t"
-        "jnz 0f\n\t"
-        "cmp 9*8(%%rsp),%%rdi\n\t"
-        "jnz 0f\n\t"
-        "cmp 10*8(%%rsp),%%rsi\n\t"
-        "jnz 0f\n\t"
-        "cmp 11*8(%%rsp),%%rdx\n\t"
-        "jnz 0f\n\t"
-        "cmp 12*8(%%rsp),%%rcx\n\t"
-        "jnz 0f\n\t"
-        "cmp 13*8(%%rsp),%%rbx\n\t"
-        "jnz 0f\n\t"
-        "cmp 14*8(%%rsp),%%rax\n\t"
-        "jnz 0f\n\t"
-        "jmp 0b\n\t"
-        "0:\n\t"
-        "ud2\n\t"
-        "call cpu_debug_break\n\t"
-        "jmp 0b\n\t"
-        :
-        : "a" (p)
-    );
-    return 0;
 }
 #endif
 
@@ -887,10 +799,6 @@ static int init_thread(void *)
     if (unlikely(process_t::wait_for_exit(init_pid) < 0))
         panic("failed to wait for init");
 
-    // Facilities needed by drivers
-    printk("Initializing driver base\n");
-    callout_call(callout_type_t::driver_base, true);
-
 #if 0
     printk("Initializing 8042 keyboard\n");
     modload_load("keyb8042.km");
@@ -1012,7 +920,7 @@ static int init_thread(void *)
 //        printk("Module load test %s\n", check == 40 ? "passed" : "failed");
 //    }
 
-    modload_load("rtl8139.km");
+    //modload_load("rtl8139.km");
 
 #if ENABLE_FIND_VBE
     thread_create(find_vbe, (void*)0xC0000, 0, false);
@@ -1126,20 +1034,20 @@ private:
 
 extern "C" _noreturn int main(void)
 {
-    bool caught = false;
-    try {
-        throw something();
-    } catch (something const& e) {
-        caught = true;
-    }
-
-    caught = false;
-    try {
-        locked thing;
-        thing.do_thing();
-    } catch (something const& e) {
-        caught = true;
-    }
+    //bool caught = false;
+    //try {
+    //    throw something();
+    //} catch (something const& e) {
+    //    caught = true;
+    //}
+    //
+    //caught = false;
+    //try {
+    //    locked thing;
+    //    thing.do_thing();
+    //} catch (something const& e) {
+    //    caught = true;
+    //}
 
     if (!kernel_params->wait_gdb)
         thread_create(init_thread, nullptr, 0, false);

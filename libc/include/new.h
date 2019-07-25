@@ -16,7 +16,7 @@ __END_NAMESPACE_STD
 void *operator new(size_t size);
 void *operator new(size_t size, void *p) noexcept;
 void *operator new(size_t size, std::align_val_t alignment);
-void *operator new(size_t size, std::nothrow_t const&);
+void *operator new(size_t size, std::nothrow_t const&) noexcept;
 void *operator new(size_t size, std::align_val_t alignment,
                    std::nothrow_t const&);
 void *operator new(size_t size);

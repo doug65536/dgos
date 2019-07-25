@@ -11,6 +11,8 @@
 #include "inttypes.h"
 #include "debug.h"
 
+EXPORT debug_out_t dbgout;
+
 typedef enum length_mod_t {
     length_none,
     length_hh,
@@ -977,6 +979,14 @@ EXPORT int snprintf(char * restrict buf, size_t limit,
     return result;
 }
 
+EXPORT int putsdbg(char const *s)
+{
+    size_t len = strlen(s);
+    write_debug_str(s, len);
+    write_debug_str("\n", 1);
+    return len + 1;
+}
+
 static int printdbg_emit_chars(char const * restrict s,
                                intptr_t ch, void * restrict context)
 {
@@ -985,6 +995,7 @@ static int printdbg_emit_chars(char const * restrict s,
     char encoded[5];
 
     if (!s) {
+        // UTF8 encode the char32_t in ch
         ch = ucs4_to_utf8(encoded, ch);
         s = encoded;
     } else if (ch == 0) {
@@ -996,9 +1007,7 @@ static int printdbg_emit_chars(char const * restrict s,
 
 EXPORT int vprintdbg(char const * restrict format, va_list ap)
 {
-    //spinlock_hold_t hold = printdbg_lock_noirq();
     return formatter(format, ap, printdbg_emit_chars, nullptr);
-    //printdbg_unlock_noirq(&hold);
 }
 
 EXPORT int printdbg(char const * restrict format, ...)
@@ -1120,4 +1129,38 @@ EXPORT size_t format_flags_register(
         buf[total_written] = 0;
 
     return total_written;
+}
+
+EXPORT debug_out_t &debug_out_t::operator<<(const char *rhs)
+{
+    return write_str(rhs);
+}
+
+EXPORT debug_out_t &debug_out_t::operator<<(std::hex)
+{
+    hex = true;
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_unsigned(uint64_t value, size_t sz)
+{
+    printdbg(hex ? "%#" PRIx64 : "%" PRIu64, value);
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_signed(int64_t value, size_t sz)
+{
+    printdbg(hex ? "%#" PRIx64 : "%" PRId64, value);
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_str(const char *rhs)
+{
+    printdbg("%s", rhs);
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::operator<<(const bool &value)
+{
+    return write_str(value ? "true" : "false");
 }

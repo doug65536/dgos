@@ -37,7 +37,7 @@ struct allocator
         using other = allocator<_U>;
     };
 
-    value_type * allocate(size_t __n) const
+    value_type *allocate(size_t __n) const
     {
         return (value_type*)malloc(__n * sizeof(value_type));
     }
@@ -91,7 +91,7 @@ struct page_allocator : public page_allocator_base
         using other = typename std::allocator<_U>;
     };
 
-    value_type * allocate(size_t __n) const
+    value_type *allocate(size_t __n) const
     {
         return allocate_impl(__n * sizeof(value_type));
     }

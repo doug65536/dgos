@@ -1,4 +1,4 @@
-.section .text
+.section .text, "ax", @progbits
 
 .hidden _Unwind_Resume
 .global _Unwind_Resume

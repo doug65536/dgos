@@ -1,4 +1,5 @@
 #include "debug.h"
+#include "export.h"
 
 static write_debug_str_handler_t write_debug_str_vec;
 
@@ -14,7 +15,6 @@ int write_debug_str(char const *str, intptr_t len)
     return -1;
 }
 
-
-void cpu_debug_break()
+EXPORT void cpu_debug_break()
 {
 }

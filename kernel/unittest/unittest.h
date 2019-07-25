@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "string.h"
+#include "printk.h"
 
 namespace unittest {
 
@@ -26,6 +27,11 @@ private:
     size_t skipped = 0;
 };
 
+#ifdef __clang__
+#define __builtin_FILE() 0
+#define __builtin_LINE() 0
+#endif
+
 class unit {
 public:
     unit(char const *name, char const *test_file, int test_line);
@@ -43,7 +49,17 @@ public:
             int line = __builtin_LINE());
 
     template<typename T, typename U>
+    void eq_np(T&& expect, U&& value,
+            char const *file = __builtin_FILE(),
+            int line = __builtin_LINE());
+
+    template<typename T, typename U>
     void eq(T&& expect, U&& value,
+            char const *file = __builtin_FILE(),
+            int line = __builtin_LINE());
+
+    template<typename T, typename U>
+    void ne_np(T&& expect, U&& value,
             char const *file = __builtin_FILE(),
             int line = __builtin_LINE());
 
@@ -92,51 +108,89 @@ private:
 };
 
 template<typename T, typename U>
+void unit::eq_np(T&& expect, U&& value,
+        char const *file, int line)
+{
+    if (!(expect == value)) {
+        dbgout << name << " got wrong value\n";
+        fail(file, line);
+    }
+}
+
+template<typename T, typename U>
 void unit::eq(T&& expect, U&& value,
         char const *file, int line)
 {
-    if (!(expect == value))
+    if (!(expect == value)) {
+        dbgout << name << " expected \"" << expect << "\"" <<
+                  " but got " << value << "\n";
         fail(file, line);
+    }
+}
+
+template<typename T, typename U>
+void unit::ne_np(T&& expect, U&& value,
+              char const *file, int line)
+{
+    if (!(expect != value)) {
+        dbgout << name << " has unwanted value\n";
+        fail(file, line);
+    }
 }
 
 template<typename T, typename U>
 void unit::ne(T&& expect, U&& value,
               char const *file, int line)
 {
-    if (!(expect != value))
+    if (!(expect != value)) {
+        dbgout << name << " expected \"" << expect <<
+                  " not equal to " << value << "\n";
         fail(file, line);
+    }
 }
 
 template<typename T, typename U>
 void unit::lt(T&& expect, U&& value,
               char const *file, int line)
 {
-    if (!(expect < value))
+    if (!(expect < value)) {
+        dbgout << name << " expected \"" << expect <<
+                  " to be less than " << value << "\n";
         fail(file, line);
+    }
 }
 
 template<typename T, typename U>
 void unit::gt(T&& expect, U&& value,
               char const *file, int line)
 {
-    if (!(expect > value))
+    if (!(expect > value)) {
+        dbgout << name << " expected \"" << expect <<
+                  " to be greater than " << value << "\n";
         fail(file, line);
+    }
 }
 
 template<typename T, typename U>
 void unit::le(T&& expect, U&& value,
               char const *file, int line)
 {
-    if (!(expect <= value))
+    if (!(expect <= value)) {
+        dbgout << name << " expected \"" << expect <<
+                  " to be less than or equal to " << value << "\n";
         fail(file, line);
+    }
 }
 
 template<typename T, typename U>
 void unit::ge(T&& expect, U&& value,
               char const *file, int line)
 {
-    if (!(expect >= value))
+    if (!(expect >= value)) {
+        dbgout << name << " expected \"" << expect <<
+                  " to be greater than or equal to " << value << "\n";
         fail(file, line);
+    }
 }
 
 extern template void unit::eq(int&&,int&&,const char *file, int line);

@@ -12,7 +12,7 @@ C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
 C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
-#define TSS_STACK_SIZE (32 << 10)
+#define TSS_STACK_SIZE (64 << 10)
 
 // Must match control_regs_constants.h GDT_SEL_* defines!
 __aligned(64) gdt_entry_combined_t gdt[24] = {
@@ -98,7 +98,7 @@ static void gdt_set_tss_base(tss_t *base)
         tss_lo.set_type(GDT_TYPE_TSS);
         uintptr_t tss_addr = uintptr_t(&base->reserved0);
         tss_lo.set_base(uint32_t(tss_addr & 0xFFFFFFFF));
-        tss_hi.set_base(uintptr_t(&base->reserved0));
+        tss_hi.set_base(tss_addr);
         tss_lo.set_limit(sizeof(*base) - 1);
 
         //new (&gdt[(GDT_SEL_TSS >> 3)]) gdt_entry_t(tss_lo);
@@ -129,13 +129,15 @@ static void gdt_set_tss_base(tss_t *base)
     }
 }
 
-void gdt_init_tss(int cpu_count)
+void gdt_init_tss(size_t cpu_count)
 {
     //tss_list = (tss_t*)mmap(nullptr, sizeof(*tss_list) * cpu_count,
     //                       PROT_READ | PROT_WRITE,
     //                       MAP_POPULATE, -1, 0);
 
-    size_t stacks_nr = size_t(cpu_count) * 4;
+    size_t constexpr stack_count_per_cpu = 5;
+
+    size_t stacks_nr = cpu_count * stack_count_per_cpu;
     size_t stacks_sz = TSS_STACK_SIZE * stacks_nr;
 
     // Map space for all the stacks
@@ -144,16 +146,18 @@ void gdt_init_tss(int cpu_count)
                 MAP_POPULATE, -1, 0);
     char *stacks_alloc = stacks_base;
 
-    for (int i = 0; i < cpu_count; ++i) {
+    for (size_t i = 0; i < cpu_count; ++i) {
         tss_t *tss = tss_list + i;
 
-        for (int st = 0; st < 5; ++st) {
+        for (size_t st = 0; st < stack_count_per_cpu; ++st) {
             void *stack = stacks_alloc;
+
             stacks_alloc += TSS_STACK_SIZE;
+
             madvise(stack, PAGESIZE, MADV_DONTNEED);
             mprotect(stack, PAGESIZE, PROT_NONE);
 
-            printdbg("Allocated IST cpu=%d slot=%d at %#" PRIx64 "\n",
+            printdbg("Allocated IST cpu=%zu slot=%zu at %#zx\n",
                      i, st, (uintptr_t)stack);
 
             tss->stack[st] = stack;

@@ -37,11 +37,9 @@ public:
     using value_type = std::aligned_storage<item_sz, 8>::type;
 
     workq_alloc();
-
     workq_alloc(workq_alloc const&) = delete;
 
     void *alloc();
-
     void free(void *p);
 
 private:
@@ -49,9 +47,9 @@ private:
 
     void free_slot(size_t i);
 
-    std::aligned_storage<item_sz, 8>::type items[capacity];
     uint32_t top;
     uint32_t map[32];
+    std::aligned_storage<item_sz, sizeof(void*)>::type items[capacity];
     static_assert(sizeof(map) <= 32*32/8, "Must be within allocator limits");
 };
 
@@ -191,7 +189,7 @@ void workq::enqueue_on_cpu(size_t cpu_nr, T&& functor)
     workq_impl *queue = percpu + cpu_nr;
     workq_impl::scoped_lock lock(queue->queue_lock);
     void *mem = queue->allocate(queue, sizeof(workq_wrapper<T>));
-    workq_wrapper<T> *item = new (mem) workq_wrapper<T>(
-                std::forward<T>(functor));
+    workq_wrapper<T> *item = new (mem)
+            workq_wrapper<T>(std::forward<T>(functor));
     percpu[cpu_nr].enqueue_and_unlock(item, lock);
 }

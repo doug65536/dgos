@@ -2,7 +2,7 @@
 
 #include <sys/cpu_bug.h>
 
-.section .text, "ax"
+.section .text, "ax", @progbits
 
 .balign 16
 .global _start
@@ -88,11 +88,11 @@ _start:
 
 	.cfi_endproc
 
-//.section .init_st, "ax"
+//.section .init_st, "ax", @progbits
 //    pushq %rbp
 //    movq %rsp,%rbp
 //
-//.section .init_en, "ax"
+//.section .init_en, "ax", @progbits
 //    movq %rbp,%rsp
 //    popq %rbp
 //    ret

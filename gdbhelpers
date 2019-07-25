@@ -12,13 +12,14 @@ define startupbreakpoints
 		b isr_entry_8
 		b vpanic
 		b unittest::unit::fail()
+		b validate_failed
 	end
 
 	hbreak modload_load_symbols
 	commands
 		printf "Loading %s at 0x%lx",$rdi,$rsi
 		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
-		c
+
 	end
 end
 

@@ -36,7 +36,7 @@
 #define GLOBAL_RECURSIVE_MAPPING    0
 
 #define DEBUG_CREATE_PT         0
-#define DEBUG_PHYS_ALLOC        0
+#define DEBUG_PHYS_ALLOC        1
 #define DEBUG_PAGE_TABLES       0
 #define DEBUG_PAGE_FAULT        0
 
@@ -234,31 +234,32 @@ extern uint64_t __nofault_tab_sz;
 // -512GB
 static uint64_t min_kern_addr = 0xFFFFFF8000000000;
 
-#define PT_KERNBASE     uintptr_t(___text_st);
+#define PT_KERNBASE     uintptr_t(___text_st)
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
 
 // Virtual address space map
 // Low half
-// +---------------+-----------------------------------+
-// |    4M - 128TB | User space                        |
-// +---------------+-----------------------------------+
-// |    1M - 4M    | User guard page                   |
-// +---------------+-----------------------------------+
-// |    4K - 1M    | Boot and legacy                   |
-// +---------------+-----------------------------------+
-// |     0 - 4K    | NULL Guard page                   |
-// +---------------+-----------------------------------+
-// High half
-// +---------------+-----------------------------------+
-// |   -4M - 0     | Reserved per elf64 spec           |
-// +---------------+-----------------------------------+
-// | -512G - -4M   | Reserved for kernel and modules   |
-// +---------------+-----------------------------------+
-// | -513G - -512G | Zeroing page                      |
-// +---------------+-----------------------------------+
-// | -128T - -513G | Kernel heap                       |
-// +---------------+-----------------------------------+
+// +-----------------+---------------------------------+-------+
+// |                 |                                 |       |
+// +-----------------+---------------------------------+-------+
+// |    4M - +128T   | User space                      | <128T |
+// +-----------------+---------------------------------+-------+----+
+// |    0  -   +4M   | NULL Guard page                 |    4M |    |
+// +-----------------+---------------------------------+-------+    |
+// High half                                                   | 8M |<- nullptr
+// +-----------------+---------------------------------+-------+    |
+// |   -4M -    0    | Reserved per elf64 spec (guard) |    4M |    |
+// +-----------------+---------------------------------+-------+----+
+// | -512G -   -4M   | Reserved for kernel and modules | <512G |
+// +-----------------+---------------------------------+-------+
+// | -513G - -512G   | Zeroing page                    |    1G |
+// +-----------------+---------------------------------+-------+
+// | -128T - -513G   | Kernel heap                     | <128T |
+// +-----------------+---------------------------------+-------+
+// | -128T - -127.5T | Recursive map                   |  512G |
+// |                 | FFFF8000...-FFFF8080...            |
+// +-----------------+---------------------------------+-------+
 
 // Page tables for entire address, worst case, consists of
 //  68719476736 4KB pages  (134217728 PT pages,   0x8000000000 bytes, 512GB)
@@ -392,7 +393,7 @@ public:
     static size_t size_from_highest_page(physaddr_t page_index);
 
     void init(void *addr, physaddr_t begin_, size_t highest_usable,
-                  uint8_t log2_pagesz_ = PAGE_SIZE_BIT);
+              uint8_t log2_pagesz_ = PAGE_SIZE_BIT);
 
     void add_free_space(physaddr_t base, size_t size);
 
@@ -486,9 +487,16 @@ private:
             size_t low = addr < 0x100000000;
             entries[index] = next_free[low];
             next_free[low] = index;
+#if DEBUG_PHYS_ALLOC
+            printdbg("Freed page @ %#zx\n", addr);
+#endif
         } else {
             // Reduce reference count
             --entries[index];
+#if DEBUG_PHYS_ALLOC
+            printdbg("Reduced reference count @ %#zx to %u\n",
+                     addr, entries[index]);
+#endif
         }
     }
 
@@ -2664,12 +2672,12 @@ int madvise(void *addr, size_t len, int advice)
                             false, len,
                             [&](size_t idx, uint8_t, physaddr_t paddr) {
                     pte_t pte = pt[3][idx];
-                    if (pte_is_demand(pte)) {
+                    while (pte_is_demand(pte)) {
                         pte_t replacement = (pte & ~PTE_ADDR) |
                             paddr | PTE_PRESENT;
-                        bool replaced = atomic_cmpxchg(&pt[3][idx], pte,
-                                              replacement) == pte;
-                        return replaced;
+                        if (likely(atomic_cmpxchg_upd(&pt[3][idx],
+                                   &pte, replacement)))
+                            return true;
                     }
                     return false;
                 });
@@ -3149,6 +3157,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 #if DEBUG_PHYS_ALLOC
             printdbg("......callback didn't need it\n");
 #endif
+            printdbg("Scheduling free for unwanted page %u\n", first);
             free_batch.free(paddr);
         }
 

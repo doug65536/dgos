@@ -684,6 +684,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/rand.h \
 	kernel/lib/rbtree.h \
 	kernel/lib/rbtree.cc \
+	kernel/lib/basic_set.h \
+	kernel/lib/basic_set.cc \
 	kernel/lib/refcount.h \
 	kernel/lib/refcount.cc \
 	kernel/lib/stddef.h \
@@ -1744,6 +1746,7 @@ bin_PROGRAMS += unittest.km
 unittest_km_SOURCES = \
 	kernel/unittest/unittest.cc \
 	kernel/unittest/unittest.h \
+	kernel/unittest/test_threads.cc \
 	kernel/unittest/test_allocator.cc \
 	kernel/unittest/test_sort.cc \
 	kernel/unittest/test_vector.cc \
@@ -2040,6 +2043,12 @@ clean-local:
 	rm -f $(top_builddir)/isodisk.img
 	rm -f $(top_builddir)/initrd
 
+	rm -f $(top_builddir)/boot1-bin
+	rm -f $(top_builddir)/dgos-kernel-asan
+	rm -f $(top_builddir)/dgos-kernel-generic
+	rm -f $(top_builddir)/dgos-kernel-tracing
+	rm -f $(top_builddir)/u_vga16.raw
+
 distclean-local:
 	rm -rf $(top_builddir)/extern
 
@@ -2116,7 +2125,7 @@ QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
-QEMU_RAM = 5G
+QEMU_RAM = 2G
 
 QEMU_MEMFILL =
 #QEMU_MEMFILL = \

@@ -1,4 +1,4 @@
-.section .data, "aw"
+.section .data, "aw", @progbits
 .balign 8
 .global __dso_handle
 .hidden __dso_handle

@@ -7,7 +7,7 @@
 #define ZEROBASED(n) ((n)-0x1000)
 
 .code16
-.section .head, "wx"
+.section .head, "wx", @progbits
 .global early_entry
 early_entry:
     movw %sp,%bp
@@ -41,7 +41,7 @@ pxenv_seg:
     .space 2
 
 // Linker script puts this at the end to avoid overwriting itself
-.section .text.reloc, "ax"
+.section .text.reloc, "ax", @progbits
 reloc_self:
 
     movw $ 0x7c0,%ax
@@ -63,7 +63,7 @@ reloc_self:
 
     ljmp $ 0, $ entry
 
-.section .early, "wx"
+.section .early, "wx", @progbits
 .global entry
 entry:
     mov $ .Linit_ret,%bx
@@ -87,7 +87,7 @@ entry:
     retf
 
 .code32
-.section .text, "ax"
+.section .text, "ax", @progbits
 
 .global pxe_call_rm
 pxe_call_rm:

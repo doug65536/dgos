@@ -23,4 +23,6 @@ module_t *modload_load_image(void const *image, size_t image_sz,
 
 int modload_run(module_t *module);
 
+int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle);
+
 __END_DECLS

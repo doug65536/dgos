@@ -288,13 +288,15 @@ void isr_restore_fxrstor(void);
 _noreturn
 void isr_sysret64(uintptr_t rip, uintptr_t rsp);
 
-void isr_save_fpu_ctx64(thread_info_t *outgoing_ctx);
+isr_fxsave_context_t *isr_save_fpu_ctx64(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx64(thread_info_t *incoming_ctx);
-void isr_save_fpu_ctx32(thread_info_t *outgoing_ctx);
+isr_fxsave_context_t *isr_save_fpu_ctx32(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx32(thread_info_t *incoming_ctx);
 
 void protection_barrier();
 void protection_barrier_ibpb();
+
+void cpu_clear_fpu();
 
 void thread_entry(void *);
 

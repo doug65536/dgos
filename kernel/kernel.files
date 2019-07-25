@@ -69,6 +69,8 @@ fs/tmpfs.h
 lib/acpi_decl.h
 lib/asan.cc
 lib/asan.h
+lib/basic_set.cc
+lib/basic_set.h
 lib/cc/algorithm.cc
 lib/cc/chrono.cc
 lib/cc/chrono.h
@@ -410,6 +412,7 @@ unittest/test_printk.cc
 unittest/test_set.cc
 unittest/test_sort.cc
 unittest/test_string.cc
+unittest/test_threads.cc
 unittest/test_vector.cc
 unittest/unittest.cc
 unittest/unittest.h

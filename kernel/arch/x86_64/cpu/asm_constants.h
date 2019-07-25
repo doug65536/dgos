@@ -19,7 +19,7 @@
 //#define THREAD_SYSCALL_STACK_OFS    24
 #define THREAD_XSAVE_PTR_OFS        32
 #define THREAD_PROCESS_PTR_OFS      64
-#define THREAD_STACK_OFS            80
+#define THREAD_PRIV_CHG_STACK_OFS   80
 #define THREAD_THREAD_ID_OFS        88
 #define THREAD_CXX_EXCEPT_OFS       128
 

@@ -2,7 +2,7 @@
 
 .macro insn_fixup
 .Linsn_fixup_\@\():
-.pushsection .rodata.fixup.insn
+.pushsection .rodata.fixup.insn, "", @progbits
     .quad .Linsn_fixup_\@
 .popsection
 .endm

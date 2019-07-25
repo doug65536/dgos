@@ -69,24 +69,25 @@ struct kernel_ht_t {
 static kernel_ht_t export_ht;
 
 static Elf64_Sym const *
-modload_lookup_name(kernel_ht_t *ht, char const *name)
+modload_lookup_name(kernel_ht_t *ht, char const *name,
+                    bool expect_missing = false)
 {
     Elf64_Word hash = elf64_hash((unsigned char const*)name);
     Elf64_Word bucket = hash % ht->hash_nbucket;
 
-    Elf64_Word i = ht->hash_buckets[bucket];
-    do {
+    for (Elf64_Word i = ht->hash_buckets[bucket]; i != 0;
+         i = ht->hash_chains[i]) {
         Elf64_Sym const *chk_sym = ___dynsym_st + i;
         Elf64_Word name_index = chk_sym->st_name;
         char const *chk_name = ___dynstr_st + name_index;
         if (likely(!strcmp(chk_name, name)))
             return chk_sym;
-        i = ht->hash_chains[i];
-    } while (i != 0);
+    }
 
     ELF64_TRACE("Failed to find %s\n", name);
 
-    cpu_debug_break();
+    if (!expect_missing)
+        cpu_debug_break();
 
     return nullptr;
 }
@@ -137,7 +138,8 @@ static std::string module_reloc_type(size_t sym_type)
 }
 #endif
 
-class module_t {
+class module_t
+{
 public:
     bool load(char const *path);
     errno_t load_image(void const *module, size_t module_sz,
@@ -193,8 +195,40 @@ public:
 
     kernel_ht_t ht;
 
+    char const *strs = nullptr;
+
+    std::string module_name;
     std::vector<std::string> param;
     std::vector<char const *> argv;
+
+    void *dso_handle = nullptr;
+
+private:
+    class module_reader_t {
+    public:
+        module_reader_t(void const *module, size_t module_sz)
+            : module(module)
+            , module_sz(module_sz)
+        {
+        }
+
+        ssize_t operator()(void *buf, size_t sz, off_t ofs) const;
+    private:
+        void const *module;
+        size_t module_sz;
+    };
+
+    void run_ctors();
+    errno_t parse_dynamic();
+    void infer_vaddr_range();
+    errno_t map_sections();
+    errno_t load_sections(module_reader_t const& pread);
+    errno_t load_dynamic(module_reader_t const& pread);
+    void find_1st_exec();
+    void apply_ph_perm();
+    void install_plt_handler();
+    errno_t apply_relocs();
+    kernel_ht_t mount_hashtab(uintptr_t addr);
 };
 
 // Shared module loader
@@ -306,138 +340,17 @@ static errno_t load_failed(errno_t err)
     return err;
 }
 
-errno_t module_t::load_image(void const *module, size_t module_sz,
-                             char const *module_name,
-                             std::vector<std::string> parameters)
+void module_t::run_ctors()
 {
-    param = std::move(parameters);
-
-    auto const pread = [&](void *buf, size_t sz, off_t ofs) -> ssize_t {
-        if (unlikely(ofs < 0 || size_t(ofs) >= module_sz))
-            return 0;
-        // If the read is truncated
-        if (off_t(sz) > off_t(module_sz) - ofs)
-            sz = module_sz > uint64_t(ofs) ? module_sz - ofs : 0;
-        if (unlikely(!mm_copy_user(buf, (char *)module + ofs, sz)))
-            return -int(errno_t::EFAULT);
-        return sz;
-    };
-
-    size_t io_size = sizeof(file_hdr);
-    auto io_result = pread(&file_hdr, io_size, 0);
-
-    if (unlikely(ssize_t(io_size) != io_result)) {
-        printk("Failed to read module file header\n");
-        return load_failed(io_result < 0
-                           ? errno_t(-io_result)
-                           : errno_t::ENOEXEC);
+    uintptr_t const *fn_addrs = (uintptr_t const *)(dt_init_array + base_adj);
+    for (size_t i = 0, e = dt_init_arraysz / sizeof(uintptr_t); i != e; ++i) {
+        auto fn = (void(*)())(fn_addrs[i]);
+        fn();
     }
+}
 
-    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
-        printk("Unrecognized program header record size\n");
-        return load_failed(errno_t::ENOEXEC);
-    }
-
-    if (unlikely(!phdrs.resize(file_hdr.e_phnum)))
-        return load_failed(errno_t::ENOMEM);
-
-    io_size = sizeof(Elf64_Phdr) * file_hdr.e_phnum;
-    io_result = pread(phdrs.data(), io_size, file_hdr.e_phoff);
-
-    if (unlikely(ssize_t(io_size) != io_result)) {
-        printk("Failed to read %u program headers\n", file_hdr.e_phnum);
-        return load_failed(io_result < 0
-                           ? errno_t(-io_result)
-                           : errno_t::ENOEXEC);
-    }
-
-    // Calculate address space needed
-
-    // Pass 1, compute address range covered by loadable segments
-    for (Elf64_Phdr& phdr : phdrs) {
-        if (phdr.p_type != PT_LOAD)
-            continue;
-
-        min_vaddr = std::min(min_vaddr, phdr.p_vaddr);
-        max_vaddr = std::max(max_vaddr, phdr.p_vaddr + phdr.p_memsz);
-    }
-
-    image = mm_alloc_space(max_vaddr - min_vaddr);
-
-    if (unlikely(!image))
-        return load_failed(errno_t::ENOMEM);
-
-    // Compute relocation distance
-    base_adj = Elf64_Sxword(Elf64_Addr(image) - min_vaddr);
-
-    dyn_seg = nullptr;
-
-    // Pass 2, map sections
-    for (Elf64_Phdr& phdr : phdrs) {
-        if (phdr.p_type != PT_LOAD)
-            continue;
-
-        void *addr = mmap((void*)(phdr.p_vaddr + base_adj),
-                          phdr.p_memsz, PROT_READ | PROT_WRITE,
-                          MAP_NOCOMMIT, -1, 0);
-        if (unlikely(addr == MAP_FAILED)) {
-            printdbg("Failed to map section\n");
-            return load_failed(errno_t::ENOMEM);
-        }
-
-        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", module_name,
-                    ((phdr.p_memsz) + 4095) & -4096,
-                    uintptr_t(addr));
-    }
-
-    // Pass 3, load sections
-    for (Elf64_Phdr& phdr : phdrs) {
-        if (phdr.p_type == PT_DYNAMIC)
-            dyn_seg = &phdr;
-
-        if (phdr.p_type != PT_LOAD)
-            continue;
-
-        void *addr = (void*)(phdr.p_vaddr + base_adj);
-
-        io_size = phdr.p_filesz;
-        io_result = pread(addr, phdr.p_filesz, phdr.p_offset);
-
-        if (unlikely(ssize_t(io_size) != io_result)) {
-            printdbg("Failed to read segment\n");
-            return load_failed(io_result < 0
-                               ? errno_t(-io_result)
-                               : errno_t::ENOEXEC);
-        }
-
-        size_t zeroed = phdr.p_memsz - phdr.p_filesz;
-        void *zeroed_addr = (void*)(phdr.p_vaddr + base_adj + phdr.p_filesz);
-        memset(zeroed_addr, 0, zeroed);
-    }
-
-    dyn_entries = dyn_seg->p_memsz / sizeof(Elf64_Dyn);
-
-    if (unlikely(dyn_entries * sizeof(Elf64_Dyn) != dyn_seg->p_memsz)) {
-        printdbg("Dynamic segment has unexpected size\n");
-        return load_failed(errno_t::ENOEXEC);
-    }
-
-    if (unlikely(!dyn.resize(dyn_entries)))
-        return load_failed(errno_t::ENOMEM);
-
-    io_size = dyn_seg->p_filesz;
-    io_result = pread(dyn.data(), io_size, dyn_seg->p_offset);
-
-    if (unlikely(ssize_t(io_size) != io_result)) {
-        printdbg("Dynamic segment read failed\n");
-        return load_failed(io_result < 0
-                           ? errno_t(-io_result)
-                           : errno_t::ENOEXEC);
-    }
-
-    //
-    // Collect information from dynamic section
-
+errno_t module_t::parse_dynamic()
+{
     for (Elf64_Dyn const& dyn_ent : dyn) {
         switch (dyn_ent.d_tag) {
         case DT_NULL:
@@ -583,6 +496,147 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
     dt_relaent = dt_relasz / sizeof(Elf64_Rela);
 
+    return errno_t::OK;
+}
+
+void module_t::infer_vaddr_range()
+{
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        min_vaddr = std::min(min_vaddr, phdr.p_vaddr);
+        max_vaddr = std::max(max_vaddr, phdr.p_vaddr + phdr.p_memsz);
+    }
+}
+
+errno_t module_t::map_sections()
+{
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        void *addr = mmap((void*)(phdr.p_vaddr + base_adj),
+                          phdr.p_memsz, PROT_READ | PROT_WRITE,
+                          MAP_NOCOMMIT, -1, 0);
+        if (unlikely(addr == MAP_FAILED)) {
+            printdbg("Failed to map section\n");
+            return load_failed(errno_t::ENOMEM);
+        }
+
+        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", module_name,
+                    ((phdr.p_memsz) + 4095) & -4096,
+                    uintptr_t(addr));
+    }
+
+    return errno_t::OK;
+}
+
+errno_t module_t::load_sections(module_reader_t const& pread)
+{
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type == PT_DYNAMIC)
+            dyn_seg = &phdr;
+
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        void *addr = (void*)(phdr.p_vaddr + base_adj);
+
+        size_t io_size = phdr.p_filesz;
+        ssize_t io_result = pread(addr, phdr.p_filesz, phdr.p_offset);
+
+        if (unlikely(ssize_t(io_size) != io_result)) {
+            printdbg("Failed to read segment\n");
+            return load_failed(io_result < 0
+                               ? errno_t(-io_result)
+                               : errno_t::ENOEXEC);
+        }
+
+        size_t zeroed = phdr.p_memsz - phdr.p_filesz;
+        void *zeroed_addr = (void*)(phdr.p_vaddr + base_adj + phdr.p_filesz);
+        memset(zeroed_addr, 0, zeroed);
+    }
+
+    return errno_t::OK;
+}
+
+errno_t module_t::load_dynamic(module_reader_t const& pread)
+{
+    dyn_entries = dyn_seg->p_memsz / sizeof(Elf64_Dyn);
+
+    if (unlikely(dyn_entries * sizeof(Elf64_Dyn) != dyn_seg->p_memsz)) {
+        printdbg("Dynamic segment has unexpected size\n");
+        return load_failed(errno_t::ENOEXEC);
+    }
+
+    if (unlikely(!dyn.resize(dyn_entries)))
+        return load_failed(errno_t::ENOMEM);
+
+    size_t io_size = dyn_seg->p_filesz;
+    ssize_t io_result = pread(dyn.data(), io_size, dyn_seg->p_offset);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
+        printdbg("Dynamic segment read failed\n");
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
+    }
+
+    return errno_t::OK;
+}
+
+ssize_t module_t::module_reader_t::operator()(
+        void *buf, size_t sz, off_t ofs) const
+{
+    if (unlikely(ofs < 0 || size_t(ofs) >= module_sz))
+        return 0;
+    // If the read is truncated
+    if (off_t(sz) > off_t(module_sz) - ofs)
+        sz = module_sz > uint64_t(ofs) ? module_sz - ofs : 0;
+    if (unlikely(!mm_copy_user(buf, (char *)module + ofs, sz)))
+        return -int(errno_t::EFAULT);
+    return sz;
+}
+
+void module_t::find_1st_exec()
+{
+    first_exec = 0;
+    for (Elf64_Phdr const& phdr : phdrs) {
+        if (phdr.p_flags & PF_X) {
+            if (!first_exec || first_exec > phdr.p_vaddr + base_adj)
+                first_exec = phdr.p_vaddr + base_adj;
+        }
+    }
+}
+
+void module_t::apply_ph_perm()
+{
+    for (Elf64_Phdr const& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        int prot = 0;
+        prot |= -((phdr.p_flags & PF_R) != 0) & PROT_READ;
+        prot |= -((phdr.p_flags & PF_W) != 0) & PROT_WRITE;
+        prot |= -((phdr.p_flags & PF_X) != 0) & PROT_EXEC;
+        if (mprotect((void*)(phdr.p_vaddr + base_adj),
+                     phdr.p_memsz, prot) != 0)
+            printk("mprotect failed\n");
+    }
+}
+
+void module_t::install_plt_handler()
+{
+    plt_slots = (Elf64_Addr*)(dt_pltgot + base_adj);
+
+    plt_slots[0] += base_adj;
+    plt_slots[1] = uintptr_t(this);
+    plt_slots[2] = Elf64_Addr((void*)__module_dynlink_plt_thunk);
+}
+
+errno_t module_t::apply_relocs()
+{
     syms = (Elf64_Sym const *)(dt_symtab + base_adj);
 
     Elf64_Rela const *rela_ptrs[] = {
@@ -597,6 +651,8 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
     static_assert(countof(rela_cnts) == countof(rela_ptrs),
                   "Arrays must have corresponding values");
+
+    strs = (char const *)(dt_strtab + base_adj);
 
     for (size_t rel_idx = 0; rel_idx < countof(rela_ptrs); ++rel_idx) {
         Elf64_Rela const *rela_ptr = rela_ptrs[rel_idx];
@@ -630,7 +686,6 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
             auto S = sym.st_value + base_adj;
 
-            auto const strs = (char const *)(dt_strtab + base_adj);
             char const *name = strs + sym.st_name;
 
             //assert(!name ^ !sym.st_value);
@@ -642,7 +697,8 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
                 if (unlikely(!addr)) {
                     printk("module link error in %s:"
-                           " Symbol \"%s\" not found", module_name, name);
+                           " Symbol \"%s\" not found",
+                           module_name.c_str(), name);
                     return load_failed(errno_t::ENOEXEC);
                 }
 
@@ -835,42 +891,120 @@ all_common:
 
 truncated_common:
                 printk("%s: %s relocation truncated to fit!\n",
-                         module_name, type_txt);
+                         module_name.c_str(), type_txt);
                 return load_failed(errno_t::ENOEXEC);
             }
         }
     }
 
-    // Install PLT handler
-    plt_slots = (Elf64_Addr*)(dt_pltgot + base_adj);
+    return errno_t::OK;
+}
 
-    plt_slots[0] += base_adj;
-    plt_slots[1] = uintptr_t(this);
-    plt_slots[2] = Elf64_Addr((void*)__module_dynlink_plt_thunk);
+errno_t module_t::load_image(void const *module, size_t module_sz,
+                             char const *module_name,
+                             std::vector<std::string> parameters)
+{
+    this->module_name = module_name;
+
+    param = std::move(parameters);
+
+    module_reader_t pread(module, module_sz);
+
+    size_t io_size = sizeof(file_hdr);
+    auto io_result = pread(&file_hdr, io_size, 0);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
+        printk("Failed to read module file header\n");
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
+    }
+
+    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
+        printk("Unrecognized program header record size\n");
+        return load_failed(errno_t::ENOEXEC);
+    }
+
+    if (unlikely(!phdrs.resize(file_hdr.e_phnum)))
+        return load_failed(errno_t::ENOMEM);
+
+    io_size = sizeof(Elf64_Phdr) * file_hdr.e_phnum;
+    io_result = pread(phdrs.data(), io_size, file_hdr.e_phoff);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
+        printk("Failed to read %u program headers\n", file_hdr.e_phnum);
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
+    }
+
+    // Calculate address space needed
+
+    // Pass 1, compute address range covered by loadable segments
+    infer_vaddr_range();
+
+    image = mm_alloc_space(max_vaddr - min_vaddr);
+    if (unlikely(!image))
+        return load_failed(errno_t::ENOMEM);
+
+    // Compute relocation distance
+    base_adj = Elf64_Sxword(Elf64_Addr(image) - min_vaddr);
+
+    dyn_seg = nullptr;
+
+    // Pass 2, map sections    
+    errno_t err = map_sections();
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    // Pass 3, load sections
+    err = load_sections(pread);
+
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    err = load_dynamic(pread);
+
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    //
+    // Collect information from dynamic section
+    err = parse_dynamic();
+
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    err = apply_relocs();
+
+    // Lookup __dso_handle
+    Elf64_Sym const *sym;
+    sym = modload_lookup_name(&ht, "__dso_handle_export", true);
+
+    if (!sym) {
+        for (sym = syms; (void*)sym < (void*)strs; ++sym) {
+            size_t name_ofs = sym->st_name;
+            char const *name = strs + name_ofs;
+            if (!strcmp(name, "__dso_handle_export"))
+                break;
+        }
+        if (!sym->st_info)
+            sym = nullptr;
+
+        // Dereferemce the pointer to __dso_handle to get __dso_handle address
+        if (sym)
+            dso_handle = *(void**)(sym->st_value + base_adj);
+    }
+
+    // Install PLT handler
+    install_plt_handler();
 
     // Apply permissions
-    for (Elf64_Phdr const& phdr : phdrs) {
-        if (phdr.p_type != PT_LOAD)
-            continue;
-
-        int prot = 0;
-        prot |= -((phdr.p_flags & PF_R) != 0) & PROT_READ;
-        prot |= -((phdr.p_flags & PF_W) != 0) & PROT_WRITE;
-        prot |= -((phdr.p_flags & PF_X) != 0) & PROT_EXEC;
-        if (mprotect((void*)(phdr.p_vaddr + base_adj),
-                     phdr.p_memsz, prot) != 0)
-            printk("mprotect failed\n");
-    }
+    apply_ph_perm();
 
     // Find first executable program header
 
-    first_exec = 0;
-    for (Elf64_Phdr const& phdr : phdrs) {
-        if (phdr.p_flags & PF_X) {
-            if (!first_exec || first_exec > phdr.p_vaddr + base_adj)
-                first_exec = phdr.p_vaddr + base_adj;
-        }
-    }
+    find_1st_exec();
 
     printk("Module %s loaded at %#" PRIx64 "\n", module_name, base_adj);
     printk("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
@@ -878,11 +1012,7 @@ truncated_common:
     modload_load_symbols(module_name, first_exec);
 
     // Run the init array
-    uintptr_t const *fn_addrs = (uintptr_t const *)(dt_init_array + base_adj);
-    for (size_t i = 0, e = dt_init_arraysz / sizeof(uintptr_t); i != e; ++i) {
-        auto fn = (void(*)())(fn_addrs[i]);
-        fn();
-    }
+    run_ctors();
 
     entry = module_entry_fn_t(file_hdr.e_entry + base_adj);
 
@@ -956,4 +1086,13 @@ void __module_dynamic_linker(plt_stub_data_t *data)
 EXPORT void __module_register_frame(void const * const *__module_dso_handle, void *__frame)
 {
 
+}
+
+EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
+{
+//    std::find_if(loaded_modules.begin(), loaded_modules.end(),
+//                 [dso_handle](std::unique_ptr<module_t> const& mp) {
+//        return mp->dso_handle == dso_handle;
+//    });
+    return 0;
 }

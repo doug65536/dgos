@@ -203,6 +203,7 @@ struct process_t
 
     void destroy();
 
+    _noreturn
     static void exit(pid_t pid, int exitcode);
     bool add_thread(thread_t tid);
     bool del_thread(thread_t tid);
@@ -227,5 +228,9 @@ private:
     int run();
 };
 
+__BEGIN_DECLS
+
 void *process_get_allocator();
 void process_set_allocator(process_t *process, void *allocator);
+
+__END_DECLS

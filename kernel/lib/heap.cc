@@ -1,19 +1,16 @@
 #include "heap.h"
-#include "threadsync.h"
+#include "mutex.h"
 #include "assert.h"
 #include "string.h"
 #include "bitsearch.h"
 #include "asan.h"
+#include "stdlib.h"
 #include "cpu/atomic.h"
+#include "debug.h"
+#include "printk.h"
 
 #ifdef __DGOS_KERNEL__
 #include "mm.h"
-#else
-#include <pthread.h>
-#define mutex_init pthread_mutex_init
-#define mutex_destroy pthread_mutex_destroy
-#define mutex_lock pthread_mutex_lock
-#define mutex_unlock pthread_mutex_unlock
 #endif
 
 // Enable wiping freed memory with 0xfe
@@ -21,7 +18,7 @@
 #define HEAP_DEBUG  1
 
 // Don't free virtual address ranges, just free physical pages
-#define HEAP_NOVFREE 1
+#define HEAP_NOVFREE 0
 
 struct heap_hdr_t {
     uintptr_t size_next;
@@ -57,45 +54,87 @@ static constexpr size_t HEAP_MMAP_THRESHOLD =
 static constexpr size_t HEAP_BUCKET_SIZE =
         (size_t(1)<<(HEAP_BUCKET_COUNT+5-1));
 
+struct heap_page_t {
+    void *mem;
+    size_t slot_size;
+
+    operator void *() const
+    {
+        return mem;
+    }
+
+    operator size_t() const
+    {
+        return slot_size;
+    }
+};
+
 // When the main heap_t::arenas array overflows, an additional
 // page is allocated to hold additional arena pointers.
 struct heap_ext_arena_t {
     heap_ext_arena_t *prev;
     size_t arena_count;
-    void *arenas[(PAGESIZE - sizeof(heap_ext_arena_t*) -
-                  sizeof(size_t)) / sizeof(void*)];
+    heap_page_t arenas[(PAGESIZE - sizeof(heap_ext_arena_t*) -
+                        sizeof(size_t)) / sizeof(heap_page_t)];
 };
 
 // The maximum number of arenas without adding extended arenas
-static constexpr size_t HEAP_MAX_ARENAS =
-    (((PAGESIZE -
-    sizeof(void*) * HEAP_BUCKET_COUNT -
-    sizeof(heap_ext_arena_t*) -
-    sizeof(uint32_t) -
-    sizeof(mutex_t)) /
-    sizeof(void*)) - 1);
+static constexpr const size_t HEAP_MAX_ARENAS =
+    ((PAGESIZE -
+      sizeof(heap_hdr_t*) * HEAP_BUCKET_COUNT - // free_chains
+      sizeof(size_t) -                          // arena_count
+      sizeof(heap_ext_arena_t*) -               // last_ext_arena
+      sizeof(mutex_t) -                         // heap_lock
+      sizeof(uint32_t)) /                       // id
+      sizeof(heap_page_t)) - 1;                 // arenas
 
 C_ASSERT(sizeof(heap_ext_arena_t) == PAGESIZE);
 
 struct heap_t {
+    using lock_type = std::mutex;
+    using scoped_lock = std::unique_lock<lock_type>;
+public:
+    static heap_t *create();
+    static void destroy(heap_t *heap);
+    static uint32_t get_heap_id(heap_t *heap);
+//protected:
+    heap_t();
+    ~heap_t();
+    void *operator new(size_t) noexcept;
+    void operator delete(void *) noexcept;
+
+    void *alloc(size_t size);
+    void *calloc(size_t num, size_t size);
+    void *realloc(void *block, size_t size);
+    void free(void *block);
+    bool maybe_blk(void *block);
+    bool validate(bool dump = false) const;
+    bool validate_locked(bool dump, scoped_lock const& lock) const;
+    void *large_alloc(size_t size, uint32_t heap_id);
+    void large_free(heap_hdr_t *hdr, size_t size);
+    _noinline
+    bool validate_failed() const;    
+
+    heap_hdr_t *create_arena(uint8_t log2size, scoped_lock const& lock);
+
     heap_hdr_t *free_chains[HEAP_BUCKET_COUNT];
-    mutex_t lock;
 
     // The first HEAP_MAX_ARENAS arena pointers are here
-    void *arenas[HEAP_MAX_ARENAS];
+    heap_page_t arenas[HEAP_MAX_ARENAS];
     size_t arena_count;
 
     // Singly linked list of overflow arena pointer pages
     heap_ext_arena_t *last_ext_arena;
+    lock_type mutable heap_lock;
 
     uint32_t id;
 };
 
-C_ASSERT(sizeof(heap_t) == PAGESIZE);
+C_ASSERT(sizeof(heap_t) <= PAGESIZE);
 
 static uint32_t next_heap_id;
 
-uint32_t heap_get_heap_id(heap_t *heap)
+uint32_t heap_t::get_heap_id(heap_t *heap)
 {
     return heap->id;
 }
@@ -110,29 +149,23 @@ uint32_t heap_get_block_heap_id(void *block)
     return thread_cpu_number();
 }
 
-heap_t *heap_create(void)
+heap_t *heap_t::create(void)
 {
-    heap_t *heap = (heap_t*)mmap(nullptr, sizeof(heap_t),
-                                 PROT_READ | PROT_WRITE,
-                                 MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
-    if (unlikely(heap == MAP_FAILED))
-        return nullptr;
-    memset(heap->free_chains, 0, sizeof(heap->free_chains));
-    memset(heap->arenas, 0, sizeof(heap->arenas));
-    heap->arena_count = 0;
-    heap->last_ext_arena = nullptr;
-    heap->id = atomic_xadd(&next_heap_id, 1);
-    mutex_init(&heap->lock);
+    heap_t *heap = new heap_t;
     return heap;
 }
 
-void heap_destroy(heap_t *heap)
+heap_t::~heap_t()
 {
-    mutex_lock(&heap->lock);
+    scoped_lock lock(heap_lock);
+
+#if HEAP_DEBUG
+    validate_locked(false, lock);
+#endif
 
     // Free buckets in extended arena lists
     // and the extended arena lists themselves
-    heap_ext_arena_t *ext_arena = heap->last_ext_arena;
+    heap_ext_arena_t *ext_arena = last_ext_arena;
     while (ext_arena) {
         for (size_t i = 0; i < ext_arena->arena_count; ++i)
             munmap(ext_arena->arenas[i], HEAP_BUCKET_SIZE);
@@ -141,30 +174,50 @@ void heap_destroy(heap_t *heap)
     }
 
     // Free the buckets in the main arena list
-    for (size_t i = 0; i < heap->arena_count; ++i)
-        munmap(heap->arenas[i], HEAP_BUCKET_SIZE);
+    for (size_t i = 0; i < arena_count; ++i)
+        munmap(arenas[i], HEAP_BUCKET_SIZE);
 
-    mutex_unlock(&heap->lock);
-    mutex_destroy(&heap->lock);
-
-    munmap(heap, sizeof(*heap));
+    lock.unlock();
 }
 
-static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
+void *heap_t::operator new(size_t) noexcept
 {
-    size_t *arena_count_ptr;
-    void **arena_list_ptr;
+    void *mem = mmap(nullptr, PAGE_SIZE,
+                     PROT_READ | PROT_WRITE,
+                     MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
+    if (unlikely(mem == MAP_FAILED))
+        return nullptr;
 
-    if (heap->arena_count < countof(heap->arenas)) {
+    return mem;
+}
+
+void heap_t::operator delete(void *heap) noexcept
+{
+    munmap(heap, PAGE_SIZE);
+}
+
+void heap_t::destroy(heap_t *heap)
+{
+    delete heap;
+}
+
+heap_hdr_t *heap_t::create_arena(uint8_t log2size, scoped_lock const& lock)
+{
+    assert(true == lock.is_locked());
+
+    size_t *arena_count_ptr;
+    heap_page_t *arena_list_ptr;
+
+    if (arena_count < countof(arenas)) {
         // Main arena list
-        arena_count_ptr = &heap->arena_count;
-        arena_list_ptr = heap->arenas;
-    } else if (heap->last_ext_arena &&
-               heap->last_ext_arena->arena_count <
-               countof(heap->last_ext_arena->arenas)) {
+        arena_count_ptr = &arena_count;
+        arena_list_ptr = arenas;
+    } else if (last_ext_arena &&
+               last_ext_arena->arena_count <
+               countof(last_ext_arena->arenas)) {
         // Last overflow arena has room
-        arena_count_ptr = &heap->last_ext_arena->arena_count;
-        arena_list_ptr = heap->last_ext_arena->arenas;
+        arena_count_ptr = &last_ext_arena->arena_count;
+        arena_list_ptr = last_ext_arena->arenas;
     } else {
         // Create a new arena overflow page
         heap_ext_arena_t *new_list;
@@ -175,9 +228,9 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
         if (!new_list || new_list == MAP_FAILED)
             return nullptr;
 
-        new_list->prev = heap->last_ext_arena;
+        new_list->prev = last_ext_arena;
         new_list->arena_count = 0;
-        heap->last_ext_arena = new_list;
+        last_ext_arena = new_list;
 
         arena_count_ptr = &new_list->arena_count;
         arena_list_ptr = new_list->arenas;
@@ -190,32 +243,37 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
                        MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
     char *arena_end = arena + HEAP_BUCKET_SIZE;
 
-    arena_list_ptr[(*arena_count_ptr)++] = arena;
+    size_t slot = (*arena_count_ptr)++;
+    arena_list_ptr[slot].mem = arena;
+    arena_list_ptr[slot].slot_size = log2size;
 
     size_t size = 1U << log2size;
 
     heap_hdr_t *hdr = nullptr;
-    heap_hdr_t *first_free = heap->free_chains[bucket];
+    heap_hdr_t *first_free = free_chains[bucket];
     for (char *fill = arena_end - size; fill >= arena; fill -= size) {
         hdr = (heap_hdr_t*)fill;
         hdr->size_next = uintptr_t(first_free);
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
         first_free = hdr;
+#if HEAP_DEBUG
+        memset(hdr + 1, 0xFE, size - sizeof(heap_hdr_t));
+#endif
     }
-    heap->free_chains[bucket] = first_free;
+    free_chains[bucket] = first_free;
 
     return hdr;
 }
 
-void *heap_calloc(heap_t *heap, size_t num, size_t size)
+void *heap_t::calloc(size_t num, size_t size)
 {
     size *= num;
-    void *block = heap_alloc(heap, size);
+    void *block = alloc(size);
 
     return memset(block, 0, size);
 }
 
-static void *heap_large_alloc(size_t size, uint32_t heap_id)
+void *heap_t::large_alloc(size_t size, uint32_t heap_id)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)mmap(nullptr, size,
                            PROT_READ | PROT_WRITE,
@@ -233,12 +291,12 @@ static void *heap_large_alloc(size_t size, uint32_t heap_id)
     return hdr + 1;
 }
 
-static void heap_large_free(heap_hdr_t *hdr, size_t size)
+void heap_t::large_free(heap_hdr_t *hdr, size_t size)
 {
     munmap(hdr, size);
 }
 
-void *heap_alloc(heap_t *heap, size_t size)
+void *heap_t::alloc(size_t size)
 {
     if (unlikely(size == 0))
         return nullptr;
@@ -261,30 +319,25 @@ void *heap_alloc(heap_t *heap, size_t size)
     heap_hdr_t *first_free;
 
     if (unlikely(bucket >= HEAP_BUCKET_COUNT))
-        return heap_large_alloc(orig_size, heap->id);
+        return large_alloc(orig_size, id);
 
     {
+        scoped_lock lock(heap_lock);
 
-// shouldn't be needed anymore
-//        // Disable irqs to allow malloc in interrupt handlers
-//#ifdef __DGOS_KERNEL__
-//        cpu_scoped_irq_disable intr_was_enabled;
-//#endif
-
-        mutex_lock(&heap->lock);
+#if HEAP_DEBUG
+        validate_locked(false, lock);
+#endif
 
         // Try to take a free item
-        first_free = heap->free_chains[bucket];
+        first_free = free_chains[bucket];
 
         if (!first_free) {
             // Create a new bucket
-            first_free = heap_create_arena(heap, log2size);
+            first_free = create_arena(log2size, lock);
         }
 
         // Remove block from chain
-        heap->free_chains[bucket] = (heap_hdr_t*)first_free->size_next;
-
-        mutex_unlock(&heap->lock);
+        free_chains[bucket] = (heap_hdr_t*)first_free->size_next;
     }
 
     if (likely(first_free)) {
@@ -294,7 +347,7 @@ void *heap_alloc(heap_t *heap, size_t size)
         assert(first_free->sig1 == HEAP_BLK_TYPE_FREE);
 
         first_free->sig1 = HEAP_BLK_TYPE_USED;
-        first_free->heap_id = heap->id;
+        first_free->heap_id = id;
 
 #if HEAP_DEBUG
         memset(first_free + 1, 0xf0, size - sizeof(*first_free));
@@ -306,7 +359,7 @@ void *heap_alloc(heap_t *heap, size_t size)
     return nullptr;
 }
 
-void heap_free(heap_t *heap, void *block)
+void heap_t::free(void *block)
 {
     if (unlikely(!block))
         return;
@@ -326,21 +379,135 @@ void heap_free(heap_t *heap, void *block)
     if (bucket < HEAP_BUCKET_COUNT) {
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
 
-// shouldn't be needed anymore
-//#ifdef __DGOS_KERNEL__
-//        cpu_scoped_irq_disable intr_was_enabled;
-//#endif
-        mutex_lock(&heap->lock);
-        hdr->size_next = uintptr_t(heap->free_chains[bucket]);
-        heap->free_chains[bucket] = hdr;
-        mutex_unlock(&heap->lock);
+        scoped_lock lock(heap_lock);
+
+#if HEAP_DEBUG
+        validate_locked(false, lock);
+#endif
+
+        hdr->size_next = uintptr_t(free_chains[bucket]);
+        free_chains[bucket] = hdr;
     } else {
-        heap_large_free(hdr, hdr->size_next);
+        large_free(hdr, hdr->size_next);
     }
     __asan_freeN_noabort(hdr, hdr->size_next);
 }
 
-void *heap_realloc(heap_t *heap, void *block, size_t size)
+bool heap_t::maybe_blk(void *block)
+{
+    uintptr_t addr = uintptr_t(block);
+    for (size_t i = 0; i < arena_count; ++i) {
+        uintptr_t st = uintptr_t(arenas[i]);
+        uintptr_t en = st + HEAP_BUCKET_SIZE;
+        if (st <= addr && en > addr)
+            return true;
+    }
+
+    for (heap_ext_arena_t *prev, *ext = last_ext_arena; ext; ext = prev) {
+        prev = ext->prev;
+        for (size_t i = 0; i < arena_count; ++i) {
+            for (size_t i = 0; i < ext->arena_count; ++i) {
+                uintptr_t st = uintptr_t(ext->arenas[i]);
+                uintptr_t en = st + HEAP_BUCKET_SIZE;
+                if (st <= addr && en > addr)
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool heap_t::validate_failed() const
+{
+    cpu_debug_break();
+    return false;
+}
+
+bool heap_t::validate(bool dump) const
+{
+    scoped_lock lock(heap_lock);
+    return validate_locked(dump, lock);
+}
+
+bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
+{
+    for (size_t i = 0; i < arena_count; ++i) {
+        size_t sz = size_t(1) << arenas[i].slot_size;
+        heap_hdr_t *st = (heap_hdr_t*)arenas[i].mem;
+        heap_hdr_t *en = (heap_hdr_t*)((char*)arenas[i].mem + HEAP_BUCKET_SIZE);
+
+        if (dump)
+            dbgout << "Processing  bucket, " << sz << " bytes per slot\n";
+
+        for (heap_hdr_t *next, *blk = st; blk < en; blk = next) {
+            next = (heap_hdr_t*)(uintptr_t(blk) + sz);
+            switch (blk->sig1) {
+            case HEAP_BLK_TYPE_USED:
+                if (unlikely(dump))
+                    hex_dump(blk, sz);
+                break;
+            case HEAP_BLK_TYPE_FREE:
+#if HEAP_DEBUG
+                // Must be full of 0xFE
+                for (uint8_t *p = (uint8_t*)(blk + 1),
+                     *e = p + sz - sizeof(heap_hdr_t);
+                     p < e; ++p) {
+                    if (likely(*p == 0xFE))
+                        continue;
+
+                    dbgout << "Free memory corrupted\n";
+                }
+#else
+                if (unlikely(dump))
+                    hex_dump(blk, sz);
+#endif
+                break;
+            default:
+                dbgout << "Invalid heap block header\n";
+                return validate_failed();
+            }
+        }
+    }
+
+    for (heap_ext_arena_t *prev, *ext = last_ext_arena; ext; ext = prev) {
+        prev = ext->prev;
+        for (size_t i = 0; i < arena_count; ++i) {
+            size_t sz = size_t(1) << arenas[i].slot_size;
+            heap_hdr_t *st = (heap_hdr_t*)
+                    (uintptr_t(ext->arenas[i].mem) + i * sz);
+            heap_hdr_t *en = (heap_hdr_t*)
+                    ((char*)ext->arenas[i].mem + HEAP_BUCKET_SIZE);
+
+            for (heap_hdr_t *next, *blk = st; blk < en; blk = next) {
+                next = (heap_hdr_t*)(uintptr_t(blk) + sz);
+                switch (blk->sig1) {
+                case HEAP_BLK_TYPE_FREE:
+#if HEAP_DEBUG
+                    // Must be full of 0xFE
+                    for (uint8_t *p = (uint8_t*)(blk + 1),
+                         *e = p + sz - sizeof(heap_hdr_t);
+                         p < e; ++p) {
+                        if (likely(*p == 0xFE))
+                            continue;
+
+                        dbgout << "Free memory corrupted\n";
+                    }
+#endif
+                    break;
+                case HEAP_BLK_TYPE_USED:
+                default:
+                    dbgout << "Invalid heap block signature\n";
+                    return validate_failed();
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+void *heap_t::realloc(void *block, size_t size)
 {
     if (block && size) {
         heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
@@ -354,7 +521,7 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
         // If it ends up in a different bucket...
         if (newlog2size != log2size) {
             // Allocate a new block
-            void *new_block = heap_alloc(heap, size);
+            void *new_block = alloc(size);
 
             // If allocation fails, leave original block unaffected
             if (!new_block)
@@ -364,21 +531,46 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
             memcpy(new_block, block, hdr->size_next - sizeof(heap_hdr_t));
 
             // Free the original
-            heap_free(heap, block);
+            free(block);
 
             // Return new block
             block = new_block;
         }
     } else if (block && !size) {
         // Reallocating to zero size is equivalent to heap_free
-        heap_free(heap, block);
+        free(block);
         block = nullptr;
     } else {
         // Reallocating null block is equivalent to heap_alloc
-        return heap_alloc(heap, size);
+        return alloc(size);
     }
 
     return block;
+}
+
+heap_t::heap_t()
+    : free_chains{}
+    , arenas{}
+    , arena_count{}
+    , last_ext_arena{}
+    , id{atomic_xadd(&next_heap_id, 1)}
+{
+}
+
+heap_t *pageheap_create()
+{
+    heap_t *heap = (heap_t*)mmap(nullptr, sizeof(heap_t),
+                                 PROT_READ | PROT_WRITE,
+                                 MAP_POPULATE, -1, 0);
+    if (unlikely(heap == MAP_FAILED))
+        return nullptr;
+    heap->id = atomic_xadd(&next_heap_id, 1);
+    return heap;
+}
+
+void pageheap_destroy(heap_t *heap)
+{
+    munmap(heap, sizeof(heap_t));
 }
 
 _assume_aligned(16)
@@ -447,7 +639,7 @@ void pageheap_free(heap_t *heap, void *block)
     assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
     assert(hdr->heap_id == heap->id);
     uintptr_t end = uintptr_t(hdr) + hdr->size_next;
-    uintptr_t st = (uintptr_t(hdr) & -PAGESIZE);
+    uintptr_t st = uintptr_t(hdr) & -PAGESIZE;
     mprotect((void*)st, end - st, PROT_NONE);
     __asan_freeN_noabort(hdr, hdr->size_next);
 }
@@ -469,4 +661,44 @@ void *pageheap_realloc(heap_t *heap, void *block, size_t size)
     memcpy(other, block, hdr->size_next - sizeof(heap_hdr_t));
     __asan_freeN_noabort(hdr, hdr->size_next);
     return block;
+}
+
+heap_t *heap_create()
+{
+    return new heap_t;
+}
+
+void *heap_alloc(heap_t *heap, size_t size)
+{
+    return heap->alloc(size);
+}
+
+uint32_t heap_get_heap_id(heap_t *heap)
+{
+    return heap->id;
+}
+
+void *heap_calloc(heap_t *heap, size_t num, size_t size)
+{
+    return heap->calloc(num, size);
+}
+
+void heap_free(heap_t *heap, void *block)
+{
+    heap->free(block);
+}
+
+void *heap_realloc(heap_t *heap, void *block, size_t size)
+{
+    return heap->realloc(block, size);
+}
+
+bool heap_maybe_blk(heap_t *heap, void *block)
+{
+    return heap->maybe_blk(block);
+}
+
+bool heap_validate(heap_t *heap, bool dump)
+{
+    return heap->validate(dump);
 }

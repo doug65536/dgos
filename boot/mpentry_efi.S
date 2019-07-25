@@ -3,7 +3,7 @@
 #include "cpu_constants.h"
 
 .code16
-.section .smp.entry, "wx"
+.section .smp.entry, "wx", @progbits
 
 // This must be position independent code
 // Note that this code is called with the cs set to

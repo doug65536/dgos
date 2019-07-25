@@ -1,6 +1,6 @@
 #include "cfi_helpers.h"
 
-.section .text, "ax"
+.section .text, "ax", @progbits
 
 .balign 16
 .global __setjmp

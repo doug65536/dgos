@@ -1,11 +1,14 @@
 #include "unittest.h"
-#include "rbtree.h"
+#include "basic_set.h"
 
 class block_data_t : public refcounted<block_data_t> {
 public:
     virtual ~block_data_t() = 0;
 
     size_t size() const;
+
+    // Cut this off at md and return a clone of this with remainder at md
+    block_data_t *split(uintptr_t md);
 
     // Clip space off the start of the range
     virtual bool clip_st(uintptr_t new_st) = 0;
@@ -58,11 +61,28 @@ class range_alloc_t
 public:
     range_alloc_t() = default;
 
+    // Find the lowest free region that is large enough and take that range
+    // Returns reserved virtual address space pointer
     uintptr_t alloc_free(size_t sz);
+
+    // Remove
     void free(uintptr_t base, size_t sz);
-    void take(uintptr_t base, block_data_t *block);
+
+    // Force a specific range
+    void take(uintptr_t base, uintptr_t sz, block_data_t *block);
 
 private:
     std::set<block_entry_t> blks;
     std::set<free_entry_t> freeblks;
 };
+
+size_t block_data_t::size() const
+{
+    return en - st;
+}
+
+block_data_t *block_data_t::split(uintptr_t md)
+{
+    assert(st < md && en > md);
+    return nullptr;
+}

@@ -2,10 +2,10 @@
 
 #include <sys/cpu_bug.h>
 
-.section .init_array, "a"
+.section .init_array, "a", @progbits
 .quad __crt0_fpu64
 
-.section .text, "ax"
+.section .text, "ax", @progbits
 
 __crt0_fpu64:
     fnstcw -8(%esp)

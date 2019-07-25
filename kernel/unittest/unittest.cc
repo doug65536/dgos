@@ -119,8 +119,11 @@ void unittest::unit::set_ctx(unit_ctx *ctx)
 void unittest::unit::eq(char const *expect, char *value,
                         const char *file, int line)
 {
-    if (strcmp(expect, value))
+    if (strcmp(expect, value)) {
+        dbgout << name << " expected \"" << expect <<
+                  " but got " << value << "\n";
         fail(file, line);
+    }
 }
 
 template void unittest::unit::eq(int&&, int&&,

@@ -1,4 +1,4 @@
-.section .text, "ax"
+.section .text, "ax", @progbits
 
 #include "control_regs_constants.h"
 #include "asm_constants.h"
@@ -90,7 +90,7 @@ syscall32_entry:
     .cfi_register rip,rcx
     .cfi_register rsp,r14
 
-    // IRQs are okay at this point
+    // IRQs are okay at this point, FPU context doesn't need saving anymore
     sti
 
     // Save edi in r13
@@ -104,20 +104,6 @@ syscall32_entry:
     mov %gs:CPU_INFO_CURTHREAD_OFS,%rdi
     cli
     swapgs
-
-    vzeroall_insn
-    emms
-    fldz
-    fldz
-    fldz
-    fldz
-    ldmxcsr THREAD_SC_MXCSR_OFS(%rdi)
-    fldz
-    fldz
-    fldz
-    fldz
-    emms
-    fldcw THREAD_SC_FCW87_OFS(%rdi)
 
     // Get return address back into ecx
     mov %r14d,%ecx
@@ -172,22 +158,17 @@ syscall_entry:
     lea syscall_handlers(%rip),%r11
     movq (%r11,%rax,8),%rax
 
+    xor %r11d,%r11d
+
     // Switch to kernel gs
     swapgs
 
     swapgs_boundary // in kernel cs with user gs ends
 
-    // Get pointer to current thread
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%r11
-
-    // Store SSE and x87 control words
-    stmxcsr THREAD_SC_MXCSR_OFS(%r11)
-    fnstcw THREAD_SC_FCW87_OFS(%r11)
-
     // Get pointer to current CPU's TSS from CPU-local data
-    movq %gs:CPU_INFO_TSS_PTR_OFS,%r11
+    movq %gs:CPU_INFO_TSS_PTR_OFS(%r11),%r11
 
-    // Get pointer to syscall stack from thread data
+    // Get privilege change stack from TSS data (just like an interrupt would)
     movq TSS_RSP0_OFS(%r11),%r11
 
     // Switch to this thread's syscall stack
@@ -218,27 +199,24 @@ syscall_entry:
     // Call handler
     indirect_call rax
 
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%rdi
+    xorl %edx,%edx
+    movl %edx,%esi
+    movl %edx,%edi
+    movl %edx,%r8d
+    movl %edx,%r9d
+    movl %edx,%r10d
 
     // IRQs are not safe when
     // - we have user gs and still in kernel mode
     // - stack is switched to user stack in kernel mode
     cli
 
-    // Don't leak information to user mode, clear SSE, clear x87
-    vzeroall_insn
-    emms
-
     // Restore return address
     pop_cfi %rcx
     .cfi_register rip,rcx
 
-    fldz
-
     // Set return rflags
     movl $ SYSCALL_RFLAGS,%r11d
-
-    fldz
 
     insn_fixup
     call protection_barrier
@@ -248,29 +226,13 @@ syscall_entry:
     .cfi_def_cfa rsp,0
     .cfi_register rsp,rsp
 
-    xorl %edx,%edx
-    fldz
-    movl %edx,%esi
-    fldz
-    movl %edx,%r8d
-    fldz
-    movl %edx,%r9d
-    fldz
-    movl %edx,%r10d
-    fldz
-    ldmxcsr THREAD_SC_MXCSR_OFS(%rdi)
-    fldz
-    emms
-    fldcw THREAD_SC_FCW87_OFS(%rdi)
-    mov %edx,%edi
-
     // Switch to user gs
     swapgs
     swapgs_boundary // in kernel cs with user gs begins
     sysretq
 
     // syscall number out of range
-0:  movl $ SYSCALL_ENOSYS,%eax
+0:  movq $ SYSCALL_ENOSYS,%rax
     sysretq
     swapgs_boundary // in kernel cs with user gs ends
 

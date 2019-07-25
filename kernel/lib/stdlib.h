@@ -33,6 +33,8 @@ void *realloc(void *p, size_t new_size);
 
 void free(void *p);
 
+bool malloc_validate(bool dump);
+
 _malloc _assume_aligned(16)
 char *strdup(char const *s);
 
@@ -45,9 +47,6 @@ int atol(char const *str);
 int atoll(char const *str);
 
 __END_DECLS
-
-
-
 
 _malloc _assume_aligned(16)
 void *operator new(size_t size);

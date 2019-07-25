@@ -237,9 +237,9 @@ void cpu_init_early(int ap)
 
     gdt_init(ap);
 
-    // These two must agree, always
-    cpu_cs_set(GDT_SEL_KERNEL_CODE64);
+    // These two must agree, always (except ring 0 allows null ss)
     cpu_ss_set(GDT_SEL_KERNEL_DATA);
+    cpu_cs_set(GDT_SEL_KERNEL_CODE64);
 
     // The CPU doesn't care about any of these registers in long mode
     // So, might as well leave them
@@ -340,6 +340,9 @@ void cpu_init_early(int ap)
                                  rdgsbase_r14_insn,
                                  sizeof(rdgsbase_r14_insn)))) {
                 // Both at once in one
+                if (cpuid_has_fsgsbase())
+                    continue;
+
                 replace_sz = 10;
                 next = addr + 5;
                 dist = uintptr_t(soft_rdfsgsbase_r13r14) - next;
@@ -349,26 +352,41 @@ void cpu_init_early(int ap)
                                         wrgsbase_r14_insn,
                                         sizeof(wrgsbase_r14_insn)))) {
                 // Both at once in one
+                if (cpuid_has_fsgsbase())
+                    continue;
+
                 replace_sz = 10;
                 next = addr + 5;
                 dist = uintptr_t(soft_wrfsgsbase_r13r14) - next;
             } else if (unlikely(!memcmp(code, rdfsbase_r13_insn,
                                         sizeof(rdfsbase_r13_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
                 replace_sz = 5;
                 next = addr + replace_sz;
                 dist = uintptr_t(soft_rdfsbase_r13) - next;
             } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
                                         sizeof(wrfsbase_r13_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
                 replace_sz = 5;
                 next = addr + replace_sz;
                 dist = uintptr_t(soft_wrfsbase_r13) - next;
             } else if (unlikely(!memcmp(code, rdgsbase_r14_insn,
                                         sizeof(rdgsbase_r14_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
                 replace_sz = 5;
                 next = addr + replace_sz;
                 dist = uintptr_t(soft_rdgsbase_r14) - next;
             } else if (unlikely(!memcmp(code, wrgsbase_r14_insn,
                                         sizeof(wrgsbase_r14_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
                 replace_sz = 5;
                 next = addr + replace_sz;
                 dist = uintptr_t(soft_wrgsbase_r14) - next;
@@ -378,6 +396,9 @@ void cpu_init_early(int ap)
         case 0xC5:
             if (unlikely(!memcmp(code, vzeroall_nopw_insn,
                                  sizeof(vzeroall_nopw_insn)))) {
+                if (cpuid_has_avx())
+                    continue;
+
                 replace_sz = 5;
                 next = addr + replace_sz;
                 dist = uintptr_t(soft_vzeroall) - next;
@@ -553,13 +574,30 @@ void cpu_init(int ap)
     cpu_msr_change_bits(CPU_MSR_EFER, clr, set);
 
     // Configure syscall
+    // Clear the alighment check, direction flag, trap flag, interrupt flag,
+    // resume flag, v86 flag
     cpu_msr_set(CPU_MSR_FMASK, CPU_EFLAGS_AC | CPU_EFLAGS_DF |
                 CPU_EFLAGS_TF | CPU_EFLAGS_IF | CPU_EFLAGS_RF |
                 CPU_EFLAGS_VM);
+    // Set 64 bit syscall kernel entry point
     cpu_msr_set(CPU_MSR_LSTAR, uint64_t(syscall_entry));
     cpu_msr_set(CPU_MSR_CSTAR, uint64_t(syscall32_entry));
-    cpu_msr_set(CPU_MSR_STAR, (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
+    // syscall CS/SS at bit 48, sysret CS/SS at bit 32
+    cpu_msr_set(CPU_MSR_STAR,
+                (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
                 (uint64_t(GDT_SEL_USER_CODE32 | 3) << 48));
+
+
+    // SYSCALL and SYSRET are hardwired to assume these things about the GDT:
+    static_assert(GDT_SEL_USER_CODE64 == GDT_SEL_USER_CODE32 + 16,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
+    static_assert(GDT_SEL_USER_DATA == GDT_SEL_USER_CODE32 + 8,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
+    static_assert(GDT_SEL_USER_CODE64 == GDT_SEL_USER_DATA + 8,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
+    static_assert(GDT_SEL_KERNEL_DATA == GDT_SEL_KERNEL_CODE64 + 8,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
+
 
     // Configure sysenter
     cpu_msr_set(CPU_MSR_SYSENTER_CS, 0);
@@ -585,14 +623,6 @@ void cpu_init(int ap)
 
     if (set)
         cpu_msr_change_bits(CPU_MSR_SPEC_CTRL, clr, set);
-
-    // SYSCALL and SYSRET are hardwired to assume these things about the GDT:
-    static_assert(GDT_SEL_USER_DATA == GDT_SEL_USER_CODE32 + 8,
-                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
-    static_assert(GDT_SEL_USER_CODE64 == GDT_SEL_USER_DATA + 8,
-                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
-    static_assert(GDT_SEL_KERNEL_DATA == GDT_SEL_KERNEL_CODE64 + 8,
-                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
 
     // Load null LDT
     cpu_ldt_set(0);
@@ -645,7 +675,7 @@ void cpu_hw_init(int ap)
 
     cmos_init();
 
-    printk("Enabling 8254 PIT\n");
+    //printk("Enabling 8254 PIT\n");
 
     pit8254_enable();
 

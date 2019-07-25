@@ -61,8 +61,11 @@ struct rtl8139_factory_t : public eth_dev_factory_t {
     virtual int detect(eth_dev_base_t ***result) override;
 };
 
+static void rtl8139_startup();
+
 int module_main(int argc, char const * const * argv)
 {
+    rtl8139_startup();
     return 0;
 }
 
@@ -851,7 +854,7 @@ void rtl8139_dev_t::set_promiscuous(int promiscuous)
 }
 
 #if 1
-static void rtl8139_startup_hack(void *p)
+static void rtl8139_startup()
 {
     if (rtl8139_device_count == 0)
         return;
@@ -880,6 +883,6 @@ static void rtl8139_startup_hack(void *p)
         self->send(pkt);
     }
 }
-REGISTER_CALLOUT(rtl8139_startup_hack, nullptr,
-                 callout_type_t::nics_ready, "000");
+//REGISTER_CALLOUT(rtl8139_startup_hack, nullptr,
+//                 callout_type_t::nics_ready, "000");
 #endif

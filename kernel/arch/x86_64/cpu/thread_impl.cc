@@ -97,7 +97,7 @@ struct alignas(256) thread_info_t {
 
     isr_context_t * volatile ctx;
 
-    // Needed in context switch and/or syscall
+    // Modified every context switch and/or syscall
     // TODO: need place to put 32 bit flags during syscall entry
     void * volatile fsbase;
     void * volatile gsbase;
@@ -115,8 +115,8 @@ struct alignas(256) thread_info_t {
 
     char *xsave_stack;
 
-    // Points to the end of the stack!
-    char *stack;
+    // Points to place in stack to use when an interrupt occurs at lower priv
+    char *priv_chg_stack;
 
     thread_t thread_id;
 
@@ -131,7 +131,7 @@ struct alignas(256) thread_info_t {
 
     uint64_t volatile wake_time;
 
-    uint32_t flags;
+    uint32_t thread_flags;
 
     // Doesn't include guard pages
     uint32_t stack_size;
@@ -171,6 +171,8 @@ struct alignas(256) thread_info_t {
     // time elapses.
     uint64_t timeslice_remaining;
 
+    char *stack;
+
     thread_cpu_mask_t cpu_affinity;
 
     std::vector<__exception_jmp_buf_t> exit_jmpbuf;
@@ -183,7 +185,7 @@ C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
-C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
+C_ASSERT(offsetof(thread_info_t, priv_chg_stack) == THREAD_PRIV_CHG_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
 C_ASSERT(offsetof(thread_info_t, syscall_mxcsr) == THREAD_SC_MXCSR_OFS);
 C_ASSERT(offsetof(thread_info_t, syscall_fcw87) == THREAD_SC_FCW87_OFS);
@@ -214,55 +216,70 @@ int spincount_mask;
 size_t storage_next_slot;
 bool thread_cls_ready;
 
-static size_t constexpr xsave_stack_size = (size_t(4) << 10);
+static size_t constexpr xsave_stack_size = (size_t(64) << 10);
+
+enum fpu_state_t : uint8_t {
+    // FPU is discarded at entry to syscall
+    discarded,
+    saved,
+    restored
+};
 
 struct alignas(128) cpu_info_t {
-    cpu_info_t *self;
+    cpu_info_t *self = nullptr;
 
-    thread_info_t * volatile cur_thread;
+    thread_info_t * volatile cur_thread = nullptr;
 
-    tss_t *tss_ptr;
+    tss_t *tss_ptr = nullptr;
 
-    uint32_t apic_id;
-    int online;
+    bool online = false;
+    fpu_state_t fpu_state = discarded;
+    uint8_t reserved2[2] = {};
 
-    thread_info_t *goto_thread;
+    // Which cpu's context is in the FPU, or -1 if discarded
+    thread_t fpu_owner = -1;
 
-    uint64_t pf_count;
+    thread_info_t *goto_thread = nullptr;
+
+    uint64_t pf_count = 0;
 
     // Context switch is prevented when this is nonzero
-    uint32_t locks_held;
+    uint32_t locks_held = 0;
     // When locks_held transitions to zero, a context switch is forced
     // when this is true. Deferrng a context switch because locks_held
     // is nonzero sets this to true
-    uint32_t csw_deferred;
+    uint32_t csw_deferred = 0;
 
-    uint64_t volatile tlb_shootdown_count;
+    uint64_t volatile tlb_shootdown_count = 0;
 
-    uint32_t time_ratio;
-    uint32_t busy_ratio;
+    // --- cache line ---
 
-    uint32_t busy_percent;
-    uint32_t cr0_shadow;
+    uint32_t apic_id = ~uint32_t(0);
+    uint32_t time_ratio = 0;
 
-    uint64_t irq_count;
+    uint32_t busy_ratio = 0;
+    uint32_t busy_percent = 0;
 
-    uint64_t irq_time;
+    uint32_t cr0_shadow = 0;
+    unsigned cpu_nr = 0;
+
+    uint64_t irq_count = 0;
+
+    uint64_t irq_time = 0;
 
     using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type queue_lock;
 
-    unsigned cpu_nr;
 
-    unsigned reserved;
+    //unsigned reserved3 = 0;
 
     // Cleanup to be run after switching stacks on a context switch
-    void (*after_csw_fn)(void*);
-    void *after_csw_vp;
+    void (*after_csw_fn)(void*) = nullptr;
+    void *after_csw_vp = nullptr;
 
-    void *storage[8];
+    void *storage[7] = {};
 
     using timestamp = uint64_t;
 
@@ -284,6 +301,8 @@ C_ASSERT(offsetof(cpu_info_t, tlb_shootdown_count) ==
          CPU_INFO_TLB_SHOOTDOWN_COUNT_OFS);
 C_ASSERT(offsetof(cpu_info_t, locks_held) == CPU_INFO_LOCKS_HELD_OFS);
 C_ASSERT(offsetof(cpu_info_t, csw_deferred) == CPU_INFO_CSW_DEFERRED_OFS);
+C_ASSERT(offsetof(cpu_info_t, after_csw_fn) == CPU_INFO_AFTER_CSW_FN_OFS);
+C_ASSERT(offsetof(cpu_info_t, after_csw_vp) == CPU_INFO_AFTER_CSW_VP_OFS);
 static cpu_info_t cpus[MAX_CPUS];
 
 _constructor(ctor_cpu_init_cpus)
@@ -396,7 +415,8 @@ static char *thread_allocate_stack(
     char *stack;
     stack = (char*)mmap(nullptr, stack_guard_size +
                         stack_size + stack_guard_size,
-                        PROT_READ | PROT_WRITE, MAP_NOCOMMIT, -1, 0);
+                        PROT_READ | PROT_WRITE,
+                        MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
 
     THREAD_STK_TRACE("Allocated %s stack"
                      ", size=%#zx"
@@ -408,24 +428,29 @@ static char *thread_allocate_stack(
     // Guard pages
 
     // Mark guard region address ranges
-    mprotect(stack, stack_guard_size, PROT_NONE);
-    mprotect(stack + stack_guard_size + stack_size,
-             stack_guard_size, PROT_NONE);
-    madvise(stack + stack_guard_size, stack_size, MADV_DONTNEED);
+    char *guard0_st = stack;
+    char *guard0_en = guard0_st + stack_guard_size;
+    char *guard1_st = guard0_en + stack_size;
+
+    madvise(guard0_st, stack_guard_size, MADV_DONTNEED);
+    mprotect(guard0_st, stack_guard_size, PROT_NONE);
+
+    //madvise(guard0_en, stack_size, MADV_WILLNEED);
+
+    madvise(guard1_st, stack_guard_size, MADV_DONTNEED);
+    mprotect(guard1_st, stack_guard_size, PROT_NONE);
 
     THREAD_TRACE("Thread %d %s stack range=%p-%p,"
                  " stack=%p-%p\n", tid, noun,
                  (void*)stack,
                  (void*)(stack + stack_guard_size + stack_size +
                          stack_guard_size),
-                 (void*)(stack + stack_guard_size),
-                 (void*)(stack + stack_guard_size + stack_size));
+                 (void*)(guard0_en),
+                 (void*)(guard1_st));
 
-    memset(stack + stack_guard_size, fill, stack_size);
+    memset(guard0_en, fill, stack_size);
 
-    stack += stack_guard_size + stack_size;
-
-    return stack;
+    return guard1_st;
 }
 
 static void thread_gc()
@@ -453,7 +478,7 @@ static thread_t thread_create_with_state(
     thread_gc();
 
     if (stack_size == 0)
-        stack_size = 32768;
+        stack_size = 65536;
     else if (stack_size < 16384)
         return -1;
 
@@ -486,7 +511,7 @@ static thread_t thread_create_with_state(
 
     atomic_barrier();
 
-    thread->flags = 0;
+    thread->thread_flags = 0;
 
     // 0 = never
     thread->wake_time = 0;
@@ -496,7 +521,9 @@ static thread_t thread_create_with_state(
 
     thread->ref_count = 1;
 
-    char *stack = thread_allocate_stack(i, stack_size, "", 0xFE);
+    char *stack = thread_allocate_stack(
+                i, stack_size, "create_with_state", 0xFE);
+
     thread->stack = stack;
     thread->stack_size = stack_size;
 
@@ -504,7 +531,7 @@ static thread_t thread_create_with_state(
     if (user) {
         // XSave stack
 
-        thread->flags |= THREAD_FLAGS_USER_FPU;
+        //thread->thread_flags |= THREAD_FLAGS_USER_FPU;
 
         xsave_stack = thread_allocate_stack(
                     i, xsave_stack_size, "xsave", 0);
@@ -540,8 +567,7 @@ static thread_t thread_create_with_state(
     memset(ctx, 0, ctx_size);
     ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
 
-    ISR_CTX_REG_RSP(ctx) = stack_end - 8;
-    assert((ISR_CTX_REG_RSP(ctx) & 0xF) == 0x8);
+    ISR_CTX_REG_RSP(ctx) = stack_end;
 
     ISR_CTX_REG_SS(ctx) = GDT_SEL_KERNEL_DATA;
 
@@ -560,7 +586,7 @@ static thread_t thread_create_with_state(
     ISR_CTX_REG_RDX(ctx) = i;
     ISR_CTX_REG_CR3(ctx) = cpu_page_directory_get();
 
-    if (thread->flags & THREAD_FLAGS_ANY_FPU) {
+    if (thread->thread_flags & THREAD_FLAGS_ANY_FPU) {
         ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
                 CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
                 default_mxcsr_mask;
@@ -926,11 +952,11 @@ static void thread_free_stacks(thread_info_t *thread)
     }
 
     // The xsave stack
-    if (thread->flags & THREAD_FLAGS_ANY_FPU) {
+    if (thread->thread_flags & THREAD_FLAGS_ANY_FPU) {
         stk = thread->xsave_stack - xsave_stack_size - stack_guard_size;
         stk_sz = stack_guard_size + xsave_stack_size + stack_guard_size;
         thread->xsave_stack = nullptr;
-        thread->flags &= ~THREAD_FLAGS_ANY_FPU;
+        thread->thread_flags &= ~THREAD_FLAGS_ANY_FPU;
 
         THREAD_STK_TRACE("Freeing %s stack"
                          ", addr=%#zx"
@@ -1072,47 +1098,101 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
         pause();
     }
+    
+    fpu_state_t& fpu_state = cpu->fpu_state;
 
     if (thread != outgoing) {
         //
         // FPU context switch save and/or restore, lockout/unlock
 
         unsigned from_cs = ISR_CTX_REG_CS(ctx);
-
-        bool from_user = (from_cs == GDT_SEL_USER_CODE64 ||
-                          from_cs == GDT_SEL_USER_CODE32);
-
-        bool from_cs64 = (from_cs == GDT_SEL_KERNEL_CODE64 ||
-                          from_cs == GDT_SEL_USER_CODE64);
-
         unsigned to_cs = ISR_CTX_REG_CS(thread->ctx);
 
-        bool to_user = (to_cs == GDT_SEL_USER_CODE64 ||
-                        to_cs == GDT_SEL_USER_CODE32);
+        bool from_kern = GDT_SEL_RPL_IS_KERNEL(from_cs);
+        bool to_kern = GDT_SEL_RPL_IS_KERNEL(to_cs);
 
-        bool to_cs64 = (to_cs == GDT_SEL_KERNEL_CODE64 ||
-                        to_cs == GDT_SEL_USER_CODE64);
+        bool from_cs64 = GDT_SEL_IS_C64(from_cs);
+        bool to_cs64 = GDT_SEL_IS_C64(to_cs);
 
-        if ((outgoing->flags & THREAD_FLAGS_KERNEL_FPU) ||
-            ((outgoing->flags & THREAD_FLAGS_USER_FPU) && from_user)) {
+        bool from_fpu = outgoing->thread_flags & THREAD_FLAGS_ANY_FPU;
+        bool to_fpu = thread->thread_flags & THREAD_FLAGS_ANY_FPU;
+
+        bool from_kern_fpu = outgoing->thread_flags & THREAD_FLAGS_KERNEL_FPU;
+        bool to_kern_fpu = thread->thread_flags & THREAD_FLAGS_KERNEL_FPU;
+
+        enum action_t { ignore, ctrlwords, zeros, dataregs };
+
+        action_t save = ignore;
+
+        if (from_fpu) {
+            // Only save control words when fpu is discarded
+            if (fpu_state == discarded)
+                save = ctrlwords;
+            
+            // Don't save FPU again on nested context save
+            else if (fpu_state == saved)
+                save = ignore;
+                
+            // Possibly save FPU registers from kernel mode
+            else if (!from_kern || from_kern_fpu)
+                save = dataregs;
+        }
+
+        action_t restore = ignore;
+
+        if (to_fpu) {
+            // In decreasing order of likelihood
+            if (!to_kern)
+                restore = dataregs;
+            else if (!to_kern_fpu)
+                restore = ctrlwords;
+            else
+                restore = dataregs;
+        }
+
+        switch (save) {
+        case dataregs:
             //
             // The outgoing FPU context needs to be saved
 
-            THREAD_TRACE("Saving context of thread %zx\n",
-                         outgoing - threads);
+            THREAD_TRACE("Saving fpu context of thread %x\n",
+                         outgoing->thread_id);
 
             // Save it correctly
-            if (from_cs64)
-                isr_save_fpu_ctx64(outgoing);
-            else
-                isr_save_fpu_ctx32(outgoing);
+            // Don't bother saving FPU for voluntary context switch
+            if (ISR_CTX_INTR(ctx) != INTR_THREAD_YIELD) {
+                ISR_CTX_FPU(ctx) = from_cs64
+                        ? isr_save_fpu_ctx64(outgoing)
+                        : isr_save_fpu_ctx32(outgoing);
+            } else {
+                // Only save FPU control words, not data registers
+                outgoing->syscall_mxcsr = cpu_mxcsr_get();
+                outgoing->syscall_fcw87 = cpu_fcw_get();
+                ISR_CTX_FPU(ctx) = nullptr;
+            }
+            
+            fpu_state = saved;
+            break;
+
+        case ctrlwords:
+            outgoing->syscall_mxcsr = cpu_mxcsr_get();
+            outgoing->syscall_fcw87 = cpu_fcw_get();
+            ISR_CTX_FPU(ctx) = nullptr;
+            fpu_state = saved;
+            break;
+
+        case zeros:
+        case ignore:
+            ISR_CTX_FPU(ctx) = nullptr;
+            break;
         }
 
-        if ((thread->flags & THREAD_FLAGS_KERNEL_FPU) ||
-            ((thread->flags & THREAD_FLAGS_USER_FPU) && to_user)) {
+        switch (restore) {
+        case dataregs:
             //
             // The incoming FPU context needs to be restored
 
+            // If FPU is blocked...
             if (cpu->cr0_shadow & CPU_CR0_TS) {
                 // Clear TS flag to unblock access to FPU
                 cpu->cr0_shadow &= ~CPU_CR0_TS;
@@ -1122,19 +1202,37 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
             THREAD_TRACE("Restoring context of thread %zx\n",
                          thread - threads);
 
-            if (to_cs64)
-                isr_restore_fpu_ctx64(thread);
-            else
-                isr_restore_fpu_ctx32(thread);
-        } else if (thread->flags & THREAD_FLAGS_ANY_FPU) {
-            // Allow use of FPU but don't restore anything
-            cpu_cr0_clts();
+            if (ISR_CTX_FPU(thread->ctx)) {
+                // Use the correct one
+                if (to_cs64)
+                    isr_restore_fpu_ctx64(thread);
+                else
+                    isr_restore_fpu_ctx32(thread);
+
+            } else if (ISR_CTX_INTR(thread->ctx) == INTR_THREAD_YIELD) {
+                // Restore just control words
+                cpu_mxcsr_set(thread->syscall_mxcsr);
+                cpu_fcw_set(thread->syscall_fcw87);
+            }
+
+            fpu_state = restored;
+            break;
+
+        case ctrlwords:
+        case zeros:
+            if (!(cpu->cr0_shadow & CPU_CR0_TS))
+                cpu_clear_fpu();
+            break;
+
+        case ignore:
+            break;
         }
 
-        // Lock out the FPU if the incoming thread does not use the
-        // FPU at all
-        if (!(thread->flags & THREAD_FLAGS_ANY_FPU) &&
-            (cpu->cr0_shadow & CPU_CR0_TS) == 0) {
+        if (to_fpu) {
+            // Allow use of FPU but don't restore anything
+            cpu_cr0_clts();
+        } else if ((cpu->cr0_shadow & CPU_CR0_TS) == 0) {
+            // Lock out the FPU
             // Set TS flag to block access to FPU
             cpu->cr0_shadow |= CPU_CR0_TS;
             cpu_cr0_set(cpu->cr0_shadow);
@@ -1238,7 +1336,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
     thread_info_t *thread = threads + tid;
 
     for (;;) {
-        //THREAD_TRACE("Resuming %d\n", tid);
+        THREAD_TRACE("Resuming %d\n", tid);
 
         cpu_wait_value(&thread->state, THREAD_IS_SLEEPING);
 
@@ -1381,7 +1479,7 @@ void thread_check_stack()
     char *sp = (char*)cpu_stack_ptr_get();
 
     if (sp > thread->stack ||
-            sp < thread->stack - thread->stack_size)
+        sp < thread->stack - thread->stack_size)
     {
         cpu_debug_break();
         cpu_crash();

@@ -13,7 +13,7 @@ void *operator new(size_t size, std::nothrow_t const&) noexcept
     return malloc(size);
 }
 
-void *operator new[](size_t size) noexcept
+void *operator new[](size_t size)
 {
     return malloc(size);
 }

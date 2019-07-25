@@ -1,5 +1,5 @@
 .code64
-.section .text, "ax"
+.section .text, "ax", @progbits
 
 //extern long syscall0(long num);
 .balign 16

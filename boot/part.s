@@ -1,5 +1,5 @@
 .code16
-.section ".parttab", "ax"
+.section .parttab, "ax", @progbits
 
 .macro partition_table_entry active,lba_start,lba_sectors,type
 	.if \active != 0

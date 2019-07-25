@@ -28,10 +28,13 @@ EXPORT void workq_impl::enqueue_and_unlock(workq_work *work, scoped_lock& lock)
     work->next = nullptr;
     work->owner = this;
 
+    assert((tail != nullptr) == (head != nullptr));
+    assert(!tail || tail->next == nullptr);
+
     // Point tail next to new node if one exists, otherwise point head
     workq_work **prev_ptr = tail ? &tail->next : &head;
-    tail = work;
     *prev_ptr = work;
+    tail = work;
     lock.unlock();
     not_empty.notify_one();
 }

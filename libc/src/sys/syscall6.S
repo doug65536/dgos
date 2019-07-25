@@ -1,5 +1,5 @@
 .code64
-.section .text, "ax"
+.section .text, "ax", @progbits
 
 //extern long syscall6(long p0, long p1, long p2, long p3,
 //                     long p4, long p5, int num);

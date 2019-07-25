@@ -857,7 +857,7 @@ void idt_mitigate_meltdown(void*)
     if (!cpuid_has_bug_meltdown())
         return;
 
-
+    printk("CPU meltdown vulnerability is unmitigated\n");
 }
 
 REGISTER_CALLOUT(idt_mitigate_meltdown, nullptr,

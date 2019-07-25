@@ -208,7 +208,7 @@ int process_t::run()
 
     // Allocate memory for program headers
     std::vector<Elf64_Phdr> program_hdrs;
-    if (!program_hdrs.resize(hdr.e_phnum)) {
+    if (unlikely(!program_hdrs.resize(hdr.e_phnum))) {
         printdbg("Failed to allocate memory for program headers\n");
         return -1;
     }
@@ -226,6 +226,7 @@ int process_t::run()
 
     size_t last_region_st = ~size_t(0);
     size_t last_region_en = 0;
+    size_t last_region_sz;
 
     uintptr_t first_exec = UINTPTR_MAX;
 
@@ -277,9 +278,10 @@ int process_t::run()
         // Update region reserved by last mapping
         last_region_st = ph.p_vaddr & -PAGESIZE;
         last_region_en = ((ph.p_vaddr + ph.p_memsz) + PAGESIZE - 1) & -PAGESIZE;
+        last_region_sz = last_region_en - last_region_st;
 
-        if (unlikely(mmap((void*)last_region_st,
-                          last_region_en - last_region_st, page_prot,
+        if (unlikely(last_region_sz &&
+                     mmap((void*)last_region_st, last_region_sz, page_prot,
                           MAP_USER | MAP_NOCOMMIT, -1, 0) == MAP_FAILED)) {
             printdbg("Failed to reserve %#" PRIx64
                      " bytes of address space"
@@ -297,7 +299,7 @@ int process_t::run()
             continue;
 
         read_size = ph.p_filesz;
-        if (ph.p_filesz > 0) {
+        if (likely(ph.p_filesz > 0)) {
             if (unlikely(read_size != file_pread(
                              fd, (void*)ph.p_vaddr,
                              read_size, ph.p_offset))) {
@@ -311,6 +313,10 @@ int process_t::run()
     for (Elf64_Phdr& ph : program_hdrs) {
         // If it is not loaded, ignore
         if (ph.p_type != PT_LOAD)
+            continue;
+
+        // Can't do anything if the size is zero
+        if (unlikely(ph.p_memsz == 0))
             continue;
 
         int page_prot = 0;
@@ -578,7 +584,9 @@ void process_t::exit(pid_t pid, int exitcode)
     lock.unlock();
     process_ptr->cond.notify_all();
 
-    thread_exit(exitcode);
+    __longjmp(&process_ptr->exit_jmpbuf, 1);
+
+    //thread_exit(exitcode);
 }
 
 bool process_t::add_thread(thread_t tid)

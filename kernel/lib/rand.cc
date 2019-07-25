@@ -54,13 +54,13 @@ EXPORT uint32_t rand_range(lfsr113_state_t *state, uint32_t st, uint32_t en)
     }
 }
 
-int rand_r(uint64_t *seed)
+EXPORT int rand_r(uint64_t *seed)
 {
     return (int)((*seed = *seed *
             6364136223846793005ULL + 1U) >> 33);
 }
 
-int rand_r_range(uint64_t *seed, int min, int max)
+EXPORT int rand_r_range(uint64_t *seed, int min, int max)
 {
     return (((int64_t)rand_r(seed) * (max-min)) >> 31) + min;
 }

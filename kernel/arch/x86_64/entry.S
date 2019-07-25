@@ -3,7 +3,7 @@
 #include "cfi_helpers.h"
 #include "cpu_bug.h"
 
-.section .entry, "ax"
+.section .entry, "ax", @progbits
 
 // Things that must be done before entering any compiler
 // generated code:
@@ -199,7 +199,7 @@ bsp_init:
 
     .cfi_endproc
 
-.section .data, "aw"
+.section .data, "aw", @progbits
 
 .balign 16
     // TSS layout is completely misaligned without nudging it up 4 bytes
@@ -239,7 +239,7 @@ early_tss:
     .space 8*8
 early_tss_end:
 
-.section .text, "ax"
+.section .text, "ax", @progbits
 .balign 16
 .global exit
 .hidden exit
@@ -292,12 +292,7 @@ __cxa_pure_virtual:
     leaq pure_call_message(%rip),%rdi
     jmp panic
 
-.balign 16
-.global __cxa_atexit
-__cxa_atexit:
-    ret
-
-.section .rodata, ""
+.section .rodata, "", @progbits
 pure_call_message:
     .string "Pure virtual function called"
 

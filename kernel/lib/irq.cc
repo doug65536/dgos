@@ -218,6 +218,28 @@ void intr_hook(int intr, intr_handler_t handler,
     }
 }
 
+void intr_handler_names(int intr)
+{
+    cpu_scoped_irq_disable irq_dis;
+    intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
+
+    if (intr_handlers_count == 0)
+        return;
+
+    intr_link_t *prev_link = &intr_first[intr];
+
+    intr_handler_reg_t *entry = nullptr;
+    while (*prev_link >= 0) {
+        entry = intr_handlers + *prev_link;
+
+        printdbg("vector %u handler: %s\n", entry->intr, entry->name);
+
+        prev_link = &entry->next;
+
+        entry = nullptr;
+    }
+}
+
 static void intr_delete(intr_link_t *prev_link,
                         intr_handler_reg_t *entry)
 {

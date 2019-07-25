@@ -1,6 +1,6 @@
 .code64
 
-.section .text.unlikely, "ax"
+.section .text.unlikely, "ax", @progbits
 
 .macro isr_entry has_code int_num
 .global isr_entry_\int_num\()

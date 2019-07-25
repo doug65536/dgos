@@ -20,7 +20,7 @@
     frame_ss:   .struct frame_ss+8
     frame_end:
 
-.section .text.isr, "ax"
+.section .text.isr, "ax", @progbits
 
 .balign 16
 .global isr_entry_st
@@ -58,13 +58,16 @@ isr_entry_st:
 
 .macro isr_section_name num
     .if \num < 10
-        .section .text.isr.00\num, "x"
+        .section .text.isr.00\num, "x", @progbits
     .elseif \num < 100
-        .section .text.isr.0\num, "x"
+        .section .text.isr.0\num, "x", @progbits
     .else
-        .section .text.isr.\num, "x"
+        .section .text.isr.\num, "x", @progbits
     .endif
 .endm
+
+any_intr:
+    ret
 
 .macro isr_entry_impl has_code int_num entryname pathname
 isr_section_name \int_num
@@ -90,6 +93,7 @@ isr_section_name \int_num
         .cfi_offset rflags,-3*8
         .cfi_offset cs,-4*8
         .cfi_offset rip,-5*8
+        call any_intr
         fn_trace \pathname,enter
         push_cfi $0
     .else
@@ -108,6 +112,7 @@ isr_section_name \int_num
         .cfi_offset rflags,-3*8
         .cfi_offset cs,-4*8
         .cfi_offset rip,-5*8
+        call any_intr
         fn_trace \pathname,enter
     .endif
     // Push the interrupt number below the error code
@@ -185,6 +190,7 @@ isr_entry 0 40
 isr_entry 0 41
 isr_entry 0 42
 isr_entry 0 43
+// Hitching ride on EOI logic by being adjacent to IOAPIC/MSI vector range
 isr_entry 0 INTR_APIC_TIMER
 isr_entry 0 INTR_IPI_TLB_SHTDN
 isr_entry 0 INTR_IPI_RESCHED
@@ -402,7 +408,7 @@ isr_entry 0 253
 isr_entry 0 254
 isr_entry 0 255
 
-.section .text.isr, "ax"
+.section .text.isr, "ax", @progbits
 
 .macro isr_common_init_cfa
      // Initial CFA using raw stack pointer
@@ -485,8 +491,6 @@ isr_common:
     pushq %rbx
     .cfi_offset rbx,-9*8
 
-    // rbx available...
-
     pushq %r15
     .cfi_offset r15,-10*8
 
@@ -543,10 +547,6 @@ isr_common:
 
     /// Register usage:
     ///  Finished with rbx, r15 now has all segment registers
-    ///  ecx = caller cs
-
-    // Get interrupted code segment
-    movzwl frame_cs(%rbp),%ecx
 
     pushq %rdx
     .cfi_offset rdx,-20*8
@@ -562,7 +562,6 @@ isr_common:
 
     /// Register usage:
     ///  Finished with rbx, r15 now has all segment registers
-    ///  ecx = caller cs
     ///  rdi = 0
 
     // Save CR3
@@ -571,16 +570,10 @@ isr_common:
     // Save segments
     pushq %r15
 
-    /// Register usage:
-    ///  Finished with r15
-
-    // Check for doublefault nonsense cs (unlikely)
-    testl %ecx,%ecx
-    jz .Lfrom_kernel
-
     // See if we are coming from kernel code
-    cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
-    je .Lfrom_kernel
+    // Handles doublefault nonsense 0 cs too
+    testl $ 3,frame_cs(%rbp)
+    jz .Lfrom_kernel
 
     // ...came from user code, fastest most common case falling right through
 
@@ -604,13 +597,8 @@ isr_common:
     ///  r13 = caller fsbase
     ///  r14 = caller gsbase
 
-    // Unlikely detour to code that loads fsbase and gsbase
-    cmp %r13,THREAD_FSBASE_OFS(%r12)
-    jne .Lthread_bases_changed
-
-    // Unlikely detour to code that loads fsbase and gsbase
-    cmp %r14,THREAD_GSBASE_OFS(%r12)
-    jne .Lthread_bases_changed
+    mov %r13,THREAD_FSBASE_OFS(%r12)
+    mov %r14,THREAD_GSBASE_OFS(%r12)
 
 .Lthread_bases_done:
 .Lfrom_kernel:
@@ -623,9 +611,6 @@ isr_common:
 
     movq %rsp,%r12
     movl frame_intr(%rbp),%ebx
-
-    // Align stack pointer
-    subq $8,%rsp
 
     // Interrupt dispatch
     // 0x00-0x1F -> exception_isr_handler
@@ -712,37 +697,34 @@ isr_common:
     //   restore fsgsbase
     // endif
 
-    // Load return cs
-    movzwl frame_cs(%rbp),%ecx
-
     // Pop segments
     popq %rdx
 
-    // r15 = current thread (maybe changed since last loaded)
-    movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r15
+    // r13 = current thread (maybe changed since last loaded)
+    movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r13
 
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
-    cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
-    je .Lreturning_to_kernel
+    testl $ 3,frame_cs(%rbp)
+    jz .Lreturning_to_kernel
 
     // ...returning to user code
 
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
     movq %gs:CPU_INFO_TSS_PTR_OFS(%rax),%rcx
-    leaq frame_end(%rbp),%rax
+    movq THREAD_PRIV_CHG_STACK_OFS(%r13),%rax
     movq %rax,TSS_RSP0_OFS(%rcx)
 
     // Restore user gs
     swapgs
 
     // If segments are not changing, avoid 136*4 cycles
-    cmpq %r13,%rdx
+    cmpq %r15,%rdx
     jnz .Lsegments_changed
 
 .Lsegments_restored:
-    movq THREAD_FSBASE_OFS(%r15),%r13
-    movq THREAD_GSBASE_OFS(%r15),%r14
+    movq THREAD_GSBASE_OFS(%r13),%r14
+    movq THREAD_FSBASE_OFS(%r13),%r13
 
     insn_fixup
     wrfsbase %r13
@@ -751,6 +733,15 @@ isr_common:
 .Lreturning_to_kernel:
 
     .cfi_remember_state
+
+    // Read eflags, toggle always set flag (becomes 0 in valid case),
+    // Mask out all bits that are allowed to be nonzero, make sure it is zero
+    movq frame_efl(%rbp),%rdi
+    xor $ CPU_EFLAGS_ALWAYS,%rdi
+    and $(CPU_EFLAGS_NEVER | CPU_EFLAGS_ALWAYS),%rdi
+    jz .Lgood_flags2
+    call cpu_debug_break
+.Lgood_flags2:
 
     // Restore CR3
     popq %rbx
@@ -1031,7 +1022,16 @@ thread_yield:
     mov 8(%rsp),%rax
 
     // Load flags from interrupt frame (reach over intr+errcode+rip+cs)
-    movl 8*4(%rsp),%edi
+    movq 8*4(%rsp),%rdi
+
+    // Read eflags, toggle always set flag (becomes 0 in valid case),
+    // Mask out all bits that are allowed to be nonzero, make sure it is zero
+    xor $ CPU_EFLAGS_ALWAYS,%rdi
+    and $(CPU_EFLAGS_NEVER | CPU_EFLAGS_ALWAYS),%rdi
+    jz .Lgood_flags1
+    call cpu_debug_break
+.Lgood_flags1:
+
     push_cfi %rdi
     popfq_cfi
 
@@ -1047,9 +1047,27 @@ thread_yield:
     adj_rsp 16
 
     // Return and pop cs, eflags, rsp, ss
-    retq $ 32
+    retq $((5-1)*8)
 
     .cfi_endproc
+
+.balign 16
+.global cpu_clear_fpu
+.hidden cpu_clear_fpu
+cpu_clear_fpu:
+    vzeroall_insn
+    emms
+    pxor %mm0,%mm0
+    movq %mm0,%mm1
+    movq %mm0,%mm2
+    movq %mm0,%mm3
+    movq %mm0,%mm4
+    movq %mm0,%mm5
+    movq %mm0,%mm6
+    movq %mm0,%mm7
+    fcom %st(0)
+    emms
+    ret
 
 .balign 16
 .global soft_vzeroall
@@ -1216,18 +1234,20 @@ soft_rdgsbase_r14:
     movl %eax,%edx
 
     // Save context using instruction passed to macro
+    // replaced with best supported instruction
     insn_fixup
     \insn (%rsi)
 
     // Update xsave stack pointer in thread
     movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
+    movq %rsi,%rax
     ret
 
     .cfi_endproc
 .endm
 
 // Expects rdi to point to saved context
-// Clobbers eax,edx,ecx
+// Clobbers eax,edx,ecx, returns new xsave stack pointer
 .macro xrstor_ctx insn
     .cfi_startproc
 
@@ -1238,18 +1258,20 @@ soft_rdgsbase_r14:
     movl %eax,%edx
 
     // Restore context using instruction passed to macro
+    // replaced with best supported instruction
     insn_fixup
     \insn (%rsi)
 
     addq sse_context_size(%rip),%rsi
     movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
+    movq %rsi,%rax
 
     ret
 
     .cfi_endproc
 .endm
 
-.section .text.isr, "ax"
+.section .text.isr, "ax", @progbits
 
 .balign 16
 .global isr_save_fpu_ctx64
@@ -1385,8 +1407,6 @@ thread_entry:
     .cfi_undefined r14
     .cfi_undefined r15
 
-    // Future person: Stack not 16 byte aligned here!
-
     call thread_startup
     ud2
 
@@ -1401,6 +1421,8 @@ isr_sysret64:
 
     push_cfi %rbx
     .cfi_offset rbx,-2*8
+
+    xorl %eax,%eax
 
     push_cfi %rbp
     .cfi_offset rbp,-3*8
@@ -1417,10 +1439,8 @@ isr_sysret64:
     push_cfi %r15
     .cfi_offset r15,-7*8
 
-    xorl %eax,%eax
-
     mov %rdi,%rcx
-    mov $ CPU_EFLAGS_IF | 2,%r11d
+    mov $ CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS,%r11d
 
     // Initialize kernel stack pointer for this thread
     // cpu_info_t *rbx = this_cpu()
@@ -1438,11 +1458,11 @@ isr_sysret64:
     // void *gs_base = rbx->gsbase
     movq THREAD_GSBASE_OFS(%rbx),%r14
 
-    // void *rdi = rbx->stack
-    movq THREAD_STACK_OFS(%rbx),%rdi
+    // rbx->priv_chg_stack = rsp (interrupts use kernel stack below this point)
+    movq %rsp,THREAD_PRIV_CHG_STACK_OFS(%rbx)
 
     // rdx->rsp0 = rbx
-    movq %rdi,TSS_RSP0_OFS(%rdx)
+    movq %rsp,TSS_RSP0_OFS(%rdx)
 
     // Avoid leaking any register values to user code
     // not ecx
@@ -1463,24 +1483,13 @@ isr_sysret64:
     // in kernel mode
     cli
 
-    vzeroall_insn
-    emms
-    fldz
-    fldz
-    fldz
-    fldz
-    fldz
-    fldz
-    fldz
-    fldz
-    emms
-
-    ldmxcsr THREAD_SC_MXCSR_OFS(%rbx)
-    fldcw THREAD_SC_FCW87_OFS(%rbx)
+    //ldmxcsr THREAD_SC_MXCSR_OFS(%rbx)
+    //fldcw THREAD_SC_FCW87_OFS(%rbx)
+    //call cpu_clear_fpu
     mov %eax,%ebx
 
+    // Protect kernel gs before loading user gs
     swapgs
-
     swapgs_boundary
 
     insn_fixup
@@ -1496,7 +1505,8 @@ isr_sysret64:
     .cfi_undefined r13
     .cfi_undefined r14
     .cfi_undefined r15
-    // goto user mode and load flags
+    // goto user mode with rip=rcx and load rflags=r11, cs and ss from STAR MSR
+
     sysretq
 
     swapgs_boundary
@@ -1671,11 +1681,11 @@ cs_enter_asm:
     ret
     .cfi_endproc
 
-.section .rodata, ""
+.section .rodata, "", @progbits
 .Lpanic_msg:
 .asciz "Counter out of range"
 
-.section .text.isr, "ax"
+.section .text.isr, "ax", @progbits
 
 // Retpoline. Works on the principle that the return stack overrides other
 // branch prediction information. Cause it to mispredict into a pause loop
@@ -1728,7 +1738,7 @@ __x86_indirect_thunk_\reg:
 
 .endm
 
-.section .nofault.text, "ax"
+.section .nofault.text, "ax", @progbits
 
 // uint128_t nofault_rdmsr(uint32_t msr)
 // returns 128 bit result in rax,rdx

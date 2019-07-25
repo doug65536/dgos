@@ -15,9 +15,10 @@ std::nothrow_t const std::nothrow;
 // Realloc always moves the memory to a new range
 #define HEAP_PAGEONLY 0
 
-#if !HEAP_PAGEONLY
 static heap_t **default_heaps;
 static size_t heap_count;
+
+#if !HEAP_PAGEONLY
 
 void malloc_startup(void*)
 {
@@ -103,30 +104,55 @@ EXPORT void free(void *p)
 {
     heap_free(heap_get_block_heap(p), p);
 }
+
+EXPORT bool malloc_validate(bool dump)
+{
+    return heap_validate(this_cpu_heap(), dump);
+}
 #else
+
+EXPORT bool malloc_validate(bool dump)
+{
+    return true;//not supported
+}
 
 void malloc_startup(void *p)
 {
+    // Create a heap
+    heap_t *default_heap = pageheap_create();
+
+    // Allocate an array for per-cpu heap pointers using the BSP heap
+    default_heaps = (heap_t**)pageheap_alloc(
+                default_heap, sizeof(*default_heaps) * 1);
+
+    if (unlikely(!default_heaps))
+        panic_oom();
+
+    // Place the BSP heap pointer as the CPU0 heap
+    default_heaps[0] = default_heap;
+
+    // Announce that we have a working heap
+    callout_call(callout_type_t::heap_ready);
 }
 
 EXPORT void *calloc(size_t num, size_t size)
 {
-    return pageheap_calloc(num, size);
+    return pageheap_calloc(default_heaps[0], num, size);
 }
 
 EXPORT void *malloc(size_t size)
 {
-    return pageheap_alloc(size);
+    return pageheap_alloc(default_heaps[0], size);
 }
 
 EXPORT void *realloc(void *p, size_t new_size)
 {
-    return pageheap_realloc(p, new_size);
+    return pageheap_realloc(default_heaps[0], p, new_size);
 }
 
 EXPORT void free(void *p)
 {
-    pageheap_free(p);
+    pageheap_free(default_heaps[0], p);
 }
 
 #endif

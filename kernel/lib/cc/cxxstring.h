@@ -119,23 +119,23 @@ char_traits<_CharT>::find(char_type const *__rhs, size_t __count,
     return nullptr;
 }
 
-__BEGIN_NAMESPACE_DETAIL
+namespace detail {
 
 _noreturn _noinline
 void throw_bad_alloc();
 
-__END_NAMESPACE
+}
 
 template<typename _CharT,
 typename _Traits = char_traits<_CharT>,
 typename _Allocator = allocator<_CharT>>
-                                         class basic_string
+class basic_string
 {
-                                         private:
-                                         using _Storage = vector<_CharT, _Allocator>;
-                                         public:
-                                         static_assert(std::has_trivial_destructor<_CharT>::value,
-                                                       "Null termination technique requires"
+private:
+    using _Storage = vector<_CharT, _Allocator>;
+public:
+    static_assert(std::has_trivial_destructor<_CharT>::value,
+                  "Null termination technique requires"
                   " trivially destructible type");
 
     using traits_type = _Traits;

@@ -165,10 +165,10 @@ struct less
 template<>
 struct less<void>
 {
-    using result_type = bool;
+    using is_transparent = true_type;
 
     template<typename _T1, typename _T2>
-    bool constexpr operator()(_T1 const& __lhs, _T2 const& __rhs) const
+    auto constexpr operator()(_T1 const& __lhs, _T2 const& __rhs) const
     {
         return __lhs < __rhs;
     }

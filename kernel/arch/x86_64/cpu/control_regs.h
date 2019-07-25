@@ -544,6 +544,19 @@ static _always_inline uint16_t cpu_fcw_get()
     return fcw;
 }
 
+static _always_inline void cpu_vzeroall_safe()
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "vzeroall\n\t"
+        ".byte 0x66, 0x90\n\t"
+        : : :
+    );
+}
+
 static _always_inline void *cpu_stack_ptr_get()
 {
     void *rsp;
