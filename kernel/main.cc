@@ -51,16 +51,16 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_READ_STRESS_THREAD   4
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_MMAP_STRESS_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_HEAP_STRESS_THREAD   1
+#define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
-#define ENABLE_SPAWN_STRESS         0
+#define ENABLE_SPAWN_STRESS         1
 #define ENABLE_CONDVAR_STRESS       0
 #define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
@@ -175,7 +175,7 @@ private:
 
         uint64_t seed = 42;
         while (1) {
-            //++*indicator;
+            ++*indicator;
 
             uint64_t lba = rand_r_range(&seed, 16, data_blocks);
             //int64_t count = rand_r_range(&seed, 1, data_blocks);

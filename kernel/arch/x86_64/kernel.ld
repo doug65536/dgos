@@ -86,14 +86,14 @@ SECTIONS {
 	} :readonly
 
 	.eh_frame_hdr :  ALIGN(64) {
-		*(.eh_frame_hdr)
-		*(.eh_frame_entry .eh_frame_entry.*)
+		KEEP(*(.eh_frame_hdr))
+		KEEP(*(.eh_frame_entry .eh_frame_entry.*))
 	} :readonly
 
 	.eh_frame : ALIGN(64) {
 		PROVIDE_HIDDEN(___eh_frame_st = .);
 		KEEP(*(.eh_frame))
-		*(.eh_frame.*)
+		KEEP(*(.eh_frame.*))
 		PROVIDE_HIDDEN(___eh_frame_en = .);
 		/* Must end with 4 zero bytes */
 		LONG(0);

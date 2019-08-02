@@ -6,6 +6,13 @@
 .global main
 main:
     .cfi_startproc
+    .cfi_undefined rip
+    .cfi_undefined rbx
+    .cfi_undefined rbp
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
 
     xor %eax,%eax
     rdtscp
