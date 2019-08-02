@@ -1,8 +1,9 @@
 #include <sys/syscall_num.h>
 
 .code64
-.section .text
+.section .text, "ax", @progbits
 
+.balign 16
 .global main
 main:
     .cfi_startproc
@@ -21,7 +22,7 @@ main:
     mov %rax,%r13
     mov $ SYS_getpriority,%ebx
     mov $1000000,%r12d
-.align 16
+.balign 16
 0:	mov %ebx,%eax
     syscall
 

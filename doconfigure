@@ -23,22 +23,24 @@ if [[ ! -f sysroot/libc/libc.a ]]; then
 	echo Bootstrapping sysroot
 	compileflags=( "-nostdlib" "-nostartfiles" )
 	configureflags=()
-
-	CFLAGS="$(join_by ' ' ${compileflags[@]})" \
-		CXXFLAGS="$CFLAGS" \
-		LDFLAGS="$CFLAGS" \
+set +x
 		"$scriptroot/configure" --host "$HOST" \
-		$(join_by ' ' ${configureflags[@]}) "$@" && \
-		nice make -j $(nproc) \
+		CFLAGS="$(join_by ' ' ${compileflags[@]})" \
+			CXXFLAGS="$CFLAGS" \
+			LDFLAGS="$CFLAGS" \
+		"$(join_by ' ' ${configureflags[@]})" "$@" && \
+		nice make --trace -j $(nproc) \
 			sysroot/lib/crt0.o \
+			sysroot/lib/crt0pc32.o \
+			sysroot/lib/crt0pc64.o \
+			sysroot/lib/crt0pc80.o \
 			sysroot/lib/libc.a \
-			sysroot/lib/libm.a \
-			sysroot/lib/libstdc++.a
+			startupcode
+
 fi
 
 compileflags=( "--sysroot sysroot" )
 configureflags=()
-done=0
 
 echo flags: "${compileflags[@]}"
 

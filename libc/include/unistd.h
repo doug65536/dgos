@@ -73,25 +73,25 @@
 
 // The implementation supports clock selection.
 // This symbol shall always be set to the value 200809L.
-#define _POSIX_CLOCK_SELECTION
+#define _POSIX_CLOCK_SELECTION 200809L
 
 // The implementation supports the Process CPU-Time Clocks option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L.
-#define _POSIX_CPUTIME
+#define _POSIX_CPUTIME 200809L
 
 // The implementation supports the File Synchronization option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L.
-#define _POSIX_FSYNC
+#define _POSIX_FSYNC 200809L
 
 // The implementation supports the IPv6 option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_IPV6
+#define _POSIX_IPV6 0
 
 // The implementation supports job control.
 // This symbol shall always be set to a value greater than zero.
@@ -99,39 +99,38 @@
 
 // The implementation supports memory mapped Files.
 // This symbol shall always be set to the value 200809L.
-#define _POSIX_MAPPED_FILES
+#define _POSIX_MAPPED_FILES 200809L
 
 // The implementation supports the Process Memory Locking option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_MEMLOCK
+#define _POSIX_MEMLOCK 200809L
 
 // The implementation supports the Range Memory Locking option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_MEMLOCK_RANGE
+#define _POSIX_MEMLOCK_RANGE 200809L
 
 // The implementation supports memory protection.
 // This symbol shall always be set to the value 200809L.
-#define _POSIX_MEMORY_PROTECTION
+#define _POSIX_MEMORY_PROTECTION 200809L
 
 // The implementation supports the Message Passing option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_MESSAGE_PASSING
-
+#define _POSIX_MESSAGE_PASSING -1
 // The implementation supports the Monotonic Clock option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_MONOTONIC_CLOCK
+#define _POSIX_MONOTONIC_CLOCK 200809L
 
 // Pathname components longer than {NAME_MAX} generate an error.
 // This symbol shall be defined with a value other than -1.
-#define _POSIX_NO_TRUNC
+#define _POSIX_NO_TRUNC 200809L
 
 // The implementation supports the Prioritized Input and Output option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
@@ -143,25 +142,25 @@
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_PRIORITY_SCHEDULING
+#define _POSIX_PRIORITY_SCHEDULING 200809L
 
 // The implementation supports the Raw Sockets option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_RAW_SOCKETS
+#define _POSIX_RAW_SOCKETS 200809L
 
 // The implementation supports read-write locks.
 // This symbol shall always be set to the value 200809L.
-#define _POSIX_READER_WRITER_LOCKS
+#define _POSIX_READER_WRITER_LOCKS 200809L
 
 // The implementation supports realtime signals.
 // This symbol shall always be set to the value 200809L.
-#define _POSIX_REALTIME_SIGNALS
+#define _POSIX_REALTIME_SIGNALS 200809L
 
 // The implementation supports the Regular Expression Handling option.
 // This symbol shall always be set to a value greater than zero.
-#define _POSIX_REGEXP
+#define _POSIX_REGEXP 200809L
 
 // Each process has a saved set-user-ID and a saved set-group-ID.
 // This symbol shall always be set to a value greater than zero.
@@ -169,17 +168,17 @@
 
 // The implementation supports semaphores.
 // This symbol shall always be set to the value 200809L.
-#define _POSIX_SEMAPHORES
+#define _POSIX_SEMAPHORES 200809L
 
 // The implementation supports the Shared Memory Objects option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_SHARED_MEMORY_OBJECTS
+#define _POSIX_SHARED_MEMORY_OBJECTS -1
 
 // The implementation supports the POSIX shell.
 // This symbol shall always be set to a value greater than zero.
-#define _POSIX_SHELL
+#define _POSIX_SHELL -1
 
 // The implementation supports the Spawn option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
@@ -189,56 +188,56 @@
 
 // The implementation supports spin locks.
 // This symbol shall always be set to the value 200809L.
-#define _POSIX_SPIN_LOCKS
+#define _POSIX_SPIN_LOCKS 200809L
 
 // The implementation supports the Process Sporadic Server option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_SPORADIC_SERVER
+#define _POSIX_SPORADIC_SERVER 200809L
 
 // The implementation supports the Synchronized Input and Output option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_SYNCHRONIZED_IO
+#define _POSIX_SYNCHRONIZED_IO 200809L
 
 // The implementation supports the Thread Stack Address Attribute option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_THREAD_ATTR_STACKADDR
+#define _POSIX_THREAD_ATTR_STACKADDR 200809L
 
 // The implementation supports the Thread Stack Size Attribute option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_THREAD_ATTR_STACKSIZE
+#define _POSIX_THREAD_ATTR_STACKSIZE 200809L
 
 // The implementation supports the Thread CPU-Time Clocks option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_THREAD_CPUTIME
+#define _POSIX_THREAD_CPUTIME 200809L
 
 // The implementation supports the
 // Non-Robust Mutex Priority Inheritance option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_THREAD_PRIO_INHERIT
+#define _POSIX_THREAD_PRIO_INHERIT 200809L
 
 // The implementation supports the Non-Robust Mutex Priority Protection option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_THREAD_PRIO_PROTECT
+#define _POSIX_THREAD_PRIO_PROTECT -1
 
 // The implementation supports the Thread Execution Scheduling option.
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_THREAD_PRIORITY_SCHEDULING
+#define _POSIX_THREAD_PRIORITY_SCHEDULING -1
 
 // The implementation supports the
 // Thread Process-Shared Synchronization option.
@@ -938,7 +937,7 @@ long         pathconf(char const *, int);
 int          pause(void);
 int          pipe(int *fds);
 ssize_t      pread(int, void *, size_t, off_t);
-ssize_t      pwrite(int, const void *, size_t, off_t);
+ssize_t      pwrite(int, void const *, size_t, off_t);
 ssize_t      read(int, void *, size_t);
 ssize_t      readlink(char const *restrict, char *restrict, size_t);
 ssize_t      readlinkat(int, char const *restrict, char *restrict, size_t);
@@ -959,7 +958,7 @@ pid_t        setsid(void);
 int          setuid(uid_t);
 unsigned     sleep(unsigned);
 
-void         swab(const void *restrict, void *restrict, ssize_t);
+void         swab(void const *restrict, void *restrict, ssize_t);
 
 int          symlink(char const *, char const *);
 int          symlinkat(char const *, int, char const *);
@@ -974,7 +973,7 @@ char        *ttyname(int);
 int          ttyname_r(int, char *, size_t);
 int          unlink(char const *);
 int          unlinkat(int, char const *, int);
-ssize_t      write(int, const void *, size_t);
+ssize_t      write(int, void const *, size_t);
 
 // Implementations may also include the pthread_atfork() prototype
 // as defined in <pthread.h>. Implementations may also include the

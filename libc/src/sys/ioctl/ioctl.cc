@@ -8,7 +8,7 @@ int ioctl(int __fd, unsigned long int __request, ...)
 {
     va_list ap;
     va_start(ap, __request);
-    char *argp = va_arg(ap, char*);
+    char * restrict argp = va_arg(ap, char *);
     va_end(ap);
 
     long result = syscall3(__fd, __request, long(argp), SYS_sys_ioctl);

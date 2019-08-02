@@ -5,6 +5,8 @@
 #include "cpu/atomic.h"
 #include "assert.h"
 #include "printk.h"
+#include "cpu/interrupts.h"
+#include "cpu/control_regs.h"
 
 typedef int16_t intr_link_t;
 
@@ -42,21 +44,28 @@ static intr_link_t intr_first_free;
 static intr_link_t intr_handlers_count;
 static intr_handler_reg_t intr_handlers[MAX_INTR_HANDLERS];
 
-using intr_handler_reg_lock_type = std::mcslock;
+using intr_handler_reg_lock_type = ext::mcslock;
 using intr_handler_reg_scoped_lock =
     std::unique_lock<intr_handler_reg_lock_type>;
 static intr_handler_reg_lock_type intr_handler_reg_lock;
 
 // Vectors
 static irq_setmask_handler_t irq_setmask_vec;
+static irq_islevel_handler_t irq_islevel_vec;
 static irq_hook_handler_t irq_hook_vec;
 static irq_unhook_handler_t irq_unhook_vec;
 static msi_irq_alloc_handler_t msi_irq_alloc_vec;
 static irq_setcpu_handler_t irq_setcpu_vec;
+static irq_unhandled_irq_handler_t irq_unhandled_irq_vec;
 
 void irq_setmask_set_handler(irq_setmask_handler_t handler)
 {
     irq_setmask_vec = handler;
+}
+
+void irq_islevel_set_handler(irq_islevel_handler_t handler)
+{
+    irq_islevel_vec = handler;
 }
 
 void irq_hook_set_handler(irq_hook_handler_t handler)
@@ -79,9 +88,35 @@ void irq_setcpu_set_handler(irq_setcpu_handler_t handler)
     irq_setcpu_vec = handler;
 }
 
-void irq_setmask(int irq, bool unmask)
+void irq_set_unhandled_irq_handler(irq_unhandled_irq_handler_t handler)
 {
+    irq_unhandled_irq_vec = handler;
+}
+
+static bool irq_mask_if_not_unmasked(int irq, bool unmask)
+{
+    if (unlikely(!intr_unmask_count[irq] && !unmask)) {
+        printdbg("Got unexpected unmask=%d of IRQ %d, masking...\n",
+                 unmask, irq);
+
+        // Caller is masking something never hooked (this happens
+        // when an IRQ is attempted to be dispatched and cannot be)
+        // Tell the hardware to mask it just in case
+        irq_setmask_vec(irq, false);
+        return false;
+    }
+
+    return true;
+}
+
+EXPORT void irq_setmask(int irq, bool unmask)
+{
+    cpu_scoped_irq_disable irq_dis;
     intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
+
+    if (unlikely(!irq_mask_if_not_unmasked(irq, unmask)))
+        return;
+
     // Unmask when unmask count transitions from 0 to 1
     // Mask when unmask count transitions from 1 to 0
     assert(intr_unmask_count[irq] != (unmask ? 255U : 0U));
@@ -89,12 +124,17 @@ void irq_setmask(int irq, bool unmask)
         irq_setmask_vec(irq, unmask);
 }
 
-void irq_hook(int irq, intr_handler_t handler, char const *name)
+EXPORT bool irq_islevel(int irq)
+{
+    return irq_islevel_vec(irq);
+}
+
+EXPORT void irq_hook(int irq, intr_handler_t handler, char const *name)
 {
     irq_hook_vec(irq, handler, name);
 }
 
-void irq_unhook(int irq, intr_handler_t handler)
+EXPORT void irq_unhook(int irq, intr_handler_t handler)
 {
     irq_unhook_vec(irq, handler);
 }
@@ -113,8 +153,10 @@ static intr_handler_reg_t *intr_alloc(void)
     return entry;
 }
 
-void intr_hook(int intr, intr_handler_t handler, char const *name)
+void intr_hook(int intr, intr_handler_t handler,
+               char const *name, intr_eoi_t eoi_handler)
 {
+    cpu_scoped_irq_disable irq_dis;
     intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
 
     if (intr_handlers_count == 0) {
@@ -147,11 +189,54 @@ void intr_hook(int intr, intr_handler_t handler, char const *name)
         entry->next = -1;
         entry->refcount = 1;
         entry->intr = intr;
-        entry->eoi_handler = 0;
+        entry->eoi_handler = eoi_handler;
         entry->handler = handler;
 
-        atomic_barrier();
-        *prev_link = entry - intr_handlers;
+        if (eoi_handler == eoi_auto) {
+            if (intr < 32)
+                eoi_handler = eoi_none;
+            else if (intr < INTR_APIC_IRQ_END)
+                eoi_handler = eoi_lapic;
+            else
+                eoi_handler = eoi_i8259;
+        }
+
+        // There is no such thing as software interrupts.
+        // Every non-exception interrupt is an IPI or APIC timer or MSI IRQ,
+        // if it is less than the beginning of the 8259 range
+
+        assert(eoi_handler != eoi_lapic || (intr >= 32 &&
+                                            (intr < (INTR_APIC_IRQ_BASE +
+                                                     INTR_APIC_IRQ_COUNT))));
+
+        assert(eoi_handler != eoi_i8259 || (intr >= INTR_PIC1_IRQ_BASE &&
+                                            (intr < (INTR_PIC2_IRQ_BASE + 8))));
+
+        assert(eoi_handler != eoi_none || (intr < INTR_PIC1_IRQ_BASE));
+
+        atomic_st_rel(prev_link, entry - intr_handlers);
+    }
+}
+
+void intr_handler_names(int intr)
+{
+    cpu_scoped_irq_disable irq_dis;
+    intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
+
+    if (intr_handlers_count == 0)
+        return;
+
+    intr_link_t *prev_link = &intr_first[intr];
+
+    intr_handler_reg_t *entry = nullptr;
+    while (*prev_link >= 0) {
+        entry = intr_handlers + *prev_link;
+
+        printdbg("vector %u handler: %s\n", entry->intr, entry->name);
+
+        prev_link = &entry->next;
+
+        entry = nullptr;
     }
 }
 
@@ -165,6 +250,7 @@ static void intr_delete(intr_link_t *prev_link,
 
 void intr_unhook(int intr, intr_handler_t handler)
 {
+    cpu_scoped_irq_disable irq_dis;
     intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
 
     intr_link_t *prev_link = &intr_first[intr];
@@ -185,6 +271,7 @@ void intr_unhook(int intr, intr_handler_t handler)
     }
 }
 
+_hot
 int intr_has_handler(int intr)
 {
     return intr_handlers_count > 0 && intr_first[intr] >= 0;
@@ -203,6 +290,7 @@ isr_context_t *intr_invoke(int intr, isr_context_t *ctx)
     return ctx;
 }
 
+_hot
 isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx)
 {
     if (intr_has_handler(intr)) {
@@ -214,11 +302,12 @@ isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx)
         }
     } else {
         printdbg("Ignored IRQ %d INTR %d!\n", irq, intr);
+        irq_unhandled_irq_vec(intr, irq);
     }
     return ctx;
 }
 
-int msi_irq_alloc(msi_irq_mem_t *results, int count,
+int irq_msi_alloc(msi_irq_mem_t *results, int count,
                   int cpu, int distribute)
 {
     if (msi_irq_alloc_vec)

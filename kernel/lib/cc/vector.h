@@ -1,12 +1,20 @@
 #pragma once
+
+#include "../likely.h"
+
+#ifdef __DGOS_KERNEL__
 #include "types.h"
-#include "likely.h"
+#else
+#include <stdint.h>
+#endif
+
 #include "initializer_list.h"
 #include "utility.h"
 #include "algorithm.h"
+#ifdef __DGOS_KERNEL__
 #include "printk.h"
+#endif
 #include "bitsearch.h"
-#include "unique_ptr.h"
 #include "memory.h"
 
 __BEGIN_NAMESPACE_STD
@@ -32,9 +40,9 @@ public:
     using reverse_iterator = vector_iter<-1, false>;
     using const_reverse_iterator = vector_iter<-1, true>;
 
-    vector();
+    inline constexpr vector();
 
-    explicit vector(_Allocator const& __alloc_);
+    constexpr explicit vector(_Allocator const& __alloc_);
 
     vector(size_type __count,
            _T const& __value,
@@ -49,8 +57,8 @@ public:
 
     vector(vector const& __other);
     vector(vector const& __other, _Allocator const& __alloc_);
-    vector(vector&& __other );
-    vector(vector&& __other, _Allocator const& __alloc_);
+    _always_inline constexpr vector(vector&& __other );
+    inline constexpr vector(vector&& __other, _Allocator const& __alloc_);
 
     vector(initializer_list<_T> __init,
             _Allocator const& __alloc_ = _Allocator());
@@ -58,12 +66,13 @@ public:
     ~vector();
 
     vector& operator=(vector const& __other);
-    vector& operator=(vector&& __other);
+    inline vector& operator=(vector&& __other);
     vector& operator=(initializer_list<_T> __ilist);
 
     bool assign(size_type __count, _T const& __value);
 
-    template<typename _InputIt>
+    template<typename _InputIt,
+             typename _InputVal = decltype(*declval<_InputIt>())>
     bool assign(_InputIt __first, _InputIt __last);
 
     bool assign(initializer_list<_T> __ilist);
@@ -73,40 +82,40 @@ public:
     _T& at(size_type __pos);
     _T const& at(size_type __pos) const;
 
-    _T& operator[](size_type __pos);
-    _T const& operator[](size_type __pos) const;
+    _always_inline _T& operator[](size_type __pos);
+    _always_inline _T const& operator[](size_type __pos) const;
 
-    _T& front();
-    _T const& front() const;
+    _always_inline _T& front();
+    _always_inline _T const& front() const;
 
-    _T& back();
-    _T const& back() const;
+    _always_inline _T& back();
+    _always_inline _T const& back() const;
 
-    pointer data();
-    const_pointer data() const;
+    _always_inline pointer data();
+    _always_inline const_pointer data() const;
 
-    iterator begin();
-    const_iterator begin() const;
-    const_iterator cbegin() const;
+    _always_inline iterator begin();
+    _always_inline const_iterator begin() const;
+    _always_inline const_iterator cbegin() const;
 
-    iterator end();
-    const_iterator end() const;
-    const_iterator cend() const;
+    _always_inline iterator end();
+    _always_inline const_iterator end() const;
+    _always_inline const_iterator cend() const;
 
-    reverse_iterator rbegin();
-    const_reverse_iterator rbegin() const;
-    const_reverse_iterator crbegin() const;
+    _always_inline reverse_iterator rbegin();
+    _always_inline const_reverse_iterator rbegin() const;
+    _always_inline const_reverse_iterator crbegin() const;
 
-    reverse_iterator rend();
-    const_reverse_iterator rend() const;
-    const_reverse_iterator crend() const;
+    _always_inline reverse_iterator rend();
+    _always_inline const_reverse_iterator rend() const;
+    _always_inline const_reverse_iterator crend() const;
 
-    bool empty() const;
-    size_type size() const;
-    size_type max_size() const;
+    _always_inline bool empty() const;
+    _always_inline size_type size() const;
+    _always_inline size_type max_size() const;
 
     bool reserve(size_type __new_cap);
-    size_type capacity() const;
+    inline size_type capacity() const;
     void shrink_to_fit();
     void clear();
     void reset();
@@ -164,22 +173,21 @@ public:
     {
     private:
         friend class vector;
-        _always_inline vector_iter(pointer __ip);
+        _always_inline explicit constexpr vector_iter(pointer __ip);
 
     public:
-        _always_inline vector_iter();
+        _always_inline constexpr vector_iter();
 
         template<bool _RhsIsConst>
-        _always_inline vector_iter(vector_iter<_Dir, _RhsIsConst> const& rhs);
+        _always_inline constexpr vector_iter(
+                vector_iter<_Dir, _RhsIsConst> const& rhs);
 
-        _always_inline _T& operator*();
+        _always_inline constexpr _T& operator*();
         _always_inline _T const& operator*() const;
-        _always_inline vector_iter operator+(size_type __n) const;
-        _always_inline vector_iter operator-(size_type __n) const;
         _always_inline _T& operator[](size_type __n);
         _always_inline _T const& operator[](size_type __n) const;
-        _always_inline pointer operator->();
-        _always_inline const_pointer operator->() const;
+        _always_inline constexpr pointer operator->();
+        _always_inline constexpr const_pointer operator->() const;
 
         _always_inline bool operator==(vector_iter const& rhs) const;
         _always_inline bool operator!=(vector_iter const& rhs) const;
@@ -198,15 +206,18 @@ public:
         _always_inline vector_iter& operator-=(difference_type diff);
 
         _always_inline vector_iter operator+(difference_type diff) const;
-        _always_inline vector_iter operator-(difference_type diff) const;
+        _always_inline constexpr vector_iter operator-(
+                difference_type diff) const;
 
-        _always_inline difference_type operator-(vector_iter const& rhs) const;
+        _always_inline constexpr difference_type operator-(
+                vector_iter const& rhs) const;
 
     private:
         pointer __p;
     };
 
 private:
+    size_type __best_cap(size_t __proposed);
     bool __grow(size_t __amount = 1);
     pointer __make_space(iterator __pos, size_t __count);
 
@@ -217,29 +228,49 @@ private:
 };
 
 template<typename _T, typename _Allocator>
-bool vector<_T,_Allocator>::__grow(size_t __amount)
+typename vector<_T,_Allocator>::size_type
+vector<_T,_Allocator>::__best_cap(size_t __amount)
 {
-    size_t __new_cap;
+    // Grow at least by the requested amount
+    size_t __req_cap = __capacity + __amount;
+    size_t __req_sz = __req_cap * sizeof(_T);
 
-    if (__capacity) {
-        __new_cap = size_t(1) << (bit_log2(__capacity + __amount));
-    } else if (__capacity == 0 && __amount < 12) {
-        __new_cap = 12;
-    } else {
-        __new_cap = __amount;
-    }
+    // Next power of two
+    size_t __best_sz = (size_t(1) << bit_log2(
+                            __req_sz + _MALLOC_OVERHEAD)) - _MALLOC_OVERHEAD;
 
-    return reserve(__new_cap);
+    // Round up to first size
+    size_t __min_sz = 64 - _MALLOC_OVERHEAD;
+
+    __best_sz = __best_sz >= __min_sz ? __best_sz : __min_sz;
+
+    size_t __new_cap = __best_sz / sizeof(_T);
+
+    return __new_cap;
 }
 
+template<typename _T, typename _Allocator>
+bool vector<_T,_Allocator>::__grow(size_t __amount)
+{
+    if (__sz + __amount > __capacity) {
+        size_type __new_cap = __best_cap(__amount);
+        return reserve(__new_cap);
+    }
+    return true;
+}
 
 template<typename _T, typename _Allocator>
 typename vector<_T,_Allocator>::pointer
 vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
 {
-    if (__capacity < __sz + __count)
+    if (__capacity < __sz + __count) {
+        // Grow and fixup iterator pointer
+        difference_type __pos_ofs =
+                difference_type(__pos.__p) - difference_type(__m);
         if (!__grow(__sz + __count - __capacity))
             return nullptr;
+        __pos.__p = pointer(difference_type(__m) + __pos_ofs);
+    }
 
     if (__pos.__p == nullptr)
         __pos.__p = __m;
@@ -256,13 +287,13 @@ vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
 // vector implementation
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector()
+constexpr vector<_T,_Allocator>::vector()
     : vector(_Allocator())
 {
 }
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector(_Allocator const& __alloc_)
+constexpr vector<_T,_Allocator>::vector(_Allocator const& __alloc_)
     : __m(nullptr)
     , __capacity(0)
     , __sz(0)
@@ -290,7 +321,11 @@ vector<_T,_Allocator>::vector(
     , __sz(0)
     , __alloc(__alloc_)
 {
-    resize(__count);
+    if (!reserve(__count))
+        panic_oom();
+    // Default construct in-place, no copy
+    ext::uninitialized_emplace<_T>(__m, __m + __count);
+    __sz = __count;
 }
 
 template<typename _T, typename _Allocator>
@@ -312,7 +347,7 @@ vector<_T,_Allocator>::vector(vector const& __other)
     , __sz(0)
     , __alloc(_Allocator())
 {
-    if (unlikely(!reserve(__other.size())))
+    if (unlikely(!reserve(__other.__sz)))
         panic_oom();
 }
 
@@ -324,12 +359,12 @@ vector<_T,_Allocator>::vector(vector const& __other,
     , __sz(0)
     , __alloc(__alloc_)
 {
-    if (unlikely(!reserve(__other.size())))
+    if (unlikely(!reserve(__other.__sz)))
         panic_oom();
 }
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector(vector&& __other )
+constexpr vector<_T,_Allocator>::vector(vector&& __other )
     : __m(__other.__m)
     , __capacity(__other.__capacity)
     , __sz(__other.__sz)
@@ -341,7 +376,7 @@ vector<_T,_Allocator>::vector(vector&& __other )
 }
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector(vector&& __other,
+constexpr vector<_T,_Allocator>::vector(vector&& __other,
                               _Allocator const& __alloc_)
     : __m(__other.__m)
     , __capacity(__other.__capacity)
@@ -425,8 +460,8 @@ bool vector<_T,_Allocator>::assign(size_type __count, _T const& __value)
 }
 
 template<typename _T, typename _Allocator>
-template<typename InputIt>
-bool vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
+template<typename _InputIt, typename _InputVal>
+bool vector<_T,_Allocator>::assign(_InputIt __first, _InputIt __last)
 {
     clear();
     if (!reserve(__last - __first))
@@ -441,7 +476,7 @@ bool vector<_T,_Allocator>::assign(initializer_list<_T> __ilist)
 {
     if (!reserve(__ilist.size()))
         return false;
-    assign(__ilist.begin(), __ilist.end());
+    return assign(__ilist.begin(), __ilist.end());
 }
 
 template<typename _T, typename _Allocator>
@@ -487,6 +522,7 @@ template<typename _T, typename _Allocator>
 _T&
 vector<_T,_Allocator>::front()
 {
+    assert(__sz > 0);
     return __m[0];
 }
 
@@ -494,6 +530,7 @@ template<typename _T, typename _Allocator>
 _T const&
 vector<_T,_Allocator>::front() const
 {
+    assert(__sz > 0);
     return __m[0];
 }
 
@@ -508,6 +545,7 @@ template<typename _T, typename _Allocator>
 _T const&
 vector<_T,_Allocator>::back() const
 {
+    assert(__sz > 0);
     return __m[__sz - 1];
 }
 
@@ -636,7 +674,8 @@ bool vector<_T,_Allocator>::reserve(size_type __new_cap)
         unique_ptr<value_type> new_p = __alloc.allocate(__new_cap);
         if (unlikely(!new_p))
             return false;
-        uninitialized_move(__m, __m + __sz, new_p.get());
+        if (__sz)
+            uninitialized_move(__m, __m + __sz, new_p.get());
         for (size_t __i = 0; __i < __sz; ++__i)
             __m[__i].~value_type();
         if (__m != nullptr)
@@ -658,8 +697,8 @@ template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::shrink_to_fit()
 {
     if (__capacity > __sz) {
-        pointer __tmp = __alloc.allocate(__sz * sizeof(value_type));
-        uninitialized_copy(__m, __m + __sz, __tmp);
+        pointer __tmp = __alloc.allocate(__sz);
+        uninitialized_move(__m, __m + __sz, __tmp);
         __alloc.deallocate(__m, __capacity);
         __m = __tmp;
         __capacity = __sz;
@@ -696,7 +735,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos, _T const& __value)
 
     constexpr size_t __count = 1;
 
-    new (__make_space(__pos, __count)) value_type(__value);
+    new (__make_space(__it, __count)) value_type(__value);
 
     __sz += __count;
 
@@ -723,7 +762,7 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(
         const_iterator __pos, size_type __count, _T const& __value)
 {
-    iterator __it = iterator(__pos.p);
+    iterator __it = iterator(__pos.__p);
     pointer place = __make_space(__it, __count);
     uninitialized_fill(place, place + __count, __value);
 
@@ -739,7 +778,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos,
                               InputIt __first, InputIt __last)
 {
     iterator __it(__pos.__p);
-    constexpr size_t __count = __last - __first;
+    size_t __count = __last - __first;
     pointer place = __make_space(__it, __count);
     uninitialized_copy(__first, __last, place);
 
@@ -751,7 +790,7 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
                               initializer_list<_T> __ilist)
 {
-    return insert(iterator(__pos.__p), __ilist.begin(), __ilist.end());
+    return iterator(insert(__pos, __ilist.begin(), __ilist.end()).__p);
 }
 
 template<typename _T, typename _Allocator>
@@ -783,7 +822,7 @@ template<typename _T, typename _Allocator>
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
 {
-    constexpr size_t __count = __last - __first;
+    size_t __count = __last - __first;
     pointer __p = __first.__p;
     pointer __e = __m + __sz - __count;
     for ( ; __p < __e; ++__p) {
@@ -792,7 +831,7 @@ vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
     }
     __alloc.destruct(__e);
     __sz -= __count;
-    return iterator(__first);
+    return iterator(__first.__p);
 }
 
 template<typename _T, typename _Allocator>
@@ -939,7 +978,7 @@ void swap(vector<_T,_Alloc>& lhs,
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
 template<bool _RhsIsConst>
-vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(
+constexpr vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(
         vector_iter<_Dir, _RhsIsConst> const& rhs)
     : __p(rhs.__p)
 {
@@ -958,6 +997,7 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
+constexpr
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(pointer __ip)
     : __p(__ip)
 {
@@ -965,10 +1005,10 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(pointer __ip)
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-_T&
+constexpr _T&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator *()
 {
-    return *__p;
+    return __p[-(_Dir < 0)];
 }
 
 template<typename _T, typename _Alloc>
@@ -976,25 +1016,7 @@ template<int _Dir, bool _Is_const>
 _T const&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator *() const
 {
-    return *__p;
-}
-
-template<typename _T, typename _Alloc>
-template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
-vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator+(
-        size_type __n) const
-{
-    return vector_iter(__p + __n * _Dir);
-}
-
-template<typename _T, typename _Alloc>
-template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
-vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
-        size_type __n) const
-{
-    return vector_iter(__p - __n * _Dir);
+    return __p[-(_Dir < 0)];
 }
 
 template<typename _T, typename _Alloc>
@@ -1002,7 +1024,7 @@ template<int _Dir, bool _Is_const>
 _T&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator[](size_type __n)
 {
-    return __p[__n];
+    return __p[__n * _Dir - (_Dir < 0)];
 }
 
 template<typename _T, typename _Alloc>
@@ -1010,12 +1032,12 @@ template<int _Dir, bool _Is_const>
 _T const&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator[](size_type __n) const
 {
-    return __p[__n];
+    return __p[__n * _Dir - (_Dir < 0)];
 }
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::pointer
+constexpr typename vector<_T,_Alloc>::pointer
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator->()
 {
     return __p;
@@ -1023,7 +1045,7 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator->()
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::const_pointer
+constexpr typename vector<_T,_Alloc>::const_pointer
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator->() const
 {
     return __p;
@@ -1082,7 +1104,7 @@ template<int _Dir, bool _Is_const>
 typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator++()
 {
-    ++__p;
+    __p += _Dir;
     return *this;
 }
 
@@ -1091,7 +1113,7 @@ template<int _Dir, bool _Is_const>
 typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator++(int)
 {
-    return vector_iter(__p++);
+    return vector_iter((__p += _Dir) - _Dir);
 }
 
 template<typename _T, typename _Alloc>
@@ -1099,7 +1121,7 @@ template<int _Dir, bool _Is_const>
 typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator--()
 {
-    ++__p;
+    __p -= _Dir;
     return *this;
 }
 
@@ -1108,7 +1130,7 @@ template<int _Dir, bool _Is_const>
 typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator--(int)
 {
-    return vector_iter(__p--);
+    return vector_iter((__p -= _Dir) + _Dir);
 }
 
 template<typename _T, typename _Alloc>
@@ -1117,7 +1139,7 @@ typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator+=(
         difference_type diff)
 {
-    __p += diff;
+    __p += diff * _Dir;
     return *this;
 }
 
@@ -1127,7 +1149,7 @@ typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-=(
         difference_type diff)
 {
-    __p -= diff;
+    __p -= diff * _Dir;
     return *this;
 }
 
@@ -1137,25 +1159,25 @@ typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator+(
         difference_type diff) const
 {
-    return vector_iter(__p + diff);
+    return vector_iter(__p + diff * _Dir);
 }
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
+constexpr typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
         difference_type diff) const
 {
-    return vector_iter(__p - diff);
+    return vector_iter(__p - diff * _Dir);
 }
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::difference_type
+constexpr typename vector<_T,_Alloc>::difference_type
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
         vector_iter const& rhs) const
 {
-    return __p - rhs.__p;
+    return (__p - rhs.__p) * _Dir;
 }
 
 //
@@ -1204,3 +1226,8 @@ cend(vector<_T, _Alloc> const& __rhs)
 }
 
 __END_NAMESPACE_STD
+
+extern template class std::vector<char, std::allocator<char>>;
+extern template class std::vector<uint8_t, std::allocator<uint8_t>>;
+extern template class std::vector<char16_t, std::allocator<char16_t>>;
+extern template class std::vector<wchar_t, std::allocator<wchar_t>>;

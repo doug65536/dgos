@@ -1,4 +1,5 @@
 #include "printk.h"
+#include "kmodule.h"
 
 int worked(void);
 
@@ -9,7 +10,7 @@ int (*text_ptr)(void) = worked;
 int volatile *data_ptr = &data_val;
 int volatile *bss_ptr = &bss_val;
 
-int entry(void)
+int module_main(int argc, char const * const * argv)
 {
     bss_val = 66;
 

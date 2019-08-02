@@ -41,18 +41,20 @@ static bool boottbl_run_searches(R &result, T (&search_data)[N])
 }
 
 static bool boottbl_rsdp_search(
-        boottbl_acpi_info_t &result, void const *start, size_t len)
+        boottbl_acpi_info_t &result, void const *start , size_t len)
 {
     for (size_t offset = 0; offset < len; offset += 16) {
-        acpi_rsdp2_t *rsdp2 = (acpi_rsdp2_t*)((char*)start + offset);
+        acpi_rsdp2_t const *rsdp2 =
+                (acpi_rsdp2_t const *)((uintptr_t)start + offset);
 
         // Check for ACPI 2.0+ RSDP
         if (!memcmp(rsdp2->rsdp1.sig, "RSD PTR ", 8)) {
             // Check checksum
             if (rsdp2->rsdp1.rev != 0 &&
-                    boottbl_checksum((char*)rsdp2, sizeof(*rsdp2)) == 0 &&
-                    boottbl_checksum((char*)&rsdp2->rsdp1,
-                                   sizeof(rsdp2->rsdp1)) == 0) {
+                boottbl_checksum((char const *)rsdp2,
+                                 sizeof(*rsdp2)) == 0 &&
+                boottbl_checksum((char const *)&rsdp2->rsdp1,
+                                 sizeof(rsdp2->rsdp1)) == 0) {
                 if (rsdp2->xsdt_addr_lo | rsdp2->xsdt_addr_hi) {
                     BOOTTBL_TRACE("Found 64-bit XSDT\n");
                     result.rsdt_addr = rsdp2->xsdt_addr_lo |
@@ -74,11 +76,11 @@ static bool boottbl_rsdp_search(
         }
 
         // Check for ACPI 1.0 RSDP
-        acpi_rsdp_t *rsdp = (acpi_rsdp_t*)rsdp2;
+        acpi_rsdp_t const *rsdp = (acpi_rsdp_t const*)rsdp2;
         if (rsdp->rev == 0 &&
                 !memcmp(rsdp->sig, "RSD PTR ", 8)) {
             // Check checksum
-            if (boottbl_checksum((char*)rsdp, sizeof(*rsdp)) == 0) {
+            if (boottbl_checksum((char const*)rsdp, sizeof(*rsdp)) == 0) {
                 result.rsdt_addr = rsdp->rsdt_addr;
                 result.rsdt_size = 0;
                 result.ptrsz = sizeof(uint32_t);
@@ -128,7 +130,7 @@ static bool boottbl_mptable_search(
 {
     for (size_t offset = 0; offset < len; offset += 16) {
         mp_table_hdr_t *sig_srch = (mp_table_hdr_t*)
-                ((char*)start + offset);
+                ((uintptr_t)start + offset);
 
         // Check for MP tables signature
         if (!memcmp(sig_srch->sig, "_MP_", 4)) {

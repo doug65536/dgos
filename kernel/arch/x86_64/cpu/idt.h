@@ -47,14 +47,43 @@ extern "C" void idt_xsave_detect(int ap);
 
 extern "C" isr_context_t *unhandled_exception_handler(isr_context_t *ctx);
 
-void idt_set_unhandled_exception_handler(
+extern "C" void idt_set_unhandled_exception_handler(
         idt_unhandled_exception_handler_t handler);
 
 int idt_init(int ap);
 
-void idt_override_vector(int intr, irq_dispatcher_handler_t handler);
-void idt_clone_debug_exception_dispatcher(void);
+extern "C" void idt_override_vector(int intr, irq_dispatcher_handler_t handler);
+extern "C" void idt_clone_debug_exception_dispatcher(void);
 
 extern "C" uint32_t xsave_supported_states;
 extern "C" uint32_t xsave_enabled_states;
 extern "C" void dump_context(isr_context_t *ctx, int to_screen);
+
+// Direct call stub that will not stall on retpoline
+#define FAST_VECTOR(name, init_target) \
+    __asm__ __volatile__ ( \
+        ".global " #name "\n\t" \
+        #name ":" "\n\t" \
+        "jmp " #init_target "\n\t"\
+        ".global " #name "_patch" "\n\t" \
+        #name "_patch:" "\n\t" \
+    ); \
+    extern char name##_patch[]
+
+
+enum struct xsave_support_t {
+    FXSAVE,
+    XSAVE,
+    XSAVEC,
+    XSAVEOPT,
+    XSAVES
+};
+
+extern xsave_support_t xsave_support;
+
+void idt_ist_adjust(int cpu, size_t ist, ptrdiff_t adj);
+
+#define IDT_IST_SLOT_STACK          1
+#define IDT_IST_SLOT_DBLFAULT       2
+#define IDT_IST_SLOT_FLUSH_TRACE    3
+#define IDT_IST_SLOT_NMI            4

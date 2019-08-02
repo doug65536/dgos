@@ -12,4 +12,4 @@ static void biosdata_remap(void *arg)
             MAP_PHYSICAL, -1, 0);
 }
 
-//REGISTER_CALLOUT(biosdata_remap, nullptr, callout_type_t::vmm_ready, "000");
+REGISTER_CALLOUT(biosdata_remap, nullptr, callout_type_t::vmm_ready, "000");

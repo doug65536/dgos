@@ -2,7 +2,7 @@
 
 int posix_spawnattr_setsigdefault(
         posix_spawnattr_t *restrict satt,
-        const sigset_t *restrict)
+        sigset_t const *restrict)
 {
     return -1;
 }

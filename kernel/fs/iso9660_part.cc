@@ -7,7 +7,7 @@
 //struct part_dev_t;
 
 struct iso9660_part_factory_t : public part_factory_t {
-    iso9660_part_factory_t() : part_factory_t("iso9660") {}
+    constexpr iso9660_part_factory_t() : part_factory_t("iso9660") {}
     std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
@@ -29,7 +29,8 @@ iso9660_part_factory_t::detect(storage_dev_base_t *drive)
     if (sector_mul < 1)
         sector_mul = 1;
 
-    std::unique_ptr<char[]> sector = new char[sector_size * sector_mul];
+    std::unique_ptr<char[]> sector =
+            new (std::nothrow) char[sector_size * sector_mul];
     iso9660_pvd_t *pvd = (iso9660_pvd_t*)sector.get();
 
     int err = drive->read_blocks(sector, 1 * sector_mul, 16 * sector_mul);
@@ -38,7 +39,7 @@ iso9660_part_factory_t::detect(storage_dev_base_t *drive)
         memcpy(sig, sector + 1, sizeof(sig));
 
     if (err >= sector_mul && !memcmp(sig, "CD001", 5)) {
-        std::unique_ptr<part_dev_t> part(new part_dev_t{});
+        std::unique_ptr<part_dev_t> part(new (std::nothrow) part_dev_t{});
 
         part->drive = drive;
         part->lba_st = 0;

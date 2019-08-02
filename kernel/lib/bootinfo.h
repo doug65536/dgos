@@ -8,7 +8,9 @@ enum struct bootparam_t {
     boot_debugger,
     boot_serial_log,
     boot_acpi_rsdp,
-    boot_mptables
+    boot_mptables,
+    initrd_base,
+    initrd_size
 };
 
 extern "C" uintptr_t bootinfo_parameter(bootparam_t param);

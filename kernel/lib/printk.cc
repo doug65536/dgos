@@ -9,6 +9,9 @@
 #include "assert.h"
 #include "math.h"
 #include "inttypes.h"
+#include "debug.h"
+
+EXPORT debug_out_t dbgout;
 
 typedef enum length_mod_t {
     length_none,
@@ -277,7 +280,7 @@ static char *dtoa(char *txt, size_t txt_sz,
 
 static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
-using formatter_lock_type = std::spinlock;
+using formatter_lock_type = ext::spinlock;
 using formatter_scoped_lock = std::unique_lock<formatter_lock_type>;
 formatter_lock_type formatter_lock;
 
@@ -289,8 +292,6 @@ intptr_t formatter(
         int (*emit_chars)(char const *, intptr_t, void*),
         void *emit_context)
 {
-    //formatter_scoped_lock hold_formatter_lock(formatter_lock);
-
     formatter_flags_t flags;
     intptr_t chars_written = 0;
     int *output_arg;
@@ -315,39 +316,40 @@ intptr_t formatter(
 
         ch = *++fp;
 
-        switch (ch) {
-        case '%':
+        if (ch == '%') {
             // Literal %
             chars_written += emit_chars(nullptr, '%', emit_context);
             continue;
+        }
 
-        case '-':
-            // Left justify
-            flags.left_justify = 1;
-            ch = *++fp;
-            break;
+        // Consume and apply one or more -, +, #, 0 modifiers
+        for (;; ch = *++fp) {
+            switch (ch) {
+            case '-':
+                // Left justify
+                flags.left_justify = 1;
+                continue;
 
-        case '+':
-            // Use leading plus if positive
-            flags.leading_plus = 1;
-            ch = *++fp;
-            break;
+            case '+':
+                // Use leading plus if positive
+                flags.leading_plus = 1;
+                continue;
 
-        case '#':
-            // Varies
-            flags.hash = 1;
-            ch = *++fp;
+            case '#':
+                // Varies
+                flags.hash = 1;
+                continue;
+
+            case '0':
+                // Use leading zeros
+                flags.leading_zero = 1;
+                continue;
+            }
+
             break;
         }
 
-        switch(ch) {
-        case '0':
-            // Use leading zeros
-            flags.leading_zero = 1;
-            ch = *++fp;
-            break;
-        }
-
+        // Consume and apply field width specification, if any
         if (ch == '*') {
             // Get minimum field width from arguments
             flags.has_min_width = 1;
@@ -363,6 +365,7 @@ intptr_t formatter(
             ch = *fp;
         }
 
+        // Consume and apply precision specification, if any
         if (ch == '.') {
             ch = *++fp;
 
@@ -392,7 +395,7 @@ intptr_t formatter(
         if (!flags.has_precision && flags.leading_zero)
             flags.precision = flags.min_width;
 
-        // Length modifier
+        // Consume and apply length modifier
         switch (ch) {
         case 'h':
             if (fp[1] == 'h') {
@@ -438,6 +441,7 @@ intptr_t formatter(
 
         }
 
+        // Consume and apply type specifier
         switch (ch) {
         case 'c':
             switch (flags.length) {
@@ -817,7 +821,7 @@ intptr_t formatter(
     return chars_written;
 }
 
-EXPORT int cprintf(char const *format, ...)
+EXPORT int cprintf(char const * restrict format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -843,11 +847,11 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
     return 0;
 }
 
-static std::mcslock cprintf_lock;
+static ext::mcslock cprintf_lock;
 
-EXPORT int vcprintf(char const *format, va_list ap)
+EXPORT int vcprintf(char const * restrict format, va_list ap)
 {
-    std::unique_lock<std::mcslock> hold_cprintf_lock(cprintf_lock);
+    std::unique_lock<ext::mcslock> hold_cprintf_lock(cprintf_lock);
 
     int chars_written = 0;
     if (con_exists()) {
@@ -874,7 +878,7 @@ EXPORT void printk(char const *format, ...)
     va_end(ap);
 }
 
-EXPORT void vprintk(char const *format, va_list ap)
+EXPORT void vprintk(char const * restrict format, va_list ap)
 {
     vcprintf(format, ap);
 }
@@ -895,10 +899,11 @@ EXPORT void panic_oom()
 }
 
 _noreturn
-EXPORT void vpanic(char const *format, va_list ap)
+EXPORT void vpanic(char const * restrict format, va_list ap)
 {
     printk("KERNEL PANIC! ");
     vprintk(format, ap);
+    cpu_debug_break();
     halt_forever();
 }
 
@@ -908,7 +913,8 @@ struct vsnprintf_context_t {
     size_t level;
 };
 
-static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
+static int vsnprintf_emit_chars(char const * restrict s,
+                                intptr_t ch, void * restrict context)
 {
     vsnprintf_context_t *ctx = (vsnprintf_context_t *)context;
     char buf[5];
@@ -943,7 +949,8 @@ static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 // "buf".
 // "buf" is guaranteed to be null terminated upon
 // returning, if limit > 0.
-EXPORT int vsnprintf(char *buf, size_t limit, char const *format, va_list ap)
+int vsnprintf(char * restrict buf, size_t limit,
+                     char const * restrict format, va_list ap)
 {
     vsnprintf_context_t context;
     context.buf = buf;
@@ -962,7 +969,8 @@ EXPORT int vsnprintf(char *buf, size_t limit, char const *format, va_list ap)
     return chars_needed;
 }
 
-EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
+EXPORT int snprintf(char * restrict buf, size_t limit,
+                    char const * restrict format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -971,13 +979,23 @@ EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
     return result;
 }
 
-static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
+EXPORT int putsdbg(char const *s)
+{
+    size_t len = strlen(s);
+    write_debug_str(s, len);
+    write_debug_str("\n", 1);
+    return len + 1;
+}
+
+static int printdbg_emit_chars(char const * restrict s,
+                               intptr_t ch, void * restrict context)
 {
     (void)context;
 
     char encoded[5];
 
     if (!s) {
+        // UTF8 encode the char32_t in ch
         ch = ucs4_to_utf8(encoded, ch);
         s = encoded;
     } else if (ch == 0) {
@@ -987,14 +1005,12 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
     return write_debug_str(s, ch);
 }
 
-EXPORT int vprintdbg(char const *format, va_list ap)
+EXPORT int vprintdbg(char const * restrict format, va_list ap)
 {
-    //spinlock_hold_t hold = printdbg_lock_noirq();
     return formatter(format, ap, printdbg_emit_chars, nullptr);
-    //printdbg_unlock_noirq(&hold);
 }
 
-EXPORT int printdbg(char const *format, ...)
+EXPORT int printdbg(char const * restrict format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -1050,12 +1066,12 @@ static int hex_dump_formatter(void const volatile *mem,
     return written;
 }
 
-int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
+EXPORT int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
 {
     return hex_dump_formatter(mem, size, base, printdbg);
 }
 
-size_t format_flags_register(
+EXPORT size_t format_flags_register(
         char *buf, size_t buf_size,
         uintptr_t flags, format_flag_info_t const *info)
 {
@@ -1113,4 +1129,38 @@ size_t format_flags_register(
         buf[total_written] = 0;
 
     return total_written;
+}
+
+EXPORT debug_out_t &debug_out_t::operator<<(const char *rhs)
+{
+    return write_str(rhs);
+}
+
+EXPORT debug_out_t &debug_out_t::operator<<(std::hex)
+{
+    hex = true;
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_unsigned(uint64_t value, size_t sz)
+{
+    printdbg(hex ? "%#" PRIx64 : "%" PRIu64, value);
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_signed(int64_t value, size_t sz)
+{
+    printdbg(hex ? "%#" PRIx64 : "%" PRId64, value);
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_str(const char *rhs)
+{
+    printdbg("%s", rhs);
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::operator<<(const bool &value)
+{
+    return write_str(value ? "true" : "false");
 }

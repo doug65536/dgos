@@ -2,7 +2,7 @@
 
 usb_class_drv_t *usb_class_drv_t::first_driver;
 
-usb_class_drv_t *usb_class_drv_t::find_driver(
+EXPORT usb_class_drv_t *usb_class_drv_t::find_driver(
         usb_config_helper *cfg, usb_bus_t *bus)
 {
     usb_class_drv_t *drv = first_driver;

@@ -32,7 +32,7 @@ enum struct usb_msc_op_t {
 };
 
 // A factory that enumerates all of the available storage devices
-class usb_msc_if_factory_t : public storage_if_factory_t {
+class usb_msc_if_factory_t final : public storage_if_factory_t {
 public:
     usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
 protected:
@@ -41,7 +41,7 @@ protected:
 };
 
 // A USB storage interface
-class usb_msc_if_t : public storage_if_base_t {
+class usb_msc_if_t final : public storage_if_base_t {
     // storage_if_base_t interface
 public:
     enum cmd_op_t : uint8_t {
@@ -211,7 +211,7 @@ public:
     static constexpr uint32_t cmd_capacity =
             std::min(PAGE_SIZE / sizeof(pending_cmd_t), size_t(32U));
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type cmd_lock;
     std::condition_variable cmd_cond;
@@ -412,7 +412,7 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     assert(bulk_out);
 
     // Allocate an interface
-    std::unique_ptr<usb_msc_if_t> if_(new usb_msc_if_t{});
+    std::unique_ptr<usb_msc_if_t> if_(new (std::nothrow) usb_msc_if_t{});
 
     USB_MSC_TRACE("initializing interface, slot=%d\n",
                   cfg_hlp->slot());
@@ -512,7 +512,7 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
     for (int lun = 0; lun <= max_lun; ++lun) {
         USB_MSC_TRACE("Initializing lun %d\n", lun);
 
-        std::unique_ptr<usb_msc_dev_t> drv(new usb_msc_dev_t{});
+        std::unique_ptr<usb_msc_dev_t> drv(new (std::nothrow) usb_msc_dev_t{});
 
         // Get size and block size
         wrapper_t cap;
@@ -671,12 +671,14 @@ void usb_msc_if_t::issue_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
 
 void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
 {
+    auto xferred = cmd->cbw.xfer_len - cmd->csw.residue;
+
     if (cmd->csw.status == cmd_status_t::success) {
         USB_MSC_TRACE("Command completed successfully\n");
-        cmd->caller_iocp->set_result(errno_t::OK);
+        cmd->caller_iocp->set_result({ errno_t::OK, xferred });
     } else {
         USB_MSC_TRACE("Command failed \n");
-        cmd->caller_iocp->set_result(errno_t::EIO);
+        cmd->caller_iocp->set_result({ errno_t::EIO, xferred });
     }
 
     // Entry is finished

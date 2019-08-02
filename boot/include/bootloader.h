@@ -3,7 +3,6 @@
 #include "farptr.h"
 #include "vesainfo.h"
 #include "physmem_data.h"
-#include "bootdev_info.h"
 #include "boottable.h"
 #include "assert.h"
 
@@ -25,12 +24,6 @@ public:
     ptr64_t &operator=(T *ptr)
     {
         addr = uint64_t(ptr);
-        return *this;
-    }
-
-    ptr64_t &operator=(far_ptr_t const& ptr)
-    {
-        addr = uint64_t((ptr.segment << 4) + ptr.offset);
         return *this;
     }
 
@@ -84,16 +77,23 @@ struct alignas(8) kernel_params_t {
     uint64_t phys_mem_table_size;
     ptr64_t<void(*)()> ap_entry;
     ptr64_t<vbe_info_t> vbe_info;
-    ptr64_t<vbe_mode_info_t> vbe_mode_info;
+    //ptr64_t<vbe_mode_info_t> vbe_mode_info;
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
+    // 3 * 8 bytes
     boottbl_acpi_info_t acpi_rsdt;
+    // 8 bytes
     boottbl_mptables_info_t mptables;
+    boottbl_nodes_info_t numa;
+    // 4 * 8 bytes
     uint64_t boot_drv_serial;
+    uint64_t initrd_st;
+    uint64_t initrd_sz;
+    // 64
     uint8_t wait_gdb;
     uint8_t serial_debugout;
     uint8_t reserved[6];
 } _packed;
 
 // Ensure that all of the architectures have the same layout
-C_ASSERT(sizeof(kernel_params_t) == 12 * 8 + 2 + 6);
-C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 12 * 8);
+C_ASSERT(sizeof(kernel_params_t) == 11 * 8 + 16 + 2 + 6 + 32);
+C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 13 * 8 + 32);

@@ -42,7 +42,7 @@ SECTIONS {
 		*(.smp.data)
 		___smp_en = .;
 
-		bootinfo_start = .;
+		bootinfo_st = .;
 		*(.bootinfo)
 
 		/* sector align end */

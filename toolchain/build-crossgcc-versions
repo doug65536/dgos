@@ -1,13 +1,6 @@
-#gccver=6.3.0
-#binver=2.28.1
-#gmpver=6.1.2
-#mpcver=1.0.3
-#mpfver=3.1.5
-#gdbver=8.0.1
-
-gccver=8.2.0
-binver=2.31
-gdbver=8.1
+gccver=9.1.0
+binver=2.32
+gdbver=8.3
 gmpver=6.1.2
 mpcver=1.1.0
-mpfver=4.0.1
+mpfver=4.0.2

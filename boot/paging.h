@@ -10,8 +10,10 @@
 
 // 4KB pages
 #define PAGE_SIZE_BIT       12
+#ifndef PAGE_SIZE
 #define PAGE_SIZE           (1U << PAGE_SIZE_BIT)
 #define PAGE_MASK           (PAGE_SIZE - 1U)
+#endif
 
 // Page table entries
 #define PTE_PRESENT_BIT     0
@@ -46,6 +48,7 @@
 #define PTE_ACCESSED        (1ULL << PTE_ACCESSED_BIT)
 #define PTE_DIRTY           (1ULL << PTE_DIRTY_BIT)
 #define PTE_PAGESIZE        (1ULL << PTE_PAGESIZE_BIT)
+#define PTE_PTPAT           (1ULL << PTE_PAGESIZE_BIT)
 #define PTE_GLOBAL          (1ULL << PTE_GLOBAL_BIT)
 #define PTE_PAT             (1ULL << PTE_PAT_BIT)
 #define PTE_NX              (1ULL << PTE_NX_BIT)
@@ -74,7 +77,7 @@ public:
     virtual phys_alloc_t alloc(size64_t size) noexcept = 0;
 
 protected:
-    virtual ~page_factory_t() noexcept {}
+    virtual ~page_factory_t() noexcept = 0;
 };
 
 void paging_map_range(
@@ -104,5 +107,8 @@ struct iovec_t {
     uint64_t size;
 };
 
-int paging_iovec(iovec_t **ret, uint64_t vaddr,
+size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
                  uint64_t size, uint64_t max_chunk);
+
+off_t paging_iovec_read(int fd, off_t file_offset, uint64_t vaddr,
+                        uint64_t size, uint64_t max_chunk);

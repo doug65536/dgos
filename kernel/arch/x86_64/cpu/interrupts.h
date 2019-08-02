@@ -1,5 +1,26 @@
 #pragma once
 
+// x86 CPUs implement 16 priority classes.
+//
+//  CR8      Masks
+// -----  -----------
+//  0x0     -
+//  0x1     -
+//  0x2    0x20-0xFF   Highest priority
+//  0x3    0xC0-0xFF
+//  0x4    0xB0-0xFF
+//  0x5    0xA0-0xFF
+//  0x6    0x90-0xFF
+//  0x7    0x80-0xFF
+//  0x8    0x70-0xFF
+//  0x9    0x60-0xFF
+//  0xA    0x50-0xFF
+//  0xB    0x40-0xFF
+//  0xC    0x30-0xFF
+//  0xD    0x20-0xFF
+//  0xE    0x10-0xFF
+//  0xF    0x00-0xFF   Lowest priority
+
 // 0x00 - 0x1F (fixed)       - Exceptions
 // 0x20 - 0x27 (hi priority) - LAPIC IRQs (error, spurious, timer, etc)
 // 0x28 - 0x2F               - reserved for software interrupts
@@ -39,16 +60,21 @@
 #define INTR_APIC_SPURIOUS  32
 #define INTR_APIC_ERROR     33
 #define INTR_APIC_THERMAL   34
-// 35-38 reserved
-#define INTR_APIC_TIMER     39
+// 35-39 reserved
 
-#define INTR_TLB_SHOOTDOWN  40
-#define INTR_THREAD_YIELD   41
+// Not really used, but yielded context is written using this interrupt number
+#define INTR_THREAD_YIELD   40
+// 41-43 reserved
 
-// 42-47 reserved
+// Vectors >= 44 go through apic_dispatcher codepath
+// Relatively hot area of the IDT, cache line aligned
+#define INTR_APIC_DSP_BASE  44
+#define INTR_APIC_TIMER     44
+#define INTR_IPI_TLB_SHTDN  45
+#define INTR_IPI_RESCHED    46
+#define INTR_IPI_FL_TRACE   47
 
-// Vectors >= 48 go through apic_dispatcher codepath
-// 192 vectors for IOAPIC and MSI
+// 192 vectors for IOAPIC and MSI(x)
 #define INTR_APIC_IRQ_BASE  48
 #define INTR_APIC_IRQ_END   239
 #define INTR_APIC_IRQ_COUNT (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1)

@@ -186,12 +186,12 @@ struct Elf64_Sym {
 } _packed;
 
 // Symbol bindings
-#define STB_LOCAL 0 Not visible outside the object file
-#define STB_GLOBAL 1 Global symbol, visible to all object files
-#define STB_WEAK 2 Global scope, but with lower precedence than global symbols
-#define STB_LOOS 10 Environment-specific use
+#define STB_LOCAL 0 //Not visible outside the object file
+#define STB_GLOBAL 1 //Global symbol, visible to all object files
+#define STB_WEAK 2 //Global scope, but with lower precedence than global symbols
+#define STB_LOOS 10 //Environment-specific use
 #define STB_HIOS 12
-#define STB_LOPROC 13 Processor-specific use
+#define STB_LOPROC 13 //Processor-specific use
 #define STB_HIPROC 15
 
 // Symbol types
@@ -240,6 +240,7 @@ struct Elf64_Phdr {
 #define PT_NOTE 4 // Note sections
 #define PT_SHLIB 5 // Reserved
 #define PT_PHDR 6 // Program header table
+#define PT_TLS 7 // TLS template location
 #define PT_LOOS 0x60000000 // Environment-specific use
 #define PT_HIOS 0x6FFFFFFF
 #define PT_LOPROC 0x70000000 // Processor-specific use

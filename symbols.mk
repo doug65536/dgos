@@ -1,61 +1,81 @@
-bootfat.sym: bootfat-elf \
+$(top_builddir)/sym/bootfat.sym: $(top_builddir)/bootfat-elf \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	$(MKDIR) -p $(@D)
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
-bootx64-efi.sym: bootefi-amd64 \
+$(top_builddir)/sym/bootx64-efi.sym: $(top_builddir)/bootefi-amd64 \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	$(MKDIR) -p $(@D)
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" p "$@" "$<"
 	$(SED) -i 's/^00000000000/00000000004/g' "$@"
 
-#bootia32-efi.sym: bootfat-elf \
+#$(top_builddir)/sym/bootia32-efi.sym: bootfat-elf \
 #		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
 #	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 #		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" p "$@" "$<"
 
-bootiso.sym: bootiso-elf \
+$(top_builddir)/sym/bootiso.sym: $(top_builddir)/bootiso-elf \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	$(MKDIR) -p $(@D)
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
-mbr.sym: mbr-elf \
+$(top_builddir)/sym/mbr.sym: $(top_builddir)/mbr-elf \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	$(MKDIR) -p $(@D)
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
-kernel-generic.sym: kernel-generic \
+$(top_builddir)/sym/kernel-generic.sym: $(top_builddir)/kernel-generic \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	$(MKDIR) -p $(@D)
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
-kernel-tracing.sym: kernel-tracing \
+$(top_builddir)/sym/kernel-tracing.sym: $(top_builddir)/kernel-tracing \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	$(MKDIR) -p $(@D)
 	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
-kernel-asan.sym: kernel-asan \
+$(top_builddir)/sym/kernel-asan.sym: $(top_builddir)/kernel-asan \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	$(MKDIR) -p $(@D)
 	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
-bootefi-amd64.dis.gz: bootefi-amd64 $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
+$(top_builddir)/sym/bootefi-amd64.dis.gz: $(top_builddir)/bootefi-amd64 \
+		$(top_srcdir)/symbols.mk
+	$(MKDIR) -p $(@D)
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-mbr.dis.gz: mbr-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source -m i8086 $< | $(GZIP) > $@ &
+$(top_builddir)/sym/mbr.dis.gz: $(top_builddir)/mbr-elf $(top_srcdir)/symbols.mk
+	$(MKDIR) -p $(@D)
+	$(OBJDUMP) --disassemble --demangle --source -m i8086 $< | $(GZIP) > $@
 
-bootfat.dis.gz: bootfat-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
+$(top_builddir)/sym/bootfat.dis.gz: $(top_builddir)/bootfat-elf  \
+		$(top_srcdir)/symbols.mk
+	$(MKDIR) -p $(@D)
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-bootiso.dis.gz: bootiso-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
+$(top_builddir)/sym/bootiso.dis.gz: $(top_builddir)/bootiso-elf  \
+		$(top_srcdir)/symbols.mk
+	$(MKDIR) -p $(@D)
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-kernel-generic.dis.gz: kernel-generic $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
+$(top_builddir)/sym/kernel-generic.dis.gz: $(top_builddir)/kernel-generic  \
+		$(top_srcdir)/symbols.mk
+	$(MKDIR) -p $(@D)
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-kernel-tracing.dis.gz: kernel-tracing $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
+$(top_builddir)/sym/kernel-tracing.dis.gz: $(top_builddir)/kernel-tracing  \
+		$(top_srcdir)/symbols.mk
+	$(MKDIR) -p $(@D)
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-kernel-asan.dis.gz: kernel-asan $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
+$(top_builddir)/sym/kernel-asan.dis.gz: $(top_builddir)/kernel-asan  \
+		$(top_srcdir)/symbols.mk
+	$(MKDIR) -p $(@D)
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@

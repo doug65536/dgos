@@ -30,7 +30,7 @@ public:
     template<typename F>
     void each_rv(F callback);
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type free_addr_lock;
     typedef rbtree_t<> tree_t;

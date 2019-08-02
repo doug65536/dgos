@@ -1,3 +1,5 @@
+// pci driver: C=STORAGE, V=VIRTIO (0x1AF4)
+
 #include "virtio-blk.h"
 #include "virtio-base.h"
 #include "dev_storage.h"
@@ -73,7 +75,7 @@ enum struct virtio_blk_op_t : uint8_t {
     flush
 };
 
-class virtio_blk_if_t
+class virtio_blk_if_t final
         : public virtio_base_t
         , public storage_if_base_t
         , public storage_dev_base_t
@@ -122,7 +124,7 @@ private:
                virtio_blk_op_t op, iocp_t *iocp);
 
 private:
-    using lock_type = std::spinlock;
+    using lock_type = ext::spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     struct blk_config_t {
@@ -204,7 +206,7 @@ std::vector<storage_dev_base_t *> virtio_blk_if_t::detect_devices()
 
 virtio_base_t *virtio_blk_factory_t::create()
 {
-    return new virtio_blk_if_t;
+    return new (std::nothrow) virtio_blk_if_t;
 }
 
 void virtio_blk_factory_t::found_device(virtio_base_t *device)
@@ -319,7 +321,7 @@ bool virtio_blk_if_t::init(pci_dev_iterator_t const &pci_iter)
     blk_config = (blk_config_t*)device_cfg;
     log2_sectorsize = bit_log2(blk_config->blk_size);
 
-    per_queue = new per_queue_t[queue_count];
+    per_queue = new (std::nothrow) per_queue_t[queue_count];
 
     for (size_t i = 0; i < queue_count; ++i) {
         if (!per_queue[i].init(this, &queues[i]))
@@ -389,7 +391,8 @@ errno_t virtio_blk_if_t::io(
         void *data, int64_t count, uint64_t lba,
         bool fua, virtio_blk_op_t op, iocp_t *iocp)
 {
-   virtio_blk_if_t::request_t *request = new virtio_blk_if_t::request_t;
+   virtio_blk_if_t::request_t *request =
+           new (std::nothrow) virtio_blk_if_t::request_t;
    request->data = data;
    request->count = count;
    request->header.lba = lba;

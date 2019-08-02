@@ -6,7 +6,7 @@
 #include "numeric_limits.h"
 #include "work_queue.h"
 
-#define DEBUG_VIRTIO 0
+#define DEBUG_VIRTIO 1
 #if DEBUG_VIRTIO
 #define VIRTIO_TRACE(...) printdbg("virtio: " __VA_ARGS__)
 #else
@@ -23,6 +23,10 @@ char const *virtio_base_t::cap_names[] = {
     "VIRTIO_PCI_CAP_DEVICE_CFG",
     "VIRTIO_PCI_CAP_PCI_CFG"
 };
+
+virtio_base_t::~virtio_base_t()
+{
+}
 
 bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                                 char const *isr_name, bool per_cpu_queues)
@@ -49,19 +53,19 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                      cap_rec.type, cap_rec.bar,
                      cap_rec.offset, cap_rec.length);
 
-        bool is_mmio;
-        is_mmio = pci_iter.config.is_bar_mmio(cap_rec.bar);
+        bool is_mmio = pci_iter.config.is_bar_mmio(cap_rec.bar);
 
-        // Not MMIO? Bail!
-        if (unlikely(!is_mmio))
-            return false;
-
+        // bar is nullptr
         uint64_t bar;
         bar = pci_iter.config.get_bar(cap_rec.bar) + cap_rec.offset;
 
         switch (cap_rec.type) {
         case VIRTIO_PCI_CAP_COMMON_CFG:
             common_cfg_size = cap_rec.length;
+
+            // Won't tolerate this being in I/O
+            if (!bar)
+                return false;
 
             common_cfg = (virtio_pci_common_cfg_t*)mmap(
                         (void*)bar, cap_rec.length, PROT_READ | PROT_WRITE,
@@ -73,10 +77,13 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             // 4.1.4.3.2 Wait until reset completes
             uint64_t timeout;
             timeout = time_ns() + 2000000000;
+
+            // Poll a million times between checking for timeout,
+            // so we don't spend 99% of CPU checking time
             int timeout_divisor;
             timeout_divisor = 1000000;
-            while (common_cfg->device_status != 0) {
-                if (--timeout_divisor) {
+            while (atomic_ld_acq(&common_cfg->device_status) != 0) {
+                if (unlikely(!--timeout_divisor)) {
                     timeout_divisor = 1000000;
                     if (time_ns() > timeout) {
                         printk("Timeout waiting for %s device reset!\n",
@@ -122,6 +129,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
             atomic_fence();
             common_cfg->device_status |= VIRTIO_STATUS_FEATURES_OK;
+
             atomic_fence();
             if (!(common_cfg->device_status & VIRTIO_STATUS_FEATURES_OK)) {
                 // Tell the device we gave up
@@ -132,7 +140,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             queue_count = common_cfg->num_queues;
 
             // Allocate number of queues supported by device
-            queues.reset(new virtio_virtqueue_t[queue_count]);
+            queues.reset(new (std::nothrow) virtio_virtqueue_t[queue_count]);
 
             if (unlikely(!queues)) {
                 // Tell the device we gave up
@@ -148,11 +156,15 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
                 std::vector<int> target_cpus(queue_count + 1, 0);
                 std::vector<int> vector_offsets(queue_count + 1, 1);
+
                 // Route config IRQs to CPU 0
                 vector_offsets[0] = 0;
+
+                // Distribute the rest of the IRQs across CPUs
                 int cpu_count = thread_get_cpu_count();
                 for (size_t i = 1; i <= queue_count; ++i)
                     target_cpus[i] = (i - 1) % cpu_count;
+
                 use_msi = pci_try_msi_irq(pci_iter, &irq_range, 0, false,
                                           queue_count + 1,
                                           &virtio_base_t::irq_handler,
@@ -176,14 +188,18 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 uint16_t queue_msix_vector = (use_msi && irq_range.msix)
                         ? i : 0;
 
-                if (!vq.init(i - 1, common_cfg, (char*)notify_cap,
-                             notify_off_multiplier, queue_msix_vector)) {
+                if (!vq.init(i - 1, common_cfg, (char volatile *)notify_cap,
+                             notify_cap->notify_off_multiplier,
+                             queue_msix_vector)) {
                     // Tell the device we gave up
                     common_cfg->device_status |= VIRTIO_STATUS_FAILED;
                     return false;
                 }
             }
 
+            atomic_fence();
+            common_cfg->device_status |= VIRTIO_STATUS_FEATURES_OK;
+            atomic_fence();
             common_cfg->device_status |= VIRTIO_STATUS_DRIVER_OK;
 
             VIRTIO_TRACE("Successfully negotiated features\n");
@@ -191,19 +207,35 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_NOTIFY_CFG:
+            if (notify_cap)
+                break;
             notify_cap_size = cap_rec.length;
+            notify_bar = bar;
+            notify_is_mmio = is_mmio;
+            uint64_t notify_paddr;
+            notify_paddr = bar + cap_rec.offset;
+            VIRTIO_TRACE("mapping notify bar %u"
+                         " at physaddr %#" PRIx64
+                         ", mmio=%u",
+                         (unsigned)bar, notify_paddr, (unsigned)notify_is_mmio);
             notify_cap = (virtio_pci_notify_cap_t *)mmap(
-                        (void*)bar, cap_rec.length, PROT_READ | PROT_WRITE,
+                        (void*)notify_paddr, cap_rec.length,
+                        PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
-            if (unlikely(notify_cap == MAP_FAILED))
+            if (unlikely(notify_cap == MAP_FAILED)) {
+                notify_cap = nullptr;
+                notify_cap_size = 0;
                 return false;
+            }
 
             notify_off_multiplier = notify_cap->notify_off_multiplier;
 
             break;
 
         case VIRTIO_PCI_CAP_ISR_CFG:
-            // This is ignored, because only MSI-X is used
+            // This is ignored, because only MSI-X is used?
+            isr_status = (uint32_t*)mmap((void*)bar, sizeof(uint32_t),
+                                         PROT_READ, MAP_PHYSICAL, -1, 0);
             break;
 
         case VIRTIO_PCI_CAP_DEVICE_CFG:
@@ -216,6 +248,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_PCI_CFG:
+            VIRTIO_TRACE("Ignoring VIRTIO_PCI_CAP_PCI_CFG\n");
             break;
 
         default:
@@ -231,8 +264,15 @@ isr_context_t *virtio_base_t::irq_handler(int irq, isr_context_t *ctx)
     for (virtio_base_t *dev : virtio_devs) {
         if (irq >= dev->irq_range.base &&
                 irq < dev->irq_range.base + dev->irq_range.count) {
+
+//            if (irq_islevel(irq))
+//                irq_setmask(irq, false);
+
             workq::enqueue([=] {
                 dev->irq_handler(irq - dev->irq_range.base);
+
+//                if (irq_islevel(irq))
+//                    irq_setmask(irq, true);
             });
         }
     }
@@ -246,13 +286,7 @@ bool virtio_virtqueue_t::init(
 {
     this->queue_idx = queue_idx;
 
-    atomic_fence();
-    common_cfg->queue_select = queue_idx;
-    atomic_fence();
-
-    notify_ptr = (uint16_t*)
-            (notify_base + (common_cfg->queue_notify_off *
-                            notify_off_multiplier));
+    atomic_st_rel(&common_cfg->queue_select, queue_idx);
 
     uint8_t log2_queue_size = bit_log2(common_cfg->queue_size);
 
@@ -319,7 +353,7 @@ bool virtio_virtqueue_t::init(
         used_ftr = (ring_ftr_t*)(used_ring + queue_count);
     }
 
-    completions.reset(new virtio_iocp_t*[queue_count]);
+    completions.reset(new (std::nothrow) virtio_iocp_t*[queue_count]);
     if (!completions)
         return false;
 
@@ -337,30 +371,38 @@ bool virtio_virtqueue_t::init(
     }
 
     common_cfg->queue_size = 1 << log2_queue_size;
-    assert(common_cfg->queue_size == (1 << log2_queue_size));
 
-    uint64_t addr;
+    uint64_t desc_paddr;
+    desc_paddr = mphysaddr(desc_tab);
+    assert((desc_paddr & -16) == desc_paddr);
+    common_cfg->queue_desc = desc_paddr;
 
-    addr = mphysaddr(desc_tab);
-    assert((addr & -16) == addr);
-    common_cfg->queue_desc = addr;
-    assert(common_cfg->queue_desc == addr);
+    uint64_t avail_paddr;
+    avail_paddr = mphysaddr(avail_hdr);
+    assert((avail_paddr & -2) == avail_paddr);
+    common_cfg->queue_avail = avail_paddr;
 
-    addr = mphysaddr(avail_hdr);
-    assert((addr & -2) == addr);
-    common_cfg->queue_avail = addr;
-    assert(common_cfg->queue_avail == addr);
+    uint64_t used_paddr;
+    used_paddr = mphysaddr(used_hdr);
+    assert((used_paddr & -4) == used_paddr);
 
-    addr = mphysaddr(used_hdr);
-    assert((addr & -4) == addr);
-    common_cfg->queue_used = addr;
-    assert(common_cfg->queue_used == addr);
-
+    common_cfg->queue_used = used_paddr;
     common_cfg->queue_msix_vector = msix_vector;
-    assert(common_cfg->queue_msix_vector == msix_vector);
 
+    // Can't reliably read back anymore until enabled
     common_cfg->queue_enable = 1;
-    assert(common_cfg->queue_enable == 1);
+
+    notify_ptr = (uint16_t*)
+            (notify_base + (common_cfg->queue_notify_off *
+                            notify_off_multiplier));
+
+    if (unlikely(!(assert(common_cfg->queue_size == (1 << log2_queue_size)) ||
+                   assert(common_cfg->queue_avail == avail_paddr) ||
+                   assert(common_cfg->queue_desc == desc_paddr) ||
+                   assert(common_cfg->queue_used == used_paddr) ||
+                   assert(common_cfg->queue_msix_vector == msix_vector) ||
+                   assert(common_cfg->queue_enable == 1))))
+        return false;
 
     return true;
 }
@@ -449,7 +491,7 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
         atomic_st_rel(notify_ptr, queue_idx);
 }
 
-void virtio_virtqueue_t::sendrecv(const void *sent_data, size_t sent_size,
+void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
                                   void *rcvd_data, size_t rcvd_size,
                                   virtio_iocp_t *iocp)
 {
@@ -481,7 +523,7 @@ void virtio_virtqueue_t::sendrecv(const void *sent_data, size_t sent_size,
                                   rcvd_data, rcvd_size,
                                   std::numeric_limits<uint32_t>::max());
 
-        for (size_t i = 0; i < range_count; ++i) {
+        for (size_t i = 0; i < range_count; ++i, ++out) {
             desc[out] = alloc_desc(true);
             desc[out]->addr = ranges[i].physaddr;
             desc[out]->len = ranges[i].size;
@@ -561,12 +603,13 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 
     VIRTIO_TRACE("Probing for %s device\n", name);
 
-    if (!pci_enumerate_begin(&pci_iter, dev_class, -1, VIRTIO_VENDOR, device))
+    if (unlikely(!pci_enumerate_begin(&pci_iter, dev_class,
+                                      -1, VIRTIO_VENDOR, device)))
         return 0;
 
     do {
-        if (pci_iter.config.device < VIRTIO_DEV_MIN ||
-                pci_iter.config.device > VIRTIO_DEV_MAX)
+        if (unlikely(pci_iter.config.device < VIRTIO_DEV_MIN ||
+                     pci_iter.config.device > VIRTIO_DEV_MAX))
             continue;
 
         VIRTIO_TRACE("Found %s device at %u:%u:%u\n", name,
@@ -574,9 +617,10 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 
         std::unique_ptr<virtio_base_t> self = create();
 
-        if (!virtio_base_t::virtio_devs.push_back(self))
+        if (unlikely(!virtio_base_t::virtio_devs.push_back(self)))
             panic_oom();
-        if (self->init(pci_iter)) {
+
+        if (likely(self->init(pci_iter))) {
             found_device(self);
             self.release();
         } else {
@@ -585,4 +629,8 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
     } while (pci_enumerate_next(&pci_iter));
 
     return 0;
+}
+
+virtio_factory_base_t::~virtio_factory_base_t()
+{
 }

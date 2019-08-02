@@ -13,13 +13,11 @@
 #include "threadsync.h"
 #include "assert.h"
 #include "cpu/atomic.h"
-#include "cpu/control_regs.h"
 #include "rand.h"
 #include "string.h"
 #include "heap.h"
 #include "elf64.h"
 #include "fileio.h"
-#include "bootdev.h"
 //#include "zlib/zlib.h"
 //#include "zlib_helper.h"
 #include "stdlib.h"
@@ -38,12 +36,12 @@
 #include "inttypes.h"
 #include "work_queue.h"
 #include "cpu/except_asm.h"
-
+#include "fs/tmpfs.h"
 #include "bootloader.h"
 
 kernel_params_t *kernel_params;
 
-size_t constexpr kernel_stack_size = 16384;
+size_t constexpr kernel_stack_size = 65536;
 char kernel_stack[kernel_stack_size] _section(".bspstk");
 
 #define TEST_FORMAT(f, t, v) \
@@ -59,14 +57,16 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
-#define ENABLE_FILESYSTEM_TEST      0
-#define ENABLE_SPAWN_STRESS         1
+#define ENABLE_FILESYSTEM_WR_TEST   0
+#define ENABLE_FILESYSTEM_RD_TEST   1
+#define ENABLE_SPAWN_STRESS         0
+#define ENABLE_SHELL                0
 #define ENABLE_CONDVAR_STRESS       0
 #define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     0
 #define ENABLE_FIND_VBE             0
-#define ENABLE_UNWIND               1
+#define ENABLE_UNWIND               0
 
 #if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE         64
@@ -135,7 +135,7 @@ private:
         static int completion_count;
         int id = atomic_xadd(&next_id, 1);
 
-        thread_set_affinity(tid, UINT64_C(1) << (index % thread_cpu_count()));
+        //thread_set_affinity(tid, UINT64_C(1) << (index % thread_cpu_count()));
 
         storage_dev_base_t *drive = storage_dev_open(devid);
 
@@ -180,7 +180,7 @@ private:
             uint64_t lba = rand_r_range(&seed, 16, data_blocks);
             //int64_t count = rand_r_range(&seed, 1, data_blocks);
 
-            status = iocp[slot].wait();
+            status = iocp[slot].wait().first;
             iocp[slot].reset();
             if (status != errno_t::OK) {
                 printdbg("(devid %d) (tid %3d)"
@@ -223,16 +223,18 @@ private:
                     ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%" PRIu64,
                                     completion_delta);
 
+                    auto ms = (now - last_time) / 1000000;
+
                     ofs += snprintf(buf + ofs, sizeof(buf) - ofs,
-                                    " %" PRIu64 " ms",
-                                    (now - last_time) / 1000000);
+                                    " %" PRIu64 " ms, %" PRIu64 "/sec",
+                                    ms, 1000 * completion_delta / ms);
 
                     last_time = now;
                 }
 
                 if (ofs) {
                     buf[ofs++] = 0;
-                    printdbg("%s\n", buf);
+                    printk("%s\n", buf);
                 }
             }
         }
@@ -255,7 +257,7 @@ void test_read_stress()
 {
     int dev_cnt = storage_dev_count();
     std::vector<read_stress_thread_t*> *read_stress_threads =
-            new std::vector<read_stress_thread_t*>();
+            new (std::nothrow) std::vector<read_stress_thread_t*>();
     if (!read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD))
         panic("Out of memory");
 
@@ -264,7 +266,8 @@ void test_read_stress()
             printk("(devid %d, worker %d)"
                    " Running block read stress\n",
                      devid, i);
-            read_stress_thread_t *thread = new read_stress_thread_t();
+            read_stress_thread_t *thread =
+                    new (std::nothrow) read_stress_thread_t();
             if (!read_stress_threads->push_back(thread))
                 panic_oom();
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
@@ -343,7 +346,7 @@ static int stress_mutex(void *p)
 
 #include "cpu/except.h"
 
-#if 1
+#if 0
 static int mprotect_test(void *)
 {
 //    char *mem = (char*)mmap(nullptr, 256 << 20, PROT_NONE, 0, -1, 0);
@@ -378,94 +381,6 @@ static int mprotect_test(void *)
 #if ENABLE_REGISTER_THREAD
 static int register_check(void *p)
 {
-    (void)p;
-    __asm__ __volatile__ (
-        "cli\n\t"
-        "movabs $0x0123456789ABCDEF,%%rbx\n\t"
-        "movabs $0xF0123456789ABCDE,%%rcx\n\t"
-        "movabs $0xEF0123456789ABCD,%%rdx\n\t"
-        "movabs $0xDEF0123456789ABC,%%rsi\n\t"
-        "movabs $0xCDEF0123456789AB,%%rdi\n\t"
-        "movabs $0xBCDEF0123456789A,%%rbp\n\t"
-        "movabs $0xABCDEF0123456789,%%r8 \n\t"
-        "movabs $0x9ABCDEF012345678,%%r9 \n\t"
-        "movabs $0x89ABCDEF01234567,%%r10\n\t"
-        "movabs $0x789ABCDEF0123456,%%r11\n\t"
-        "movabs $0x6789ABCDEF012345,%%r12\n\t"
-        "movabs $0x56789ABCDEF01234,%%r13\n\t"
-        "movabs $0x456789ABCDEF0123,%%r14\n\t"
-        "movabs $0x3456789ABCDEF012,%%r15\n\t"
-        "xor %%rax,%%rbx\n\t"
-        "xor %%rax,%%rcx\n\t"
-        "xor %%rax,%%rdx\n\t"
-        "xor %%rax,%%rsi\n\t"
-        "xor %%rax,%%rdi\n\t"
-        "xor %%rax,%%rbp\n\t"
-        "xor %%rax,%%r8 \n\t"
-        "xor %%rax,%%r9 \n\t"
-        "xor %%rax,%%r10\n\t"
-        "xor %%rax,%%r11\n\t"
-        "xor %%rax,%%r12\n\t"
-        "xor %%rax,%%r13\n\t"
-        "xor %%rax,%%r14\n\t"
-        "xor %%rax,%%r15\n\t"
-        "andq $-16,%%rsp\n\t"
-        "push %%rax\n\t"
-        "push %%rbx\n\t"
-        "push %%rcx\n\t"
-        "push %%rdx\n\t"
-        "push %%rsi\n\t"
-        "push %%rdi\n\t"
-        "push %%rbp\n\t"
-        "push %%r8 \n\t"
-        "push %%r9 \n\t"
-        "push %%r10\n\t"
-        "push %%r11\n\t"
-        "push %%r12\n\t"
-        "push %%r13\n\t"
-        "push %%r14\n\t"
-        "push %%r15\n\t"
-        "sti\n\t"
-        "0:\n\t"
-        "cmp 0*8(%%rsp),%%r15\n\t"
-        "jnz 0f\n\t"
-        "cmp 1*8(%%rsp),%%r14\n\t"
-        "jnz 0f\n\t"
-        "cmp 2*8(%%rsp),%%r13\n\t"
-        "jnz 0f\n\t"
-        "cmp 3*8(%%rsp),%%r12\n\t"
-        "jnz 0f\n\t"
-        "cmp 4*8(%%rsp),%%r11\n\t"
-        "jnz 0f\n\t"
-        "cmp 5*8(%%rsp),%%r10\n\t"
-        "jnz 0f\n\t"
-        "cmp 6*8(%%rsp),%%r9\n\t"
-        "jnz 0f\n\t"
-        "cmp 7*8(%%rsp),%%r8\n\t"
-        "jnz 0f\n\t"
-        "cmp 8*8(%%rsp),%%rbp\n\t"
-        "jnz 0f\n\t"
-        "cmp 9*8(%%rsp),%%rdi\n\t"
-        "jnz 0f\n\t"
-        "cmp 10*8(%%rsp),%%rsi\n\t"
-        "jnz 0f\n\t"
-        "cmp 11*8(%%rsp),%%rdx\n\t"
-        "jnz 0f\n\t"
-        "cmp 12*8(%%rsp),%%rcx\n\t"
-        "jnz 0f\n\t"
-        "cmp 13*8(%%rsp),%%rbx\n\t"
-        "jnz 0f\n\t"
-        "cmp 14*8(%%rsp),%%rax\n\t"
-        "jnz 0f\n\t"
-        "jmp 0b\n\t"
-        "0:\n\t"
-        "ud2\n\t"
-        "call cpu_debug_break\n\t"
-        "jmp 0b\n\t"
-        :
-        : "a" (p)
-    );
-    return 0;
 }
 #endif
 
@@ -597,21 +512,18 @@ static int stress_heap_thread(void *p)
 }
 #endif
 
+_noreturn
 int clks_unhalted(void *cpu)
 {
-    //auto cpu_nr = size_t(cpu);
-    //uint64_t last = thread_get_usage(-1);
-    //while (1) {
-    //    thread_sleep_for(1000);
-    //    uint64_t curr = thread_get_usage(-1);
-    //    printk("CPU %zx: %" PRIu64 " clocks\n", cpu_nr, curr - last);
-    //    last = curr;
-    //}
-    return 0;
+    auto cpu_nr = size_t(cpu);
+    uint64_t last = thread_get_usage(-1);
+    while (1) {
+        thread_sleep_for(1000);
+        uint64_t curr = thread_get_usage(-1);
+        printk("CPU %zx: %" PRIu64 " clocks\n", cpu_nr, curr - last);
+        last = curr;
+    }
 }
-
-extern void usbxhci_detect(void*);
-void (*usbxhci_pull_in)(void*) = usbxhci_detect;
 
 #if ENABLE_FIND_VBE
 static uint8_t sum_bytes(char *st, size_t len)
@@ -751,9 +663,9 @@ void test_catch()
 }
 #endif
 
-#if ENABLE_FILESYSTEM_TEST
+#if ENABLE_FILESYSTEM_WR_TEST
 _noreturn
-int test_filesystem_thread(void *p)
+int test_filesystem_write_thread(void *p)
 {
     int x = int(intptr_t(p));
 
@@ -780,28 +692,46 @@ int test_filesystem_thread(void *p)
             if (unlink_test == -int(errno_t::EROFS))
                 printk("Delete %s failed with %d\n", name, unlink_test);
         }
-
-        printk("Opening root directory\n");
-
-        int od = file_opendir("");
-        dirent_t de;
-        dirent_t *dep;
-        while (file_readdir_r(od, &de, &dep) > 0) {
-            printk("File: %s\n", de.d_name);
-        }
-        file_closedir(od);
     }
 }
 
-void test_filesystem()
+int test_filesystem_write()
 {
-    for (int n = 0; n < ENABLE_FILESYSTEM_TEST; ++n)
-        thread_create(test_filesystem_thread, (void*)intptr_t(n), 0, false);
+    for (int n = 0; n < ENABLE_FILESYSTEM_WR_TEST; ++n)
+        thread_create(test_filesystem_write_thread, (void*)intptr_t(n), 0, false);
+    return 1;
+}
+#endif
+
+#if ENABLE_FILESYSTEM_RD_TEST > 0
+int test_filesystem_read_thread(void*)
+{
+    printk("Opening root directory\n");
+
+    int od = file_opendir("");
+    dirent_t de;
+    dirent_t *dep;
+    while (file_readdir_r(od, &de, &dep) > 0) {
+        printk("File: %s\n", de.d_name);
+    }
+    file_closedir(od);
+    return 1;
+}
+
+bool test_filesystem_read()
+{
+    int tid = thread_create(test_filesystem_read_thread, nullptr, 0, false);
+    if (tid > 0) {
+        thread_close(tid);
+        return true;
+    }
+    return false;
 }
 #endif
 
 void test_spawn()
 {
+#if ENABLE_SPAWN_STRESS
     printk("Starting spawn stress with %d threads\n", ENABLE_SPAWN_STRESS);
     for (size_t i = 0; i < ENABLE_SPAWN_STRESS; ++i) {
         pid_t pid = 0;
@@ -812,11 +742,20 @@ void test_spawn()
                  pid, spawn_result);
         assert(spawn_result == 0 || pid < 0);
     }
+#endif
+
+#if ENABLE_SHELL
+    int shell_pid;
+    int spawn_result = process_t::spawn(
+                &shell_pid, "shell", nullptr, nullptr);
+    printk("shell pid: %d\n", spawn_result);
+#endif
 }
 
 static int init_thread(void *)
 {
 #if ENABLE_UNWIND
+    printk("Testing exception unwind\n");
     test_unwind();
     test_catch();
 #endif
@@ -830,49 +769,90 @@ static int init_thread(void *)
     printk("Initializing keyboard event queue\n");
     keybd_init();
 
-    printk("Initializing 8042 keyboard\n");
-    keyb8042_init();
+    tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
+    modload_init();
 
-    // Facilities needed by drivers
-    printk("Initializing driver base\n");
-    callout_call(callout_type_t::driver_base);
+    //printk("Running set<int> self test\n");
+    //std::set<int>::test();
+//    rbtree_t<>::test();
+
+//    {
+//        using tree = rbtree_t<uintptr_t,uintptr_t>;
+//        tree rotation_stress;
+//        rotation_stress.init();
+//        for (int i = 0; i < 4000000; ++i) {
+//            rotation_stress.insert(i, 0);
+//            if (i >= 1000000) {
+//                tree::kvp_t kvp{i - 1000000, 0};
+//                tree::iter_t it;
+//                tree::kvp_t *item = rotation_stress.find(&kvp, &it);
+//                assert(it);
+//                rotation_stress.delete_at(it);
+//            }
+//        }
+//    }
+
+    pid_t init_pid = -1;
+    if (unlikely(process_t::spawn(&init_pid, "init", nullptr, nullptr) != 0))
+        panic("spawn init failed!");
+
+    if (unlikely(process_t::wait_for_exit(init_pid) < 0))
+        panic("failed to wait for init");
+
+#if 0
+    printk("Initializing 8042 keyboard\n");
+    modload_load("keyb8042.km");
+    //thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
 
     // Run late initializations
     printk("Initializing late devices\n");
-    callout_call(callout_type_t::late_dev);
+    callout_call(callout_type_t::late_dev, true);
 
     // Register USB interfaces
     printk("Initializing USB interfaces\n");
-    callout_call(callout_type_t::usb);
+    //callout_call(callout_type_t::usb, true);
+
+    modload_load("usbxhci.km");
 
     // Register filesystems
     printk("Initializing filesystems\n");
-    callout_call(callout_type_t::reg_filesys);
+    callout_call(callout_type_t::reg_filesys, true);
+
+    modload_load("fat32.km");
+    modload_load("iso9660.km");
 
     // Storage interfaces
     printk("Initializing storage devices\n");
-    callout_call(callout_type_t::storage_dev);
+    callout_call(callout_type_t::storage_dev, true);
+
+    modload_load("nvme.km");
+    modload_load("ahci.km");
+    modload_load("ide.km");
 
     // Register partition schemes
     printk("Initializing partition probes\n");
-    callout_call(callout_type_t::partition_probe);
+    callout_call(callout_type_t::partition_probe, true);
+
+    modload_load("gpt.km");
+    modload_load("mbr.km");
 
     // Register network interfaces
     printk("Initializing network interfaces\n");
-    callout_call(callout_type_t::nic);
+    callout_call(callout_type_t::nic, true);
+
+    modload_load("rtl8139.km");
 
     // Register network interfaces
     printk("Initializing network interfaces\n");
-    callout_call(callout_type_t::nics_ready);
+    callout_call(callout_type_t::nics_ready, true);
 
-    //bootdev_info(0, 0, 0);
-
-#if ENABLE_SPAWN_STRESS > 0
-    test_spawn();
+    modload_load("ide.km");
 #endif
 
-    //printk("Initializing framebuffer\n");
-    //fb_init();
+    //test_spawn();
+
+//    printk("Initializing framebuffer\n");
+//    fb_init();
 
     //priqueue_test.test();
 
@@ -911,15 +891,19 @@ static int init_thread(void *)
     printk("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
 #endif
 
-#if ENABLE_FILESYSTEM_TEST
-    test_filesystem();
+#if ENABLE_FILESYSTEM_RD_TEST
+    test_filesystem_read();
 #endif
 
-    printk("Running mprotect self test\n");
-    mprotect_test(nullptr);
+#if ENABLE_FILESYSTEM_WR_TEST
+    test_filesystem_write();
+#endif
+
+    //printk("Running mprotect self test\n");
+    //mprotect_test(nullptr);
 
     printk("Running red-black tree self test\n");
-    rbtree_t<>::test();
+    //rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
     printk("Starting framebuffer stress\n");
@@ -928,15 +912,15 @@ static int init_thread(void *)
     printk("draw thread id=%d\n", draw_thread_id);
 #endif
 
-    modload_init();
+//    printk("Running module load test\n");
+//    module_entry_fn_t mod_entry = modload_load("hello.km");
+//    if (mod_entry) {
+//        int check = mod_entry();
+//        assert(check == 40);
+//        printk("Module load test %s\n", check == 40 ? "passed" : "failed");
+//    }
 
-    printk("Running module load test\n");
-    module_entry_fn_t mod_entry = modload_load("hello.km");
-    if (mod_entry) {
-        int check = mod_entry();
-        assert(check == 40);
-        printk("Module load test %s\n", check == 40 ? "passed" : "failed");
-    }
+    //modload_load("rtl8139.km");
 
 #if ENABLE_FIND_VBE
     thread_create(find_vbe, (void*)0xC0000, 0, false);
@@ -947,7 +931,7 @@ static int init_thread(void *)
     printk("Running context switch stress with %d threads\n",
              ENABLE_CTXSW_STRESS_THREAD);
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
-        thread_create(ctx_sw_thread, 0, 0, false);
+        thread_close(thread_create(ctx_sw_thread, 0, 0, false));
     }
 #endif
 
@@ -998,6 +982,8 @@ static int init_thread(void *)
     }
 #endif
 
+    printk("init_thread completed\n");
+
     return 0;
 }
 
@@ -1010,8 +996,59 @@ int debugger_thread(void *)
     return 0;
 }
 
+class something {
+public:
+    int big = 0xbbb12166;
+    long long enough = 0xeee000020001111;
+
+    ~something()
+    {
+        printdbg("something destructed\n");
+    }
+};
+
+class locked {
+public:
+    virtual void do_thing()
+    {
+        scoped_lock lock(some_lock);
+
+        do_throw();
+
+        x = 1;
+    }
+
+    virtual void do_throw()
+    {
+        if (x == 0)
+            throw something();
+    }
+
+private:
+    int x = 0;
+
+    using lock_type = std::mutex;
+    using scoped_lock = std::unique_lock<lock_type>;
+    lock_type some_lock;
+};
+
 extern "C" _noreturn int main(void)
 {
+    //bool caught = false;
+    //try {
+    //    throw something();
+    //} catch (something const& e) {
+    //    caught = true;
+    //}
+    //
+    //caught = false;
+    //try {
+    //    locked thing;
+    //    thing.do_thing();
+    //} catch (something const& e) {
+    //    caught = true;
+    //}
+
     if (!kernel_params->wait_gdb)
         thread_create(init_thread, nullptr, 0, false);
     else
@@ -1026,9 +1063,5 @@ extern "C" _noreturn int main(void)
 
 extern "C" _noreturn void mp_main()
 {
-    cpu_init_early(1);
-
-    callout_call(callout_type_t::smp_start);
-
-    __builtin_unreachable();
+    cpu_init_ap();
 }

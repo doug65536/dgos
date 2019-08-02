@@ -5,6 +5,7 @@
 #include "hash_table.h"
 #include "cpu/atomic.h"
 #include "refcount.h"
+#include "export.h"
 
 struct udp_bind_t : public refcounted<udp_bind_t> {
     ipv4_addr_pair_t pair;
@@ -22,7 +23,7 @@ static void udp_handle_tbl_init(void)
     next_handle = 1;
 }
 
-void udp_frame_received(ethq_pkt_t *pkt)
+EXPORT void udp_frame_received(ethq_pkt_t *pkt)
 {
     udp_hdr_t const *p = (udp_hdr_t*)pkt;
 
@@ -37,7 +38,7 @@ void udp_frame_received(ethq_pkt_t *pkt)
     (void)p;
 }
 
-int udp_bind(ipv4_addr_pair_t const *pair)
+EXPORT int udp_bind(ipv4_addr_pair_t const *pair)
 {
     int handle = atomic_xadd(&next_handle, 1);
     udp_bind_t *bind = (udp_bind_t*)malloc(sizeof(*bind));

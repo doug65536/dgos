@@ -1,0 +1,2 @@
+-std=c17
+-Wno-old-style-cast

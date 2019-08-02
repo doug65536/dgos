@@ -4,6 +4,10 @@
 #include "cpu/cpu_metrics.h"
 //#include "process.h"
 #include "errno.h"
+#include "string.h"
+#include "refcount.h"
+
+__BEGIN_DECLS
 
 /// Failure return value for memory mapping functions
 #define MAP_FAILED ((void*)-1)
@@ -93,6 +97,9 @@
 #define MAP_EXECUTABLE      0
 #define MAP_FILE            0
 #define MAP_NONBLOCK        0
+
+/// Allocate address space only
+void *mm_alloc_space(size_t size);
 
 /// Map a range of address space
 /// __addr, hint, map memory as near as possible to that address,
@@ -244,7 +251,7 @@ struct mmphysrange_t {
 /// sizes less than or equal to max_length
 size_t mphysranges(mmphysrange_t *ranges,
                    size_t ranges_count,
-                   const void *addr, size_t size,
+                   void const *addr, size_t size,
                    size_t max_size);
 
 // Ensure no range crosses the specified boundary
@@ -289,8 +296,8 @@ void *sbrk(intptr_t __increment);
 #endif
 
 /// Maximum number of arguments to exec functions
-#define _SC_ARG_MAX
-#define ARG_MAX _SC_ARG_MAX
+//#define _SC_ARG_MAX
+//#define ARG_MAX _SC_ARG_MAX
 
 /// Maximum number of processes per user
 #define _SC_CHILD_MAX
@@ -386,8 +393,32 @@ uintptr_t mm_fork_kernel_text();
 
 void mm_set_master_pagedir();
 
-extern "C"
-bool mm_copy_user(void *dst, void const *src, size_t size);
+__END_DECLS
 
-extern "C" _const
-bool mm_is_user_range(void *buf, size_t size);
+#include "cxxexception.h"
+
+class inval_user_pf : public std::exception {
+    inval_user_pf(uintptr_t address, bool insn, bool write);
+
+    inval_user_pf(inval_user_pf const&) = default;
+    ~inval_user_pf() = default;
+
+    uintptr_t const address = 0;
+    bool insn = false;
+    bool write = false;
+
+    // exception interface
+protected:
+    const char *what() const noexcept override;
+};
+
+class ralloc_item_t : refcounted<ralloc_item_t> {
+public:
+    virtual ~ralloc_item_t() = 0;
+};
+
+class ralloc_t {
+public:
+
+private:
+};

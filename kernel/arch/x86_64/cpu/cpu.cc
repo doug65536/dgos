@@ -1,4 +1,3 @@
-
 #include "cpu.h"
 #include "mm.h"
 #include "mmu.h"
@@ -22,8 +21,214 @@
 #include "numeric_limits.h"
 #include "except.h"
 #include "work_queue.h"
+#include "utility.h"
 
 uint32_t default_mxcsr_mask;
+
+extern uint8_t * const ___rodata_fixup_insn_st[];
+extern uint8_t * const ___rodata_fixup_insn_en[];
+
+static uint8_t const stac_insn[] = {
+    0x0f, 0x01, 0xcb
+};
+
+static uint8_t const clac_insn[] = {
+    0x0f, 0x01, 0xca
+};
+
+static uint8_t const vzeroall_nopw_insn[] = {
+    0xc5, 0xfc, 0x77, 0x66, 0x90
+};
+
+static uint8_t const rdfsbase_r13_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xc5
+};
+
+static uint8_t const rdgsbase_r14_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xce
+};
+
+static uint8_t const wrfsbase_r13_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xd5
+};
+
+static uint8_t const wrgsbase_r14_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xde
+};
+
+static uint8_t const xsaves_rsi_insn[] = {
+    0x0f, 0xc7, 0x2e    // xsaves (%rsi)
+};
+
+static uint8_t const xsaveopt_rsi_insn[] = {
+    0x0f, 0xae, 0x36    // xsaveopt (%rsi)
+};
+
+static uint8_t const xsavec_rsi_insn[] = {
+    0x0f, 0xc7, 0x26    // xsavec (%rsi)
+};
+
+static uint8_t const xsave_rsi_insn[] = {
+    0x0f, 0xae, 0x26    // xsave  (%rsi)
+};
+
+static uint8_t const fxsave_rsi_insn[] = {
+    0x0f, 0xae, 0x06    // fxsave (%rsi)
+};
+
+static uint8_t const xrstor_rsi_insn[] = {
+    0x0f, 0xae, 0x2e    // xrstor (%rsi)
+};
+
+static uint8_t const xrstors_rsi_insn[] = {
+    0x0f, 0xc7, 0x1e    // xrstors (%rsi)
+};
+
+static uint8_t const fxrstor_rsi_insn[] = {
+    0x0f, 0xae, 0x0e        // fxrstor (%rsi)
+};
+
+static uint8_t const xsaves64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x2e  // xsaves64 (%rsi)
+};
+
+static uint8_t const xsaveopt64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x36  // xsaveopt64 (%rsi)
+};
+
+static uint8_t const xsavec64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x26  // xsavec64 (%rsi)
+};
+
+static uint8_t const xsave64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x26  // xsave64 (%rsi)
+};
+
+static uint8_t const fxsave64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x06  // fxsave64 (%rsi)
+};
+
+static uint8_t const xrstor64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x2e  // xrstor64 (%rsi)
+};
+
+static uint8_t const xrstors64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x1e  // xrstors64 (%rsi)
+};
+
+static uint8_t const fxrstor64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x0e  // fxrstor64 (%rsi)
+};
+
+static uint8_t const jmp_disp32_insn[] = {
+    0xe9, 0x00, 0x00, 0x00  // jmp further_than_signed_byte_displacement
+};
+
+static uint8_t const *xsave64_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxsave64_rsi_insn;
+    case xsave_support_t::XSAVE: return xsave64_rsi_insn;
+    case xsave_support_t::XSAVEC: return xsavec64_rsi_insn;
+    case xsave_support_t::XSAVEOPT: return xsaveopt64_rsi_insn;
+    case xsave_support_t::XSAVES: return xsaves64_rsi_insn;
+    }
+}
+
+static size_t xsave64_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxsave64_rsi_insn);
+    case xsave_support_t::XSAVE: return sizeof(xsave64_rsi_insn);
+    case xsave_support_t::XSAVEC: return sizeof(xsavec64_rsi_insn);
+    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt64_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xsaves64_rsi_insn);
+    }
+}
+
+static uint8_t const *xsave32_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxsave_rsi_insn;
+    case xsave_support_t::XSAVE: return xsave_rsi_insn;
+    case xsave_support_t::XSAVEC: return xsavec_rsi_insn;
+    case xsave_support_t::XSAVEOPT: return xsaveopt_rsi_insn;
+    case xsave_support_t::XSAVES: return xsaves_rsi_insn;
+    }
+}
+
+static size_t xsave32_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxsave_rsi_insn);
+    case xsave_support_t::XSAVE: return sizeof(xsave_rsi_insn);
+    case xsave_support_t::XSAVEC: return sizeof(xsavec_rsi_insn);
+    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xsaves_rsi_insn);
+    }
+}
+
+static uint8_t const *xrstor64_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxrstor_rsi_insn;
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return xrstor64_rsi_insn;
+    case xsave_support_t::XSAVES: return xrstors64_rsi_insn;
+    }
+}
+
+static size_t xrstor64_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxrstor_rsi_insn);
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return sizeof(xrstor64_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xrstors64_rsi_insn);
+    }
+}
+
+static uint8_t const *xrstor32_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxrstor_rsi_insn;
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return xrstor_rsi_insn;
+    case xsave_support_t::XSAVES: return xrstors_rsi_insn;
+    }
+}
+
+static size_t xrstor32_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxrstor_rsi_insn);
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return sizeof(xrstor_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xrstors_rsi_insn);
+    }
+}
+
+// These preserve all registers like the instruction they replace
+extern "C" void soft_vzeroall();
+extern "C" void soft_rdfsgsbase_r13r14();
+extern "C" void soft_wrfsgsbase_r13r14();
+extern "C" void soft_rdfsbase_r13();
+extern "C" void soft_rdgsbase_r14();
+extern "C" void soft_wrfsbase_r13();
+extern "C" void soft_wrgsbase_r14();
+
 
 void cpu_init_early(int ap)
 {
@@ -31,17 +236,23 @@ void cpu_init_early(int ap)
         mm_set_master_pagedir();
 
     gdt_init(ap);
-    gdt_init_tss_early();
-    idt_init(ap);
 
-    cpu_cs_set(GDT_SEL_KERNEL_CODE64);
+    // These two must agree, always (except ring 0 allows null ss)
     cpu_ss_set(GDT_SEL_KERNEL_DATA);
+    cpu_cs_set(GDT_SEL_KERNEL_CODE64);
+
+    // The CPU doesn't care about any of these registers in long mode
+    // So, might as well leave them
+    // permanently set to compatibility mode values
     cpu_ds_set(GDT_SEL_USER_DATA | 3);
     cpu_es_set(GDT_SEL_USER_DATA | 3);
     cpu_fs_set(GDT_SEL_USER_DATA | 3);
     cpu_gs_set(GDT_SEL_USER_DATA | 3);
 
-    thread_set_cpu_gsbase(ap);
+    thread_cls_init_early(ap);
+
+    gdt_init_tss_early();
+    idt_init(ap);
 
     // Enable SSE early
     cpu_cr4_change_bits(0, CPU_CR4_OFXSR | CPU_CR4_OSXMMEX);
@@ -76,6 +287,183 @@ void cpu_init_early(int ap)
         cpu_cr4_change_bits(0, CPU_CR4_OSXSAVE);
         cpu_xcr_change_bits(0, ~xsave_supported_states, xsave_enabled_states);
     }
+
+    idt_xsave_detect(ap);
+
+    // Perform code patch fixups
+    for (uint8_t * const *fixup_ptr = ___rodata_fixup_insn_st;
+         !ap && fixup_ptr < ___rodata_fixup_insn_en; ++fixup_ptr) {
+        uint8_t *code = *fixup_ptr;
+
+        uintptr_t addr = uintptr_t(code);
+        uintptr_t next = 0;
+
+        size_t replace_sz = 0;
+
+        intptr_t dist = 0;
+
+        switch (*code) {
+        case 0xE8:
+            // Call instruction
+            int32_t disp32;
+            next = addr + 5;
+            memcpy(&disp32, code + 1, sizeof(disp32));
+
+            uintptr_t dest_addr;
+            dest_addr = next + disp32;
+
+            if (dest_addr == uintptr_t(protection_barrier)) {
+                // No point calling protection barrier if
+                // the CPU does not have IBPB, nop it out
+                cpu_scoped_wp_disable wp_dis;
+                if (!cpuid_has_ibpb()) {
+                    cpu_patch_nop(code, 5);
+                } else {
+                    replace_sz = 5;
+                    next = addr + 5;
+                    dist = uintptr_t(protection_barrier_ibpb) - next;
+                    break;
+                }
+            }
+
+            continue;
+
+        case 0xF3:
+            // rd/wr fs/gs base
+
+            //
+            // Read and write fsbase r13
+
+            if (unlikely(!memcmp(code, rdfsbase_r13_insn,
+                                sizeof(rdfsbase_r13_insn)) &&
+                         !memcmp(code + sizeof(rdfsbase_r13_insn),
+                                 rdgsbase_r14_insn,
+                                 sizeof(rdgsbase_r14_insn)))) {
+                // Both at once in one
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                replace_sz = 10;
+                next = addr + 5;
+                dist = uintptr_t(soft_rdfsgsbase_r13r14) - next;
+            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
+                                        sizeof(wrfsbase_r13_insn)) &&
+                                !memcmp(code + sizeof(wrfsbase_r13_insn),
+                                        wrgsbase_r14_insn,
+                                        sizeof(wrgsbase_r14_insn)))) {
+                // Both at once in one
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                replace_sz = 10;
+                next = addr + 5;
+                dist = uintptr_t(soft_wrfsgsbase_r13r14) - next;
+            } else if (unlikely(!memcmp(code, rdfsbase_r13_insn,
+                                        sizeof(rdfsbase_r13_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_rdfsbase_r13) - next;
+            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
+                                        sizeof(wrfsbase_r13_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_wrfsbase_r13) - next;
+            } else if (unlikely(!memcmp(code, rdgsbase_r14_insn,
+                                        sizeof(rdgsbase_r14_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_rdgsbase_r14) - next;
+            } else if (unlikely(!memcmp(code, wrgsbase_r14_insn,
+                                        sizeof(wrgsbase_r14_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_wrgsbase_r14) - next;
+            }
+            break;
+
+        case 0xC5:
+            if (unlikely(!memcmp(code, vzeroall_nopw_insn,
+                                 sizeof(vzeroall_nopw_insn)))) {
+                if (cpuid_has_avx())
+                    continue;
+
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_vzeroall) - next;
+            }
+            break;
+
+        case 0x0f:
+            if (unlikely(!memcmp(code, fxsave_rsi_insn,
+                                 sizeof(fxsave_rsi_insn)))) {
+                cpu_patch_code(code, xsave32_insn(xsave_support),
+                               xsave32_sz(xsave_support));
+                continue;
+            } else if (unlikely(!memcmp(code, fxrstor_rsi_insn,
+                                        sizeof(fxrstor_rsi_insn)))) {
+                cpu_patch_code(code, xrstor32_insn(xsave_support),
+                               xrstor32_sz(xsave_support));
+                continue;
+            } else if (unlikely(!memcmp(code, stac_insn,
+                                        sizeof(stac_insn)))) {
+                if (!cpuid_has_smap())
+                    cpu_patch_nop(code, sizeof(stac_insn));
+                continue;
+            } else if (unlikely(!memcmp(code, clac_insn,
+                                        sizeof(clac_insn)))) {
+                if (!cpuid_has_smap())
+                    cpu_patch_nop(code, sizeof(stac_insn));
+                continue;
+            }
+            break;
+
+        case 0x48:
+            if (unlikely(!memcmp(code, fxsave64_rsi_insn,
+                                 sizeof(fxsave64_rsi_insn)))) {
+                cpu_patch_code(code, xsave64_insn(xsave_support),
+                               xsave64_sz(xsave_support));
+                continue;
+            } else if (unlikely(!memcmp(code, fxrstor64_rsi_insn,
+                                        sizeof(fxrstor64_rsi_insn)))) {
+                cpu_patch_code(code, xrstor64_insn(xsave_support),
+                               xrstor64_sz(xsave_support));
+                continue;
+            }
+            break;
+
+        }
+
+        if (unlikely(dist == 0))
+            panic("Not valid\n");
+
+        // Replace with a call
+
+        // Relocation truncated to fit? Doubt it but unhandled if so
+        if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
+            panic("Relocation would be truncated to fit");
+
+        // Disable write protection and interrupts temporarily
+        cpu_scoped_wp_disable wp_dis;
+        cpu_scoped_irq_disable irq_dis;
+
+        code[0] = 0xE8;
+        memcpy(code + 1, &dist, sizeof(uint32_t));
+
+        if (unlikely(replace_sz > 5))
+            cpu_patch_nop(code + 5, replace_sz - 5);
+    }
 }
 
 _constructor(ctor_cpu_init_bsp)
@@ -84,7 +472,17 @@ static void cpu_init_bsp()
     cpu_init(0);
 }
 
-void cpu_init(int)
+_noreturn
+void cpu_init_ap()
+{
+    cpu_init_early(1);
+    cpu_init(1);
+    apic_init(1);
+    thread_init(1);
+    __builtin_unreachable();
+}
+
+void cpu_init(int ap)
 {
     cpu_cr0_change_bits(
                 // TS = 0 (No task switch pending)
@@ -153,17 +551,17 @@ void cpu_init(int)
         cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, 0,
                             CPU_MSR_MISC_ENABLE_FAST_STR);
 
-//    if (cpuid_is_intel()) {
-//        clr = CPU_MSR_MISC_ENABLE_LIMIT_CPUID;
+    //    if (cpuid_is_intel()) {
+    //        clr = CPU_MSR_MISC_ENABLE_LIMIT_CPUID;
 
-//        if (cpuid_has_mwait())
-//            set = CPU_MSR_MISC_ENABLE_MONITOR_FSM;
+    //        if (cpuid_has_mwait())
+    //            set = CPU_MSR_MISC_ENABLE_MONITOR_FSM;
 
-//        if (cpuid_has_nx())
-//            clr = CPU_MSR_MISC_ENABLE_XD_DISABLE;
+    //        if (cpuid_has_nx())
+    //            clr = CPU_MSR_MISC_ENABLE_XD_DISABLE;
 
-//        cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
-//    }
+    //        cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
+    //    }
 
     // Enable syscall/sysret
     set = CPU_MSR_EFER_SCE;
@@ -176,20 +574,55 @@ void cpu_init(int)
     cpu_msr_change_bits(CPU_MSR_EFER, clr, set);
 
     // Configure syscall
+    // Clear the alighment check, direction flag, trap flag, interrupt flag,
+    // resume flag, v86 flag
     cpu_msr_set(CPU_MSR_FMASK, CPU_EFLAGS_AC | CPU_EFLAGS_DF |
                 CPU_EFLAGS_TF | CPU_EFLAGS_IF | CPU_EFLAGS_RF |
                 CPU_EFLAGS_VM);
+    // Set 64 bit syscall kernel entry point
     cpu_msr_set(CPU_MSR_LSTAR, uint64_t(syscall_entry));
-    cpu_msr_set(CPU_MSR_STAR, (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
-               (uint64_t(GDT_SEL_USER_CODE32 | 3) << 48));
+    cpu_msr_set(CPU_MSR_CSTAR, uint64_t(syscall32_entry));
+    // syscall CS/SS at bit 48, sysret CS/SS at bit 32
+    cpu_msr_set(CPU_MSR_STAR,
+                (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
+                (uint64_t(GDT_SEL_USER_CODE32 | 3) << 48));
+
 
     // SYSCALL and SYSRET are hardwired to assume these things about the GDT:
+    static_assert(GDT_SEL_USER_CODE64 == GDT_SEL_USER_CODE32 + 16,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
     static_assert(GDT_SEL_USER_DATA == GDT_SEL_USER_CODE32 + 8,
                   "GDT inconsistent with SYSCALL/SYSRET behaviour");
     static_assert(GDT_SEL_USER_CODE64 == GDT_SEL_USER_DATA + 8,
                   "GDT inconsistent with SYSCALL/SYSRET behaviour");
     static_assert(GDT_SEL_KERNEL_DATA == GDT_SEL_KERNEL_CODE64 + 8,
                   "GDT inconsistent with SYSCALL/SYSRET behaviour");
+
+
+    // Configure sysenter
+    cpu_msr_set(CPU_MSR_SYSENTER_CS, 0);
+    cpu_msr_set(CPU_MSR_SYSENTER_EIP, uint64_t(0));
+    cpu_msr_set(CPU_MSR_SYSENTER_ESP, 0);
+
+    // Configure security features/workarounds
+    clr = 0;
+    set = 0;
+
+    // Try to resort to IBRS if IBPB not supported
+    // If we can't flush branch prediction caches then make CPU segregate
+    if (!cpuid_has_ibpb() && cpuid_has_ibrs())
+        set |= CPU_MSR_SPEC_CTRL_IBRS;
+
+    // Enable peer threads to have separate indirect branch predictors
+    if (cpuid_has_stibp())
+        set |= CPU_MSR_SPEC_CTRL_STIBP;
+
+    // Enable blocking speculative stores until prior loads are resolved
+    if (cpuid_has_ssbd())
+        set |= CPU_MSR_SPEC_CTRL_SSBD;
+
+    if (set)
+        cpu_msr_change_bits(CPU_MSR_SPEC_CTRL, clr, set);
 
     // Load null LDT
     cpu_ldt_set(0);
@@ -212,6 +645,10 @@ void cpu_hw_init(int ap)
 
     apic_init(ap);
 
+    // We know the machine topology now...
+
+    thread_set_cpu_count(apic_cpu_count());
+
     // Initialize APIC, but fallback to 8259 if no MP tables
     if (!apic_enable()) {
         printk("Enabling 8259 PIC\n");
@@ -229,28 +666,21 @@ void cpu_hw_init(int ap)
 
     callout_call(callout_type_t::smp_online);
 
+#ifdef _CALL_TRACE_ENABLED
+    extern void eainst_set_cpu_count(int count);
+    eainst_set_cpu_count(thread_cpu_count());
+#endif
+
     printk("Initializing RTC\n");
 
     cmos_init();
 
-    printk("Enabling 8254 PIT\n");
+    //printk("Enabling 8254 PIT\n");
 
     pit8254_enable();
 
     //printk("Enabling IRQs\n");
 }
-
-static void cpu_init_smp_apic(void *)
-{
-    cpu_init(1);
-
-    printdbg("AP in cpu_init_smp_apic\n");
-    apic_init(1);
-
-    thread_init(1);
-}
-
-REGISTER_CALLOUT(cpu_init_smp_apic, nullptr, callout_type_t::smp_start, "200");
 
 void cpu_patch_insn(void *addr, uint64_t value, size_t size)
 {
@@ -271,14 +701,24 @@ void cpu_patch_code(void *addr, void const *src, size_t size)
 }
 
 // points refers to an array of pointers to labels that are after the calls
-void cpu_patch_calls(void *call_target, size_t point_count, uint32_t **points)
+// pass nullptr call_target to NOP out call instructions
+void cpu_patch_calls(void const *call_target,
+                     size_t point_count, uint32_t **points)
 {
     for (size_t i = 0; i < point_count; ++i) {
         int32_t *point = (int32_t*)points[i];
         intptr_t dist = intptr_t(call_target) - intptr_t(point);
-        assert(dist >= std::numeric_limits<int32_t>::min() &&
-               dist <= std::numeric_limits<int32_t>::max());
-        point[-1] = dist;
+        if (call_target != nullptr) {
+            assert(dist >= std::numeric_limits<int32_t>::min() &&
+                   dist <= std::numeric_limits<int32_t>::max());
+            cpu_patch_insn(point - 1, dist, sizeof(uint32_t));
+        } else {
+            // 0xE8 is call disp32 opcode
+            uint8_t *call = (uint8_t*)(point - 1) - 1;
+            assert(*call == 0xE8);
+            if (*call == 0xE8)
+                cpu_patch_nop(call, 5);
+        }
     }
     atomic_fence();
 }
@@ -310,50 +750,73 @@ void cpu_patch_nop(void *addr, size_t size)
 
     uint8_t *out = (uint8_t*)addr;
 
-     while (size) {
+    cpu_scoped_irq_disable irq_dis;
+
+    while (size) {
         size_t insn_sz = size <= 15 ? size : 15;
         size -= insn_sz;
 
         // Place a number of 0x66 prefixes for sizes over 8 bytes
-        if (size > 8) {
+        if (insn_sz > 8) {
             out = std::fill_n(out, insn_sz - 8, 0x66);
             insn_sz = 8;
         }
 
-        out = std::copy(nop_insns + nop_lookup[insn_sz - 1],
-                        nop_insns + nop_lookup[insn_sz - 1] + insn_sz, out);
-     }
+        cpu_patch_code(out, nop_insns + nop_lookup[insn_sz - 1], insn_sz);
 
-     atomic_fence();
+        // Serializing instruction
+        cpu_fault_address_set(0);
+    }
 }
 
-bool cpu_msr_set_safe(uint32_t msr, uint32_t value)
+bool cpu_patch_jmp(void *addr, size_t size, void const *jmp_target)
 {
-    __try {
-        cpu_msr_set(msr, value);
+    assert(size >= 5);
+    uintptr_t code = uintptr_t(addr);
+    uintptr_t next = code + 4;
+    uintptr_t dest = uintptr_t(jmp_target);
+    intptr_t dist = dest - next;
+    if (likely(dist >= std::numeric_limits<int32_t>::min() ||
+               dist <= std::numeric_limits<int32_t>::max())) {
+        uint8_t buf[sizeof(jmp_disp32_insn)];
+        memcpy(buf, jmp_disp32_insn, sizeof(buf));
+        int32_t disp32 = dist;
+        memcpy(buf + 1, &disp32, sizeof(disp32));
+        cpu_patch_code(addr, jmp_disp32_insn, sizeof(jmp_disp32_insn));
+        return true;
     }
-    __catch {
-        return false;
-    }
-    return true;
+    return false;
 }
+
+bool cpu_msr_set_safe(uint32_t msr, uint64_t value)
+{
+    bool result = true;
+    try {
+        cpu_msr_set(msr, value);
+    } catch (ext::gpf_exception const&) {
+        result = false;
+    }
+
+    return result;
+}
+
+
+
+extern "C" uint128_t nofault_rdmsr(uint32_t msr);
 
 bool cpu_msr_get_safe(uint32_t msr, uint64_t &value)
 {
-    __try {
-        value = cpu_msr_get(msr);
-    }
-    __catch {
-        return false;
-    }
-    return true;
+    auto result = nofault_rdmsr(msr);
+
+    value = uint64_t(result);
+    return (result >> 64) == 0;
 }
 
 // Runs once on each CPU at early boot
 static void cpu_init_late_msrs_one_cpu()
 {
     // Enable lfence speculation control on AMD processors
-    // Enable lfence to block instruction issue until it retires
+    // Enable lfence to block op dispatch until it retires
     // MSR is available on family 10h/12h/14h/15h/16h/17h
     if (cpuid_is_amd() && cpuid_family() >= 0x10 && cpuid_family() <= 0x17 &&
             cpuid_family() != 0x11 && cpuid_family() != 0x13) {
@@ -365,9 +828,22 @@ static void cpu_init_late_msrs_one_cpu()
 
 void cpu_init_late_msrs()
 {
-    for (size_t i = 0, e = thread_cpu_count(); i < e; ++i) {
-        workq::enqueue_on_cpu(i, [=] {
-            cpu_init_late_msrs_one_cpu();
-        });
-    }
+    workq::enqueue_on_all_barrier([=] (size_t) {
+        cpu_init_late_msrs_one_cpu();
+    });
+}
+
+EXPORT bool arch_irq_disable()
+{
+    return cpu_irq_save_disable();
+}
+
+EXPORT void arch_irq_enable()
+{
+    cpu_irq_enable();
+}
+
+EXPORT void arch_irq_toggle(bool en)
+{
+    cpu_irq_toggle(en);
 }

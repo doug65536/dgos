@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <errno.h>
 
-ssize_t pwrite(int fd, const void *buf, size_t sz, off_t ofs)
+ssize_t pwrite(int fd, void const *buf, size_t sz, off_t ofs)
 {
     long status = syscall4(fd, long(buf), sz, ofs, SYS_pwrite64);
 

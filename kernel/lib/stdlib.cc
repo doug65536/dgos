@@ -5,109 +5,208 @@
 #include "printk.h"
 #include "heap.h"
 #include "callout.h"
+#include "thread.h"
+#include "cpu/atomic.h"
+#include "export.h"
+
+std::nothrow_t const std::nothrow;
 
 // Always use paged allocation with guard pages
 // Realloc always moves the memory to a new range
-#define HEAP_PAGEONLY 1
+#define HEAP_PAGEONLY 0
+
+static heap_t **default_heaps;
+static size_t heap_count;
 
 #if !HEAP_PAGEONLY
-static heap_t *default_heap;
 
-extern "C" void register_eh_frame();
-
-void malloc_startup(void *p)
+void malloc_startup(void*)
 {
-    (void)p;
-    default_heap = heap_create();
+    // Create a heap
+    heap_t *default_heap = heap_create();
 
-    register_eh_frame();
+    // Allocate an array for per-cpu heap pointers using the BSP heap
+    default_heaps = (heap_t**)heap_alloc(
+                default_heap, sizeof(*default_heaps) * 1);
+
+    if (unlikely(!default_heaps))
+        panic_oom();
+
+    // Place the BSP heap pointer as the CPU0 heap
+    default_heaps[0] = default_heap;
+
+    // Announce that we have a working heap
+    callout_call(callout_type_t::heap_ready);
 }
 
-void *calloc(size_t num, size_t size)
+static void malloc_statup_smp(void*)
 {
-    return heap_calloc(default_heap, num, size);
+    // Lock free transition to N per-cpu heaps
+    size_t new_heap_count = thread_get_cpu_count();
+
+    heap_t **new_default_heaps = new (std::nothrow) heap_t *[new_heap_count];
+    if (unlikely(!default_heaps))
+        panic_oom();
+
+    // Bring in the uniprocessor heap as the CPU 0 heap entry
+    new_default_heaps[0] = default_heaps[0];
+
+    for (size_t i = 1; i < new_heap_count; ++i)
+    {
+        new_default_heaps[i] = heap_create();
+
+
+        if (unlikely(!new_default_heaps[i]))
+            panic_oom();
+
+        // Make sure the first N cpu-local heaps get heap ID (0)thru(N-1)
+        assert(heap_get_heap_id(new_default_heaps[i]) == i);
+    }
+
+    auto old_default_heaps = atomic_xchg(&default_heaps, new_default_heaps);
+    atomic_st_rel(&heap_count, new_heap_count);
+
+    delete[] old_default_heaps;
 }
 
-void *malloc(size_t size)
+REGISTER_CALLOUT(malloc_statup_smp, nullptr, callout_type_t::smp_online, "000");
+
+static heap_t *this_cpu_heap()
 {
-    return heap_alloc(default_heap, size);
+    auto cpu = thread_cpu_number();
+    assert(heap_count == 0 || size_t(cpu) < heap_count);
+    return default_heaps[cpu];
 }
 
-void *realloc(void *p, size_t new_size)
+static heap_t *heap_get_block_heap(void *block)
 {
-    return heap_realloc(default_heap, p, new_size);
+    int id = heap_get_block_heap_id(block);
+    assert(heap_count == 0 || size_t(id) < heap_count);
+    return default_heaps[id];
 }
 
-void free(void *p)
+EXPORT void *calloc(size_t num, size_t size)
 {
-    heap_free(default_heap, p);
+    return heap_calloc(this_cpu_heap(), num, size);
+}
+
+EXPORT void *malloc(size_t size)
+{
+    return heap_alloc(this_cpu_heap(), size);
+}
+
+EXPORT void *realloc(void *p, size_t new_size)
+{
+    return heap_realloc(heap_get_block_heap(p), p, new_size);
+}
+
+EXPORT void free(void *p)
+{
+    heap_free(heap_get_block_heap(p), p);
+}
+
+EXPORT bool malloc_validate(bool dump)
+{
+    return heap_validate(this_cpu_heap(), dump);
 }
 #else
 
+EXPORT bool malloc_validate(bool dump)
+{
+    return true;//not supported
+}
+
 void malloc_startup(void *p)
 {
+    // Create a heap
+    heap_t *default_heap = pageheap_create();
+
+    // Allocate an array for per-cpu heap pointers using the BSP heap
+    default_heaps = (heap_t**)pageheap_alloc(
+                default_heap, sizeof(*default_heaps) * 1);
+
+    if (unlikely(!default_heaps))
+        panic_oom();
+
+    // Place the BSP heap pointer as the CPU0 heap
+    default_heaps[0] = default_heap;
+
+    // Announce that we have a working heap
+    callout_call(callout_type_t::heap_ready);
 }
 
-void *calloc(size_t num, size_t size)
+EXPORT void *calloc(size_t num, size_t size)
 {
-    return pageheap_calloc(num, size);
+    return pageheap_calloc(default_heaps[0], num, size);
 }
 
-void *malloc(size_t size)
+EXPORT void *malloc(size_t size)
 {
-    return pageheap_alloc(size);
+    return pageheap_alloc(default_heaps[0], size);
 }
 
-void *realloc(void *p, size_t new_size)
+EXPORT void *realloc(void *p, size_t new_size)
 {
-    return pageheap_realloc(p, new_size);
+    return pageheap_realloc(default_heaps[0], p, new_size);
 }
 
-void free(void *p)
+EXPORT void free(void *p)
 {
-    pageheap_free(p);
+    pageheap_free(default_heaps[0], p);
 }
 
 #endif
 
-char *strdup(char const *s)
+EXPORT char *strdup(char const *s)
 {
     size_t len = strlen(s);
-    char *b = new char[len+1];
+    char *b = new (std::nothrow) char[len+1];
     return (char*)memcpy(b, s, len+1);
 }
 
-void *operator new(size_t size) noexcept
+// banned throwing new, linker error please
+//EXPORT void *operator new(size_t size)
+//{
+//    return malloc(size);
+//}
+
+EXPORT void *operator new(size_t size, std::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
 
-void *operator new[](size_t size) noexcept
+// banned throwing new, linker error please
+//EXPORT void *operator new[](size_t size)
+//{
+//    return malloc(size);
+//}
+
+EXPORT void *operator new[](size_t size, std::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
 
-void operator delete(void *block, size_t) noexcept
+EXPORT void operator delete(void *block, size_t) noexcept
 {
     free(block);
 }
 
-void operator delete(void *block) throw()
+EXPORT void operator delete(void *block) noexcept
 {
     free(block);
 }
 
-void operator delete[](void *block) noexcept
+EXPORT void operator delete[](void *block) noexcept
 {
     free(block);
 }
 
-void operator delete[](void *block, size_t) noexcept
+EXPORT void operator delete[](void *block, size_t) noexcept
 {
     free(block);
 }
 
-void *operator new(size_t, void *p) noexcept
+EXPORT void *operator new(size_t, void *p) noexcept
 {
     return p;
 }
@@ -153,17 +252,17 @@ static T strto(char const *str, char **end, int base)
     return !sign ? n : n * sign;
 }
 
-int strtoi(char const *str, char **end, int base)
+EXPORT int strtoi(char const *str, char **end, int base)
 {
     return strto<int>(str, end, base);
 }
 
-long strtol(char const *str, char **end, int base)
+EXPORT long strtol(char const *str, char **end, int base)
 {
     return strto<long>(str, end, base);
 }
 
-long long strtoll(char const *str, char **end, int base)
+EXPORT long long strtoll(char const *str, char **end, int base)
 {
     return strto<long long>(str, end, base);
 }

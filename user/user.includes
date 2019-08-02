@@ -3,3 +3,6 @@ test
 crt0
 bin/dhcpclient
 bin/ls
+shell
+.
+init

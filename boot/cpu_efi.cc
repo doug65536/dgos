@@ -33,13 +33,13 @@ void run_kernel(uint64_t entry, void *param)
     status = efi_systab->BootServices->GetMemoryMap(
                 &mapsz, nullptr, &mapkey, &descsz, nullptr);
     
-    if (EFI_ERROR(status) && status != EFI_BUFFER_TOO_SMALL)
+    if (unlikely(EFI_ERROR(status) && status != EFI_BUFFER_TOO_SMALL))
         PANIC("Error getting EFI memory map");
 
     status = efi_systab->BootServices->ExitBootServices(
                 efi_image_handle, mapkey);
     
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         PANIC("Error exiting boot services");
 
     code64_run_kernel(entry, param, paging_root_addr(), nx_available);

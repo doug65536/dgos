@@ -215,25 +215,25 @@ void print_str_xy(int x, int y, tchar const *s, size_t len,
 
 void print_lba(uint32_t lba)
 {
-    PRINT("%" PRIu32 "\n", lba);
+    //PRINT("%" PRIu32 "\n", lba);
 }
 
-void dump_regs(bios_regs_t& regs, bool show_flags)
-{
-    PRINT("eax=%" PRIx32 "\n", regs.eax);
-    PRINT("ebx=%" PRIx32 "\n", regs.ebx);
-    PRINT("ecx=%" PRIx32 "\n", regs.ecx);
-    PRINT("edx=%" PRIx32 "\n", regs.edx);
-    PRINT("esi=%" PRIx32 "\n", regs.esi);
-    PRINT("edi=%" PRIx32 "\n", regs.edi);
-    PRINT("ebp=%" PRIx32 "\n", regs.ebp);
-    PRINT(" ds=%x\n", regs.ds);
-    PRINT(" es=%x\n", regs.es);
-    PRINT(" fs=%x\n", regs.fs);
-    PRINT(" gs=%x\n", regs.gs);
-    if (show_flags)
-        PRINT("flg=%" PRIx32 "\n", regs.eflags);
-}
+//void dump_regs(bios_regs_t& regs, bool show_flags)
+//{
+//    PRINT("eax=%" PRIx32 "\n", regs.eax);
+//    PRINT("ebx=%" PRIx32 "\n", regs.ebx);
+//    PRINT("ecx=%" PRIx32 "\n", regs.ecx);
+//    PRINT("edx=%" PRIx32 "\n", regs.edx);
+//    PRINT("esi=%" PRIx32 "\n", regs.esi);
+//    PRINT("edi=%" PRIx32 "\n", regs.edi);
+//    PRINT("ebp=%" PRIx32 "\n", regs.ebp);
+//    PRINT(" ds=%x\n", regs.ds);
+//    PRINT(" es=%x\n", regs.es);
+//    PRINT(" fs=%x\n", regs.fs);
+//    PRINT(" gs=%x\n", regs.gs);
+//    if (show_flags)
+//        PRINT("flg=%" PRIx32 "\n", regs.eflags);
+//}
 
 
 void print_box(int left, int top, int right, int bottom, int attr, bool clear)

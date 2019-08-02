@@ -2,6 +2,8 @@
 
 #include "types.h"
 
+__BEGIN_DECLS
+
 int rand_r(uint64_t *seed);
 int rand_r_range(uint64_t *seed, int min, int max);
 
@@ -32,3 +34,5 @@ private:
     unsigned a;
     unsigned b;
 };
+
+__END_DECLS

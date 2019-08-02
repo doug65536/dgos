@@ -1,4 +1,5 @@
 #include "__bytebitmap.h"
+#include <stdint.h>
 #include <stddef.h>
 
 void __byte_bitmap(uint32_t (&bitmap)[256>>5], char const *s)

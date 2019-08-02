@@ -230,4 +230,25 @@ template<typename _K, typename _V> struct hash<pair<_K, _V>>
     }
 };
 
+template<typename T, T ...Ints>
+class integer_sequence
+{
+public:
+    using value_type = T;
+
+    static constexpr size_t size() noexcept
+    {
+        return sizeof...(Ints);
+    }
+};
+
+template<size_t... Ints>
+using index_sequence = integer_sequence<size_t, Ints...>;
+
+//template<class T, T N>
+//using make_integer_sequence = integer_sequence<T, __integer_pack(N)... >;
+//
+//template<size_t N>
+//using make_index_sequence = make_integer_sequence<size_t, N>;
+
 __END_NAMESPACE_STD

@@ -545,10 +545,10 @@ int kill(pid_t, int);
 int killpg(pid_t, int);
 
 
-void psiginfo(const siginfo_t *, char const *);
+void psiginfo(siginfo_t const *, char const *);
 void psignal(int, char const *);
 int pthread_kill(pthread_t, int);
-int pthread_sigmask(int, const sigset_t *restrict,
+int pthread_sigmask(int, sigset_t const *restrict,
            sigset_t *restrict);
 
 int raise(int);
@@ -558,7 +558,7 @@ int sigaction(int, const struct sigaction *restrict,
 int sigaddset(sigset_t *, int);
 
 
-int sigaltstack(const stack_t *restrict, stack_t *restrict);
+int sigaltstack(stack_t const *restrict, stack_t *restrict);
 
 
 int sigdelset(sigset_t *, int);
@@ -571,7 +571,7 @@ int sigignore(int);
 int siginterrupt(int, int);
 
 
-int sigismember(const sigset_t *, int);
+int sigismember(sigset_t const *, int);
 
 void (*signal(int, void (*)(int)))(int);
 
@@ -579,7 +579,7 @@ int sigpause(int);
 
 
 int sigpending(sigset_t *);
-int sigprocmask(int, const sigset_t *restrict, sigset_t *restrict);
+int sigprocmask(int, sigset_t const *restrict, sigset_t *restrict);
 int sigqueue(pid_t, int, union sigval);
 
 
@@ -587,8 +587,8 @@ int sigrelse(int);
 void (*sigset(int, void (*)(int)))(int);
 
 
-int sigsuspend(const sigset_t *);
-int sigtimedwait(const sigset_t *restrict, siginfo_t *restrict,
+int sigsuspend(sigset_t const *);
+int sigtimedwait(sigset_t const *restrict, siginfo_t *restrict,
            const struct timespec *restrict);
-int sigwait(const sigset_t *restrict, int *restrict);
-int sigwaitinfo(const sigset_t *restrict, siginfo_t *restrict);
+int sigwait(sigset_t const *restrict, int *restrict);
+int sigwaitinfo(sigset_t const *restrict, siginfo_t *restrict);

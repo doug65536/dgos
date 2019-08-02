@@ -37,7 +37,7 @@ _constructor(ctor_malloc) void malloc_init_auto()
     // |         .text           |
     // +-------------------------+ <- 0x1000
     
-    void *st = (void*)((uintptr_t(___heap_st) + 4095) & -4096);
+    void *st = (void*)((uintptr_t(___heap_st) + 4095) & -4096U);
     void *en = get_top_of_low_memory(st);
 
     malloc_init(st, en);

@@ -1,10 +1,21 @@
 #pragma once
 #include "types.h"
 #include "assert.h"
+#include "asm_constants.h"
 #include "control_regs.h"
 #include "control_regs_constants.h"
 
 struct gdt_entry_t {
+    constexpr gdt_entry_t()
+        : limit_low(0)
+        , base_low(0)
+        , base_middle(0)
+        , access(0)
+        , flags_limit_high(0)
+        , base_high(0)
+    {
+    }
+
     constexpr gdt_entry_t(uint64_t base, uint64_t limit,
                           uint8_t access_, uint8_t flags_)
         : limit_low(limit & 0xFFFF)
@@ -23,12 +34,47 @@ struct gdt_entry_t {
     uint8_t flags_limit_high;
     uint8_t base_high;
 
-    void set_type(uint8_t type)
+    constexpr gdt_entry_t& set_base(uint32_t base_31_0)
     {
-        access = (access & ~0xF) | type;
+        base_low = base_31_0 & 0xFFFF;
+        base_31_0 >>= 16;
+        base_middle = base_31_0 & 0xFF;
+        base_31_0 >>= 8;
+        base_high = base_31_0 & 0xFF;
+        return *this;
     }
 
-    uint8_t get_type()
+    constexpr gdt_entry_t& set_limit(uint32_t limit)
+    {
+        if (limit >= (1U << 20)) {
+            limit >>= 12;
+            flags_limit_high |= GDT_FLAGS_GRAN;
+        } else {
+            flags_limit_high &= ~GDT_FLAGS_GRAN;
+        }
+        limit_low = limit & 0xFFFF;
+        limit >>= 16;
+        flags_limit_high &= 0xF0;
+        limit &= 0xF;
+        flags_limit_high = (flags_limit_high & 0xF0) | limit;
+        return *this;
+    }
+
+    constexpr gdt_entry_t& set_type(uint8_t type)
+    {
+        access = (access & ~0xF) | type;
+        return *this;
+    }
+
+    constexpr gdt_entry_t& set_flags(uint8_t flags)
+    {
+        flags_limit_high &= 0x0F;
+        flags &= 0xF0;
+        flags_limit_high |= flags;
+        return *this;
+    }
+
+    constexpr uint8_t get_type()
     {
         return access & 0xF;
     }
@@ -37,10 +83,22 @@ struct gdt_entry_t {
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 
 struct gdt_entry_tss_ldt_t {
-    constexpr gdt_entry_tss_ldt_t(uint64_t base)
-        : base_high2((base >> 32) & 0xFFFFFFFF)
+    constexpr gdt_entry_tss_ldt_t()
+        : base_high2(0)
         , reserved(0)
     {
+    }
+
+    constexpr gdt_entry_tss_ldt_t(uint64_t base)
+        : base_high2((base >> 32) & 0xFFFFFFFFU)
+        , reserved(0)
+    {
+    }
+
+    constexpr gdt_entry_tss_ldt_t& set_base(uint64_t base)
+    {
+        base_high2 = (base >> 32) & 0xFFFFFFFFU;
+        return *this;
     }
 
     uint32_t base_high2;
@@ -50,6 +108,7 @@ struct gdt_entry_tss_ldt_t {
 union gdt_entry_combined_t {
     gdt_entry_t mem;
     gdt_entry_tss_ldt_t tss_ldt;
+    uint64_t raw;
 
     constexpr gdt_entry_combined_t(gdt_entry_t e) : mem(e) {}
     constexpr gdt_entry_combined_t(gdt_entry_tss_ldt_t e) : tss_ldt(e) {}
@@ -146,7 +205,7 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
 // Task State Segment (64-bit)
-struct tss_t {
+struct alignas(64) tss_t {
     // EVERYTHING is misaligned without dummy_align
     uint32_t dummy_align;
 
@@ -171,15 +230,17 @@ struct tss_t {
 };
 
 // Ensure no false sharing
-C_ASSERT_ISPO2((sizeof(tss_t) & 63) == 0);
+C_ASSERT((sizeof(tss_t) & 63) == 0);
 
 // Ensure no spanning page boundaries
 C_ASSERT(4096 % sizeof(tss_t) == 0);
 
+C_ASSERT(offsetof(tss_t, rsp) == TSS_RSP0_OFS);
+
 extern tss_t tss_list[];
 
 void gdt_init(int ap);
-void gdt_init_tss(int cpu_count);
+void gdt_init_tss(size_t cpu_count);
 void gdt_load_tr(int cpu_number);
 
 extern "C" gdt_entry_combined_t gdt[];

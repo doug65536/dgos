@@ -3,14 +3,16 @@
 #include "cpu_constants.h"
 
 .code16
-.section .smp.entry
+.section .smp.entry, "wx", @progbits
 
 // This must be position independent code
 // Note that this code is called with the cs set to
 // some segment and ip is zero
-.align 16
+.balign 16
 .global ap_entry
 ap_entry:
+    cli
+    cld
     xor %ax,%ax
     mov %ax,%ss
     mov $0xFFF0,%sp
@@ -59,7 +61,7 @@ ap_entry:
     movl %eax,%cr0
     cs ljmpl *(%di)
 
-.align 16
+.balign 16
 pm_entry:
 .code32
     // Load all of the segment registers with 32 bit data segments
@@ -116,7 +118,7 @@ pm_entry:
     movl %eax,%cr0
     ljmpl *(%edi)
 
-.align 16
+.balign 16
 lm_entry:
 .code64
     //
@@ -145,19 +147,19 @@ lm_entry:
     // jump to code64_run_kernel
     jmpq *%rax
 
-.align 8
+.balign 8
 pm_entry_vector:
     .int 0
     .word GDT_SEL_PM_CODE32
 
-.align 8
+.balign 8
 lm_entry_vector:
     .int 0
     .word GDT_SEL_KERNEL_CODE64
 
     // Emit a copy of the GDT here so it ends up in low memory
     // The BSP GDT is relocated far above 1MB boundary
-.align 64
+.balign 64
 .global gdt
 .global gdtr
     gdt_emit gdt, gdtr

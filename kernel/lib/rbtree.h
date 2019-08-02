@@ -3,24 +3,23 @@
 #include "assert.h"
 #include "stdlib.h"
 #include "string.h"
+#include "utility.h"
+#include "numeric_limits.h"
+#include "memory.h"
+#include "functional.h"
+#include "printk.h"
+#include "debug.h"
+
+#define _RBTREE_TRACE_ON    0
+#if _RBTREE_TRACE_ON
+#include "printk.h"
+#define _RBTREE_TRACE(...) printk (__VA_ARGS__)
+#else
+#define _RBTREE_TRACE(...) ((void)0)
+#endif
 
 template<typename _Tkey = uintptr_t, typename _Tval = uintptr_t>
 class rbtree_t {
-private:
-    struct __node_t;
-
-    template<typename _U>
-    static int default_cmp(_U const& __lhs, _U const& __rhs, void*)
-    {
-        if (__lhs.key < __rhs.key)
-            return -1;
-
-        if (__rhs.key < __lhs.key)
-            return 1;
-
-        return 0;
-    }
-
 public:
     using key_type = _Tkey;
     using value_type = _Tval;
@@ -38,7 +37,7 @@ public:
     // Returns true if the tree is initialized
     operator bool() const;
 
-    rbtree_t();
+    constexpr rbtree_t();
     ~rbtree_t();
 
     rbtree_t &init();
@@ -71,7 +70,7 @@ public:
     _pure iter_t last(iter_t __start);
 
     _pure kvp_t& item(iter_t __iter);
-    int delete_at(iter_t __n);
+    int __delete_at(iter_t __n);
     int delete_pair(kvp_t *__kvp);
     int delete_item(_Tkey __key, _Tval __val);
 
@@ -80,6 +79,8 @@ public:
     int validate();
 
     static int test(void);
+
+    void dump();
 
 private:
     enum __color_t : int {
@@ -99,36 +100,46 @@ private:
 
     C_ASSERT(sizeof(__node_t) == 32);
 
-    void insert_case1(iter_t __n);
-    void insert_case2(iter_t __n);
-    void insert_case3(iter_t __n);
-    void insert_case4(iter_t __n);
-    void insert_case5(iter_t __n);
+    static int default_cmp(kvp_t const* __lhs, kvp_t const* __rhs, void*)
+    {
+        if (__lhs->key < __rhs->key)
+            return -1;
 
-    void delete_case6(iter_t __n);
-    void delete_case5(iter_t __n);
-    void delete_case4(iter_t __n);
-    void delete_case3(iter_t __n);
-    void delete_case2(iter_t __n);
-    void delete_case1(iter_t __n);
+        if (__rhs->key < __lhs->key)
+            return 1;
+
+        return 0;
+    }
+
+    void __insert_case1(iter_t __n);
+    void __insert_case2(iter_t __n);
+    void __insert_case3(iter_t __n);
+    void __insert_case4(iter_t __n);
+    void __insert_case5(iter_t __n);
+
+    void __delete_case6(iter_t __n);
+    void __delete_case5(iter_t __n);
+    void __delete_case4(iter_t __n);
+    void __delete_case3(iter_t __n);
+    void __delete_case2(iter_t __n);
+    void __delete_case1(iter_t __n);
 
     iter_t alloc_node();
-    void free_node(iter_t __n);
-    void dump();
+    void __free_node(iter_t __n);
     iter_t grandparent(iter_t __n);
     iter_t uncle(iter_t __n);
 
-    void replace_node(iter_t __oldn, iter_t __newn);
+    void __replace_node(iter_t __oldn, iter_t __newn);
 
-    void rotate_left(iter_t __n);
+    void __rotate_left(iter_t __n);
 
-    void rotate_right(iter_t __n);
+    void __rotate_right(iter_t __n);
 
-    iter_t new_node(kvp_t *__kvp);
+    iter_t __new_node(kvp_t *__kvp);
 
     int walk_impl(visitor_t __callback, void *__p, iter_t __n);
 
-    iter_t sibling(iter_t __n);
+    iter_t __sibling(iter_t __n);
 
     static int test_cmp(kvp_t const *__lhs, kvp_t const *__rhs, void *__p);
 
@@ -165,14 +176,6 @@ private:
 //  4. Every path from the root to a nil node
 //     has the same number of black nodes
 
-#define _RBTREE_TRACE_ON    0
-#if _RBTREE_TRACE_ON
-#include "printk.h"
-#define _RBTREE_TRACE(...) printk (__VA_ARGS__)
-#else
-#define _RBTREE_TRACE(...) ((void)0)
-#endif
-
 #define _RBTREE_CAPACITY_FROM_BYTES(n) \
     ((n > _MALLOC_OVERHEAD ? n - _MALLOC_OVERHEAD : 0) / sizeof(__node_t))
 
@@ -187,7 +190,7 @@ private:
 //
 // Internals
 
-#define _NODE(i) (__nodes + i)
+#define _NODE(i) (__nodes + (i))
 
 template<typename _Tkey, typename _Tval>
 typename rbtree_t<_Tkey,_Tval>::iter_t
@@ -225,7 +228,7 @@ rbtree_t<_Tkey,_Tval>::alloc_node()
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::free_node(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__free_node(iter_t __n)
 {
     --__count;
 
@@ -247,7 +250,7 @@ void rbtree_t<_Tkey,_Tval>::dump()
     _RBTREE_TRACE("ROOT=%u\n", __root);
     for (iter_t i = 1; i < __size; ++i)
         _RBTREE_TRACE("%u) left=%u right=%u parent=%u c=%c item=%d\n",
-               i, _NODE(i)->left, _NODE(i)->right,
+               i, _NODE(i)->__left, _NODE(i)->__right,
                _NODE(i)->parent,
                _NODE(i)->color == _RED ? 'R' : 'B',
                *(int*)_NODE(i)->item);
@@ -278,7 +281,7 @@ rbtree_t<_Tkey,_Tval>::uncle(iter_t __n)
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::replace_node(iter_t __oldn, iter_t __newn)
+void rbtree_t<_Tkey,_Tval>::__replace_node(iter_t __oldn, iter_t __newn)
 {
     assert(__oldn != 0);
 
@@ -298,13 +301,13 @@ void rbtree_t<_Tkey,_Tval>::replace_node(iter_t __oldn, iter_t __newn)
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::rotate_left(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__rotate_left(iter_t __n)
 {
     assert(__n != 0);
 
     iter_t r = _NODE(__n)->__right;
 
-    replace_node(__n, r);
+    __replace_node(__n, r);
     _NODE(__n)->__right = _NODE(r)->__left;
 
     iter_t rl = _NODE(r)->__left;
@@ -317,13 +320,13 @@ void rbtree_t<_Tkey,_Tval>::rotate_left(iter_t __n)
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::rotate_right(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__rotate_right(iter_t __n)
 {
     assert(__n != 0);
 
     iter_t nl = _NODE(__n)->__left;
 
-    replace_node(__n, nl);
+    __replace_node(__n, nl);
     _NODE(__n)->__left = _NODE(nl)->__right;
 
     iter_t lr = _NODE(nl)->__right;
@@ -337,28 +340,28 @@ void rbtree_t<_Tkey,_Tval>::rotate_right(iter_t __n)
 
 // Root can become black at any time, root must always be black
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::insert_case1(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__insert_case1(iter_t __n)
 {
     _RBTREE_TRACE("Insert case 1\n");
 
     if (!_NODE(__n)->__parent)
         _NODE(__n)->__color = _BLACK;
     else
-        insert_case2(__n);
+        __insert_case2(__n);
 }
 
 // n is not the root,
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::insert_case2(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__insert_case2(iter_t __n)
 {
     _RBTREE_TRACE("Insert case 2\n");
 
     if (_NODE(_NODE(__n)->__parent)->__color != _BLACK)
-        insert_case3(__n);
+        __insert_case3(__n);
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::insert_case3(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__insert_case3(iter_t __n)
 {
     _RBTREE_TRACE("Insert case 3\n");
 
@@ -370,14 +373,14 @@ void rbtree_t<_Tkey,_Tval>::insert_case3(iter_t __n)
         _NODE(u)->__color = _BLACK;
         g = grandparent(__n);
         _NODE(g)->__color = _RED;
-        insert_case1(g);
+        __insert_case1(g);
     } else {
-        insert_case4(__n);
+        __insert_case4(__n);
     }
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::insert_case4(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__insert_case4(iter_t __n)
 {
     _RBTREE_TRACE("Insert case 4\n");
 
@@ -385,18 +388,18 @@ void rbtree_t<_Tkey,_Tval>::insert_case4(iter_t __n)
 
     if ((__n == _NODE(_NODE(__n)->__parent)->__right &&
          (_NODE(__n)->__parent == _NODE(g)->__left))) {
-        rotate_left(_NODE(__n)->__parent);
+        __rotate_left(_NODE(__n)->__parent);
         __n = _NODE(__n)->__left;
     } else if ((__n == _NODE(_NODE(__n)->__parent)->__left) &&
                (_NODE(__n)->__parent == _NODE(g)->__right)) {
-        rotate_right(_NODE(__n)->__parent);
+        __rotate_right(_NODE(__n)->__parent);
         __n = _NODE(__n)->__right;
     }
-    insert_case5(__n);
+    __insert_case5(__n);
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::insert_case5(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__insert_case5(iter_t __n)
 {
     _RBTREE_TRACE("Insert case 5\n");
 
@@ -405,54 +408,54 @@ void rbtree_t<_Tkey,_Tval>::insert_case5(iter_t __n)
     _NODE(_NODE(__n)->__parent)->__color = _BLACK;
     _NODE(g)->__color = _RED;
     if (__n == _NODE(_NODE(__n)->__parent)->__left)
-        rotate_right(g);
+        __rotate_right(g);
     else
-        rotate_left(g);
+        __rotate_left(g);
 }
 
 template<typename _Tkey, typename _Tval>
 typename rbtree_t<_Tkey,_Tval>::iter_t
-rbtree_t<_Tkey,_Tval>::new_node(kvp_t *__kvp)
+rbtree_t<_Tkey,_Tval>::__new_node(kvp_t *__kvp)
 {
-    iter_t p = 0;
-    iter_t i = __root;
+    iter_t __p = 0;
+    iter_t __i = __root;
 
-    if (i) {
-        int cmp_result;
+    if (__i) {
+        int __cmp_result;
         for (;;) {
-            cmp_result = __cmp(__kvp, &_NODE(i)->__kvp, __cmp_param);
-            p = i;
-            if (cmp_result < 0) {
+            __cmp_result = __cmp(__kvp, &_NODE(__i)->__kvp, __cmp_param);
+            __p = __i;
+            if (__cmp_result < 0) {
                 // item < node
-                if (_NODE(i)->__left) {
-                    i = _NODE(i)->__left;
+                if (_NODE(__i)->__left) {
+                    __i = _NODE(__i)->__left;
                 } else {
-                    i = alloc_node();
-                    _NODE(p)->__left = i;
+                    __i = alloc_node();
+                    _NODE(__p)->__left = __i;
                     break;
                 }
             } else {
                 // item >= node
-                if (_NODE(i)->__right) {
-                    i = _NODE(i)->__right;
+                if (_NODE(__i)->__right) {
+                    __i = _NODE(__i)->__right;
                 } else {
-                    i = alloc_node();
-                    _NODE(p)->__right = i;
+                    __i = alloc_node();
+                    _NODE(__p)->__right = __i;
                     break;
                 }
             }
         }
     } else {
         // Tree was empty
-        i = alloc_node();
-        __root = i;
+        __i = alloc_node();
+        __root = __i;
     }
-    _NODE(i)->__parent = p;
-    _NODE(i)->__left = 0;
-    _NODE(i)->__right = 0;
-    _NODE(i)->__color = _RED;
-    _NODE(i)->__kvp = *__kvp;
-    return i;
+    _NODE(__i)->__parent = __p;
+    _NODE(__i)->__left = 0;
+    _NODE(__i)->__right = 0;
+    _NODE(__i)->__color = _RED;
+    _NODE(__i)->__kvp = *__kvp;
+    return __i;
 }
 
 // Returns first nonzero callback return value
@@ -493,7 +496,7 @@ int rbtree_t<_Tkey,_Tval>::walk_impl(
 // Public API
 
 template<typename _Tkey, typename _Tval>
-rbtree_t<_Tkey,_Tval>::rbtree_t()
+constexpr rbtree_t<_Tkey,_Tval>::rbtree_t()
     : __nodes(nullptr)
     , __cmp(nullptr)
     , __cmp_param(nullptr)
@@ -515,16 +518,16 @@ template<typename _Tkey, typename _Tval>
 rbtree_t<_Tkey,_Tval> &
 rbtree_t<_Tkey,_Tval>::init()
 {
-    return init(default_cmp<_Tkey>, nullptr);
+    return init(default_cmp, nullptr);
 }
 
 template<typename _Tkey, typename _Tval>
 rbtree_t<_Tkey,_Tval> &
-rbtree_t<_Tkey,_Tval>::init(cmp_t init_cmp, void *p)
+rbtree_t<_Tkey,_Tval>::init(cmp_t __init_cmp, void *__p)
 {
-    if (init_cmp) {
-        __cmp = init_cmp;
-        __cmp_param = p;
+    if (__init_cmp) {
+        __cmp = __init_cmp;
+        __cmp_param = __p;
     } else {
     }
     __root = 0;
@@ -538,7 +541,7 @@ rbtree_t<_Tkey,_Tval>::init(cmp_t init_cmp, void *p)
     __nodes = nullptr;
 
     // Cause initial allocation
-    free_node(alloc_node());
+    __free_node(alloc_node());
 
     return *this;
 }
@@ -577,8 +580,8 @@ template<typename _Tkey, typename _Tval>
 typename rbtree_t<_Tkey,_Tval>::iter_t
 rbtree_t<_Tkey,_Tval>::insert_pair(kvp_t *__kvp)
 {
-    iter_t i = new_node(__kvp);
-    insert_case1(i);
+    iter_t i = __new_node(__kvp);
+    __insert_case1(i);
     //dump();
     return i;
 }
@@ -683,34 +686,27 @@ typename rbtree_t<_Tkey,_Tval>::kvp_t *
 rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter)
 {
     iter_t n = __root;
-    iter_t next;
-    int cmp_result = -1;
+    iter_t __next;
+    int __cmp_result = -1;
 
-    for (; n; n = next) {
-        __node_t const *node = _NODE(n);
+    for (; n; n = __next) {
+        __node_t const *__node = _NODE(n);
 
-        cmp_result = __cmp(__kvp, &node->__kvp, __cmp_param);
+        __cmp_result = __cmp(__kvp, &__node->__kvp, __cmp_param);
 
-        if (cmp_result == 0)
+        if (unlikely(__cmp_result == 0))
             break;
 
-        if (cmp_result < 0)
-            next = node->__left;
-        else
-            next = node->__right;
+        __next = __cmp_result < 0 ? __node->__left : __node->__right;
 
-        if (!next)
+        if (unlikely(!__next))
             break;
     }
 
-    if (__iter)
-        *__iter = n;
-    else
-        *__iter = 0;
+    *__iter = __iter ? n : 0;
 
-    return cmp_result ? nullptr : &_NODE(n)->__kvp;
+    return __cmp_result ? nullptr : &_NODE(n)->__kvp;
 }
-
 
 template<typename _Tkey, typename _Tval>
 typename rbtree_t<_Tkey,_Tval>::kvp_t *
@@ -724,43 +720,43 @@ rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter) const
 
 template<typename _Tkey, typename _Tval>
 typename rbtree_t<_Tkey,_Tval>::iter_t
-rbtree_t<_Tkey,_Tval>::sibling(iter_t __n)
+rbtree_t<_Tkey,_Tval>::__sibling(iter_t __n)
 {
     assert(__n);
 
-    iter_t parent = _NODE(__n)->__parent;
+    iter_t __parent = _NODE(__n)->__parent;
 
-    assert(parent);
+    assert(__parent);
 
-    if (_NODE(parent)->__left == __n)
-        return _NODE(parent)->__right;
-    return _NODE(parent)->__left;
+    if (_NODE(__parent)->__left == __n)
+        return _NODE(__parent)->__right;
+    return _NODE(__parent)->__left;
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::delete_case6(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__delete_case6(iter_t __n)
 {
-    iter_t nparent = _NODE(__n)->__parent;
-    iter_t nsib = sibling(__n);
+    iter_t __nparent = _NODE(__n)->__parent;
+    iter_t __nsib = __sibling(__n);
 
-    _NODE(nsib)->__color = _NODE(nparent)->__color;
-    _NODE(nparent)->__color = _BLACK;
-    if (__n == _NODE(nparent)->__left) {
-        assert(_NODE(_NODE(nsib)->__right)->__color == _RED);
-        _NODE(_NODE(nsib)->__right)->__color = _BLACK;
-        rotate_left(nparent);
+    _NODE(__nsib)->__color = _NODE(__nparent)->__color;
+    _NODE(__nparent)->__color = _BLACK;
+    if (__n == _NODE(__nparent)->__left) {
+        assert(_NODE(_NODE(__nsib)->__right)->__color == _RED);
+        _NODE(_NODE(__nsib)->__right)->__color = _BLACK;
+        __rotate_left(__nparent);
     } else {
-        assert(_NODE(_NODE(nsib)->__left)->__color == _RED);
-        _NODE(_NODE(nsib)->__left)->__color = _BLACK;
-        rotate_right(nparent);
+        assert(_NODE(_NODE(__nsib)->__left)->__color == _RED);
+        _NODE(_NODE(__nsib)->__left)->__color = _BLACK;
+        __rotate_right(__nparent);
     }
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::delete_case5(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__delete_case5(iter_t __n)
 {
     iter_t nparent = _NODE(__n)->__parent;
-    iter_t nsib = sibling(__n);
+    iter_t nsib = __sibling(__n);
 
     if (__n == _NODE(nparent)->__left &&
             _NODE(nsib)->__color == _BLACK &&
@@ -768,23 +764,23 @@ void rbtree_t<_Tkey,_Tval>::delete_case5(iter_t __n)
             _NODE(_NODE(nsib)->__right)->__color == _BLACK) {
         _NODE(nsib)->__color = _RED;
         _NODE(_NODE(nsib)->__left)->__color = _BLACK;
-        rotate_right(nsib);
+        __rotate_right(nsib);
     } else if (__n == _NODE(nparent)->__right &&
                _NODE(nsib)->__color == _BLACK &&
                _NODE(_NODE(nsib)->__right)->__color == _RED &&
                _NODE(_NODE(nsib)->__left)->__color == _BLACK) {
         _NODE(nsib)->__color = _RED;
         _NODE(_NODE(nsib)->__right)->__color = _BLACK;
-        rotate_left(nsib);
+        __rotate_left(nsib);
     }
-    delete_case6(__n);
+    __delete_case6(__n);
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::delete_case4(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__delete_case4(iter_t __n)
 {
     iter_t nparent = _NODE(__n)->__parent;
-    iter_t nsib = sibling(__n);
+    iter_t nsib = __sibling(__n);
 
     if (_NODE(nparent)->__color == _RED &&
             _NODE(nsib)->__color == _BLACK &&
@@ -793,84 +789,84 @@ void rbtree_t<_Tkey,_Tval>::delete_case4(iter_t __n)
         _NODE(nsib)->__color = _RED;
         _NODE(nparent)->__color = _BLACK;
     } else {
-        delete_case5(__n);
+        __delete_case5(__n);
     }
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::delete_case3(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__delete_case3(iter_t __n)
 {
     iter_t nparent = _NODE(__n)->__parent;
-    iter_t nsib = sibling(__n);
+    iter_t nsib = __sibling(__n);
 
     if (_NODE(nparent)->__color == _BLACK &&
             _NODE(nsib)->__color == _BLACK &&
             _NODE(_NODE(nsib)->__left)->__color == _BLACK &&
             _NODE(_NODE(nsib)->__right)->__color == _BLACK) {
         _NODE(nsib)->__color = _RED;
-        delete_case1(nparent);
+        __delete_case1(nparent);
     } else {
-        delete_case4(__n);
+        __delete_case4(__n);
     }
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::delete_case2(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__delete_case2(iter_t __n)
 {
-    iter_t nsib = sibling(__n);
+    iter_t nsib = __sibling(__n);
 
     if (_NODE(nsib)->__color == _RED) {
         iter_t nparent = _NODE(__n)->__parent;
         _NODE(nparent)->__color = _RED;
         _NODE(nsib)->__color = _BLACK;
         if (__n == _NODE(nparent)->__left)
-            rotate_left(nparent);
+            __rotate_left(nparent);
         else
-            rotate_right(nparent);
+            __rotate_right(nparent);
     }
-    delete_case3(__n);
+    __delete_case3(__n);
 }
 
 template<typename _Tkey, typename _Tval>
-void rbtree_t<_Tkey,_Tval>::delete_case1(iter_t __n)
+void rbtree_t<_Tkey,_Tval>::__delete_case1(iter_t __n)
 {
     if (_NODE(__n)->__parent)
-        delete_case2(__n);
+        __delete_case2(__n);
 }
 
 template<typename _Tkey, typename _Tval>
-int rbtree_t<_Tkey,_Tval>::delete_at(iter_t __n)
+int rbtree_t<_Tkey,_Tval>::__delete_at(iter_t __n)
 {
-    iter_t child;
-    iter_t left;
-    iter_t right;
+    iter_t __child;
+    iter_t __left;
+    iter_t __right;
 
-    left = _NODE(__n)->__left;
-    right = _NODE(__n)->__right;
+    __left = _NODE(__n)->__left;
+    __right = _NODE(__n)->__right;
 
-    if (left && right) {
+    if (__left && __right) {
         // Find highest value in left subtree
-        iter_t pred = last(left);
+        iter_t pred = last(__left);
 
         // Move the highest node in the left child
         // to this node and delete that node
         _NODE(__n)->__kvp.key = _NODE(pred)->__kvp.key;
         _NODE(__n)->__kvp.val = _NODE(pred)->__kvp.val;
         __n = pred;
-        left = _NODE(__n)->__left;
-        right = _NODE(__n)->__right;
+        __left = _NODE(__n)->__left;
+        __right = _NODE(__n)->__right;
     }
 
-    assert(!left || !right);
-    child = !right ? left : right;
+    assert(!__left || !__right);
+    __child = !__right ? __left : __right;
     if (_NODE(__n)->__color == _BLACK) {
-        _NODE(__n)->__color = _NODE(child)->__color;
-        delete_case1(__n);
+        _NODE(__n)->__color = _NODE(__child)->__color;
+        __delete_case1(__n);
     }
-    replace_node(__n, child);
-    if (!_NODE(__n)->__parent && child)
-        _NODE(child)->__color = _BLACK;
-    free_node(__n);
+    __replace_node(__n, __child);
+    if (!_NODE(__n)->__parent && __child)
+        _NODE(__child)->__color = _BLACK;
+    __free_node(__n);
 
     return 1;
 }
@@ -880,7 +876,7 @@ int rbtree_t<_Tkey,_Tval>::delete_pair(kvp_t *__kvp)
 {
     iter_t __n;
     if (find(__kvp, &__n))
-        return delete_at(__n);
+        return __delete_at(__n);
     return 0;
 }
 
@@ -927,7 +923,7 @@ int rbtree_t<_Tkey,_Tval>::test_visit(kvp_t *__kvp, void *__p)
 {
     (void)__p;
     (void)__kvp;
-    _RBTREE_TRACE("Item: key=%d val=%d\n", __kvp->key, __kvp->val);
+    //_RBTREE_TRACE("Item: key=%d val=%d\n", __kvp->key, __kvp->val);
     return 0;
 }
 
@@ -1117,3 +1113,4 @@ int rbtree_t<_Tkey,_Tval>::test(void)
 
     return 0;
 }
+

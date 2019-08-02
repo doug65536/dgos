@@ -1,38 +1,24 @@
-ENTRY(entry)
+ENTRY(module_entry);
+EXTERN(module_entry);
 
 PHDRS {
+	read PT_LOAD FILEHDR PHDRS FLAGS(4);
 	text PT_LOAD FLAGS(5);
-	readonly PT_LOAD FLAGS(4);
 	data PT_LOAD FLAGS(6);
+
+	ehfr PT_GNU_EH_FRAME FLAGS(4);
+	dyna PT_DYNAMIC FLAGS(4);
+	/*relr 0x6474e552 / *PT_GNU_RELRO* / FLAGS(6);*/
 }
 
 SECTIONS {
 	/* Code and read-only data */
 
-	PROVIDE_HIDDEN(___text_st = .);
+	. = 0;
+	. += SIZEOF_HEADERS;
 
-	.text : ALIGN(4096) {
-		*(.entry)
-		*(.text)
-		*(.text.startup .text.startup.*)
-		*(.text.hot .text.hot.*)
-		*(SORT(.text.*))
-		*(.text.unlikely)
-	} :text
-
-	.rodata : ALIGN(4096) {
-		PROVIDE_HIDDEN(___init_st = .);
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		PROVIDE_HIDDEN(___init_en = .);
-
-		. = ALIGN(16);
-		PROVIDE_HIDDEN(___fini_st = .);
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
-		PROVIDE_HIDDEN(___fini_en = .);
-
-		. = ALIGN(32);
+	.rodata : {
+		PROVIDE_HIDDEN(___rodata_st = .);
 
 		PROVIDE_HIDDEN(___callout_array_st = .);
 		*(SORT(.callout_array.*))
@@ -43,52 +29,65 @@ SECTIONS {
 		*(.rodata)
 		*(SORT(.rodata.*))
 
-		*(.stub .text.* .gnu.linkonce.t.*)
+		*(.stub .gnu.linkonce.t.*)
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
 
-		PROVIDE_HIDDEN(___text_en = .);
-	} :readonly
+		PROVIDE_HIDDEN(___rodata_en = .);
+	} :read
 
-	.eh_frame_hdr : ALIGN(4096) {
-		*(.eh_frame_hdr)
-		*(.eh_frame_entry .eh_frame_entry.*)
-	} :readonly
+	.gnu.version : {
+		*(.gnu.version)
+	} :read
 
-	.eh_frame : ALIGN(4096) {
+	.gnu.version_r : {
+		*(.gnu.version_r)
+	} :read
+
+	.gnu.version_d : {
+		*(.gnu.version_d)
+	} :read
+
+	.eh_frame : {
+		PROVIDE_HIDDEN(___eh_frame_st = .);
 		KEEP(*(.eh_frame))
 		*(.eh_frame.*)
-	} :readonly
+		PROVIDE_HIDDEN(___eh_frame_en = .);
+	} :read :ehfr
 
-	.hash : ALIGN(4096) {
+	.hash : {
 		PROVIDE_HIDDEN(___hash_st = .);
 		*(.hash);
 		PROVIDE_HIDDEN(___hash_en = .);
-	} :readonly
+	} :read
 
-	.dynsym : ALIGN(4096) {
+	.dynsym : {
 		PROVIDE_HIDDEN(___dynsym_st = .);
 		*(.dynsym);
 		PROVIDE_HIDDEN(___dynsym_en = .);
-	} :readonly
+	} :read
 
-	.dynstr : ALIGN(4096) {
+	.dynstr : {
 		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
 		PROVIDE_HIDDEN(___dynstr_en = .);
-	} :readonly
+	} :read
 
-	.got : ALIGN(4096) {
-		PROVIDE_HIDDEN(___got = .);
-		*(.got*)
-		*(.got.plt)
-	} :readonly
+	.rela.plt : {
+		PROVIDE_HIDDEN(___rela_plt = .);
+		*(.rela.plt)
+		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		*(.rela.iplt)
+		PROVIDE_HIDDEN (__rela_iplt_end = .);
+	} :read
 
 	.rela.dyn : {
-		PROVIDE_HIDDEN(___rela_dyn = .);
+		PROVIDE_HIDDEN(___rela_dyn_st = .);
 		*(.rela.init)
+		*(.rela.init_array)
 		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
 		*(.rela.fini)
+		*(.rela.fini_array)
 		*(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
 		*(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
 		*(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
@@ -101,69 +100,108 @@ SECTIONS {
 		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
 		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
 		*(.rela.ifunc)
-	} :readonly
-
-	.rela.plt : {
-		PROVIDE_HIDDEN(___rela_plt = .);
-		*(.rela.plt)
-		PROVIDE_HIDDEN (__rela_iplt_start = .);
-		*(.rela.iplt)
-		PROVIDE_HIDDEN (__rela_iplt_end = .);
-	} :readonly
-
-	.plt : ALIGN(4096) {
-		PROVIDE_HIDDEN(___plt = .);
-		*(.plt)
-		*(.iplt)
-	} :readonly
+		*(.rela.*)
+		PROVIDE_HIDDEN (__rela_dyn_en = .);
+	} :read
 
 	.plt.got : {
 		PROVIDE_HIDDEN(___plt_got = .);
 		*(.plt.got)
-	} :readonly
+	} :read
 
 	.plt.bnd : {
 		PROVIDE_HIDDEN(___plt_bnd = .);
 		*(.plt.bnd)
-	} :readonly
+	} :read
 
-	.dynamic : ALIGN(4096) {
-		PROVIDE_HIDDEN(___dynamic_st = .);
-		*(.dynamic);
-		PROVIDE_HIDDEN(___dynamic_en = .);
-	} :data
+	. = ALIGN(4K);
 
-	/* Initialized data */
-	.data  : ALIGN(4096) {
-		*(.data)
-		*(SORT(.data.*))
-		. = ALIGN(16);
-	} :data
+	/*
+	 * text must be the first executable section to correctly infer
+	 * the symbol address when auto-loading kernel symbols
+	 */
 
-	.got : ALIGN(4096) {
+	.text : {
+		PROVIDE_HIDDEN(___text_st = .);
+		*(.entry)
+		*(.text)
+		*(.text.startup .text.startup.*)
+		*(.text.hot .text.hot.*)
+		*(SORT(.text.*))
+		*(.text.unlikely)
+		PROVIDE_HIDDEN(___text_en = .);
+	} :text
+
+	.plt : {
+		PROVIDE_HIDDEN(___plt_st = .);
+		*(.plt)
+		*(.iplt)
+		PROVIDE_HIDDEN(___plt_en = .);
+	} :text
+
+	. = ALIGN(4K);
+
+	.got : {
 		PROVIDE_HIDDEN(___got = .);
-		*(.got*)
+		*(.got)
+	} :data
+
+	.got.plt : {
 		*(.got.plt)
 	} :data
 
-	.bss : ALIGN(4096) {
+	.dynamic : {
+		PROVIDE_HIDDEN(___dynamic_st = .);
+		*(.dynamic);
+		PROVIDE_HIDDEN(___dynamic_en = .);
+	} :dyna :data
+
+	.init_array : {
+		PROVIDE_HIDDEN(___init_st = .);
+		*(.init_array)
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		PROVIDE_HIDDEN(___init_en = .);
+	} :data
+
+	.fini_array : {
+		PROVIDE_HIDDEN(___fini_st = .);
+		*(.fini_array)
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		PROVIDE_HIDDEN(___fini_en = .);
+	} :data
+
+	/* . = ALIGN(4K); */
+
+	/* Initialized data */
+	.data : {
+		*(.data)
+		*(SORT(.data.*))
+	} :data
+
+	.bss : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
+		*(.dynbss)
 		*(SORT(.bss.*))
 		*(COMMON)
 		. = ALIGN(16);
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :data
 
-	. = ALIGN(4096);
+	. = ALIGN(4K);
+	PROVIDE_HIDDEN(___image_en = .);
 
-	.debug_info		(NOLOAD) : { *(.debug_info)    }
-	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  }
-	.debug_aranges	(NOLOAD) : { *(.debug_aranges) }
-	.debug_macro	(NOLOAD) : { *(.debug_macro)   }
-	.debug_line		(NOLOAD) : { *(.debug_line)    }
-	.debug_str		(NOLOAD) : { *(.debug_str)     }
-
-	/DISCARD/       : { *(.interp)        }
-	/DISCARD/		: { *(.comment)       }
+/*
+	.debug          : { *(.debug)         }
+	.debug_info		: { *(.debug_info)    }
+	.debug_abbrev	: { *(.debug_abbrev)  }
+	.debug_aranges	: { *(.debug_aranges) }
+	.debug_ranges	: { *(.debug_ranges)  }
+	.debug_frame	: { *(.debug_frame)   }
+	.debug_macro	: { *(.debug_macro)   }
+	.debug_line		: { *(.debug_line)    }
+	.debug_str		: { *(.debug_str)     }
+	.debug_loc		: { *(.debug_loc)     }
+	.comment        : { *(.comment)       }
+*/
 }

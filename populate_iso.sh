@@ -1,23 +1,27 @@
 #!/bin/bash
 
-set +x
+set -x
 
 mkdir -p iso_stage || exit
+
+echo Running mkposixdirs
 "$1/mkposixdirs.sh" iso_stage || exit
 
-cp -u bootiso-bin iso_stage/bootiso-bin || exit
+echo mkposixdirs complete
+ln -fsTr bootiso-bin iso_stage/bootiso-bin || exit
 
-ln -f kernel-generic iso_stage/dgos-kernel-generic || exit
-ln -f kernel-tracing iso_stage/dgos-kernel-tracing || exit
-ln -f kernel-asan iso_stage/dgos-kernel-asan|| exit
-cp -u hello.km iso_stage/hello.km || exit
+ln -fsTr kernel-generic iso_stage/dgos-kernel-generic || exit
+ln -fsTr kernel-tracing iso_stage/dgos-kernel-tracing || exit
+ln -fsTr kernel-asan iso_stage/dgos-kernel-asan || exit
+for f in initrd; do
+    ln -fsTr "$f" "iso_stage/$f" || exit
+done
 
-cp -u user-shell iso_stage || exit
-cp -u "$1/user/background.png" iso_stage || exit
+ln -fsTr "$1/user/background.png" iso_stage/background.png || exit
 
 mkdir -p iso_stage/EFI/boot || exit
-cp -u bootx64.efi iso_stage/EFI/boot/bootx64.efi || exit
+ln -fsTr bootx64.efi iso_stage/EFI/boot/bootx64.efi || exit
 
-ln -f fatpart.img iso_stage/efipart.img || exit
+ln -fsTr fatpart.img iso_stage/efipart.img || exit
 
 #cp -u bootia32.efi iso_stage/EFI/boot/bootia32.efi || exit

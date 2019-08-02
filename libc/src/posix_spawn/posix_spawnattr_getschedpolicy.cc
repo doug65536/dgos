@@ -1,7 +1,7 @@
 #include <spawn.h>
 
 int posix_spawnattr_getschedpolicy(
-        const posix_spawnattr_t *restrict satt,
+        posix_spawnattr_t const *restrict satt,
         int *restrict)
 {
     return -1;

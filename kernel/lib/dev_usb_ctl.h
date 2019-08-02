@@ -8,7 +8,6 @@ class usb_bus_t;
 struct usb_iocp_result_t {
     usb_iocp_result_t()
         : ccp(0)
-        , xfer_len(0)
         , cc(usb_cc_t::invalid)
         , slotid(0)
     {
@@ -22,7 +21,7 @@ struct usb_iocp_result_t {
     int len_or_error()
     {
         return cc == usb_cc_t::success || cc == usb_cc_t::short_pkt
-                ? xfer_len
+                ? ccp
                 : -int(cc);
     }
 
@@ -32,7 +31,7 @@ struct usb_iocp_result_t {
     }
 
     uint32_t ccp;
-    uint32_t xfer_len;
+    //uint32_t xfer_len;
     usb_cc_t cc;
     uint8_t slotid;
 
@@ -42,8 +41,8 @@ struct usb_iocp_result_t {
     }
 };
 
-using usb_iocp_t = basic_iocp_t<usb_iocp_result_t>;
-using usb_blocking_iocp_t = basic_blocking_iocp_t<usb_iocp_result_t>;
+using usb_iocp_t = dgos::basic_iocp_t<usb_iocp_result_t>;
+using usb_blocking_iocp_t = dgos::basic_blocking_iocp_t<usb_iocp_result_t>;
 
 class usb_pipe_t {
 public:
@@ -122,7 +121,7 @@ public:
                             int max_packet_sz, int interval,
                             usb_ep_attr ep_type) = 0;
 
-    bool alloc_pipe(int slotid, const usb_desc_iface *iface,
+    bool alloc_pipe(int slotid, usb_desc_iface const *iface,
                     usb_desc_ep const* ep, usb_pipe_t &pipe);
 
     virtual int send_control(

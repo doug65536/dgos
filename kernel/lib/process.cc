@@ -1,4 +1,5 @@
 #include "process.h"
+#include <inttypes.h>
 
 #include "mm.h"
 #include "fileio.h"
@@ -12,9 +13,10 @@
 #include "thread.h"
 #include "vector.h"
 #include "desc_alloc.h"
-#include "cpu/control_regs.h"
 #include "cpu/isr.h"
 #include "contig_alloc.h"
+#include "user_mem.h"
+#include "cpu/except_asm.h"
 
 union process_ptr_t {
     process_t *p;
@@ -28,7 +30,7 @@ union process_ptr_t {
 
 static std::vector<process_ptr_t> processes;
 static size_t process_count;
-using processes_lock_type = std::mcslock;
+using processes_lock_type = ext::mcslock;
 using processes_scoped_lock = std::unique_lock<processes_lock_type>;
 static processes_lock_type processes_lock;
 static pid_t process_first_free;
@@ -39,7 +41,7 @@ process_t *process_t::add_locked(processes_scoped_lock const&)
     pid_t pid;
     size_t realloc_count = 0;
 
-    process_t *process = new process_t;
+    process_t *process = new (std::nothrow) process_t;
     if (unlikely(!process))
         return nullptr;
 
@@ -103,6 +105,9 @@ int process_t::spawn(pid_t * pid_result,
 
     process->path = strdup(path);
 
+    if (unlikely(!process->path))
+        return int(errno_t::ENOMEM);
+
     // Count the arguments
     size_t arg_count = 0;
     while (argv && argv[arg_count++]);
@@ -113,101 +118,192 @@ int process_t::spawn(pid_t * pid_result,
 
     // Make a copy of the arguments and environment variables
     process->argv = (char**)calloc(arg_count + 1, sizeof(*argv));
+
+    if (unlikely(!process->argv))
+        return int(errno_t::ENOMEM);
+
     process->env = (char**)calloc(env_count + 1, sizeof(*envp));
 
-    for (size_t i = 0; i < arg_count; ++i)
+    if (unlikely(!process->env))
+        return int(errno_t::ENOMEM);
+
+    for (size_t i = 0; i < arg_count; ++i) {
         process->argv[i] = strdup(argv[i]);
+
+        if (unlikely(!process->argv[i]))
+            return int(errno_t::ENOMEM);
+    }
     process->argv[arg_count] = nullptr;
     process->argc = arg_count;
 
-    for (size_t i = 0; i < env_count; ++i)
+    for (size_t i = 0; i < env_count; ++i) {
         process->env[i] = strdup(envp[i]);
+
+        if (unlikely(!process->env[i]))
+            return int(errno_t::ENOMEM);
+    }
     process->env[env_count] = nullptr;
     process->envc = env_count;
 
     // Return the assigned PID
     *pid_result = process->pid;
 
-    thread_t tid = thread_create(&process_t::start, process, 0, true);
+    thread_t tid = thread_create(&process_t::run, process, 0, true);
 
-    process->add_thread(tid);
+    if (unlikely(tid < 0))
+        return int(errno_t::ENOMEM);
+
+    if (unlikely(!process->add_thread(tid)))
+        return int(errno_t::ENOMEM);
 
     processes_scoped_lock lock(process->process_lock);
     while (process->state == process_t::state_t::starting)
         process->cond.wait(lock);
 
-    return process->state == process_t::state_t::running
+    return (process->state == process_t::state_t::running ||
+            process->state == process_t::state_t::exited)
             ? 0
             : int(errno_t::EFAULT);
 }
 
-int process_t::start(void *process_arg)
+int process_t::run(void *process_arg)
 {
-    return ((process_t*)process_arg)->start();
+    return ((process_t*)process_arg)->run();
 }
 
-int process_t::start()
+// Hack to reuse module loader symbol auto-load hook for processes too
+extern void modload_load_symbols(char const *path, uintptr_t addr);
+
+// Returns when program exits
+int process_t::run()
 {
+    // Attach this kernel thread to this process
     thread_set_process(-1, this);
 
+    // Switch to user address space
     mmu_context = mm_new_process(this);
 
     // Simply load it for now
     Elf64_Ehdr hdr;
 
+    // Open a stdin, stdout, and stderr
+    /*int fd_i = */file_open("/dev/conin", 0, 0);
+    /*int fd_o = */file_open("/dev/conout", 0, 0);
+    /*int fd_e = */file_open("/dev/conerr", 0, 0);
+
     file_t fd{file_open(path, O_RDONLY)};
+
+    if (unlikely(!fd)) {
+        printdbg("Failed to open executable %s\n", path);
+        return -1;
+    }
 
     ssize_t read_size;
 
     read_size = file_read(fd, &hdr, sizeof(hdr));
-    if (read_size != sizeof(hdr))
+    if (unlikely(read_size != sizeof(hdr))) {
+        printdbg("Failed to read ELF header\n");
         return -1;
+    }
 
     // Allocate memory for program headers
     std::vector<Elf64_Phdr> program_hdrs;
-    program_hdrs.resize(hdr.e_phnum);
+    if (unlikely(!program_hdrs.resize(hdr.e_phnum))) {
+        printdbg("Failed to allocate memory for program headers\n");
+        return -1;
+    }
 
     // Read program headers
     read_size = sizeof(Elf64_Phdr) * hdr.e_phnum;
-    if (read_size != file_pread(
-                fd,
-                program_hdrs.data(),
-                read_size,
-                hdr.e_phoff))
+    if (unlikely(read_size != file_pread(
+                     fd,
+                     program_hdrs.data(),
+                     read_size,
+                     hdr.e_phoff))) {
+        printdbg("Failed to read program headers\n");
         return -1;
+    }
 
+    size_t last_region_st = ~size_t(0);
+    size_t last_region_en = 0;
+    size_t last_region_sz;
+
+    uintptr_t first_exec = UINTPTR_MAX;
+
+    // Map every section, just in case any pages overlap
     for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is not loaded, ignore
+        if (ph.p_type != PT_LOAD)
+            continue;
+
         // If it is not readable, writable or executable, ignore
         if ((ph.p_flags & (PF_R | PF_W | PF_X)) == 0)
             continue;
 
+        // No memory size? Ignore
         if (ph.p_memsz == 0)
             continue;
 
-        // See if it grossly overflows into kernel space
-        if (intptr_t(ph.p_vaddr + ph.p_memsz) < 0)
+        // See if it begins in reserved space
+        if (intptr_t(ph.p_vaddr) < 0x400000) {
+            printdbg("The virtual address is not in user address space\n");
             return -1;
+        }
+
+        // See if it overflows into kernel space
+        if (intptr_t(ph.p_vaddr + ph.p_memsz) < 0) {
+            printdbg("The section overflows into user space\n");
+            return -1;
+        }
 
         int page_prot = 0;
 
         if (ph.p_flags & PF_R)
             page_prot |= PROT_READ;
+
         // Unconditionally writable until loaded
         page_prot |= PROT_WRITE;
-        if (ph.p_flags & PF_X)
+        if (ph.p_flags & PF_X) {
+            if (first_exec == UINTPTR_MAX)
+                first_exec = ph.p_vaddr;
             page_prot |= PROT_EXEC;
+        }
 
-        void *mem = mmap((void*)ph.p_vaddr,
-                         ph.p_memsz, page_prot,
-                         MAP_USER | MAP_POPULATE, -1, 0);
+        // Skip pointless calls to mmap for little regions that overlap
+        // previously reserved regions
+        if (ph.p_vaddr >= last_region_st &&
+                ph.p_vaddr + ph.p_memsz <= last_region_en)
+            continue;
+
+        // Update region reserved by last mapping
+        last_region_st = ph.p_vaddr & -PAGESIZE;
+        last_region_en = ((ph.p_vaddr + ph.p_memsz) + PAGESIZE - 1) & -PAGESIZE;
+        last_region_sz = last_region_en - last_region_st;
+
+        if (unlikely(last_region_sz &&
+                     mmap((void*)last_region_st, last_region_sz, page_prot,
+                          MAP_USER | MAP_NOCOMMIT, -1, 0) == MAP_FAILED)) {
+            printdbg("Failed to reserve %#" PRIx64
+                     " bytes of address space"
+                     " with protection %d"
+                     " at %#" PRIx64 "! \n",
+                     ph.p_memsz, page_prot, ph.p_vaddr);
+            return -1;
+        }
+    }
+
+    // Read everything after mapping the memory
+    for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is not loaded, ignore
+        if (ph.p_type != PT_LOAD)
+            continue;
 
         read_size = ph.p_filesz;
-        if (ph.p_filesz > 0) {
-            if (read_size != file_pread(
-                        fd,
-                        mem,
-                        read_size,
-                        ph.p_offset)) {
+        if (likely(ph.p_filesz > 0)) {
+            if (unlikely(read_size != file_pread(
+                             fd, (void*)ph.p_vaddr,
+                             read_size, ph.p_offset))) {
+                printdbg("Failed to read program headers!\n");
                 return -1;
             }
         }
@@ -215,6 +311,14 @@ int process_t::start()
 
     // Make read only pages read only
     for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is not loaded, ignore
+        if (ph.p_type != PT_LOAD)
+            continue;
+
+        // Can't do anything if the size is zero
+        if (unlikely(ph.p_memsz == 0))
+            continue;
+
         int page_prot = 0;
 
         // Ignore the region if it should be writable
@@ -226,8 +330,23 @@ int process_t::start()
         if (ph.p_flags & PF_X)
             page_prot |= PROT_EXEC;
 
-        mprotect((void*)ph.p_vaddr, ph.p_memsz, page_prot);
+        if (unlikely(mprotect((void*)ph.p_vaddr, ph.p_memsz, page_prot) < 0)) {
+            printdbg("Failed to set page protection\n");
+            return -1;
+        }
     }
+
+    // Find TLS
+    for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is a TLS header, remember the range
+        if (unlikely(ph.p_type == PT_TLS)) {
+            tls_addr = ph.p_vaddr;
+            tls_msize = ph.p_memsz;
+            tls_fsize = ph.p_filesz;
+        }
+    }
+
+    modload_load_symbols(path, first_exec);
 
     // Initialize the stack
 
@@ -235,8 +354,58 @@ int process_t::start()
     void *stack = mmap(nullptr, stack_size, PROT_READ | PROT_WRITE,
                        MAP_STACK | MAP_USER, -1, 0);
 
+    if (unlikely(stack == MAP_FAILED)) {
+        printdbg("Failed to allocate user stack\n");
+        return -1;
+    }
+
     printdbg("process: allocated %zuKB stack at %#zx\n",
              stack_size >> 10, uintptr_t(stack));
+
+    // Initialize main thread TLS
+    static_assert(sizeof(uintptr_t) == sizeof(void*), "Unexpected size");
+    // The space for the uintptr_t is for the pointer to itself at TLS offset 0
+    size_t tls_vsize = PAGE_SIZE + tls_msize + sizeof(uintptr_t) + PAGE_SIZE;
+    void *tls = mmap(nullptr, tls_vsize,
+                     PROT_READ | PROT_WRITE,
+                     MAP_USER | MAP_NOCOMMIT, -1, 0);
+    if (tls == MAP_FAILED)
+        return -1;
+
+    // 4KB guard region around TLS
+    mprotect(tls, PAGE_SIZE, PROT_NONE);
+    mprotect((void*)(((uintptr_t(tls) + PAGESIZE + tls_msize +
+                       PAGESIZE - 1)) & -PAGESIZE), PAGE_SIZE, PROT_NONE);
+
+    uintptr_t tls_area = uintptr_t(tls) + PAGESIZE;
+
+    if (unlikely(!mm_is_user_range((void*)tls_area, tls_msize)))
+        return -1;
+
+    // Copy template into TLS area
+    mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize);
+    mm_copy_user((char*)tls_area + tls_fsize, nullptr, tls_msize - tls_fsize);
+
+    /// TLS uses negative offsets from the end of the TLS data, and a
+    /// pointer to the TLS is located at the TLS base address.
+    ///
+    ///    /\       +-----------------+
+    ///    |  +-----| pointer to self |
+    ///    |  +---->+-----------------+ <--- TLS base address (FSBASE)
+    ///    +        |                 |
+    ///    +        |    TLS  data    | <--- copied from TLS template
+    ///    +        |                 |
+    ///  addr       +-----------------+ <--- mmap allocation for TLS
+    ///
+
+    // The TLS pointer here points to the end of the TLS, which is where
+    // the pointer to itself is located
+    uintptr_t tls_ptr = uintptr_t(tls) + PAGE_SIZE + tls_msize;
+    // Patch the pointer to itself into the TLS area
+    mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr));
+
+    // Point fs at it
+    thread_set_fsbase(thread_get_id(), tls_ptr);
 
     // Initialize the stack according to the ELF ABI
     //
@@ -258,18 +427,6 @@ int process_t::start()
 
     // Populate the stack
     void *stack_ptr = (char*)stack + stack_size;
-
-// screw program headers and auxv for now
-//    // Calculate size of the program header array
-//    size_t info_ph_ofs = info_sz;
-//    info_sz += hdr.e_phentsize * hdr.e_phnum;
-//    size_t info_ph_sz = info_sz - info_ph_ofs;
-
-//    // Copy the program headers onto the stack
-//    stack_ptr = (char*)stack_ptr - info_ph_sz;
-//    void *phdrs_ptr = stack_ptr;
-//    memcpy(stack_ptr, program_hdrs.data(),
-//           sizeof(*program_hdrs.data()) * hdr.e_phnum);
 
     // Calculate the total size of environment string text
     info_sz = 0;
@@ -344,15 +501,34 @@ int process_t::start()
         panic_oom();
     if (!auxent.push_back({ auxv_t::AT_EXECFD, fd.release() }))
         panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_UID, 0L }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_EUID, 0L }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_GID, 0L }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_EGID, 0L }))
+        panic_oom();
 
     processes_scoped_lock lock(processes_lock);
     state = state_t::running;
     lock.unlock();
     cond.notify_all();
 
-    isr_sysret64(hdr.e_entry, uintptr_t(stack_ptr));
+    return enter_user(hdr.e_entry, uintptr_t(stack_ptr));
+}
 
-    return pid;
+int process_t::enter_user(uintptr_t ip, uintptr_t sp)
+{
+    //
+    if (!__setjmp(&exit_jmpbuf)) {
+        // First time
+        isr_sysret64(ip, sp);
+        __builtin_trap();
+    }
+
+    // exiting program continues here
+    return exitcode;
 }
 
 void *process_t::get_allocator()
@@ -388,12 +564,29 @@ void process_t::destroy()
 
 void process_t::exit(pid_t pid, int exitcode)
 {
-    // Kill all the threads...
+    scoped_lock lock(processes_lock);
 
     process_t *process_ptr = lookup(pid);
 
+    thread_t current_thread_id = thread_get_id();
+
+    // Kill all the threads...
+    for (thread_t thread : process_ptr->threads) {
+        if (thread != current_thread_id) {
+
+        }
+        //thread_terminate(thread);
+
+    }
+
     process_ptr->exitcode = exitcode;
-    thread_exit(exitcode);
+    process_ptr->state = state_t::exited;
+    lock.unlock();
+    process_ptr->cond.notify_all();
+
+    __longjmp(&process_ptr->exit_jmpbuf, 1);
+
+    //thread_exit(exitcode);
 }
 
 bool process_t::add_thread(thread_t tid)
@@ -412,6 +605,21 @@ bool process_t::del_thread(thread_t tid)
     threads.erase(it);
 
     return threads.empty();
+}
+
+int process_t::wait_for_exit(int pid)
+{
+    scoped_lock lock(processes_lock);
+
+    process_t *p = lookup(pid);
+
+    if (unlikely(!p))
+        return -int(errno_t::EINVAL);
+
+    while (p->state != state_t::exited)
+        p->cond.wait(lock);
+
+    return 0;
 }
 
 process_t *process_t::lookup(pid_t pid)

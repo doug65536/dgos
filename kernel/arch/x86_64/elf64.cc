@@ -1,5 +1,6 @@
 #include "elf64.h"
 #include "elf64_decl.h"
+#include "debug.h"
 #include "printk.h"
 #include "mm.h"
 #include "fileio.h"
@@ -12,13 +13,44 @@
 #include "likely.h"
 #include "inttypes.h"
 #include "numeric_limits.h"
+#include "cpu.h"
+#include "callout.h"
+#include "cxxstring.h"
+#include "user_mem.h"
+#include "kmodule.h"
+#include "mutex.h"
 
-#define ELF64_DEBUG     1
+#define ELF64_DEBUG     0
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) printdbg(__VA_ARGS__)
 #else
 #define ELF64_TRACE(...) ((void)0)
 #endif
+
+using lock_type = std::shared_mutex;
+using ex_lock = std::unique_lock<lock_type>;
+using sh_lock = std::shared_lock<lock_type>;
+static lock_type loaded_modules_lock;
+static std::vector<std::unique_ptr<module_t>> loaded_modules;
+
+// Keep this in sync with __module_dynlink_thunk
+struct plt_stub_data_t {
+    uintptr_t rax;
+    uintptr_t rdi;
+    uintptr_t rsi;
+    uintptr_t rdx;
+    uintptr_t rcx;
+    uintptr_t r8;
+    uintptr_t r9;
+    uintptr_t r10;
+    uintptr_t r11;
+    uintptr_t rflags;
+    uintptr_t result;
+    module_t *plt_ctx;
+    uintptr_t plt_index;
+};
+
+// Relocatable module loader
 
 extern Elf64_Sym const ___dynsym_st[];
 extern Elf64_Sym const ___dynsym_en[];
@@ -28,460 +60,43 @@ extern Elf64_Word const ___hash_st[];
 extern Elf64_Word const ___hash_en[];
 
 struct kernel_ht_t {
-    Elf64_Word hash_nbucket;
-    Elf64_Word hash_nchain;
-    Elf64_Word const * hash_buckets;
-    Elf64_Word const * hash_chains;
+    Elf64_Word hash_nbucket = 0;
+    Elf64_Word hash_nchain = 0;
+    Elf64_Word const * hash_buckets = nullptr;
+    Elf64_Word const * hash_chains = nullptr;
 };
 
 static kernel_ht_t export_ht;
 
-static void modload_find_syms(Elf64_Shdr const **symtab,
-                              Elf64_Shdr const **strtab,
-                              Elf64_Shdr const *scn_hdrs,
-                              size_t scn)
-{
-    *symtab = nullptr;
-    *strtab = nullptr;
-
-    Elf64_Word symtab_idx = scn_hdrs[scn].sh_link;
-    Elf64_Word strtab_idx = scn_hdrs[symtab_idx].sh_link;
-
-    *symtab = scn_hdrs + symtab_idx;
-    *strtab = scn_hdrs + strtab_idx;
-}
-
-static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
+static Elf64_Sym const *
+modload_lookup_name(kernel_ht_t *ht, char const *name,
+                    bool expect_missing = false)
 {
     Elf64_Word hash = elf64_hash((unsigned char const*)name);
     Elf64_Word bucket = hash % ht->hash_nbucket;
 
-    Elf64_Word i = ht->hash_buckets[bucket];
-    do {
+    for (Elf64_Word i = ht->hash_buckets[bucket]; i != 0;
+         i = ht->hash_chains[i]) {
         Elf64_Sym const *chk_sym = ___dynsym_st + i;
         Elf64_Word name_index = chk_sym->st_name;
         char const *chk_name = ___dynstr_st + name_index;
-        if (!strcmp(chk_name, name))
+        if (likely(!strcmp(chk_name, name)))
             return chk_sym;
-        i = ht->hash_chains[i];
-    } while (i != 0);
+    }
+
+    ELF64_TRACE("Failed to find %s\n", name);
+
+    if (!expect_missing)
+        cpu_debug_break();
 
     return nullptr;
-}
-
-static Elf64_Sym const *modload_lookup_in_module(
-        Elf64_Sym const *mod_sym,
-        Elf64_Sym const *end,
-        char const *mod_str,
-        char const *name)
-{
-    for (Elf64_Sym const *s = mod_sym; s < end; ++s) {
-        if (s->st_name != 0) {
-            char const *sym_name = mod_str + s->st_name;
-            if (!strcmp(sym_name, name))
-                return s;
-        }
-    }
-    return nullptr;
-}
-
-static char const * modload_rel_type_text(int type)
-{
-    switch (type) {
-    case R_AMD64_NONE:          return "R_AMD64_NONE";
-    case R_AMD64_64:            return "R_AMD64_64";
-    case R_AMD64_32S:           return "R_AMD64_32S";
-    case R_AMD64_32:            return "R_AMD64_32";
-    case R_AMD64_16:            return "R_AMD64_16";
-    case R_AMD64_8:             return "R_AMD64_8";
-    case R_AMD64_PC64:          return "R_AMD64_PC64";
-    case R_AMD64_PC32:          return "R_AMD64_PC32";
-    case R_AMD64_PC16:          return "R_AMD64_PC16";
-    case R_AMD64_PC8:           return "R_AMD64_PC8";
-    case R_AMD64_GOT32:         return "R_AMD64_GOT32";
-    case R_AMD64_PLT32:         return "R_AMD64_PLT32";
-    case R_AMD64_COPY:          return "R_AMD64_COPY";
-    case R_AMD64_GLOB_DAT:      return "R_AMD64_GLOB_DAT";
-    case R_AMD64_JUMP_SLOT:     return "R_AMD64_JUMP_SLOT";
-    case R_AMD64_RELATIVE:      return "R_AMD64_RELATIVE";
-    case R_AMD64_GOTPCREL:      return "R_AMD64_GOTPCREL";
-    case R_AMD64_GOTOFF64:      return "R_AMD64_GOTOFF64";
-    case R_AMD64_GOTPC32:       return "R_AMD64_GOTPC32";
-    case R_AMD64_SIZE32:        return "R_AMD64_SIZE32";
-    case R_AMD64_SIZE64:        return "R_AMD64_SIZE64";
-    case R_AMD64_REX_GOTPCRELX: return "R_AMD64_REX_GOTPCRELX";
-    default:                    return "<?>";
-    }
-}
-
-void modload_load_symbols(char const *path, uintptr_t addr)
-{
-    // Force the compiler to believe that the call is necessary
-    __asm__ __volatile__ ("" : : "r" (path), "r" (addr));
-}
-
-module_entry_fn_t modload_load(char const *path)
-{
-    file_t fd{file_open(path, O_RDONLY)};
-
-    if (unlikely(!fd.is_open())) {
-        printdbg("Failed to open module \"%s\"\n", path);
-        return nullptr;
-    }
-
-    ELF64_TRACE("module %s opened, fd=%d\n", path, (int)fd);
-
-    Elf64_Ehdr file_hdr;
-
-    if (unlikely(sizeof(file_hdr) !=
-                 file_read(fd, &file_hdr, sizeof(file_hdr)))) {
-        printdbg("Failed to read module file header\n");
-        return nullptr;
-    }
-
-    ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
-    std::unique_ptr<Elf64_Shdr> scn_hdrs = new Elf64_Shdr[file_hdr.e_shnum];
-
-    if (unlikely(scn_hdr_size != file_pread(
-                     fd, scn_hdrs, scn_hdr_size,
-                     file_hdr.e_shoff))) {
-        printdbg("Error reading program headers\n");
-        return nullptr;
-    }
-
-    size_t mod_str_scn = 0;
-    ext::unique_ptr_free<Elf64_Sym> mod_sym;
-    Elf64_Sym *mod_sym_end = nullptr;
-    ext::unique_ptr_free<char> mod_str;
-
-    Elf64_Xword max_addr = 0;
-    Elf64_Xword min_addr = (Elf64_Xword)-1;
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-
-        if (hdr->sh_type == SHT_NULL || hdr->sh_size == 0)
-            continue;
-
-        Elf64_Xword addr;
-
-        addr = hdr->sh_addr + hdr->sh_size;
-        if (max_addr < addr)
-            max_addr = addr;
-
-        addr = hdr->sh_addr;
-        if (min_addr > addr)
-            min_addr = addr;
-
-        switch (hdr->sh_type) {
-        case SHT_SYMTAB:
-            ELF64_TRACE("Found symbol table at offset %#" PRIx64
-                        ", link=%#x, size=%#" PRIx64 "\n",
-                        hdr->sh_offset, hdr->sh_link, hdr->sh_size);
-
-            mod_str_scn = hdr->sh_link;
-
-            mod_sym.reset((Elf64_Sym *)malloc(hdr->sh_size));
-            mod_sym_end = mod_sym + hdr->sh_size;
-            if ((ssize_t)hdr->sh_size != file_pread(
-                        fd, mod_sym, hdr->sh_size, hdr->sh_offset)) {
-                printdbg("Error reading module symbols\n");
-                return nullptr;
-            }
-            break;
-        case SHT_STRTAB:
-            ELF64_TRACE("Found string table at offset %#" PRIx64
-                        ", link=%#x, size=%#" PRIx64 "\n",
-                        hdr->sh_offset, hdr->sh_link, hdr->sh_size);
-            if (i != mod_str_scn)
-                break;
-            mod_str.reset((char*)malloc(hdr->sh_size));
-            if ((ssize_t)hdr->sh_size != file_pread(
-                        fd, mod_str, hdr->sh_size, hdr->sh_offset)) {
-                printdbg("Error reading module strings\n");
-                return nullptr;
-            }
-            break;
-        }
-    }
-
-    char *module = (char *)mmap(nullptr, max_addr - min_addr,
-                        PROT_READ | PROT_WRITE,
-                        MAP_NEAR, -1, 0);
-
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-        Elf64_Xword vofs = hdr->sh_addr - min_addr;
-        char *vaddr = module + vofs;
-
-        if ((hdr->sh_type != SHT_NOBITS) && (hdr->sh_flags & SHF_ALLOC)) {
-            if (hdr->sh_size != (size_t)file_pread(
-                        fd, vaddr, hdr->sh_size,
-                        hdr->sh_offset)) {
-                printdbg("Error reading module\n");
-                return nullptr;
-            }
-        }
-    }
-
-    // Find the largest relocation section
-    size_t max_rel = 0;
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-
-        // Can't process relocations that do not refer to a section
-        if (hdr->sh_info == 0)
-            continue;
-
-        switch (hdr->sh_type) {
-        case SHT_REL:   // fall thru
-        case SHT_RELA:
-            if (max_rel < hdr->sh_size)
-                max_rel = hdr->sh_size;
-            break;
-        }
-    }
-
-    ext::unique_ptr_free<void> rel_buf(malloc(max_rel));
-
-    Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf.get();
-    Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf.get();
-
-    // Process relocations
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-
-        switch (hdr->sh_type) {
-        case SHT_REL:   // fall thru
-        case SHT_RELA:
-            break;
-
-        default:
-            continue;
-        }
-
-        if ((ssize_t)hdr->sh_size != file_pread(
-                    fd, rel_buf, hdr->sh_size, hdr->sh_offset)) {
-            printdbg("Error reading module relocations\n");
-            return nullptr;
-        }
-
-        hex_dump(rel_buf, hdr->sh_size, 0);
-
-        Elf64_Shdr const * const target_scn = scn_hdrs + hdr->sh_info;
-        void *end;
-
-        Elf64_Shdr const *symtab;
-        Elf64_Shdr const *strtab;
-
-        modload_find_syms(&symtab, &strtab, scn_hdrs, i);
-
-        ext::unique_ptr_free<Elf64_Sym> symdata(
-                    (Elf64_Sym *)malloc(symtab->sh_size));
-        ext::unique_ptr_free<char> strdata((char*)malloc(strtab->sh_size));
-
-        if (unlikely((ssize_t)symtab->sh_size != file_pread(
-                    fd, symdata, symtab->sh_size, symtab->sh_offset))) {
-            printdbg("Error reading symbol table\n");
-            return nullptr;
-        }
-
-        if (unlikely((ssize_t)strtab->sh_size != file_pread(
-                    fd, strdata, strtab->sh_size, strtab->sh_offset))) {
-            printdbg("Error reading string table\n");
-            return nullptr;
-        }
-
-        uint32_t symtab_idx;
-        uint32_t rel_type;
-        //void *patch;
-
-        // L is the address of the section being relocated
-        Elf64_Addr const scn_base = target_scn->sh_addr -
-                min_addr + (Elf64_Addr)module;
-
-        switch (hdr->sh_type) {
-        case SHT_REL:
-            end = (char*)rel + hdr->sh_size;
-            for (Elf64_Rel const *r = rel; (void*)r < end; ++r) {
-                //symtab_idx = ELF64_R_SYM(r->r_info);
-                //rel_type = ELF64_R_TYPE(r->r_info);
-                assert(!"Unhandled relocation type!");
-                return nullptr;
-            }
-            break;
-
-        case SHT_RELA:
-            end = (char*)rela + hdr->sh_size;
-            for (Elf64_Rela const *r = rela; (void*)r < end; ++r) {
-                symtab_idx = ELF64_R_SYM(r->r_info);
-                rel_type = ELF64_R_TYPE(r->r_info);
-
-                Elf64_Sym *sym = symdata + symtab_idx;
-                char const *name = strdata + sym->st_name;
-
-                Elf64_Sym const *match = nullptr;
-
-                int internal = 0;
-
-                if (name[0]) {
-                    if (sym->st_shndx == SHN_UNDEF) {
-                        match = modload_lookup_name(&export_ht, name);
-                    } else  {
-                        internal = 1;
-                        match = modload_lookup_in_module(
-                                    mod_sym, mod_sym_end, mod_str, name);
-                    }
-                } else {
-                    internal = 1;
-                }
-
-                Elf64_Addr fixup_addr = scn_base + r->r_offset;
-
-                printdbg("Fixup at %#" PRIx64 ", match=%c,"
-                         " name=%s, type=%s (%d), symvalue=%" PRIx64
-                         ", addend=%+" PRId64 "\n",
-                         fixup_addr, match ? 'y' : 'n',
-                         name, modload_rel_type_text(rel_type),
-                         rel_type, sym->st_value, r->r_addend);
-
-                bool fixup_is_64 = false;
-                bool fixup_is_unsigned = false;
-                int64_t fixup64 = 0;
-                switch (rel_type) {
-                case R_AMD64_PLT32: // L + A - P
-                    fixup64 = match->st_value +
-                            r->r_addend - fixup_addr;
-                    printdbg("...writing %#" PRIx32 "\n", int32_t(fixup64));
-                    break;
-
-                case R_AMD64_32S:   // S + A
-                    fixup64 = int64_t(module) +
-                            scn_hdrs[sym->st_shndx].sh_addr +
-                            r->r_addend;
-                    printdbg("...writing %#" PRIx32 "\n", int32_t(fixup64));
-                    break;
-
-                case R_AMD64_PC32:  // S + A - P
-                    if (!match) {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                r->r_addend - fixup_addr;
-                    } else {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                match->st_value +
-                                r->r_addend - fixup_addr;
-                    }
-                    printdbg("...writing %#" PRIx32 "\n", int32_t(fixup64));
-                    break;
-
-                case R_AMD64_64:
-                    fixup_is_64 = true;
-                    if (!match) {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                r->r_addend;
-                    } else {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                match->st_value + r->r_addend;
-                    }
-                    printdbg("...writing %#" PRIx64 "\n", fixup64);
-                    break;
-
-                case R_AMD64_32:
-                    // Untested
-                    fixup_is_unsigned = true;
-                    if (internal) {
-                        fixup64 = uint64_t(module) +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                r->r_addend;
-                    } else {
-                        fixup64 = uint64_t(module) +
-                                scn_hdrs[match->st_shndx].sh_addr +
-                                r->r_addend + match->st_value;
-                    }
-                    printdbg("...writing %#" PRIx32 "\n", uint32_t(fixup64));
-                    break;
-
-                default:
-                    printdbg("...unhandled relocation, type=%d!\n", rel_type);
-                    break;
-
-                }
-
-                bool relocation_truncated = false;
-                if (!fixup_is_64) {
-                    if (fixup64 < std::numeric_limits<int32_t>::min() ||
-                            fixup64 > std::numeric_limits<int32_t>::max()) {
-                        relocation_truncated = true;
-                    } else if (fixup_is_unsigned) {
-                        if (fixup64 < 0 || fixup64 >
-                                std::numeric_limits<uint32_t>::max()) {
-                            relocation_truncated = true;
-                        }
-                    }
-                }
-
-                if (relocation_truncated) {
-                    printdbg("Relocation truncated to fit!\n");
-                    munmap(module, max_addr - min_addr);
-                    return nullptr;
-                }
-
-                if (!fixup_is_64)
-                    *(int32_t*)fixup_addr = int32_t(fixup64);
-                else
-                    *(int64_t*)fixup_addr = fixup64;
-            }
-
-            break;
-        }
-    }
-
-    // Apply page permissions
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr * const hdr = scn_hdrs + i;
-        Elf64_Xword vofs = hdr->sh_addr - min_addr;
-        char *vaddr = module + vofs;
-
-        if ((hdr->sh_flags & SHF_ALLOC) && hdr->sh_size) {
-            int prot = PROT_READ |
-                    ((hdr->sh_flags & SHF_WRITE) ? PROT_WRITE: 0) |
-                    ((hdr->sh_flags & SHF_EXECINSTR) ? PROT_EXEC : 0);
-
-            printdbg("Setting %c%c%c permissions for %zx bytes at %p\n",
-                     (prot & PROT_READ) ? 'r' : '-',
-                     (prot & PROT_WRITE) ? 'w' : '-',
-                     (prot & PROT_EXEC) ? 'x' : '-',
-                     hdr->sh_size, (void*)vaddr);
-
-            mprotect(vaddr, hdr->sh_size, prot);
-        } else if (hdr->sh_size) {
-//            printdbg("Discarding %zx at %p\n",
-//                     hdr->sh_size, (void*)vaddr);
-//            madvise(vaddr, hdr->sh_size, MADV_DONTNEED);
-//            mprotect(vaddr, hdr->sh_size, PROT_NONE);
-        }
-    }
-
-    printdbg("add-symbol-file %s %p\n", path, (void*)module);
-
-    // Work around pedantic warning
-    module_entry_fn_t fn;
-    void *entry = module + file_hdr.e_entry;
-    memcpy(&fn, &entry, sizeof(fn));
-
-    modload_load_symbols(path, uintptr_t(module));
-
-    return fn;
 }
 
 void modload_init(void)
 {
     for (Elf64_Sym const *sym = ___dynsym_st + 1;
          sym < ___dynsym_en; ++sym) {
-        printdbg("addr=%p symbol=%s\n",
+        ELF64_TRACE("addr=%p symbol=%s\n",
                  (void*)sym->st_value,
                  ___dynstr_st + sym->st_name);
     }
@@ -493,7 +108,991 @@ void modload_init(void)
             export_ht.hash_nbucket;
 }
 
-extern "C" void dl_debug_state(void);
-EXPORT void dl_debug_state(void)
+#if ELF64_DEBUG
+static std::string module_reloc_type(size_t sym_type)
 {
+    switch (sym_type) {
+    case R_AMD64_NONE: return "R_AMD64_NONE";
+    case R_AMD64_64: return "R_AMD64_64";
+    case R_AMD64_PC32: return "R_AMD64_PC32";
+    case R_AMD64_GOT32: return "R_AMD64_GOT32";
+    case R_AMD64_PLT32: return "R_AMD64_PLT32";
+    case R_AMD64_COPY: return "R_AMD64_COPY";
+    case R_AMD64_GLOB_DAT: return "R_AMD64_GLOB_DAT";
+    case R_AMD64_JUMP_SLOT: return "R_AMD64_JUMP_SLOT";
+    case R_AMD64_RELATIVE: return "R_AMD64_RELATIVE";
+    case R_AMD64_GOTPCREL: return "R_AMD64_GOTPCREL";
+    case R_AMD64_32: return "R_AMD64_32";
+    case R_AMD64_32S: return "R_AMD64_32S";
+    case R_AMD64_16: return "R_AMD64_16";
+    case R_AMD64_PC16: return "R_AMD64_PC16";
+    case R_AMD64_8: return "R_AMD64_8";
+    case R_AMD64_PC8: return "R_AMD64_PC8";
+    case R_AMD64_PC64: return "R_AMD64_PC64";
+    case R_AMD64_GOTOFF64: return "R_AMD64_GOTOFF64";
+    case R_AMD64_GOTPC32: return "R_AMD64_GOTPC32";
+    case R_AMD64_SIZE32: return "R_AMD64_SIZE32";
+    case R_AMD64_SIZE64: return "R_AMD64_SIZE64";
+    }
+    return "Unknown";
+}
+#endif
+
+class module_t
+{
+public:
+    bool load(char const *path);
+    errno_t load_image(void const *module, size_t module_sz,
+                    char const *module_name,
+                    std::vector<std::string> parameters);
+    int run();
+
+    ~module_t();
+
+    Elf64_Ehdr file_hdr{};
+    std::vector<Elf64_Phdr> phdrs;
+    Elf64_Addr min_vaddr = ~Elf64_Addr(0);
+    Elf64_Addr max_vaddr = 0;
+    void *image = nullptr;
+    Elf64_Sxword base_adj = 0;
+    Elf64_Phdr *dyn_seg = nullptr;
+    size_t dyn_entries = 0;
+    std::vector<Elf64_Dyn> dyn;
+
+    std::vector<Elf64_Xword> dt_needed;
+    Elf64_Addr dt_strtab = 0;
+    Elf64_Xword dt_strsz = 0;
+
+    Elf64_Addr dt_symtab = 0;
+
+    Elf64_Addr dt_pltgot = 0;
+    Elf64_Addr dt_jmprel = 0;
+
+    Elf64_Addr dt_rela = 0;
+    Elf64_Xword dt_relasz = 0;
+
+    Elf64_Xword dt_pltrelsz = 0;
+    Elf64_Xword dt_hash = 0;
+    Elf64_Xword dt_soname = 0;
+    Elf64_Xword dt_rpath = 0;
+    Elf64_Xword dt_symbolic = 0;
+    Elf64_Xword dt_relaent = 0;
+    Elf64_Xword dt_textrel = 0;
+    Elf64_Xword dt_bind_now = 0;
+    Elf64_Addr dt_init_array = 0;
+    Elf64_Addr dt_fini_array = 0;
+    Elf64_Xword dt_init_arraysz = 0;
+    Elf64_Xword dt_fini_arraysz = 0;
+    size_t unknown_count = 0;
+
+    Elf64_Sym const *syms = nullptr;
+    Elf64_Addr *plt_slots = nullptr;
+
+    module_entry_fn_t entry = nullptr;
+    int run_result = 0;
+
+    Elf64_Addr first_exec = 0;
+
+    kernel_ht_t ht;
+
+    char const *strs = nullptr;
+
+    std::string module_name;
+    std::vector<std::string> param;
+    std::vector<char const *> argv;
+
+    void *dso_handle = nullptr;
+
+private:
+    class module_reader_t {
+    public:
+        module_reader_t(void const *module, size_t module_sz)
+            : module(module)
+            , module_sz(module_sz)
+        {
+        }
+
+        ssize_t operator()(void *buf, size_t sz, off_t ofs) const;
+    private:
+        void const *module;
+        size_t module_sz;
+    };
+
+    void run_ctors();
+    errno_t parse_dynamic();
+    void infer_vaddr_range();
+    errno_t map_sections();
+    errno_t load_sections(module_reader_t const& pread);
+    errno_t load_dynamic(module_reader_t const& pread);
+    void find_1st_exec();
+    void apply_ph_perm();
+    void install_plt_handler();
+    errno_t apply_relocs();
+    kernel_ht_t mount_hashtab(uintptr_t addr);
+};
+
+// Shared module loader
+module_t *modload_load(char const *path, bool run)
+{
+    std::unique_ptr<module_t> module(new (std::nothrow) module_t{});
+    if (likely(module->load(path)))
+        return module.release();
+    return nullptr;
+}
+
+// Shared module loader
+module_t *modload_load_image(void const *image, size_t image_sz,
+                             char const *module_name,
+                             std::vector<std::string> parameters,
+                             errno_t *ret_errno)
+{
+    std::unique_ptr<module_t> module(new (std::nothrow) module_t{});
+
+    if (unlikely(!module)) {
+        if (ret_errno)
+            *ret_errno = errno_t::ENOMEM;
+        return nullptr;
+    }
+
+    parameters.insert(parameters.begin(), module_name);
+
+//    if (parameters.back())
+//        parameters.push_back(nullptr);
+
+    errno_t err = module->load_image(image, image_sz, module_name,
+                                     std::move(parameters));
+
+    if (likely(err == errno_t::OK))
+        return module.release();
+
+    if (ret_errno)
+        *ret_errno = err;
+
+    return nullptr;
+}
+
+int modload_run(module_t *module)
+{
+    return module->run();
+}
+
+static char const * const relocation_types_0_15[16] = {
+    "NONE",
+    "64",
+    "PC32",
+    "GOT32",
+    "PLT32",
+    "COPY",
+    "GLOB_DAT",
+    "JUMP_SLOT",
+    "RELATIVE",
+    "GOTPCREL",
+    "32",
+    "32S",
+    "16",
+    "PC16",
+    "8",
+    "PC8"
+};
+
+static char const * const relocation_types_24_26[3] = {
+    "PC64",
+    "GOTOFF64",
+    "GOTPC32"
+};
+
+static char const * const relocation_types_32_33[2] = {
+    "SIZE32",
+    "SIZE64"
+};
+
+static char const * const relocation_types_42_42[1] = {
+    "REX_GOTPCRELX"
+};
+
+static constexpr char const *get_relocation_type(size_t type) {
+    if (type < 16)
+        return relocation_types_0_15[type];
+    if (type >= 24 && type <= 26)
+        return relocation_types_24_26[type - 24];
+    if (type >= 32 && type <= 33)
+        return relocation_types_32_33[type - 32];
+    if (type >= 42 && type <= 42)
+        return relocation_types_42_42[type - 42];
+    return "<unrecognized relocation!>";
+}
+
+// This function's purpose is to act as a place to put a breakpoint
+// with commands that magically load the symbols for a module when loaded
+void modload_load_symbols(char const *path, uintptr_t addr)
+{
+    // Automated breakpoint is placed here to load symbols
+    // The debugger is actually going to dereference path and get addr
+    // So that memory clobber is really needed, I need the caller to write
+    // the actual path string into memory there (flow analysis could discard
+    // it without the memory clobber)
+    __asm__ __volatile__ ("" : : "D" (path), "S" (addr) : "memory");
+}
+
+static errno_t load_failed(errno_t err)
+{
+    cpu_debug_break();
+    return err;
+}
+
+void module_t::run_ctors()
+{
+    uintptr_t const *fn_addrs = (uintptr_t const *)(dt_init_array + base_adj);
+    for (size_t i = 0, e = dt_init_arraysz / sizeof(uintptr_t); i != e; ++i) {
+        auto fn = (void(*)())(fn_addrs[i]);
+        fn();
+    }
+}
+
+errno_t module_t::parse_dynamic()
+{
+    for (Elf64_Dyn const& dyn_ent : dyn) {
+        switch (dyn_ent.d_tag) {
+        case DT_NULL:
+            continue;
+
+        case DT_STRTAB:
+            dt_strtab = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_SYMTAB:
+            dt_symtab = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_STRSZ:
+            dt_strsz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_SYMENT:
+            if (unlikely(dyn_ent.d_un.d_val != sizeof(Elf64_Sym))) {
+                printdbg("Unexpected symbol record size"
+                         ", expect=%zu, got=%zu\n", sizeof(Elf64_Sym),
+                         dyn_ent.d_un.d_val);
+                return load_failed(errno_t::ENOEXEC);
+            }
+            continue;
+
+        case DT_PLTGOT:
+            dt_pltgot = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_PLTRELSZ:
+            dt_pltrelsz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_PLTREL:
+            if (unlikely(dyn_ent.d_un.d_val != DT_RELA)) {
+                printdbg("Unexpected relocation type, expecting RELA\n");
+                return load_failed(errno_t::ENOEXEC);
+            }
+            continue;
+
+        case DT_JMPREL:
+            dt_jmprel = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_RELA:
+            dt_rela = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_RELASZ:
+            dt_relasz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_RELAENT:
+            if (unlikely(dyn_ent.d_un.d_val != sizeof(Elf64_Rela))) {
+                printdbg("Relocations have unexpected size\n");
+                return load_failed(errno_t::ENOEXEC);
+            }
+            continue;
+
+        case DT_NEEDED:
+            dt_needed.push_back(dyn_ent.d_un.d_val);
+            continue;
+
+        case DT_HASH:
+            dt_hash = dyn_ent.d_un.d_ptr;
+
+            Elf64_Word const *hash;
+            hash = (Elf64_Word const *)(dt_hash + base_adj);
+
+            ht.hash_nbucket = hash[0];
+            ht.hash_nchain = hash[1];
+            ht.hash_buckets = hash + 2;
+            ht.hash_chains = ht.hash_buckets + ht.hash_nbucket;
+
+            continue;
+
+        case DT_INIT:
+            dt_init_array = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_FINI:
+            dt_fini_array = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_SONAME:
+            dt_soname = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_RPATH:
+            dt_rpath = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_SYMBOLIC:
+            dt_symbolic = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_REL:    // fallthru
+        case DT_RELSZ:  // fallthru
+        case DT_RELENT:
+            printdbg("Unhandled relocation type\n");
+            continue;
+
+        case DT_DEBUG:
+            continue;
+
+        case DT_TEXTREL:
+            dt_textrel = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_BIND_NOW:
+            dt_bind_now = 1;
+            continue;
+
+        case DT_INIT_ARRAY:
+            dt_init_array = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_FINI_ARRAY:
+            dt_fini_array = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_INIT_ARRAYSZ:
+            dt_init_arraysz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_FINI_ARRAYSZ:
+            dt_fini_arraysz = dyn_ent.d_un.d_val;
+            continue;
+
+        default:
+            printdbg("encountered unknown .dynamic entry type=%#" PRIx64 "\n",
+                     dyn_ent.d_tag);
+            ++unknown_count;
+            continue;
+        }
+    }
+
+    if (unknown_count) {
+        printdbg("encountered %zu unrecognized .dynamic entries\n",
+                 unknown_count);
+    }
+
+    dt_relaent = dt_relasz / sizeof(Elf64_Rela);
+
+    return errno_t::OK;
+}
+
+void module_t::infer_vaddr_range()
+{
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        min_vaddr = std::min(min_vaddr, phdr.p_vaddr);
+        max_vaddr = std::max(max_vaddr, phdr.p_vaddr + phdr.p_memsz);
+    }
+}
+
+errno_t module_t::map_sections()
+{
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        void *addr = mmap((void*)(phdr.p_vaddr + base_adj),
+                          phdr.p_memsz, PROT_READ | PROT_WRITE,
+                          MAP_NOCOMMIT, -1, 0);
+        if (unlikely(addr == MAP_FAILED)) {
+            printdbg("Failed to map section\n");
+            return load_failed(errno_t::ENOMEM);
+        }
+
+        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", module_name,
+                    ((phdr.p_memsz) + 4095) & -4096,
+                    uintptr_t(addr));
+    }
+
+    return errno_t::OK;
+}
+
+errno_t module_t::load_sections(module_reader_t const& pread)
+{
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type == PT_DYNAMIC)
+            dyn_seg = &phdr;
+
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        void *addr = (void*)(phdr.p_vaddr + base_adj);
+
+        size_t io_size = phdr.p_filesz;
+        ssize_t io_result = pread(addr, phdr.p_filesz, phdr.p_offset);
+
+        if (unlikely(ssize_t(io_size) != io_result)) {
+            printdbg("Failed to read segment\n");
+            return load_failed(io_result < 0
+                               ? errno_t(-io_result)
+                               : errno_t::ENOEXEC);
+        }
+
+        size_t zeroed = phdr.p_memsz - phdr.p_filesz;
+        void *zeroed_addr = (void*)(phdr.p_vaddr + base_adj + phdr.p_filesz);
+        memset(zeroed_addr, 0, zeroed);
+    }
+
+    return errno_t::OK;
+}
+
+errno_t module_t::load_dynamic(module_reader_t const& pread)
+{
+    dyn_entries = dyn_seg->p_memsz / sizeof(Elf64_Dyn);
+
+    if (unlikely(dyn_entries * sizeof(Elf64_Dyn) != dyn_seg->p_memsz)) {
+        printdbg("Dynamic segment has unexpected size\n");
+        return load_failed(errno_t::ENOEXEC);
+    }
+
+    if (unlikely(!dyn.resize(dyn_entries)))
+        return load_failed(errno_t::ENOMEM);
+
+    size_t io_size = dyn_seg->p_filesz;
+    ssize_t io_result = pread(dyn.data(), io_size, dyn_seg->p_offset);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
+        printdbg("Dynamic segment read failed\n");
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
+    }
+
+    return errno_t::OK;
+}
+
+ssize_t module_t::module_reader_t::operator()(
+        void *buf, size_t sz, off_t ofs) const
+{
+    if (unlikely(ofs < 0 || size_t(ofs) >= module_sz))
+        return 0;
+    // If the read is truncated
+    if (off_t(sz) > off_t(module_sz) - ofs)
+        sz = module_sz > uint64_t(ofs) ? module_sz - ofs : 0;
+    if (unlikely(!mm_copy_user(buf, (char *)module + ofs, sz)))
+        return -int(errno_t::EFAULT);
+    return sz;
+}
+
+void module_t::find_1st_exec()
+{
+    first_exec = 0;
+    for (Elf64_Phdr const& phdr : phdrs) {
+        if (phdr.p_flags & PF_X) {
+            if (!first_exec || first_exec > phdr.p_vaddr + base_adj)
+                first_exec = phdr.p_vaddr + base_adj;
+        }
+    }
+}
+
+void module_t::apply_ph_perm()
+{
+    for (Elf64_Phdr const& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        int prot = 0;
+        prot |= -((phdr.p_flags & PF_R) != 0) & PROT_READ;
+        prot |= -((phdr.p_flags & PF_W) != 0) & PROT_WRITE;
+        prot |= -((phdr.p_flags & PF_X) != 0) & PROT_EXEC;
+        if (mprotect((void*)(phdr.p_vaddr + base_adj),
+                     phdr.p_memsz, prot) != 0)
+            printk("mprotect failed\n");
+    }
+}
+
+void module_t::install_plt_handler()
+{
+    plt_slots = (Elf64_Addr*)(dt_pltgot + base_adj);
+
+    plt_slots[0] += base_adj;
+    plt_slots[1] = uintptr_t(this);
+    plt_slots[2] = Elf64_Addr((void*)__module_dynlink_plt_thunk);
+}
+
+errno_t module_t::apply_relocs()
+{
+    syms = (Elf64_Sym const *)(dt_symtab + base_adj);
+
+    Elf64_Rela const *rela_ptrs[] = {
+        (Elf64_Rela*)(dt_rela + base_adj),
+        (Elf64_Rela*)(dt_jmprel + base_adj)
+    };
+
+    size_t const rela_cnts[] = {
+        dt_relaent,
+        dt_pltrelsz / sizeof(Elf64_Rela)
+    };
+
+    static_assert(countof(rela_cnts) == countof(rela_ptrs),
+                  "Arrays must have corresponding values");
+
+    strs = (char const *)(dt_strtab + base_adj);
+
+    for (size_t rel_idx = 0; rel_idx < countof(rela_ptrs); ++rel_idx) {
+        Elf64_Rela const *rela_ptr = rela_ptrs[rel_idx];
+        size_t ent_count = rela_cnts[rel_idx];
+        for (size_t i = 0; i < ent_count; ++i) {
+            void const *operand = (void*)(rela_ptr[i].r_offset + base_adj);
+            Elf64_Word sym_idx = ELF64_R_SYM(rela_ptr[i].r_info);
+            Elf64_Word sym_type = ELF64_R_TYPE(rela_ptr[i].r_info);
+
+            auto const& sym = syms[sym_idx];
+
+            ELF64_TRACE("Fixup at %#zx + %#zx (%#zx), type=%s\n",
+                     uintptr_t(base_adj), uintptr_t(rela_ptr[i].r_offset),
+                     base_adj + rela_ptr[i].r_offset,
+                     module_reloc_type(sym_type).c_str());
+
+            // A addend
+            // B base address
+            // G GOT offset
+            // L PLT entry address
+            // P place of relocation
+            // S symbol value
+            // Z size of relocation
+
+            auto const A = intptr_t(rela_ptr[i].r_addend);
+            auto const& B = base_adj;
+            auto const P = intptr_t(operand);
+            auto const& G = dt_pltgot + base_adj;
+
+            auto const Z = sym.st_size;
+
+            auto S = sym.st_value + base_adj;
+
+            char const *name = strs + sym.st_name;
+
+            //assert(!name ^ !sym.st_value);
+
+            if (sym.st_name) {
+                // Lookup name in kernel
+                ELF64_TRACE("%s lookup %s\n", module_name, name);
+                Elf64_Sym const *addr = modload_lookup_name(&export_ht, name);
+
+                if (unlikely(!addr)) {
+                    printk("module link error in %s:"
+                           " Symbol \"%s\" not found",
+                           module_name.c_str(), name);
+                    return load_failed(errno_t::ENOEXEC);
+                }
+
+                S = intptr_t(addr->st_value);
+            }
+
+            uint64_t value;
+
+            char const * const type_txt = get_relocation_type(sym_type);
+
+            switch (sym_type) {
+            case R_AMD64_JUMP_SLOT://7
+                // word64 S
+
+                if (dt_bind_now || true) {
+                    // Link it all right now
+                    value = S;
+                    *(int64_t*)operand = S;
+                } else {
+                    // Just add base to point to lazy resolution thunk
+                    value = *(int64_t*)operand + base_adj;
+                    *(int64_t*)operand = value;
+                }
+
+                ELF64_TRACE("R_AMD64_JUMP_SLOT=%#" PRIx64 ", name=%s\n",
+                         value, name);
+                break;
+
+            // === 64 bit ===
+
+            case R_AMD64_64:    //1
+                // word64 S + A
+                value = S + A;
+                goto int64_common;
+
+            case R_AMD64_GLOB_DAT://6
+                // word64 S
+                value = S;
+                goto int64_common;
+
+            case R_AMD64_RELATIVE://8
+                // word64 B + A
+                value = B + A;
+                goto int64_common;
+
+            case R_AMD64_GOTOFF64://25
+                // word64 S + A - GOT
+                value = S + A - dt_pltgot;
+                goto int64_common;
+
+            case R_AMD64_PC64:  //24
+                // word64 S + A - P
+                value = S + A - P;
+                goto int64_common;
+
+            case R_AMD64_SIZE64://33
+                // word64 Z + A
+                value = Z + A;
+                goto int64_common;
+
+            // === 32 bit ===
+
+            case R_AMD64_PC32:  //2
+                // word32 S + A - P
+                value = S + A - P;
+                goto int32_common;
+
+            case R_AMD64_GOT32: //3
+                // word32 G + A
+                value = G + A;
+                goto uint32_common;
+
+//            case R_AMD64_COPY:  //5
+//                // Refer to the explanation following this table. ???
+//                ELF64_TRACE("R_AMD64_COPY\n");
+
+//                break;
+
+            case R_AMD64_GOTPC32:// 26
+                // word32 GOT + A + P
+                value = G + A + P;
+                goto int32_common;
+
+            case R_AMD64_SIZE32:// 32
+                // word32 Z + A
+                cpu_debug_break();
+                value = Z + A;
+                goto uint32_common;
+
+//            case R_AMD64_PLT32: //4
+//                // word32 L + A - P
+//                value = L + A - P;
+//                goto int32_common;
+
+            case R_AMD64_GOTPCREL://9
+                // word32 G + GOT + A - P
+                value = G + A - P;
+                goto int32_common;
+
+            case R_AMD64_32:    //10
+                // word32 S + A
+                value = S + A;
+                goto uint32_common;
+
+            case R_AMD64_32S:   //11
+                // word32 S + A
+                value = S + A;
+                goto int32_common;
+
+            // === 16 bit ===
+
+            case R_AMD64_16:    //12
+                // word16 S + A
+                value = S + A;
+                goto uint16_common;
+
+            case R_AMD64_PC16:  //13
+                // word16 S + A - P
+                value = S + A - P;
+                goto int16_common;
+
+            // === 8 bit ===
+
+            case R_AMD64_8:     //14
+                // word8 S + A
+                value = S + A;
+                goto uint8_common;
+
+            case R_AMD64_PC8:   //15
+                // word8 S + A - P
+                value = S + A - P;
+                goto int8_common;
+
+            // === No operation ===
+
+            case R_AMD64_NONE:
+                ELF64_TRACE("%s\n", type_txt);
+                continue;
+
+            default:
+                ELF64_TRACE("Unknown relocation type %#x\n", sym_type);
+                cpu_debug_break();
+                break;
+
+int32_common:
+                *(int32_t*)operand = value;
+                if (unlikely(int64_t(value) != int32_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+uint32_common:
+                *(uint32_t*)operand = uint32_t(value);
+                if (unlikely(value != uint32_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+int16_common:
+                *(int16_t*)operand = int16_t(value);
+                if (unlikely(int64_t(value) != int16_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+uint16_common:
+                *(uint16_t*)operand = uint16_t(value);
+                if (unlikely(value != uint16_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+int8_common:
+                *(int8_t*)operand = int8_t(value);
+                if (unlikely(int64_t(value) != int8_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+uint8_common:
+                *(uint8_t*)operand = uint8_t(value);
+                ELF64_TRACE("%s=%#" PRIx64 "\n", type_txt, value);
+                if (unlikely(value != uint8_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+int64_common:
+                *(int64_t*)operand = int64_t(value);
+                goto all_common;
+
+all_common:
+                ELF64_TRACE("Wrote type=%s, value=%#" PRIx64 " to vaddr=%#zx\n",
+                         type_txt, value, uintptr_t(operand));
+                break;
+
+truncated_common:
+                printk("%s: %s relocation truncated to fit!\n",
+                         module_name.c_str(), type_txt);
+                return load_failed(errno_t::ENOEXEC);
+            }
+        }
+    }
+
+    return errno_t::OK;
+}
+
+errno_t module_t::load_image(void const *module, size_t module_sz,
+                             char const *module_name,
+                             std::vector<std::string> parameters)
+{
+    this->module_name = module_name;
+
+    param = std::move(parameters);
+
+    module_reader_t pread(module, module_sz);
+
+    size_t io_size = sizeof(file_hdr);
+    auto io_result = pread(&file_hdr, io_size, 0);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
+        printk("Failed to read module file header\n");
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
+    }
+
+    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
+        printk("Unrecognized program header record size\n");
+        return load_failed(errno_t::ENOEXEC);
+    }
+
+    if (unlikely(!phdrs.resize(file_hdr.e_phnum)))
+        return load_failed(errno_t::ENOMEM);
+
+    io_size = sizeof(Elf64_Phdr) * file_hdr.e_phnum;
+    io_result = pread(phdrs.data(), io_size, file_hdr.e_phoff);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
+        printk("Failed to read %u program headers\n", file_hdr.e_phnum);
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
+    }
+
+    // Calculate address space needed
+
+    // Pass 1, compute address range covered by loadable segments
+    infer_vaddr_range();
+
+    image = mm_alloc_space(max_vaddr - min_vaddr);
+    if (unlikely(!image))
+        return load_failed(errno_t::ENOMEM);
+
+    // Compute relocation distance
+    base_adj = Elf64_Sxword(Elf64_Addr(image) - min_vaddr);
+
+    dyn_seg = nullptr;
+
+    // Pass 2, map sections    
+    errno_t err = map_sections();
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    // Pass 3, load sections
+    err = load_sections(pread);
+
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    err = load_dynamic(pread);
+
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    //
+    // Collect information from dynamic section
+    err = parse_dynamic();
+
+    if (unlikely(err != errno_t::OK))
+        return err;
+
+    err = apply_relocs();
+
+    // Lookup __dso_handle
+    Elf64_Sym const *sym;
+    sym = modload_lookup_name(&ht, "__dso_handle_export", true);
+
+    if (!sym) {
+        for (sym = syms; (void*)sym < (void*)strs; ++sym) {
+            size_t name_ofs = sym->st_name;
+            char const *name = strs + name_ofs;
+            if (!strcmp(name, "__dso_handle_export"))
+                break;
+        }
+        if (!sym->st_info)
+            sym = nullptr;
+
+        // Dereferemce the pointer to __dso_handle to get __dso_handle address
+        if (sym)
+            dso_handle = *(void**)(sym->st_value + base_adj);
+    }
+
+    // Install PLT handler
+    install_plt_handler();
+
+    // Apply permissions
+    apply_ph_perm();
+
+    // Find first executable program header
+
+    find_1st_exec();
+
+    printk("Module %s loaded at %#" PRIx64 "\n", module_name, base_adj);
+    printk("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
+
+    modload_load_symbols(module_name, first_exec);
+
+    // Run the init array
+    run_ctors();
+
+    entry = module_entry_fn_t(file_hdr.e_entry + base_adj);
+
+    if (unlikely(!argv.reserve(param.size() + 1)))
+        return load_failed(errno_t::ENOMEM);
+
+    for (std::string const& parameter : param) {
+        if (unlikely(!argv.push_back(parameter.c_str())))
+            return load_failed(errno_t::ENOMEM);
+    }
+
+    // Made it this far, we can put the module on the list
+    ex_lock lock(loaded_modules_lock);
+    if (unlikely(!loaded_modules.push_back(this)))
+        return load_failed(errno_t::ENOMEM);
+    lock.unlock();
+
+    run();
+
+    return errno_t::OK;
+}
+
+bool module_t::load(char const *path)
+{
+    return false;
+}
+
+int module_t::run()
+{
+    run_result = entry(argv.size() - 1, argv.data());
+    return run_result;
+}
+
+module_t::~module_t()
+{
+    if (image && (max_vaddr-min_vaddr)) {
+        munmap(image, (max_vaddr - min_vaddr));
+        image = nullptr;
+    }
+}
+
+void __module_dynamic_linker(plt_stub_data_t *data)
+{
+    module_t *module = data->plt_ctx;
+
+    auto jmprel = (Elf64_Rela const *)(module->dt_jmprel + module->base_adj);
+
+    auto const& rela = jmprel[data->plt_index];
+    Elf64_Word sym_idx = ELF64_R_SYM(rela.r_info);
+    Elf64_Word sym_type = ELF64_R_TYPE(rela.r_info);
+
+    assert(sym_type == R_AMD64_JUMP_SLOT);
+
+    auto symtab = (Elf64_Sym const *)(module->dt_symtab + module->base_adj);
+    auto strtab = (char const *)(module->dt_strtab + module->base_adj);
+
+    char const *name = strtab + symtab[sym_idx].st_name;
+
+    Elf64_Sym const *sym = modload_lookup_name(&export_ht, name);
+
+    assert(sym);
+
+    auto got = (uintptr_t *)(module->dt_pltgot + module->base_adj);
+
+    cpu_patch_code(&got[data->plt_index], &sym->st_value,
+            sizeof(got[data->plt_index]));
+
+    data->result = sym->st_value;
+}
+
+EXPORT void __module_register_frame(void const * const *__module_dso_handle, void *__frame)
+{
+
+}
+
+EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
+{
+//    std::find_if(loaded_modules.begin(), loaded_modules.end(),
+//                 [dso_handle](std::unique_ptr<module_t> const& mp) {
+//        return mp->dso_handle == dso_handle;
+//    });
+    return 0;
 }

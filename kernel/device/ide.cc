@@ -1,3 +1,5 @@
+// pci driver: C=STORAGE, S=IDE
+
 #include "dev_storage.h"
 #include "ata.h"
 #include "cpu/ioport.h"
@@ -7,7 +9,6 @@
 #include "time.h"
 #include "printk.h"
 #include "cpu/atomic.h"
-#include "cpu/control_regs.h"
 #include "threadsync.h"
 #include "bswap.h"
 #include "unique_ptr.h"
@@ -35,7 +36,7 @@ struct ide_chan_ports_t {
     uint8_t irq;
 };
 
-struct ide_if_factory_t : public storage_if_factory_t {
+struct ide_if_factory_t final : public storage_if_factory_t {
     ide_if_factory_t() : storage_if_factory_t("ide") {}
     virtual std::vector<storage_if_base_t *> detect(void) override;
 };
@@ -43,8 +44,11 @@ struct ide_if_factory_t : public storage_if_factory_t {
 static ide_if_factory_t ide_if_factory;
 STORAGE_REGISTER_FACTORY(ide_if);
 
-struct ide_if_t : public storage_if_base_t, public zero_init_t {
+struct ide_if_t final : public storage_if_base_t, public zero_init_t {
     STORAGE_IF_IMPL
+
+    using lock_type = std::mutex;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     struct bmdma_prd_t {
         uint32_t physaddr;
@@ -105,9 +109,9 @@ struct ide_if_t : public storage_if_base_t, public zero_init_t {
         int busy;
         int io_done;
         int io_status;
-        mutex_t lock;
-        condition_var_t not_busy_cond;
-        condition_var_t done_cond;
+        lock_type lock;
+        std::condition_variable not_busy_cond;
+        std::condition_variable done_cond;
 
         void *io_window;
         void *dma_bounce;
@@ -187,8 +191,8 @@ struct ide_if_t : public storage_if_base_t, public zero_init_t {
     // (which can only work for one channel at one time)
     int simplex_dma;
     int dma_inuse;
-    mutex_t dma_lock;
-    condition_var_t dma_available;
+    lock_type dma_lock;
+    std::condition_variable dma_available;
 };
 
 struct ide_dev_t : public storage_dev_base_t {
@@ -248,7 +252,7 @@ std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
     size_t std_idx = 0;
 
     do {
-        std::unique_ptr<ide_if_t> if_(new ide_if_t{});
+        std::unique_ptr<ide_if_t> if_(new (std::nothrow) ide_if_t{});
 
         if_->chan[0].ports.cmd = pci_iter.config.is_bar_portio(0) &&
                 pci_iter.config.get_bar(0)
@@ -487,9 +491,6 @@ void ide_if_t::ide_chan_t::set_feature(
 
 ide_if_t::ide_chan_t::ide_chan_t()
 {
-    mutex_init(&lock);
-    condvar_init(&not_busy_cond);
-    condvar_init(&done_cond);
 }
 
 ide_if_t::ide_chan_t::~ide_chan_t()
@@ -504,22 +505,22 @@ ide_if_t::ide_chan_t::~ide_chan_t()
 int ide_if_t::ide_chan_t::acquire_access()
 {
     int intr_was_enabled = cpu_irq_save_disable();
-    mutex_lock(&lock);
+    scoped_lock hold(lock);
 
     while (busy)
-        condvar_wait(&not_busy_cond, &lock);
+        not_busy_cond.wait(hold);
 
     busy = 1;
-    mutex_unlock(&lock);
+
     return intr_was_enabled;
 }
 
 void ide_if_t::ide_chan_t::release_access(int intr_was_enabled)
 {
-    mutex_lock(&lock);
+    scoped_lock hold(lock);
     busy = 0;
-    mutex_unlock(&lock);
-    condvar_wake_one(&not_busy_cond);
+    hold.unlock();
+    not_busy_cond.notify_one();
     cpu_irq_toggle(intr_was_enabled);
 }
 
@@ -615,7 +616,7 @@ void ide_if_t::ide_chan_t::detect_devices(
             continue;
         }
 
-        std::unique_ptr<ide_dev_t> dev(new ide_dev_t{});
+        std::unique_ptr<ide_dev_t> dev(new (std::nothrow) ide_dev_t{});
         dev->chan = this;
         dev->slave = slave;
         dev->is_atapi = is_atapi;
@@ -624,7 +625,8 @@ void ide_if_t::ide_chan_t::detect_devices(
         if (!list.push_back(dev.release()))
             panic_oom();
 
-        std::unique_ptr<ata_identify_t> ident = new ata_identify_t;
+        std::unique_ptr<ata_identify_t> ident =
+                new (std::nothrow) ata_identify_t;
 
         IDE_TRACE("if=%d, slave=%d, receiving IDENTIFY\n", secondary, slave);
 
@@ -905,30 +907,28 @@ void ide_if_t::bmdma_outd(uint16_t reg, uint32_t value)
 void ide_if_t::bmdma_acquire()
 {
     if (simplex_dma) {
-        mutex_lock(&dma_lock);
+        scoped_lock hold(dma_lock);
         while (dma_inuse)
-            condvar_wait(&dma_available, &dma_lock);
+            dma_available.wait(hold);
         dma_inuse = 1;
-        mutex_unlock(&dma_lock);
     }
 }
 
 void ide_if_t::bmdma_release()
 {
     if (simplex_dma) {
-        mutex_lock(&dma_lock);
+        scoped_lock hold(dma_lock);
         dma_inuse = 0;
-        mutex_unlock(&dma_lock);
-        condvar_wake_one(&dma_available);
+        hold.unlock();
+        dma_available.notify_one();
     }
 }
 
 void ide_if_t::ide_chan_t::yield_until_irq()
 {
-    mutex_lock(&lock);
+    scoped_lock hold(lock);
     while (!io_done)
-        condvar_wait(&done_cond, &lock);
-    mutex_unlock(&lock);
+        done_cond.wait(hold);
 }
 
 void ide_if_t::ide_chan_t::trace_status(int slave, char const *msg,
@@ -995,9 +995,10 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
         uint32_t sub_size = sub_count << log2_sector_size;
 
-        mutex_lock(&lock);
-        io_done = 0;
-        mutex_unlock(&lock);
+        {
+            scoped_lock hold(lock);
+            io_done = 0;
+        }
 
         if (unit.max_dma >= 0) {
             iface->bmdma_acquire();
@@ -1152,7 +1153,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
     release_access(intr_was_enabled);
 
-    iocp->set_result(err);
+    iocp->set_result(dgos::err_sz_pair_t{ err, size_t(count) });
     iocp->set_expect(1);
     iocp->invoke();
 
@@ -1175,11 +1176,12 @@ isr_context_t *ide_if_t::ide_chan_t::irq_handler(int irq, isr_context_t *ctx)
 
 void ide_if_t::ide_chan_t::irq_handler()
 {
-    mutex_lock_noyield(&lock);
+    scoped_lock hold(lock);
+
     io_done = 1;
     io_status = inb(ata_reg_cmd::STATUS);
-    mutex_unlock(&lock);
-    condvar_wake_one(&done_cond);
+    hold.unlock();
+    done_cond.notify_one();
 }
 
 errno_t ide_if_t::ide_chan_t::flush(int slave, int is_atapi, iocp_t *iocp)
@@ -1204,8 +1206,7 @@ std::vector<storage_dev_base_t*> ide_if_t::detect_devices()
         simplex_dma = (bmdma_inb(ATA_BMDMA_REG_STATUS_n(0)) & 0x80) != 0;
 
         if (simplex_dma) {
-            mutex_init(&dma_lock);
-            condvar_init(&dma_available);
+            scoped_lock hold(dma_lock);
             dma_inuse = 0;
         }
     }

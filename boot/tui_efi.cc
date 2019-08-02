@@ -5,13 +5,14 @@
 #include "likely.h"
 #include "debug.h"
 
-static EFI_GUID efi_simple_text_input_protocol_guid = {
-    0x387477c1,0x69c7,0x11d2, {
-        0x8e,0x39,0x00,0xa0,0xc9,0x69,0x72,0x3b
-    }
-};
+static EFI_GUID efi_simple_text_input_protocol_guid =
+        EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
+
+static EFI_GUID efi_simple_pointer_protocol_guid =
+        EFI_SIMPLE_POINTER_PROTOCOL_GUID;
 
 static EFI_SIMPLE_TEXT_INPUT_PROTOCOL *efi_simple_text_input;
+static EFI_SIMPLE_POINTER_PROTOCOL *efi_simple_pointer;
 
 static EFI_EVENT efi_timer_event;
 
@@ -83,7 +84,7 @@ private:
     T value;
 };
 
-static simple_atomic<int> systime_counter;
+static simple_atomic<uint64_t> systime_counter;
 
 static constexpr int keybuf_mask = 15;
 static int keybuf_queue[keybuf_mask + 1];
@@ -131,8 +132,8 @@ _constructor(ctor_console) void conin_init()
 {
     EFI_STATUS status;
 
-    EFI_HANDLE *efi_text_input_handles;
-    UINTN efi_num_text_input_handles;
+    EFI_HANDLE *efi_text_input_handles = nullptr;
+    UINTN efi_num_text_input_handles = 0;
 
     status = efi_systab->BootServices->LocateHandleBuffer(
                 ByProtocol,
@@ -141,7 +142,7 @@ _constructor(ctor_console) void conin_init()
                 &efi_num_text_input_handles,
                 &efi_text_input_handles);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Unable to query text input handle");
 
     status = efi_systab->BootServices->HandleProtocol(
@@ -149,14 +150,29 @@ _constructor(ctor_console) void conin_init()
             &efi_simple_text_input_protocol_guid,
             (VOID**)&efi_simple_text_input);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Unable to query text output interface");
+
+    EFI_HANDLE *efi_pointer_handles = nullptr;
+    UINTN efi_num_pointer_handles = 0;
+
+    status = efi_systab->BootServices->LocateHandleBuffer(
+                ByProtocol,
+                &efi_simple_pointer_protocol_guid,
+                nullptr,
+                &efi_num_pointer_handles,
+                &efi_pointer_handles);
+
+    status = efi_systab->BootServices->HandleProtocol(
+                efi_pointer_handles[0],
+            &efi_simple_pointer_protocol_guid,
+            (VOID**)&efi_simple_pointer);
 
     status = efi_systab->BootServices->CreateEvent(
                 EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK,
                 efi_timer_callback, nullptr, &efi_timer_event);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Could not create timer event");
 
     // Set timer tick period to 59.4ms
@@ -164,7 +180,7 @@ _constructor(ctor_console) void conin_init()
                 efi_timer_event,
                 TimerPeriodic, 549000);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Could not set timer");
 }
 
@@ -178,15 +194,79 @@ int readkey()
     return result;
 }
 
+mouse_evt readmouse()
+{
+    EFI_STATUS status;
+    mouse_evt s{};
+
+    if (efi_simple_pointer) {
+        EFI_SIMPLE_POINTER_STATE e;
+        status = efi_simple_pointer->GetState(
+                    efi_simple_pointer, &e);
+
+        if (likely(!EFI_ERROR(status))) {
+            s.x = e.RelativeMovementX;
+            s.y = e.RelativeMovementY;
+            s.lmb = e.LeftButton;
+            s.rmb = e.RightButton;
+        }
+    }
+
+    return s;
+}
+
 // Get ticks since midnight (54.9ms units)
-int systime()
+int64_t systime()
 {
     return systime_counter.get();
 }
 
+bool wait_input(uint32_t ms_timeout)
+{
+    EFI_STATUS status;
+
+    // Create a timer event to allow WaitForEvent to have a timeout
+    EFI_EVENT efi_timeout_event;
+    status = efi_systab->BootServices->CreateEvent(
+                EVT_TIMER, TPL_CALLBACK,
+                nullptr, nullptr, &efi_timeout_event);
+
+    if (unlikely(EFI_ERROR(status)))
+        halt(TSTR "Could not create timeout event");
+
+    // Set the timer to fire at the passed timeout
+    status = efi_systab->BootServices->SetTimer(
+                efi_timeout_event, TimerRelative, ms_timeout * 10000);
+
+    if (unlikely(EFI_ERROR(status)))
+        halt(TSTR "Could not set timeout timer");
+
+    // Array of events to be waited
+    EFI_EVENT events[] = {
+        efi_simple_text_input->WaitForKey,
+        efi_simple_pointer->WaitForInput,
+        efi_timeout_event
+    };
+
+    UINTN index = UINTN(-1);
+    status = efi_systab->BootServices->WaitForEvent(
+                countof(events), events, &index);
+
+    if (unlikely(EFI_ERROR(status)))
+        halt(TSTR "Could not wait for events");
+
+    // Close the timeout event
+    status = efi_systab->BootServices->CloseEvent(efi_timeout_event);
+
+    if (unlikely(EFI_ERROR(status)))
+        halt(TSTR "Could not close timeout event");
+
+    return index < 2;
+}
+
 void idle()
 {
-    efi_systab->BootServices->Stall(16000);
+    wait_input(16);
 }
 
 // Returns true if a key is availble
@@ -199,6 +279,8 @@ bool pollkey()
 
         if (scan != 0)
             keybuf_queue[keybuf_head++ & keybuf_mask] = scan;
+
+        idle();
     } else {
         debug_out(TSTR "Keyboard buffer full!\n", -1);
     }

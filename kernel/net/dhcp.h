@@ -1,6 +1,8 @@
 #pragma once
 #include "net/udp.h"
 
+__BEGIN_DECLS
+
 // TODO: Move this to user mode
 
 struct dhcp_pkt_t {
@@ -146,3 +148,5 @@ uint16_t dhcp_build_discover(void *buf, uint8_t const *mac_addr);
 #define DHCP_TYPE_ACK           5
 #define DHCP_TYPE_NACK          6
 #define DHCP_TYPE_RELEASE       7
+
+__END_DECLS

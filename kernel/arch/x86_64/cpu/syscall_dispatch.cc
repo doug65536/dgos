@@ -8,13 +8,19 @@
 #include "syscall/sys_mem.h"
 #include "syscall/sys_time.h"
 #include "syscall/sys_process.h"
+#include "syscall/sys_module.h"
+#include "syscall/sys_sys.h"
+#include "syscall/sys_render.h"
 
 long sys_unimplemented()
 {
     return -int(errno_t::ENOSYS);
 }
 
+uint8_t syscall_zmasks[SYSCALL_COUNT] = {};
+
 syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
+    // 0x00
     (syscall_handler_t*)(void*)sys_read,
     (syscall_handler_t*)(void*)sys_write,
     (syscall_handler_t*)(void*)sys_open,
@@ -31,6 +37,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigaction,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigprocmask,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_stub_rt_sigreturn,
+    // 0x10
     (syscall_handler_t*)(void*)sys_ioctl,
     (syscall_handler_t*)(void*)sys_pread64,
     (syscall_handler_t*)(void*)sys_pwrite64,
@@ -47,6 +54,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_shmget,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_shmat,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_shmctl,
+    // 0x20
     (syscall_handler_t*)(void*)sys_dup,
     (syscall_handler_t*)(void*)sys_dup2,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_pause,
@@ -56,16 +64,17 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setitimer,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getpid,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sendfile,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_socket,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_connect,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_accept,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_sendto,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_recvfrom,
+    (syscall_handler_t*)(void*)sys_socket,
+    (syscall_handler_t*)(void*)sys_connect,
+    (syscall_handler_t*)(void*)sys_accept,
+    (syscall_handler_t*)(void*)sys_sendto,
+    (syscall_handler_t*)(void*)sys_recvfrom,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sendmsg,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_recvmsg,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_shutdown,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_bind,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_listen,
+    // 0x30
+    (syscall_handler_t*)(void*)sys_shutdown,
+    (syscall_handler_t*)(void*)sys_bind,
+    (syscall_handler_t*)(void*)sys_listen,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getsockname,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getpeername,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_socketpair,
@@ -79,6 +88,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_wait4,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_kill,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_uname,
+    // 0x40
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_semget,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_semop,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_semctl,
@@ -87,14 +97,15 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_msgsnd,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_msgrcv,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_msgctl,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_fcntl,
+    (syscall_handler_t*)(void*)sys_fcntl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_flock,
     (syscall_handler_t*)(void*)sys_fsync,
     (syscall_handler_t*)(void*)sys_fdatasync,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_truncate,
     (syscall_handler_t*)(void*)sys_ftruncate,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getdents,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_getcwd,
+    (syscall_handler_t*)(void*)sys_getcwd,
+    // x50
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_chdir,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fchdir,
     (syscall_handler_t*)(void*)sys_rename,
@@ -111,6 +122,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_fchown,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_lchown,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_umask,
+    // 0x60
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_gettimeofday,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getrlimit,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getrusage,
@@ -127,6 +139,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setpgid,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getppid,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getpgrp,
+    // 0x70
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setsid,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setreuid,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setregid,
@@ -143,6 +156,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_capget,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_capset,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigpending,
+    // 0x80
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigtimedwait,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigqueueinfo,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigsuspend,
@@ -159,6 +173,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setpriority,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_setparam,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_getparam,
+    // 0x90
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_setscheduler,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_getscheduler,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_get_priority_max,
@@ -175,6 +190,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_prctl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_arch_prctl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_adjtimex,
+    // 0xA0
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setrlimit,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_chroot,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sync,
@@ -184,16 +200,17 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_umount2,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_swapon,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_swapoff,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_reboot,
+    (syscall_handler_t*)(void*)sys_reboot,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sethostname,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setdomainname,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_iopl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_ioperm,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_create_module,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_init_module,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_delete_module,
+    (syscall_handler_t*)(void*)sys_init_module,
+    // 0xB0
+    (syscall_handler_t*)(void*)sys_delete_module,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_get_kernel_syms,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_query_module,
+    (syscall_handler_t*)(void*)sys_query_module,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_quotactl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_nfsservctl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getpmsg,
@@ -207,6 +224,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_lsetxattr,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fsetxattr,
     (syscall_handler_t*)(void*)sys_getxattr,
+    // 0xC0
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_lgetxattr,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fgetxattr,
     (syscall_handler_t*)(void*)sys_listxattr,
@@ -217,12 +235,13 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fremovexattr,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_tkill,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_time,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_futex,
+    (syscall_handler_t*)(void*)sys_futex,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_setaffinity,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_getaffinity,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_set_thread_area,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_io_setup,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_io_destroy,
+    // 0xD0
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_io_getevents,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_io_submit,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_io_cancel,
@@ -239,6 +258,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fadvise64,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_timer_create,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_timer_settime,
+    // 0xE0
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_timer_gettime,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_timer_getoverrun,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_timer_delete,
@@ -255,6 +275,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_mbind,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_set_mempolicy,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_get_mempolicy,
+    // 0xF0
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_mq_open,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_mq_unlink,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_mq_timedsend,
@@ -271,6 +292,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_inotify_init,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_inotify_add_watch,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_inotify_rm_watch,
+    // 0x100
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_migrate_pages,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_openat,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_mkdirat,
@@ -287,6 +309,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_faccessat,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_pselect6,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_ppoll,
+    // 0x110
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_unshare,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_set_robust_list,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_get_robust_list,
@@ -303,6 +326,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fallocate,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_timerfd_settime,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_timerfd_gettime,
+    // 0x120
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_accept4,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_signalfd4,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_eventfd2,
@@ -319,6 +343,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fanotify_mark,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_prlimit64,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_name_to_handle_at,
+    // 0x130
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_open_by_handle_at,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_clock_adjtime,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_syncfs,
@@ -328,8 +353,13 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_process_vm_readv,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_process_vm_writev,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_kcmp,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_finit_module
-    (syscall_handler_t*)(void*)sys_unimplemented//sys_fexecve
+    (syscall_handler_t*)(void*)sys_unimplemented,//sys_finit_module,
+    (syscall_handler_t*)(void*)sys_unimplemented,//sys_fexecve
+    (syscall_handler_t*)(void*)sys_probe_pci_for,
+    (syscall_handler_t*)(void*)sys_render_batch
+    //(syscall_handler_t*)(void*)sys_,
+    //(syscall_handler_t*)(void*)sys_,
+    //(syscall_handler_t*)(void*)sys_,
 };
 
 C_ASSERT(countof(syscall_handlers) == SYSCALL_COUNT);

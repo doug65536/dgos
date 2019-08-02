@@ -16,13 +16,13 @@
 #define ZEROBASED(n) n - 0x1000
 
 // This is linked at the beginning of the binary
-.section .head
+.section .head, "wx", @progbits
 .global entry
 entry:
     // Jump to the unrelocated "entry_start"
     ljmpw $0,$ UNRELOCATED(entry_start)
 
-.align 8
+.balign 8
 .global bootinfo_primary_volume_desc
 bootinfo_primary_volume_desc:
     .space 4
@@ -44,6 +44,9 @@ bootinfo_reserved:
     .space 10*4
 
 entry_start:
+    cli
+    cld
+
     // Initialize segment registers
     xorw %ax,%ax
     movw %ax,%ds
@@ -95,7 +98,7 @@ entry_start:
     // the middle of its execution
     ljmpw *(%bx)
 
-.align 4
+.balign 4
 relocate_farptr:
     .space 4
 
@@ -116,7 +119,7 @@ relocate:
 relocate_end:
 
 // This is linked after head
-.section .early
+.section .early, "wx", @progbits
 reloc_entry:
     callw clear_bss
     
@@ -144,7 +147,7 @@ reloc_entry:
     movw $0x4200,%ax
     movb boot_drive,%dl
     int $0x13
-    jc .Lretry_io
+    jnc load_done	
     
 load_done:	// utility label for placing debugger breakpoint
     
@@ -161,12 +164,12 @@ load_done:	// utility label for placing debugger breakpoint
 0:  hlt
     jmp 0b
 
-.align 64
+.balign 64
 .global boot_drive
 boot_drive:
     .byte 0
 
-.section .bss
+.section .bss, "aw", @progbits
 dap:
     .space dap_length
     

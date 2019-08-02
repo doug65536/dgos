@@ -59,8 +59,59 @@
 //                            kerneldata
 #define CPU_MSR_STAR            0xC0000081U
 
+#define CPU_MSR_SPEC_CTRL       0x48
+
+// IBRS if CPUID.(EAX=07H,ECX=0):EDX[26]=1
+#define CPU_MSR_SPEC_CTRL_IBRS_BIT      0
+
+// STIBP If CPUID.(EAX=07H,ECX=0):EDX[27]=1
+#define CPU_MSR_SPEC_CTRL_STIBP_BIT     1
+
+// SSBD If CPUID.(EAX=07H,ECX=0):EDX[31]=1
+#define CPU_MSR_SPEC_CTRL_SSBD_BIT      2
+
+#define CPU_MSR_PRED_CMD        0x49
+
+// If CPUID.(EAX=07H,ECX=0):EDX[26]=1
+#define CPU_MSR_PRED_CMD_IBPB_BIT   0
+#define CPU_MSR_PRED_CMD_IBPB       (1<<CPU_MSR_PRED_CMD_IBPB_BIT)
+
+#define CPU_MSR_SPEC_CTRL_IBRS      (1<<CPU_MSR_SPEC_CTRL_IBRS_BIT)
+#define CPU_MSR_SPEC_CTRL_STIBP     (1<<CPU_MSR_SPEC_CTRL_STIBP_BIT)
+#define CPU_MSR_SPEC_CTRL_SSBD      (1<<CPU_MSR_SPEC_CTRL_SSBD_BIT)
+
+#define CPU_MSR_SYSENTER_CS     0x174
+#define CPU_MSR_SYSENTER_ESP    0x175
+#define CPU_MSR_SYSENTER_EIP    0x176
+
+#define CPU_MSR_ARCH_CAPS       0x10A
+#define CPU_MSR_ARCH_CAPS_RDCL_NO_BIT   0
+#define CPU_MSR_ARCH_CAPS_IBRS_ALL_BIT  1
+#define CPU_MSR_ARCH_CAPS_RSBA_BIT      2
+#define CPU_MSR_ARCH_CAPS_L1TF_NO_BIT   3
+#define CPU_MSR_ARCH_CAPS_SSB_NO_BIT    4
+// 1=no rogue cache load
+#define CPU_MSR_ARCH_CAPS_RDCL_NO       (1<<CPU_MSR_ARCH_CAPS_RDCL_NO_BIT)
+// 1=support IBRS
+#define CPU_MSR_ARCH_CAPS_IBRS_ALL      (1<<CPU_MSR_ARCH_CAPS_IBRS_ALL_BIT)
+// 1=uses alternate predictor for ret
+#define CPU_MSR_ARCH_CAPS_RSBA          (1<<CPU_MSR_ARCH_CAPS_RSBA_BIT)
+// 1=no L1 terminal fault
+#define CPU_MSR_ARCH_CAPS_L1TF_NO       (1<<CPU_MSR_ARCH_CAPS_L1TF_NO_BIT)
+// 1=no speculative store bypass
+#define CPU_MSR_ARCH_CAPS_SSB_NO        (1<<CPU_MSR_ARCH_CAPS_SSB_NO_BIT)
+
+#define CPU_MSR_FLUSH_CMD       0x10B
+// Writeback and invalidate L1 cache
+#define CPU_MSR_FLUSH_CMD_L1D_FLUSH_BIT  0
+#define CPU_MSR_FLUSH_CMD_L1D_FLUSH  (1<<CPU_MSR_FLUSH_CMD_L1D_FLUSH_BIT)
+
 // IA32_MISC_ENABLE
-#define CPU_MSR_MISC_ENABLE    0x1A0U
+#define CPU_MSR_MISC_ENABLE     0x1A0U
+
+// IA32_PERF_BIAS
+#define CPU_MSR_PERF_BIAS       0x1B0
+//4 bit value, 0=fast, 1=lowpower If CPUID.6H:ECX[3] = 1
 
 // PAT MSR
 #define CPU_MSR_IA32_PAT        0x277U
@@ -124,6 +175,7 @@
 #define CPU_MSR_MISC_ENABLE_MONITOR_FSM_BIT     18
 #define CPU_MSR_MISC_ENABLE_LIMIT_CPUID_BIT     22
 #define CPU_MSR_MISC_ENABLE_XTPR_DISABLED_BIT   23
+// 33:24 reserved
 #define CPU_MSR_MISC_ENABLE_XD_DISABLE_BIT      34
 
 #define CPU_MSR_MISC_ENABLE_FAST_STR \
@@ -307,7 +359,6 @@
 #define XCR0_PT                 (1U<<XCR0_PT_BIT)
 #define XCR0_PKRU               (1U<<XCR0_PKRU_BIT)
 
-
 //
 // CPU context
 
@@ -345,6 +396,14 @@
 #define CPU_EFLAGS_VIF      (1U << CPU_EFLAGS_VIF_BIT)
 #define CPU_EFLAGS_VIP      (1U << CPU_EFLAGS_VIP_BIT)
 #define CPU_EFLAGS_ID       (1U << CPU_EFLAGS_ID_BIT)
+
+// Always set
+#define CPU_EFLAGS_ALWAYS   2
+
+// Never set (only for debugging)
+
+// Bits 1, 3, 5, 15, and 22 through 31 of eflags are reserved
+#define CPU_EFLAGS_NEVER    ((1<<3)|(1<<5)|(1<<15)|-(1<<22))
 
 #define CPU_EFLAGS_IOPL_BITS    2
 #define CPU_EFLAGS_IOPL_MASK    ((1 << CPU_EFLAGS_IOPL_BITS)-1)
@@ -530,6 +589,25 @@
 #define GDT_SEL_TSS_HI          0x88
 
 #define GDT_SEL_END             0xC0
+
+#define GDT_SEL_RPL_OF(sel)     ((sel) & 3)
+
+// Selector is a 32 or 64 bit kernel or user code segment
+#define GDT_SEL_IS_CSEG(sel)    (((sel) >= 0x40+3) && \
+                                    ((sel) <= 0x60) && \
+                                    !((sel) & 8))
+
+// Selector is a kernel or user data segment
+#define GDT_SEL_IS_DSEG(sel)    (((sel) >= 0x48+3) && \
+                                    ((sel) <= 0x68) && \
+                                    ((sel) & 8))
+
+#define GDT_SEL_IS_C64(sel)     (((sel) >= 0x50+3) && \
+                                    ((sel) <= 0x60) && \
+                                    !((sel) & 8))
+
+#define GDT_SEL_RPL_IS_KERNEL(sel)  (GDT_SEL_RPL_OF((sel)) == 0)
+#define GDT_SEL_RPL_IS_USER(sel)    (GDT_SEL_RPL_OF((sel)) == 3)
 
 #define GDT_TYPE_TSS            0x09
 

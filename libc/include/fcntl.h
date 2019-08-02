@@ -158,7 +158,7 @@ __BEGIN_DECLS
 #define O_EXEC
 
 // Open for reading only.
-#define O_RDONLY
+//#define O_RDONLY
 
 // Open for reading and writing.
 #define O_RDWR

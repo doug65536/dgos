@@ -13,32 +13,51 @@ struct trace_item {
     unsigned cid:6; // Up to 64 CPUs
     unsigned tid:9; // Up to 512 threads
     bool irq_en:1;  // EFLAGS.IF
+
+    // <- 64 bit boundary
+    uint64_t tsc;
+
     unsigned sync:7;// sync recovery
     bool call:1;    // true for fn entry, false for fn exit
 
     __attribute__((__no_instrument_function__))
-    trace_item()
-        : sync(0x55)
+    constexpr trace_item()
+        : fn{0}
+        , cid{0}
+        , tid{0}
+        , irq_en{false}
+        , tsc{0}
+        , sync{0x55}
+        , call{0}
     {
     }
 
     __attribute__((__no_instrument_function__))
-    inline bool valid() const { return sync == 0x55; }
+    inline constexpr bool valid() const { return sync == 0x55; }
+
     __attribute__((__no_instrument_function__))
-    inline void *get_ip() const { return (void*)(int64_t(fn << 16) >> 16); }
+    inline void *get_ip() const
+    {
+        return (void*)(int64_t(uint64_t(fn) << 16) >> 16);
+    }
+
     __attribute__((__no_instrument_function__))
-    inline int get_tid() const { return tid < 255 ? tid : -1; }
+    inline constexpr int get_tid() const { return tid; }
+
     __attribute__((__no_instrument_function__))
-    inline int get_cid() const { return cid < 63 ? cid : -1; }
+    inline constexpr int get_cid() const { return cid; }
+
     __attribute__((__no_instrument_function__))
     inline void set_ip(void *p) { fn = uint64_t(p); }
+
     __attribute__((__no_instrument_function__))
-    inline void set_tid(unsigned t) { tid = t < 255 ? t : 255; }
+    inline constexpr void set_tid(unsigned t) { tid = t <= 255 ? t : 255; }
+
     __attribute__((__no_instrument_function__))
-    inline void set_cid(unsigned c) { cid = c < 63 ? c : 63; }
+    inline constexpr void set_cid(unsigned c) { cid = c <= 63 ? c : 63; }
 } _packed;
 
-static_assert(sizeof(trace_item) == 9, "Unexpected size");
+static_assert(sizeof(trace_item) == 17, "Unexpected size");
 
 // The same as a trace_item with the thread id and sync field omitted
 // Intended for use in when the data has been filtered by thread id
@@ -53,7 +72,12 @@ struct trace_record {
     bool irq_en:1;  // EFLAGS.IF
     bool call:1;    // true for fn entry, false for fn exit
 
-    trace_record()
+    uint64_t tsc;
+
+    uint64_t total_time;
+    uint64_t child_time;
+
+    constexpr trace_record()
         : fn(0)
         , show(true)
         , showable(true)
@@ -63,10 +87,13 @@ struct trace_record {
         , cid(0)
         , irq_en(0)
         , call(0)
+        , tsc(0)
+        , total_time(0)
+        , child_time(0)
     {
     }
 
-    trace_record(trace_item const& rhs)
+    constexpr trace_record(trace_item const& rhs)
         : fn(rhs.fn)
         , show(true)
         , showable(true)
@@ -76,21 +103,29 @@ struct trace_record {
         , cid(rhs.cid)
         , irq_en(rhs.irq_en)
         , call(rhs.call)
+        , tsc(rhs.tsc)
+        , total_time(0)
+        , child_time(0)
     {
     }
 
     __attribute__((__no_instrument_function__))
-    inline void *get_ip() const { return (void*)(int64_t(fn << 16) >> 16); }
+    inline void *get_ip() const
+    {
+        return (void*)(int64_t(fn << 16) >> 16);
+    }
     __attribute__((__no_instrument_function__))
-    inline int get_cid() const { return cid < 63 ? cid : -1; }
+    inline constexpr int get_cid() const { return cid < 63 ? cid : -1; }
 } _packed;
 
-static_assert(sizeof(trace_record) == 8, "Unexpected size");
+static_assert(sizeof(trace_record) == 32, "Unexpected size");
 
-#ifdef __DGOS_KERNEL__
+#ifdef __DGOS__
 extern "C" _no_instrument
 void __cyg_profile_func_enter(void *this_fn, void *call_site);
 
 extern "C" _no_instrument
 void __cyg_profile_func_exit(void *this_fn, void *call_site);
+
+extern int eainst_flush_ready;
 #endif

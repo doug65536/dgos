@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set +x
+
 IMG="$1"
 TOPSRC="$2"
 
@@ -9,18 +11,20 @@ mkdir -p stage || exit
 
 truncate --size 128K stage/.big || exit
 
-ln -f kernel-generic stage/dgos-kernel-generic || exit
-ln -f kernel-tracing stage/dgos-kernel-tracing || exit
-ln -f kernel-asan stage/dgos-kernel-asan || exit
-cp -u hello.km stage/hello.km || exit
+ln -fsTr kernel-generic stage/dgos-kernel-generic || exit
+ln -fsTr kernel-tracing stage/dgos-kernel-tracing || exit
+ln -fsTr kernel-asan stage/dgos-kernel-asan || exit
+for f in initrd; do
+    ln -fsTr "$f" "stage/$f" || exit
+done
 
-cp -u user-shell stage || exit
-cp -u "$TOPSRC/user/background.png" stage || exit
+ln -fsTr "$TOPSRC/user/background.png" stage/background.png || exit
 
+# EFI boot files
 mkdir -p stage/EFI/boot || exit
-cp -u bootx64.efi stage/EFI/boot/bootx64.efi || exit
-#cp -u bootia32.efi stage/EFI/boot/bootia32.efi || exit
+ln -fsTr bootx64.efi stage/EFI/boot/bootx64.efi || exit
+#ln -fsTr bootia32.efi stage/EFI/boot/bootia32.efi || exit
 
 echo Populating FAT image
-mcopy -s -Q -i "$IMG" stage/* ::/ || exit
-mcopy -s -Q -i "$IMG" stage/.b* ::/ || exit
+mcopy -v -s -Q -i "$IMG" stage/* ::/ || exit
+mcopy -v -s -Q -i "$IMG" stage/.b* ::/ || exit

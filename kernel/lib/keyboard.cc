@@ -1,6 +1,9 @@
 #include "keyboard.h"
 #include "mutex.h"
 #include "printk.h"
+#include "memory.h"
+
+#include "fs/devfs.h"
 
 #define DEBUG_KEYBD 1
 #if DEBUG_KEYBD
@@ -14,7 +17,7 @@ struct keyboard_buffer_t {
     size_t head;
     size_t tail;
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
@@ -24,8 +27,8 @@ struct keyboard_buffer_t {
 static keyboard_buffer_t keybd_buffer;
 
 // Drivers plug implementation into these
-int (*keybd_get_modifiers)(void);
-int (*keybd_set_layout_name)(char const *name);
+EXPORT int (*keybd_get_modifiers)(void);
+EXPORT int (*keybd_set_layout_name)(char const *name);
 
 // The order here must match the order of KEYB_VK_NUMPAD_* enum
 char const keybd_fsa_t::numpad_ascii[] =
@@ -231,7 +234,7 @@ char const *keybd_special_text(int codepoint)
         codepoint = -codepoint;
 
     int index = codepoint - KEYB_VK_BASE - 1;
-    if (index >= 0 && index < (int)countof(keyboard_special_text)) {
+    if (index >= 0 && index < int(countof(keyboard_special_text))) {
         return keyboard_special_text[index];
     } else if (codepoint < 0x101000)
         return "";
@@ -242,14 +245,14 @@ void keybd_init(void)
 {
 }
 
-keybd_fsa_t::keybd_fsa_t()
+EXPORT keybd_fsa_t::keybd_fsa_t()
     : shifted_lookup(shifted_lookup_us)
     , alt_code(0)
     , shift_state(0)
 {
 }
 
-void keybd_fsa_t::deliver_vk(int vk)
+EXPORT void keybd_fsa_t::deliver_vk(int vk)
 {
     int is_keyup = vk < 0;
 
@@ -346,7 +349,7 @@ void keybd_fsa_t::deliver_vk(int vk)
     }
 }
 
-int keybd_fsa_t::get_modifiers()
+EXPORT int keybd_fsa_t::get_modifiers()
 {
     int flags = 0;
 
@@ -364,3 +367,56 @@ int keybd_fsa_t::get_modifiers()
 
     return flags;
 }
+
+class keybd_file_reg_t : public dev_fs_file_reg_t {
+public:
+    static keybd_file_reg_t *get_registration()
+    {
+        if (unlikely(!instance))
+            instance.reset(new (std::nothrow) keybd_file_reg_t("conin"));
+        return instance;
+    }
+
+    keybd_file_reg_t(char const *name)
+        : dev_fs_file_reg_t(name)
+    {
+    }
+
+    struct keybd_file_t : public dev_fs_file_t {
+        // dev_fs_file_t interface
+        ssize_t read(char *buf, size_t size, off_t offset) override
+        {
+            if (size < sizeof(keyboard_event_t))
+                return -int(errno_t::EINVAL);
+
+            keyboard_event_t ev = keybd_waitevent();
+            memcpy(buf, &ev, sizeof(ev));
+            return sizeof(ev);
+        }
+
+        // dev_fs_file_t interface
+        ssize_t write(char const *buf, size_t size, off_t offset) override
+        {
+            return -int(errno_t::EROFS);
+        }
+    };
+
+    // dev_fs_file_reg_t interface
+    dev_fs_file_t *open(int flags, mode_t mode) override
+    {
+        return &file;
+    }
+
+    keybd_file_t file;
+
+    static std::unique_ptr<keybd_file_reg_t> instance;
+};
+
+std::unique_ptr<keybd_file_reg_t> keybd_file_reg_t::instance;
+
+EXPORT void keybd_register(void*)
+{
+    devfs_register(keybd_file_reg_t::instance);
+}
+
+REGISTER_CALLOUT(keybd_register, nullptr, callout_type_t::devfs_ready, "000");

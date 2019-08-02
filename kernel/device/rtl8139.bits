@@ -1,0 +1,114 @@
+-- RTL8139_IDR_HI=0x00 MAC address (must be 32-bit I/O)
+-- RTL8139_IDR_LO=0x04 MAC address (must be 32-bit I/O)
+
+-- RTL8139_MAR_LO=0x08 Multicast Address Register (must be 32-bit I/O)
+-- RTL8139_MAR_HI=0x0C Multicast Address Register (must be 32-bit I/O)
+
+-- RTL8139_CR=0x37 Command register
+4 RST Reset
+3 RXEN Rx enable
+2 TXEN Tx enable
+0 RXEMPTY Rx buffer is empty (read only)
+
+-- RTL8139_TSD_n(n)=(0x10+((n)<<2)) Tx status descriptor 0-3 (32-bit)
+
+-- RTL8139_TSD
+31 CRS Carrier sense lost (read only)
+30 TABT Transmit aborted (read only)
+29 OWC Out of window collision (read only)
+28 CDH CD Heart Beat (10Mbps only) (read only)
+27:24 NCC Number of tx collisions count
+21:16 ERTXTH Early tx threshold (in units of 8 bytes, 0=8 bytes, max 2KB)
+15 TOK Transmit OK (read only)
+14 TUN Transmit FIFO underrun (read only)
+13 OWN Owned 1=by driver, 0=by NIC
+12:0 SIZE Tx packet size
+-- RTL8139_TSD_SIZE_MAX=1792
+
+-- RTL8139_TSAD_n(n)=(0x20+((n)<<2)) Tx start address descriptor 0-3 (32-bit)
+
+-- RTL8139_RBSTART=0x30 Rx buffer address descriptor (32-bit)
+
+-- RTL8139_ERBCR=0x34 Early rx byte count (16-bit)
+
+-- RTL8139_ERSR=0x36 Early rx status register (8-bit)
+
+-- RTL8139_CAPR=0x38 Current address of packet read (16-bit)
+
+-- RTL8139_CBR=0x3A Current rx buffer address (16-bit)
+
+-- RTL8139_IMR=0x3C Interrupt Mask Register (16-bit)
+-- RTL8139_ISR=0x3E Interrupt Status Register (16-bit)
+
+-- RTL8139_IxR RTL8139_IMR and RTL8139_ISR: Interrupt Mask/Status Registers
+15 SERR System error
+14 TIMEOUT Timeout
+13 LENCHG Cable length change
+6 FOVW Rx FIFO Overflow
+5 PUNLC Packet underrun / link change
+4 RXOVW Rx overflow
+3 TER Transmit error
+2 TOK Transmit OK
+1 RER Rx error
+0 ROK Rx OK
+
+-- RTL8139_TCR=0x40 Tx Configuration Register (32-bit)
+
+-- RTL8139_RCR=0x44 Rx Configuration Register (32-bit)
+
+-- RTL8139_TCTR=0x48 Timer Count Register (32-bit)
+
+-- RTL8139_MPC=0x4C Missed Packet Counter (32-bit)
+
+-- RTL8139_9346CR=0x50 93C46 Command Register (8-bit)
+
+-- RTL8139_CONFIG0=0x51 Configuration Register 0 (8-bit)
+
+-- RTL8139_CONFIG1=0x52 Configuration Register 1 (8-bit)
+
+-- RTL8139_TIMERINT=0x54 Timer Interrupt Register (32-bit)
+
+-- RTL8139_MSR=0x58 Media Status Register (8-bit)
+
+-- RTL8139_CONFIG3=0x59 Configuration Register 3 (8-bit)
+
+-- RTL8139_CONFIG4=0x5A Configuration Register 4 (8-bit)
+
+-- RTL8139_MULINT=0x5C Multiple Interrupt Select (16-bit)
+
+-- RTL8139_RERID=0x5E PCI Revision ID (8-bit)
+
+-- RTL8139_TSAD=0x60 Tx Status of All Descriptors (16-bit)
+
+-- RTL8139_BMCR=0x62 Basic Mode Control Register (16-bit)
+
+-- RTL8139_BMSR=0x64 Basic Mode Status Register (16-bit)
+
+-- RTL8139_ANAR=0x66 Auto-Negotiation Address Register (16-bit)
+
+-- RTL8139_ANLPAR=0x68 Auto-Negotiation Link Partner Register (16-bit)
+
+-- RTL8139_ANER=0x6A Auto-Negotiation Expansion Register (16-bit)
+
+-- RTL8139_DIS=0x6C Disconnect counter (16-bit)
+
+-- RTL8139_FCSC=0x6E False Carrier Sense Counter (16-bit)
+
+-- RTL8139_NWAYTR=0x70 N-Way Test Register (16-bit)
+
+-- RTL8139_REC=0x72 RX_ER Counter (16-bit)
+
+-- RTL8139_CSCR=0x74 CS Configuration Register (16-bit)
+
+-- RTL8139_PHY1_PARM=0x78 PHY Parameter 1 (32-bit)
+
+-- RTL8139_TW_PARM=0x7C Twister Parameter (32-bit)
+
+-- RTL8139_PHY2_PARM=0x80 PHY Parameter 2 (8-bit)
+
+-- RTL8139_CRC_n(n)=(0x84+(n)) PM CRC register for wakeup frame n (8-bit)
+
+-- RTL8139_WAKELO_n(n)=(0x8C+((n)<<2)) PM wakeup frame0 (64-bit)
+-- RTL8139_WAKEHI_n(n)=(0x90+((n)<<2)) PM wakeup frame0 (64-bit)
+
+-- RTL8139_LSBCRC0_n(n)=(0xCC+(n)) LSB of mask byte of wakeup frame 12 to 75 (8-bit)

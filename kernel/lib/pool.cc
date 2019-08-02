@@ -15,7 +15,7 @@ static uint32_t pool_round_up(uint32_t n, int8_t log2m)
     return (n + ((1U<<log2m)-1)) & (~0U << log2m);
 }
 
-bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
+EXPORT bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
 {
     // Round item size up to multiple of cache line
     item_size = pool_round_up(item_size, POOL_LOG2_ALIGN);
@@ -37,7 +37,16 @@ bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
     return true;
 }
 
-pool_base_t::~pool_base_t()
+EXPORT pool_base_t::pool_base_t()
+    : items(nullptr)
+    , item_size(0)
+    , item_capacity(0)
+    , item_count(0)
+    , first_free(0)
+{
+}
+
+EXPORT pool_base_t::~pool_base_t()
 {
     // Cache line align first item slot
     size_t hdr_size = pool_round_up(sizeof(pool_base_t), POOL_LOG2_ALIGN);
@@ -48,13 +57,13 @@ pool_base_t::~pool_base_t()
     munmap(this, size);
 }
 
-void *pool_base_t::item(uint32_t index)
+EXPORT void *pool_base_t::item(uint32_t index)
 {
     assert(index < item_capacity);
     return items + index * item_size;
 }
 
-void *pool_base_t::alloc()
+EXPORT void *pool_base_t::alloc()
 {
     uint32_t *slot;
 
@@ -75,14 +84,14 @@ void *pool_base_t::alloc()
     return slot;
 }
 
-void *pool_base_t::calloc()
+EXPORT void *pool_base_t::calloc()
 {
     void *item = alloc();
     memset(item, 0, item_size);
     return item;
 }
 
-void pool_base_t::free(uint32_t index)
+EXPORT void pool_base_t::free(uint32_t index)
 {
     scoped_lock lock(pool_lock);
 

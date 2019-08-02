@@ -18,3 +18,4 @@ syscall
 device
 ../emu/bochs
 ../toolchain
+unittest

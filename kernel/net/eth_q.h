@@ -2,6 +2,8 @@
 #include "types.h"
 #include "ethernet.h"
 
+__BEGIN_DECLS
+
 // Circular dependency
 struct ethq_pkt_t;
 struct eth_dev_base_t;
@@ -42,3 +44,5 @@ struct ethq_queue_t {
 void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt);
 ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue);
 ethq_pkt_t *ethq_dequeue_all(ethq_queue_t *queue);
+
+__END_DECLS

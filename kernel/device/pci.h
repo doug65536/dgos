@@ -4,6 +4,8 @@
 #include "assert.h"
 #include "irq.h"
 #include "string.h"
+#include "vector.h"
+#include "export.h"
 
 struct pci_addr_t {
     // Legacy PCI supports 256 busses, 32 slots, 8 functions, and 64 dwords
@@ -28,79 +30,55 @@ struct pci_addr_t {
     //                       +-----------+-------+------+------+
     //                            16         8       5      3
 
-    pci_addr_t()
-        : addr(0)
-    {
-    }
-
-    pci_addr_t(int seg, int bus, int slot, int func)
-        : addr((uint32_t(seg) << 16) | (bus << 8) | (slot << 3) | (func))
-    {
-        assert(seg >= 0);
-        assert(seg < 65536);
-        assert(bus >= 0);
-        assert(bus < 256);
-        assert(slot >= 0);
-        assert(slot < 32);
-        assert(func >= 0);
-        assert(func < 8);
-    }
-
-    int bus() const
-    {
-        return (addr >> 8) & 0xFF;
-    }
-
-    int slot() const
-    {
-        return (addr >> 3) & 0x1F;
-    }
-
-    int func() const
-    {
-        return addr & 0x7;
-    }
+    pci_addr_t();
+    pci_addr_t(int seg, int bus, int slot, int func);
+    int bus() const;
+    int slot() const;
+    int func() const;
 
     // Returns true if segment is zero
-    bool is_legacy() const
-    {
-        return (addr < 65536);
-    }
-
-    uint64_t get_addr() const
-    {
-        return addr << 12;
-    }
+    bool is_legacy() const;
+    uint64_t get_addr() const;
 
 private:
     uint32_t addr;
 };
 
 struct pci_config_hdr_t {
+    // 0x00
     uint16_t vendor;
     uint16_t device;
 
+    // 0x04
     uint16_t command;
     uint16_t status;
 
+    // 0x08
     uint8_t revision;
     uint8_t prog_if;
     uint8_t subclass;
     uint8_t dev_class;
 
+    // 0x0C
     uint8_t cache_line_size;
     uint8_t latency_timer;
     uint8_t header_type;
     uint8_t bist;
 
+    // 0x10, 0x14, 0x18, 0x1C, 0x20, 0x24
     uint32_t base_addr[6];
 
+    // 0x28
     uint32_t cardbus_cis_ptr;
 
+    // 0x2C
     uint16_t subsystem_vendor;
     uint16_t subsystem_id;
 
+    // 0x30
     uint32_t expansion_rom_addr;
+
+    // 0x34
     uint8_t capabilities_ptr;
 
     uint8_t reserved[7];
@@ -110,33 +88,33 @@ struct pci_config_hdr_t {
     uint8_t min_grant;
     uint8_t max_latency;
 
-    bool is_bar_mmio(ptrdiff_t bar) const
-    {
-        return (base_addr[bar] & 1) == 0;
-    }
-
-    bool is_bar_portio(ptrdiff_t bar) const
-    {
-        return base_addr[bar] & 1;
-    }
-
-    bool is_bar_prefetchable(ptrdiff_t bar) const
-    {
-        return base_addr[bar] & 8;
-    }
+    bool is_bar_mmio(ptrdiff_t bar) const;
+    bool is_bar_portio(ptrdiff_t bar) const;
+    bool is_bar_prefetchable(ptrdiff_t bar) const;
 
     // Returns true if the BAR is MMIO and is 64 bit
-    bool is_bar_64bit(ptrdiff_t bar) const
-    {
-        return (base_addr[bar] & 7) == 4;
-    }
+    bool is_bar_64bit(ptrdiff_t bar) const;
 
     uint64_t get_bar(ptrdiff_t bar) const;
 
     // Write the specified address to the BAR and read it back, updating
     // config.base_addr[bar] and config.base_addr[bar+1] if it is 64 bit
-    void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
+    EXPORT void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
 };
+
+template<typename T>
+static _always_inline void pci_config_copy_read(
+        pci_addr_t addr, T& dest, int ofs)
+{
+    pci_config_copy(addr, &dest, ofs, sizeof(T));
+}
+
+template<typename T>
+static _always_inline void pci_config_copy_write(
+        pci_addr_t addr, T const& dest, int ofs)
+{
+    pci_config_write(addr, ofs, &dest, sizeof(T));
+}
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
 #define PCI_DEV_CLASS_STORAGE           0x01
@@ -394,13 +372,16 @@ C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
 struct pci_dev_t {
     pci_config_hdr_t config;
     pci_addr_t addr;
+
+    pci_dev_t();
+    ~pci_dev_t();
 };
 
 struct pci_dev_iterator_t : public pci_dev_t {
-    operator pci_addr_t() const
-    {
-        return pci_addr_t(segment, bus, slot, func);
-    }
+    pci_dev_iterator_t();
+    ~pci_dev_iterator_t();
+
+    operator pci_addr_t() const;
 
     int segment;
     int bus;
@@ -417,21 +398,14 @@ struct pci_dev_iterator_t : public pci_dev_t {
     uint8_t bus_todo_len;
     uint8_t bus_todo[64];
 
-    void reset()
-    {
-        segment = 0;
-        bus = 0;
-        slot = 0;
-        func = 0;
-        dev_class = 0;
-        subclass = 0;
-        vendor = 0;
-        device = 0;
-        header_type = 0;
-        bus_todo_len = 0;
-        memset(bus_todo, 0, sizeof(bus_todo));
-    }
+    void reset();
+
+    pci_dev_iterator_t& copy_from(pci_dev_iterator_t const& rhs);
+
+    bool operator==(pci_dev_iterator_t const& rhs) const;
 };
+
+__BEGIN_DECLS
 
 int pci_init(void);
 
@@ -534,7 +508,7 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
 
 bool pci_set_msi_irq(pci_addr_t addr,
                      pci_irq_range_t *irq_range,
-                     int cpu, bool distribute, int req_count,
+                     int cpu, bool distribute, size_t req_count,
                      intr_handler_t handler, char const *name,
                      int const *target_cpus = nullptr,
                      int const *vector_offsets = nullptr);
@@ -549,11 +523,175 @@ void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin);
 void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
                           uint16_t set, uint16_t clr);
 
-void pci_adj_control_bits(int bus, int slot, int func,
-                          uint16_t set, uint16_t clr);
-
 void pci_clear_status_bits(pci_addr_t addr, uint16_t bits);
 
 char const * pci_device_class_text(uint8_t cls);
 
 int pci_vector_count_from_offsets(int const *vector_offsets, int count);
+
+__END_DECLS
+
+// == MMIO accessor helpers
+
+#define _MM_WR_IMPL(type, mm, value) \
+    __asm__ __volatile__ ( \
+        "mov %" type "[src],(%q[dest])\n\t" \
+        : \
+        : [dest] "a" (&(mm)) \
+        , [src] "ri" (value) \
+        : "memory" \
+    )
+
+#define _MM_RD_IMPL(type, value, mm) \
+    __asm__ __volatile__ ( \
+        "mov (%[src]),%" type "[dest]\n\t" \
+        : [dest] "=r" (value) \
+        : [src] "a" (&(mm)) \
+        : "memory" \
+    ); \
+    return value
+
+static inline void mm_wr(uint8_t volatile& dest, uint8_t src)
+{
+    _MM_WR_IMPL("b", dest, src);
+}
+
+static inline void mm_wr(uint16_t volatile& dest, uint16_t src)
+{
+    _MM_WR_IMPL("w", dest, src);
+}
+
+static inline void mm_wr(uint32_t volatile& dest, uint32_t src)
+{
+    _MM_WR_IMPL("k", dest, src);
+}
+
+static inline void mm_wr(uint64_t volatile& dest, uint64_t src)
+{
+    _MM_WR_IMPL("q", dest, src);
+}
+
+static inline void mm_wr(int8_t volatile& dest, int8_t src)
+{
+    _MM_WR_IMPL("b", dest, src);
+}
+
+static inline void mm_wr(int16_t volatile& dest, int16_t src)
+{
+    _MM_WR_IMPL("w", dest, src);
+}
+
+static inline void mm_wr(int32_t volatile& dest, int32_t src)
+{
+    _MM_WR_IMPL("k", dest, src);
+}
+
+static inline void mm_wr(int64_t volatile& dest, int64_t src)
+{
+    _MM_WR_IMPL("q", dest, src);
+}
+
+static inline void mm_copy_wr(void volatile *dst, void const *src, size_t sz)
+{
+    while (sz >= sizeof(uint32_t)) {
+        mm_wr(*(uint32_t volatile*)dst, *(uint32_t const*)src);
+        dst = (char*)dst + sizeof(uint32_t);
+        src = (char*)src + sizeof(uint32_t);
+        sz -= sizeof(uint32_t);
+    }
+
+    while (sz >= sizeof(uint16_t)) {
+        mm_wr(*(uint16_t volatile*)dst, *(uint16_t const*)src);
+        dst = (char*)dst + sizeof(uint16_t);
+        src = (char*)src + sizeof(uint16_t);
+        sz -= sizeof(uint16_t);
+    }
+
+    while (sz >= sizeof(uint8_t)) {
+        mm_wr(*(uint8_t volatile*)dst, *(uint8_t const*)src);
+        dst = (char*)dst + sizeof(uint8_t);
+        src = (char*)src + sizeof(uint8_t);
+        sz -= sizeof(uint8_t);
+    }
+}
+
+//
+
+static inline uint8_t mm_rd(uint8_t volatile const& src)
+{
+    uint8_t dest;
+    _MM_RD_IMPL("b", dest, src);
+}
+
+static inline int8_t mm_rd(int8_t volatile const& src)
+{
+    uint8_t dest;
+    _MM_RD_IMPL("b", dest, src);
+}
+
+static inline uint16_t mm_rd(uint16_t volatile const& src)
+{
+    uint16_t dest;
+    _MM_RD_IMPL("w", dest, src);
+}
+
+static inline int16_t mm_rd(int16_t volatile const& src)
+{
+    uint16_t dest;
+    _MM_RD_IMPL("w", dest, src);
+}
+
+static inline uint32_t mm_rd(uint32_t volatile const& src)
+{
+    uint32_t dest;
+    _MM_RD_IMPL("k", dest, src);
+}
+
+static inline int32_t mm_rd(int32_t volatile const& src)
+{
+    uint32_t dest;
+    _MM_RD_IMPL("k", dest, src);
+}
+
+static inline uint64_t mm_rd(uint64_t volatile const& src)
+{
+    uint64_t dest;
+    _MM_RD_IMPL("q", dest, src);
+}
+
+static inline int64_t mm_rd(int64_t volatile const& src)
+{
+    uint64_t dest;
+    _MM_RD_IMPL("q", dest, src);
+}
+
+static inline void mm_copy_rd(void *dst, void const volatile *src, size_t sz)
+{
+    while (sz >= sizeof(uint32_t)) {
+        *(uint32_t*)dst = mm_rd(*(uint32_t const volatile *)src);
+        dst = (char*)dst + sizeof(uint32_t);
+        src = (char*)src + sizeof(uint32_t);
+        sz -= sizeof(uint32_t);
+    }
+
+    while (sz >= sizeof(uint16_t)) {
+        *(uint16_t*)dst = mm_rd(*(uint16_t const*)src);
+        dst = (char*)dst + sizeof(uint16_t);
+        src = (char*)src + sizeof(uint16_t);
+        sz -= sizeof(uint16_t);
+    }
+
+    while (sz >= sizeof(uint8_t)) {
+        *(uint8_t*)dst = mm_rd(*(uint8_t const*)src);
+        dst = (char*)dst + sizeof(uint8_t);
+        src = (char*)src + sizeof(uint8_t);
+        sz -= sizeof(uint8_t);
+    }
+}
+
+#undef _MM_RD_IMPL
+
+struct pci_cache_t {
+    std::vector<pci_dev_iterator_t> iters;
+    uint64_t updated_at;
+};

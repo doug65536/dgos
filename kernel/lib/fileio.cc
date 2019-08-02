@@ -7,6 +7,8 @@
 #include "string.h"
 #include "vector.h"
 #include "mutex.h"
+#include "fs/devfs.h"
+#include "user_mem.h"
 
 #define DEBUG_FILEHANDLE 1
 #if DEBUG_FILEHANDLE
@@ -16,24 +18,49 @@
 #endif
 
 struct filetab_t {
+    // Default and move construct allowed
     filetab_t() = default;
     filetab_t(filetab_t&&) = default;
+
+    // Copying not allowed
     filetab_t(filetab_t const&) = delete;
     filetab_t& operator=(filetab_t const&) = delete;
     filetab_t& operator=(filetab_t&&) = delete;
 
+    // Filesystem specific per-file structure
     fs_file_info_t *fi;
+
+    // Filesystem implementation
     fs_base_t *fs;
+
+    // Current seek position
     off_t pos;
+
+    // Free list pointer
     filetab_t *next_free;
+
+    // Reference count
     int refcount;
+
+    // Size align
+    int reserved[7];
 };
 
-using file_table_lock_type = std::mcslock;
+// Make it fast to compute index from pointer difference
+C_ASSERT_ISPO2(sizeof(filetab_t));
+
+using file_table_lock_type = ext::mcslock;
 using file_table_scoped_lock = std::unique_lock<file_table_lock_type>;
+
 static file_table_lock_type file_table_lock;
+
+// Array of files
 static std::vector<filetab_t> file_table;
+
+// First free
 static filetab_t *file_table_ff;
+
+static dev_fs_t *dev_fs;
 
 static void file_init(void *)
 {
@@ -42,13 +69,49 @@ static void file_init(void *)
         panic_oom();
 }
 
-static fs_base_t *file_fs_from_path(char const *path)
+static filetab_t *file_fh_from_id(int id)
 {
-    (void)path;
+    file_table_scoped_lock lock(file_table_lock);
+    filetab_t *item = nullptr;
+    if (likely(id >= 0 && size_t(id) < file_table.size())) {
+        item = &file_table[id];
+
+        if (likely(item->refcount > 0))
+            return item;
+        assert(!"Zero ref count!");
+    }
+    return nullptr;
+}
+
+static fs_base_t *file_fs_from_path(char const *path, size_t& consumed)
+{
+    if (path[0] == '/' && !memcmp(path, "/dev/", 5)) {
+        consumed = 5;
+
+        auto cur_devfs = atomic_ld_acq(&dev_fs);
+
+        if (cur_devfs)
+            return cur_devfs;
+
+        // Create an instance, possibly racing with another thread
+        auto* new_devfs = devfs_create();
+
+        // Set it if it was zero
+        auto old_devfs = atomic_cmpxchg(&dev_fs, nullptr, new_devfs);
+
+        if (unlikely(old_devfs != nullptr)) {
+            // We got nonzero, another thread won the race, cleanup
+            devfs_delete(new_devfs);
+            return old_devfs;
+        }
+
+        return new_devfs;
+    }
+
     return fs_from_id(0);
 }
 
-static filetab_t *file_new_filetab(void)
+filetab_t *file_new_filetab(void)
 {
     file_table_scoped_lock lock(file_table_lock);
     filetab_t *item = nullptr;
@@ -95,21 +158,7 @@ bool file_ref_filetab(int id)
     return false;
 }
 
-REGISTER_CALLOUT(file_init, nullptr, callout_type_t::partition_probe, "999");
-
-static filetab_t *file_fh_from_id(int id)
-{
-    file_table_scoped_lock lock(file_table_lock);
-    filetab_t *item = nullptr;
-    if (likely(id >= 0 && size_t(id) < file_table.size())) {
-        item = &file_table[id];
-
-        if (likely(item->refcount > 0))
-            return item;
-        assert(!"Zero ref count!");
-    }
-    return nullptr;
-}
+REGISTER_CALLOUT(file_init, nullptr, callout_type_t::heap_ready, "000");
 
 int file_creat(char const *path, mode_t mode)
 {
@@ -118,7 +167,8 @@ int file_creat(char const *path, mode_t mode)
 
 int file_open(char const *path, int flags, mode_t mode)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
@@ -130,7 +180,7 @@ int file_open(char const *path, int flags, mode_t mode)
     if (unlikely(!fh))
         return -int(errno_t::ENFILE);
 
-    int status = fs->open(&fh->fi, path, flags, mode);
+    int status = fs->open(&fh->fi, path + consumed, flags, mode);
     if (unlikely(status < 0)) {
         FILEHANDLE_TRACE("open failed on %s, status=%d\n", path, status);
         file_del_filetab(fh);
@@ -301,7 +351,8 @@ int file_fdatasync(int id)
 
 int file_opendir(char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
@@ -334,7 +385,7 @@ ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
     ssize_t size = fh->fs->readdir(fh->fi, buf, fh->pos);
 
     *result = nullptr;
-    if (size < 0)
+    if (unlikely(size < 0))
         return -int(errno_t::EINVAL);
 
     fh->pos += size;
@@ -378,40 +429,281 @@ int file_closedir(int id)
 
 int file_mkdir(char const *path, mode_t mode)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->mkdir(path, mode);
+    return fs->mkdir(path + consumed, mode);
 }
 
 int file_rmdir(char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->rmdir(path);
+    return fs->rmdir(path + consumed);
 }
 
-int file_rename(char const *old_path, char const *new_path)
+int file_rename(char const *old_path, char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(old_path);
+    size_t old_consumed = 0;
+    fs_base_t *old_fs = file_fs_from_path(old_path, old_consumed);
+
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
+
+    if (unlikely(old_fs != fs))
+        return -int(errno_t::EXDEV);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->rename(old_path, new_path);
+    return fs->rename(old_path + old_consumed, path + consumed);
 }
 
 int file_unlink(char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->unlink(path);
+    return fs->unlink(path + consumed);
+}
+
+int file_fchmod(int id, mode_t mode)
+{
+    filetab_t *fh = file_fh_from_id(id);
+    if (unlikely(!fh))
+        return int(errno_t::EBADF);
+
+    if (unlikely(!fh))
+        return -int(errno_t::ENOENT);
+
+    return fh->fs->fchmod(fh->fi, mode);
+}
+
+int file_chown(int id, int uid, int gid)
+{
+    filetab_t *fh = file_fh_from_id(id);
+
+    if (unlikely(!fh))
+        return -int(errno_t::ENOENT);
+
+    return fh->fs->fchown(fh->fi, uid, gid);
+}
+
+path_t::path_t(char const *user_path)
+{
+    // Get the length of the user memory string
+    intptr_t len = mm_lenof_user_str(user_path, PATH_MAX);
+
+    // Return with valid still false
+    if (unlikely(len < 0))
+        return;
+
+    // Get a pointer to aligned storage
+    char *buf = reinterpret_cast<char *>(&data);
+
+    // If failed to copy string
+    if (unlikely(!mm_copy_user(buf, user_path, len + 1))) {
+        err = errno_t::EFAULT;
+        return;
+    }
+
+    // If the string myseriously changed length, fail
+    if (unlikely(memchr(buf, 0, len + 1) != buf + len)) {
+        // That's strange, nice try
+        err = errno_t::EFAULT;
+        return;
+    }
+
+    // Round up to aligned boundary and place component pointer list there
+    size_t comp_ofs = (len + sizeof(void*) - 1) & -(sizeof(void*));
+
+    components = (path_frag_t *)(buf + comp_ofs);
+
+    char const *it = buf;
+
+    // One or three (but not two) leading slashes means absolute
+    if ((it[0] == '/' && it[1] != '/') ||
+            (it[0] == '/' && it[1] == '/' && it[2] == '/')) {
+        // Absolute path
+        absolute = true;
+        while (*++it == '/');
+    } else if (it[0] == '/' && it[1] == '/') {
+        // UNC path
+        absolute = true;
+        unc = true;
+        it += 2;
+    }
+
+    char const *st = it;
+
+    for (; ; ) {
+        // Handle separator or end of path as end of token
+        if (*it != '/' && *it != 0) {
+            ++it;
+        } else {
+            // Emit a component
+            components[nr_components++] = {
+                uint16_t(st - buf), uint16_t(it - buf), hash_32(st, it - st)
+            };
+
+            // If it was end of path, then done
+            if (*it == 0)
+                break;
+
+            // Eat consecutive slashes
+            while (*++it == '/');
+
+            // Next token starts here
+            st = it;
+        }
+    }
+
+    valid = true;
+}
+
+size_t path_t::size() const
+{
+    return nr_components;
+}
+
+size_t path_t::text_len() const
+{
+    return uintptr_t(components) - uintptr_t(&data);
+}
+
+uint32_t path_t::hash_of(size_t index) const
+{
+    return components[index].hash;
+}
+
+char const *path_t::begin_of(size_t index) const
+{
+    if (likely(index < nr_components))
+        return reinterpret_cast<char const *>(data.data) +
+                components[index].st;
+    assert(!"Not good");
+    return nullptr;
+}
+
+char const *path_t::end_of(size_t index) const
+{
+    if (likely(index < nr_components))
+        return reinterpret_cast<char const *>(data.data) +
+                components[index].en;
+    assert(!"Not good");
+    return nullptr;
+}
+
+size_t path_t::len_of(size_t index) const
+{
+    if (likely(index < nr_components)) {
+        path_frag_t const& frag = components[index];
+        return frag.en - frag.st;
+    }
+    return 0;
+}
+
+std::pair<char const *, char const *> path_t::range_of(size_t index) const
+{
+    if (likely(index < nr_components)) {
+        path_frag_t const& frag = components[index];
+        return {
+            reinterpret_cast<char const *>(data.data) + frag.st,
+                    reinterpret_cast<char const *>(data.data) + frag.en
+        };
+    }
+    assert(!"Not good");
+    return {nullptr, nullptr};
+}
+
+bool path_t::is_abs() const
+{
+    return absolute;
+}
+
+bool path_t::is_unc() const
+{
+    return unc;
+}
+
+bool path_t::is_relative() const
+{
+    return !absolute;
+}
+
+bool path_t::is_valid() const
+{
+    return valid;
+}
+
+errno_t path_t::error() const
+{
+    return err;
+}
+
+char const *path_t::operator[](size_t component) const
+{
+    return begin_of(component);
+}
+
+std::string path_t::to_string() const
+{
+    std::string s;
+
+    s.reserve(8 + uintptr_t(components) - uintptr_t(&data));
+
+    if (absolute)
+        s.push_back('/');
+
+    if (unc)
+        s.push_back('/');
+
+    for (size_t i = 0; i < nr_components; ++i) {
+        if (i > 0)
+            s.push_back('/');
+        std::pair<char const *, char const *> range = range_of(i);
+        s.append(range.first, range.second);
+    }
+
+    return s;
+}
+
+path_t::operator bool() const
+{
+    return valid && err == errno_t::OK;
+}
+
+user_str_t::user_str_t(const char *user_str)
+{
+    // Get a pointer to aligned storage
+    char *buf = reinterpret_cast<char *>(&data);
+
+    lenof_str = mm_copy_user_str(buf, user_str, PATH_MAX);
+
+    // If failed to copy string
+    if (unlikely(lenof_str < 0)) {
+        set_err(errno_t::EFAULT);
+        return;
+    }
+
+    char const *nt = (char const *)memchr(buf, 0, lenof_str + 1);
+
+    // If the string myseriously changed length, fail
+    // See if any null terminators sneaked into the string
+    // Or the final null terminator mysteriously disappeared
+    if (unlikely(nt != buf + lenof_str)) {
+        // That's strange, nice try
+        set_err(errno_t::EFAULT);
+        return;
+    }
 }

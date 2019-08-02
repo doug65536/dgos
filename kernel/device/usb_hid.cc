@@ -444,6 +444,20 @@ static int const usb_hid_keybd_lookup[] = {
 
 C_ASSERT(countof(usb_hid_keybd_lookup) == 0xe8);
 
+class usb_hid_report_parser_t {
+public:
+    usb_hid_report_parser_t() {
+
+    }
+
+    usb_hid_report_parser_t(usb_hid_report_parser_t const&) = delete;
+    usb_hid_report_parser_t& operator=(usb_hid_report_parser_t) = delete;
+
+    /// type
+    /// tag
+    /// size
+};
+
 class usb_hid_dev_t {
 protected:
     enum struct hid_request_t : uint8_t {
@@ -468,8 +482,8 @@ protected:
 
     static constexpr unsigned phase_count = 4;
 
-    using lock_type = std::mcslock;
-    using scoped_lock = std::unique_lock<std::mcslock>;
+    using lock_type = ext::mcslock;
+    using scoped_lock = std::unique_lock<ext::mcslock>;
     lock_type change_lock;
     usb_iocp_t in_iocp[phase_count];
     unsigned phase;
@@ -521,6 +535,9 @@ static std::vector<usb_hid_dev_t*> hid_devs;
 
 class usb_hid_class_drv_t final : public usb_class_drv_t {
 protected:
+    usb_hid_class_drv_t() = default;
+    ~usb_hid_class_drv_t() = default;
+
     static usb_hid_class_drv_t usb_hid;
 
     // usb_class_drv_t interface
@@ -572,9 +589,11 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     // Keyboard
     if (match.iface->iface_proto == 1) {
-        dev = new usb_hid_keybd_t(control, in, out, match.iface_idx);
+        dev = new (std::nothrow)
+                usb_hid_keybd_t(control, in, out, match.iface_idx);
     } else if (match.iface->iface_proto == 2) {
-        dev = new usb_hid_mouse_t(control, in, out, match.iface_idx);
+        dev = new (std::nothrow)
+                usb_hid_mouse_t(control, in, out, match.iface_idx);
     }
 
     if (dev)

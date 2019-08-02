@@ -1,5 +1,5 @@
 .code64
-.section .text
+.section .text, "ax", @progbits
 
 // Load segments 256,000,000 times from top of stack
 // old way 136 cycles
@@ -9,7 +9,7 @@ mov_seg_perf:
 	mov $1000000,%ecx
 
 	xor %eax,%eax
-.align 16
+.balign 16
 0:	mov (%rsp),%rax
 	mov %ax,%ds
 	shr $16,%rax
@@ -533,7 +533,7 @@ str_seg_perf:
 	push $0
 	mov $1000000,%ecx
 
-.align 16
+.balign 16
 0:	mov %ds,(%rsp)
 	mov %es,2(%rsp)
 	mov %fs,4(%rsp)
@@ -846,7 +846,7 @@ rdfsbase_perf:
 	push %rax
 	mov $60000000,%esi
 
-	.align 16
+.balign 16
 0:	iter_block
 	iter_block
 	iter_block

@@ -1,10 +1,10 @@
 #pragma once
 #include "types.h"
-#include "type_traits.h"
+#include "cc/type_traits.h"
 
 // Return bit number of least significant set bit
 _const
-static constexpr _always_inline uint8_t bit_lsb_set_64(int64_t n)
+static constexpr _always_inline _flatten uint8_t bit_lsb_set_64(int64_t n)
 {
 #if __SIZEOF_LONG__ == 8
     return __builtin_ctzl(n);
@@ -17,7 +17,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_64(int64_t n)
 
 // Return bit number of least significant set bit
 _const
-static constexpr _always_inline uint8_t bit_lsb_set_32(int32_t n)
+static constexpr _always_inline _flatten uint8_t bit_lsb_set_32(int32_t n)
 {
 #if __SIZEOF_INT__ == 4
     return __builtin_ctz(n);
@@ -28,7 +28,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_32(int32_t n)
 
 // Return bit number of most significant set bit
 _const
-static constexpr _always_inline uint8_t bit_msb_set_64(int64_t n)
+static constexpr _always_inline _flatten uint8_t bit_msb_set_64(int64_t n)
 {
 #if __SIZEOF_LONG__ == 8
     return 63 - __builtin_clzl(n);
@@ -41,7 +41,7 @@ static constexpr _always_inline uint8_t bit_msb_set_64(int64_t n)
 
 // Return bit number of most significant set bit
 _const
-static constexpr _always_inline uint8_t bit_msb_set_32(int32_t n)
+static constexpr _always_inline _flatten uint8_t bit_msb_set_32(int32_t n)
 {
 #if __SIZEOF_INT__ == 4
     return 31 - __builtin_clz(n);
@@ -51,7 +51,7 @@ static constexpr _always_inline uint8_t bit_msb_set_32(int32_t n)
 }
 
 _const
-static constexpr _always_inline uint8_t bit_popcnt_64(int64_t n)
+static constexpr _always_inline _flatten uint8_t bit_popcnt_64(int64_t n)
 {
 #if __SIZEOF_LONG__ == 8
     return __builtin_popcountl(n);
@@ -63,7 +63,7 @@ static constexpr _always_inline uint8_t bit_popcnt_64(int64_t n)
 }
 
 _const
-static constexpr _always_inline uint8_t bit_popcnt_32(int32_t n)
+static constexpr _always_inline _flatten uint8_t bit_popcnt_32(int32_t n)
 {
 #if __SIZEOF_INT__ == 4
     return __builtin_popcount(n);
@@ -74,7 +74,7 @@ static constexpr _always_inline uint8_t bit_popcnt_32(int32_t n)
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_lsb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_lsb_set_64(int64_t(n));
@@ -82,7 +82,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_lsb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_lsb_set_32(int32_t(n));
@@ -90,7 +90,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_lsb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
     return bit_lsb_set_32(int32_t(uint16_t(n)));
@@ -98,7 +98,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_lsb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_lsb_set_32(int32_t(uint8_t(n)));
@@ -106,7 +106,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_lsb_set(T const& n)
+static constexpr _always_inline _flatten uint8_t bit_lsb_set(T const& n)
 {
     return bit_lsb_set_n(n, typename std::integral_constant<
                        uint8_t, sizeof(T)>::type());
@@ -114,7 +114,7 @@ static constexpr _always_inline uint8_t bit_lsb_set(T const& n)
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_msb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_msb_set_64(int64_t(n));
@@ -122,7 +122,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_msb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_msb_set_32(int32_t(n));
@@ -130,7 +130,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_msb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
     return bit_msb_set_32(int32_t(uint16_t(n)));
@@ -138,7 +138,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_msb_set_n(
+static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_msb_set_32(int32_t(uint8_t(n)));
@@ -146,7 +146,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_msb_set(T const& n)
+static constexpr _always_inline _flatten uint8_t bit_msb_set(T const& n)
 {
     return bit_msb_set_n(n, typename std::integral_constant<
                          uint8_t, sizeof(n)>::type());
@@ -157,7 +157,7 @@ static constexpr _always_inline uint8_t bit_msb_set(T const& n)
 
 // return ceil(log(n) / log(2))
 _const
-static constexpr _always_inline uint8_t bit_log2_n_64(int64_t n)
+static constexpr _always_inline _flatten uint8_t bit_log2_n_64(int64_t n)
 {
     uint8_t top = bit_msb_set_64(n);
     return top + !!(~(uint64_t(-1) << top) & n);
@@ -165,7 +165,7 @@ static constexpr _always_inline uint8_t bit_log2_n_64(int64_t n)
 
 // return ceil(log(n) / log(2))
 _const
-static constexpr _always_inline uint8_t bit_log2_n_32(int32_t n)
+static constexpr _always_inline _flatten uint8_t bit_log2_n_32(int32_t n)
 {
     uint8_t top = bit_msb_set_32(n);
     return top + !!(~(uint32_t(-1) << top) & n);
@@ -173,7 +173,7 @@ static constexpr _always_inline uint8_t bit_log2_n_32(int32_t n)
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_log2_n(
+static constexpr _always_inline  _flatten uint8_t bit_log2_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_log2_n_64(int64_t(n));
@@ -181,7 +181,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_log2_n(
+static constexpr _always_inline _flatten uint8_t bit_log2_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_log2_n_32(int32_t(n));
@@ -197,7 +197,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_log2_n(
+static constexpr _always_inline _flatten uint8_t bit_log2_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_log2_n_32(int32_t(uint8_t(n)));
@@ -205,7 +205,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_log2(T const& n)
+static constexpr _always_inline _flatten uint8_t bit_log2(T const& n)
 {
     return bit_log2_n(n, typename std::integral_constant<
                       uint8_t, sizeof(T)>::type());
@@ -213,7 +213,7 @@ static constexpr _always_inline uint8_t bit_log2(T const& n)
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_popcnt_n(
+static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_popcnt_64(int64_t(n));
@@ -221,7 +221,7 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_popcnt_n(
+static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_popcnt_32(int32_t(n));
@@ -229,7 +229,7 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_popcnt_n(
+static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
     return bit_popcnt_32(int32_t(uint16_t(n)));
@@ -237,7 +237,7 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_popcnt_n(
+static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_popcnt_32(int32_t(uint8_t(n)));
@@ -245,8 +245,40 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 
 template<typename T>
 _const
-static constexpr _always_inline uint8_t bit_popcnt(T const& n)
+static constexpr _always_inline _flatten uint8_t bit_popcnt(T const& n)
 {
     return bit_popcnt_n(n, typename std::integral_constant<
                         uint8_t, sizeof(n)>::type());
 }
+
+template<size_t _D>
+class bitmap_tree_impl_t {
+public:
+    // depth     max capacity              min capacity
+    // ----- --------------------- -------------------------
+    //   1            64 (2^(6*1))                         1
+    //   2          4096 (2^(6*2))                      64+1
+    //   3        262144 (2^(6*3))                 4096+64+1
+    //   4      16777216 (2^(6*4))          262144+4096+64+1
+    //   5    1073741824 (2^(6*5)) 16777216+262144+4096+64+1
+
+    static_assert(sizeof(uint64_t) == 8, "");
+
+    static constexpr const size_t depth = _D;
+    static constexpr const size_t capacity = 1 << (depth * 6);
+    //static constexpr const size_t slots = infer_slot_count;
+
+private:
+};
+
+static inline constexpr size_t bitmap_tree_depth(size_t n)
+{
+    for (size_t d = 1, c = 64; d < 6; ++d, c <<= 6) {
+        if (c >= n)
+            return d;
+    }
+    return 0;
+}
+
+template<size_t _N>
+using bitmap_tree_t = bitmap_tree_impl_t<bitmap_tree_depth(_N)>;

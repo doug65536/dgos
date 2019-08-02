@@ -3,6 +3,7 @@
 
 enum constructor_order_t {
     ctor_ctors_ran = 1000,
+    ctor_cpu_init_cpus,
     ctor_cpu_init_bsp,
     ctor_text_dev,
     ctor_mmu_init,
@@ -28,7 +29,7 @@ enum constructor_order_t {
 enum struct callout_type_t : uint32_t {
     // bootstrap
     vmm_ready = 'M',
-    smp_start = 'S',
+    heap_ready = 'R',
     txt_dev = 'V',
     acpi_ready = 'A',
     smp_online = 'T',
@@ -43,7 +44,9 @@ enum struct callout_type_t : uint32_t {
     partition_probe = 'P',
     nic = 'N',
     nics_ready = 129,
-    usb = 'U'
+    usb = 'U',
+
+    devfs_ready = 256
 };
 
 struct callout_t {
@@ -59,8 +62,9 @@ struct callout_t {
 
 #define REGISTER_CALLOUT(fn, arg, type, order) \
     __attribute__((section(".callout_array." order), used, aligned(16))) \
-    static constexpr callout_t REGISTER_CALLOUT2(callout_, __COUNTER__) = { \
+    static constexpr callout_t const \
+    REGISTER_CALLOUT2(callout_, __COUNTER__) = { \
         (fn), (arg), (type), 0, 0 \
     }
 
-extern "C" size_t callout_call(callout_type_t type);
+extern "C" size_t callout_call(callout_type_t type, bool as_thread = false);

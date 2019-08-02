@@ -13,6 +13,7 @@
 #include "bootinfo.h"
 #include "inttypes.h"
 #include "cxxstring.h"
+#include "user_mem.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -84,7 +85,7 @@ struct fat32_fs_t final : public fs_base_t {
     static uint8_t lfn_checksum(char const *fcb_name);
 
     static void fcbname_from_lfn(full_lfn_t *full, char *fcbname,
-                                 uint16_t const *lfn, size_t lfn_len);
+                                 char16_t const *lfn, size_t lfn_len);
 
     static void dirents_from_name(full_lfn_t *full,
                                   char const *pathname, size_t name_len);
@@ -189,7 +190,7 @@ pool_t<fat32_fs_t::file_handle_t> fat32_fs_t::handles;
 
 class fat32_factory_t : public fs_factory_t {
 public:
-    fat32_factory_t() : fs_factory_t("fat32") {}
+    constexpr fat32_factory_t() : fs_factory_t("fat32") {}
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
@@ -277,7 +278,7 @@ uint8_t fat32_fs_t::lfn_checksum(char const *fcb_name)
 
 void fat32_fs_t::fcbname_from_lfn(
         full_lfn_t *full, char *fcbname,
-        uint16_t const *lfn, size_t lfn_len)
+        char16_t const *lfn, size_t lfn_len)
 {
     memset(fcbname, ' ', 11);
 
@@ -362,15 +363,15 @@ void fat32_fs_t::dirents_from_name(
 {
     memset(full, 0, sizeof(*full));
 
-    uint16_t lfn[256];
+    char16_t lfn[256];
 
     char const *utf8_in = pathname;
     char const *utf8_end = pathname + name_len;
-    uint16_t *utf16_out = lfn;
+    char16_t *utf16_out = lfn;
     int codepoint;
 
     do {
-        codepoint = utf8_to_ucs4(utf8_in, &utf8_in);
+        codepoint = utf8_to_ucs4_upd(utf8_in);
         utf16_out += ucs4_to_utf16(utf16_out, codepoint);
     } while (utf8_in < utf8_end);
     *utf16_out = 0;
@@ -1138,7 +1139,19 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
     off_t cached_end = file->cached_cluster
             ? file->cached_offset + block_size
             : 0;
+
     while (size > 0) {
+        if (unlikely(!file->dirent->is_within_size(offset)))
+            break;
+
+        // Calculate the amount of data remaining at this offset
+        off_t remain = file->dirent->size - offset;
+
+        remain = (remain > 0) ? remain : 0;
+
+        // Clamp read size to entire remainder of file
+        size = (size > uint64_t(remain)) ? remain : size;
+
         if (file->cached_cluster &&
                 file->dirent->is_within_size(offset) &&
                 (offset >= cached_end) &&
@@ -1269,7 +1282,8 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    std::unique_ptr<char[]> sector_buffer = new char[sector_size];
+    std::unique_ptr<char[]> sector_buffer =
+            new (std::nothrow) char[sector_size];
 
     if (!sector_buffer)
         return false;
@@ -1334,7 +1348,7 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
     if (fat32_mounts.empty())
         fat32_fs_t::handles.create(510);
 
-    std::unique_ptr<fat32_fs_t> self(new fat32_fs_t);
+    std::unique_ptr<fat32_fs_t> self(new (std::nothrow) fat32_fs_t);
     if (self->mount(conn)) {
         if (!fat32_mounts.push_back(self))
             panic_oom();
@@ -1575,20 +1589,20 @@ int fat32_fs_t::unlink(fs_cpath_t path)
 //
 // Modify directory entries
 
-int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
+int fat32_fs_t::fchmod(fs_file_info_t *fi, fs_mode_t mode)
 {
     write_lock lock(rwlock);
 
-    (void)path;
+    (void)fi;
     (void)mode;
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
+int fat32_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
 {
     write_lock lock(rwlock);
 
-    (void)path;
+    (void)fi;
     (void)uid;
     (void)gid;
     return -int(errno_t::ENOSYS);
@@ -1604,7 +1618,7 @@ int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 }
 
 int fat32_fs_t::utimens(fs_cpath_t path,
-                         const fs_timespec_t *ts)
+                         fs_timespec_t const *ts)
 {
     write_lock lock(rwlock);
 

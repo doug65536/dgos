@@ -3,5 +3,6 @@
 
 int main()
 {
-    int s = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+    int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+    
 }

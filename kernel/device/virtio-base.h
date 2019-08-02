@@ -15,7 +15,7 @@ protected:
 
     virtual void found_device(virtio_base_t *) {}
 
-    virtual ~virtio_factory_base_t() {}
+    virtual ~virtio_factory_base_t() = 0;
     virtual virtio_base_t *create() = 0;
 };
 
@@ -38,9 +38,9 @@ public:
 
     using virtio_iocp_result_t = uint64_t;
 
-    using virtio_iocp_t = basic_iocp_t<
+    using virtio_iocp_t = dgos::basic_iocp_t<
         virtio_iocp_result_t, virtio_blocking_iocp_success_t>;
-    using virtio_blocking_iocp_t = basic_blocking_iocp_t<
+    using virtio_blocking_iocp_t = dgos::basic_blocking_iocp_t<
         virtio_iocp_result_t, virtio_blocking_iocp_success_t>;
 
     struct desc_t {
@@ -81,13 +81,6 @@ public:
     };
 
     virtio_virtqueue_t()
-        : desc_tab(nullptr)
-        , avail_ring(nullptr)
-        , used_ring(nullptr)
-        , used_tail(0)
-        , desc_first_free(-1)
-        , log2_queue_size(0)
-        , single_page(false)
     {
     }
 
@@ -134,7 +127,7 @@ public:
     }
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type queue_lock;
@@ -144,26 +137,26 @@ private:
     std::vector<virtio_iocp_t*> pending_completions;
     std::vector<virtio_iocp_t*> finished_completions;
 
-    desc_t *desc_tab;
+    desc_t *desc_tab = nullptr;
 
-    ring_hdr_t *avail_hdr;
-    avail_t *avail_ring;
-    ring_ftr_t *avail_ftr;
+    ring_hdr_t *avail_hdr = nullptr;
+    avail_t *avail_ring = nullptr;
+    ring_ftr_t *avail_ftr = nullptr;
 
-    ring_hdr_t *used_hdr;
-    ring_ftr_t *used_ftr;
-    used_t *used_ring;
+    ring_hdr_t *used_hdr = nullptr;
+    ring_ftr_t *used_ftr = nullptr;
+    used_t *used_ring = nullptr;
 
-    uint16_t used_tail;
-    uint16_t queue_idx;
+    uint16_t used_tail = 0;
+    uint16_t queue_idx = 0;
 
-    int desc_first_free;
-    unsigned desc_free_count;
+    int desc_first_free = -1;
+    unsigned desc_free_count = 0;
 
-    uint16_t volatile *notify_ptr;
+    uint16_t volatile *notify_ptr = nullptr;
 
-    uint8_t log2_queue_size;
-    bool single_page;
+    uint8_t log2_queue_size = 0;
+    bool single_page = false;
 };
 
 struct virtio_pci_cap_hdr_t {
@@ -281,15 +274,11 @@ C_ASSERT(sizeof(virtio_pci_notify_cap_t) == 20);
 
 class virtio_base_t {
 public:
-    virtio_base_t()
-        : use_msi(false)
-        , common_cfg(nullptr)
-        , common_cfg_size(0)
-        , notify_off_multiplier(0)
-    {
-    }
+    virtio_base_t() = default;
+    virtio_base_t(virtio_base_t const&) = delete;
+    virtio_base_t(virtio_base_t&&) = default;
 
-    virtual ~virtio_base_t() {}
+    virtual ~virtio_base_t() = 0;
 protected:
     friend class virtio_factory_base_t;
 
@@ -399,14 +388,14 @@ protected:
     virtual bool offer_features(feature_set_t& features) = 0;
 
     // Allow an implementation to verify which features actually got set
-    virtual bool verify_features(feature_set_t& features)
+    virtual bool verify_features(feature_set_t& features _unused)
     {
         return true;
     }
 
     using blocking_iocp_t = virtio_virtqueue_t::virtio_blocking_iocp_t;
     using async_iocp_t = virtio_virtqueue_t::virtio_iocp_t;
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
@@ -414,25 +403,29 @@ protected:
 
     static std::vector<virtio_base_t*> virtio_devs;
 
-    bool use_msi;
+    bool use_msi = false;
+
     pci_irq_range_t irq_range;
 
     std::unique_ptr<virtio_virtqueue_t[]> queues;
-    size_t queue_count;
+    size_t queue_count = 0;
 
     lock_type cfg_lock;
 
     // MMIO
-    virtio_pci_common_cfg_t volatile *common_cfg;
-    size_t common_cfg_size;
+    virtio_pci_common_cfg_t volatile *common_cfg = nullptr;
+    size_t common_cfg_size = 0;
 
-    void volatile *device_cfg;
-    size_t device_cfg_size;
+    void volatile *device_cfg = nullptr;
+    size_t device_cfg_size = 0;
 
-    virtio_pci_notify_cap_t *notify_cap;
-    size_t notify_cap_size;
+    virtio_pci_notify_cap_t volatile *notify_cap = nullptr;
+    uint64_t notify_bar = 0;
+    size_t notify_cap_size = 0;
+    bool notify_is_mmio;
 
-    uint32_t notify_off_multiplier;
+    uint32_t volatile *isr_status = nullptr;
+    uint32_t notify_off_multiplier = 0;
 
     static char const *cap_names[];
 };

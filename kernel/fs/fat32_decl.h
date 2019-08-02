@@ -132,6 +132,11 @@ struct fat32_dir_entry_t {
     {
         return ofs < size || is_directory();
     }
+
+    int get_start() const
+    {
+        return (start_hi << 16) | start_lo;
+    }
 };
 // Long filenames are stored in reverse order
 // The last fragment of the long filename is stored first,

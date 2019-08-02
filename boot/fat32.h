@@ -22,6 +22,8 @@ struct fat32_sector_iterator_t {
     // Set to false when a disk error occurs
     bool ok;
 
+    off_t file_size;
+
     uint32_t *clusters;
     uint32_t cluster_count;
 

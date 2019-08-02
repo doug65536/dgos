@@ -4,7 +4,6 @@
 #include "vector.h"
 #include "irq.h"
 #include "mutex.h"
-#include "cpu/control_regs.h"
 #include "nano_time.h"
 #include "work_queue.h"
 
@@ -17,12 +16,15 @@
 
 // Null modem connections:
 //
-//  Peer      Peer
-//   TxD  ->   RxD
-//   DTR  ->   DSR
-//   RTS  ->   CTS
-//   RxD  <-   TxD
-//   DSR  <-   DTR
+//  Self -- Peer
+// Out
+//   TxD -> RxD : Outgoing data
+//   RTS -> CTS : Deassert RTS when you are running out of Rx buffer space
+//   DTR -> DSR : Keep DTR asserted to keep connection open
+// In
+//   RxD <- TxD : Incoming data
+//   CTS <- RTS : Stop transmitting when peer deasserts CTS
+//   DSR <- DTR : Peer disconnect(ed) deasserts DSR
 //
 
 namespace uart_defs {
@@ -73,23 +75,20 @@ struct dat_t {
     uint8_t value;
 };
 
-union ier_t {
-    struct bits_t {
-        // Byte available in rx register
-        bool rx_avail:1;
+struct ier_t {
+    // Byte available in rx register
+    bool rx_avail:1;
 
-        // Tx FIFO empty, may write 16 bytes
-        bool tx_empty:1;
+    // Tx FIFO empty, may write 16 bytes
+    bool tx_empty:1;
 
-        // Enable IRQ on error
-        bool error:1;
+    // Enable IRQ on error
+    bool error:1;
 
-        // Enable IRQ on status change
-        bool status:1;
+    // Enable IRQ on status change
+    bool status:1;
 
-        uint8_t unused:4;
-    } bits;
-    uint8_t value;
+    uint8_t unused:4;
 };
 
 enum struct iir_source_t {
@@ -99,17 +98,14 @@ enum struct iir_source_t {
     ERROR = 3
 };
 
-union iir_t {
-    struct bits_t {
-        // 0=IRQ occurred
-        uint8_t nintr:1;
+struct iir_t {
+    // 0=IRQ occurred
+    uint8_t nintr:1;
 
-        // Source of IRQ
-        uint8_t source:2;
+    // Source of IRQ
+    uint8_t source:2;
 
-        uint8_t unused:5;
-    } bits;
-    uint8_t value;
+    uint8_t unused:5;
 };
 
 enum struct fcr_rx_trigger_t {
@@ -119,26 +115,23 @@ enum struct fcr_rx_trigger_t {
     FIFO14 = 3
 };
 
-union fcr_t {
-    struct bits_t {
-        // Enable tx/rx FIFOs
-        bool fifo_en:1;
+struct fcr_t {
+    // Enable tx/rx FIFOs
+    bool fifo_en:1;
 
-        // Self-clearing tx/rx FIFO resets
-        bool fifo_rx_reset:1;
-        bool fifo_tx_reset:1;
+    // Self-clearing tx/rx FIFO resets
+    bool fifo_rx_reset:1;
+    bool fifo_tx_reset:1;
 
-        bool dma_mode:1;
+    bool dma_mode:1;
 
-        bool unused:1;
+    bool unused:1;
 
-        // 16750 only
-        bool fifo64:1;
+    // 16750 only
+    bool fifo64:1;
 
-        // Rx FIFO trigger threshold
-        uint8_t rx_trigger:2;
-    } bits;
-    uint8_t value;
+    // Rx FIFO trigger threshold
+    uint8_t rx_trigger:2;
 };
 
 enum struct lcr_wordlen_t : uint8_t {
@@ -160,100 +153,88 @@ enum struct lcr_parity_t : uint8_t {
     SPACE = 3
 };
 
-union lcr_t {
-    struct bits_t {
-        // Configure number of data bits per character
-        uint8_t wordlen:2;
+struct lcr_t {
+    // Configure number of data bits per character
+    uint8_t wordlen:2;
 
-        // Configure number of stop bits per character
-        uint8_t stopbits:1;
+    // Configure number of stop bits per character
+    uint8_t stopbits:1;
 
-        // Enable parity
-        bool parity_en:1;
+    // Enable parity
+    bool parity_en:1;
 
-        // Configure parity method
-        uint8_t parity:2;
+    // Configure parity method
+    uint8_t parity:2;
 
-        // Transmit a break signal
-        bool tx_break:1;
+    // Transmit a break signal
+    bool tx_break:1;
 
-        // Toggle between tx/rx/ier and dll/dlm registers in register 0 and 1
-        bool baud_latch:1;
-    } bits;
-    uint8_t value;
+    // Toggle between tx/rx/ier and dll/dlm registers in register 0 and 1
+    bool baud_latch:1;
 };
 
-union mcr_t {
-    struct bits_t {
-        // Tell the peer we are ready for a communication channel
-        bool dtr:1;
+struct mcr_t {
+    // Tell the peer we are ready for a communication channel
+    bool dtr:1;
 
-        // Tell the peer we are ready to rx
-        bool rts:1;
+    // Tell the peer we are ready to rx
+    bool rts:1;
 
-        // Enable IRQs (externally ANDed with int_en to IRQ line)
-        bool out1:1;
+    // Enable IRQs (externally ANDed with int_en to IRQ line)
+    bool out1:1;
 
-        // Enable IRQs
-        bool int_en:1;
+    // Enable IRQs
+    bool int_en:1;
 
-        // Enable loopback mode (does not generate IRQs)
-        bool loopback:1;
+    // Enable loopback mode (does not generate IRQs)
+    bool loopback:1;
 
-        uint8_t unused:3;
-    } bits;
-    uint8_t value;
+    uint8_t unused:3;
 };
 
-union lsr_t {
-    struct bits_t {
-        bool rx_data:1;
-        bool overrun:1;
-        bool parity_err:1;
-        bool framing_err:1;
+struct lsr_t {
+    bool rx_data:1;
+    bool overrun:1;
+    bool parity_err:1;
+    bool framing_err:1;
 
-        // Break in progress
-        bool break_intr:1;
+    // Break in progress
+    bool break_intr:1;
 
-        // Tx data register empty
-        bool tx_hold_empty:1;
+    // Tx data register empty
+    bool tx_hold_empty:1;
 
-        // Tx shift register empty
-        bool tx_sr_empty:1;
+    // Tx shift register empty
+    bool tx_sr_empty:1;
 
-        // Parity error, framing error, or break, in FIFO somewhere
-        bool err_in_fifo:1;
-    } bits;
-    uint8_t value;
+    // Parity error, framing error, or break, in FIFO somewhere
+    bool err_in_fifo:1;
 };
 
-union msr_t {
-    struct bits_t {
-        // CTS input changed
-        bool cts_change:1;
+struct msr_t {
+    // CTS input changed
+    bool cts_change:1;
 
-        // DSR input changed
-        bool dsr_change:1;
+    // DSR input changed
+    bool dsr_change:1;
 
-        // RI input changed
-        bool ring_done:1;
+    // RI input changed
+    bool ring_done:1;
 
-        // DCR input changed
-        bool dcr_change:1;
+    // DCR input changed
+    bool dcr_change:1;
 
-        // Peer is ready to receive more data, allowed to tx
-        bool cts:1;
+    // Peer is ready to receive more data, allowed to tx
+    bool cts:1;
 
-        // Peer is ready for a communication channel
-        bool dsr:1;
+    // Peer is ready for a communication channel
+    bool dsr:1;
 
-        // RI input state
-        bool ring:1;
+    // RI input state
+    bool ring:1;
 
-        // DCD input state
-        bool dcd:1;
-    } bits;
-    uint8_t value;
+    // DCD input state
+    bool dcd:1;
 };
 
 union scr_t {
@@ -324,12 +305,14 @@ protected:
     virtual void port_irq_handler();
 
     _always_inline void out(port_t ofs, uint8_t value) const;
-    _always_inline void outs(port_t ofs, const void *value, size_t len) const;
+    _always_inline void outs(port_t ofs, void const *value, size_t len) const;
 
     template<typename T>
     _always_inline void outp(T const& reg)
     {
-        out(reg_t<T>::ofs, reg.value);
+        uint8_t value{};
+        memcpy(&value, &reg, sizeof(value));
+        out(reg_t<T>::ofs, value);
     }
 
     _always_inline uint8_t in(port_t ofs)
@@ -340,7 +323,8 @@ protected:
     template<typename T>
     _always_inline T inp(T& reg)
     {
-        reg.value = in(reg_t<T>::ofs);
+        uint8_t value = in(reg_t<T>::ofs);
+        memcpy(&reg, &value, sizeof(reg));
         return reg;
     }
 
@@ -384,10 +368,10 @@ protected:
         default: return false;
         }
 
-        reg_lcr.bits.wordlen = uint8_t(reg_wordlen);
-        reg_lcr.bits.stopbits = uint8_t(reg_stop);
-        reg_lcr.bits.parity_en = reg_parity_en;
-        reg_lcr.bits.parity = uint8_t(reg_parity);
+        reg_lcr.wordlen = uint8_t(reg_wordlen);
+        reg_lcr.stopbits = uint8_t(reg_stop);
+        reg_lcr.parity_en = reg_parity_en;
+        reg_lcr.parity = uint8_t(reg_parity);
 
         return true;
     }
@@ -426,14 +410,14 @@ uart_t::uart_t()
     , fifo_size(0)
     , max_baud(0)
 {
-    reg_ier.value = 0;
-    reg_iir.value = 0;
-    reg_fcr.value = 0;
-    reg_lcr.value = 0;
-    reg_mcr.value = 0;
-    reg_lsr.value = 0;
-    reg_msr.value = 0;
-    reg_scr.value = 0;
+    reg_ier = {};
+    reg_iir = {};
+    reg_fcr = {};
+    reg_lcr = {};
+    reg_mcr = {};
+    reg_lsr = {};
+    reg_msr = {};
+    reg_scr = {};
 }
 
 bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
@@ -455,27 +439,27 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
     in(port_t::DAT);
 
     // Detect type of UART
-    reg_fcr.value = 0;
-    reg_fcr.bits.fifo_en = 1;
-    reg_fcr.bits.fifo_rx_reset = 1;
-    reg_fcr.bits.fifo_tx_reset = 1;
-    reg_fcr.bits.fifo64 = 1;
-    reg_fcr.bits.rx_trigger = 3;
+    reg_fcr = {};
+    reg_fcr.fifo_en = 1;
+    reg_fcr.fifo_rx_reset = 1;
+    reg_fcr.fifo_tx_reset = 1;
+    reg_fcr.fifo64 = 1;
+    reg_fcr.rx_trigger = 3;
     outp(reg_fcr);
 
     inp(reg_fcr);
-    if (reg_fcr.bits.rx_trigger == 3 && reg_fcr.bits.fifo64) {
+    if (reg_fcr.rx_trigger == 3 && reg_fcr.fifo64) {
         // 64 byte fifo bit was writable, it is a 16750
         chip = chiptype_t::U16750;
         fifo_size = 64;
         max_baud = 115200;
-    } else if (reg_fcr.bits.rx_trigger == 3 && !reg_fcr.bits.fifo64) {
+    } else if (reg_fcr.rx_trigger == 3 && !reg_fcr.fifo64) {
         // Both rx_trigger bits were writable, it is a good 16550A
         // Good 16550A
         chip = chiptype_t::U16550A;
         fifo_size = 16;
         max_baud = 115200;
-    } else if (reg_fcr.bits.rx_trigger == 1) {
+    } else if (reg_fcr.rx_trigger == 1) {
         // Bit 6 was not preserved, is a crap 16550
         // Buggy 16550
         chip = chiptype_t::U16550;
@@ -499,11 +483,11 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
     }
 
     // Enable access to baud rate registers
-    reg_lcr.bits.baud_latch = 1;
+    reg_lcr.baud_latch = 1;
 
     // Might as well program the rest of LCR here
     set_framing(data_bits, parity_type, stop_bits);
-    reg_lcr.bits.tx_break = 0;
+    reg_lcr.tx_break = 0;
 
     outp(reg_lcr);
 
@@ -513,45 +497,45 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
     out(port_t::DLM, (divisor >> (1*8)) & 0xFF);
 
     // Disable access to baud rate registers
-    reg_lcr.bits.baud_latch = 0;
+    reg_lcr.baud_latch = 0;
     outp(reg_lcr);
 
     //
     // Configure and reset FIFO
 
     if (fifo_size > 1) {
-        reg_fcr.value = 0;
-        reg_fcr.bits.fifo_en = 1;
-        reg_fcr.bits.fifo_rx_reset = 1;
-        reg_fcr.bits.fifo_tx_reset = 1;
-        reg_fcr.bits.rx_trigger = uint8_t(fcr_rx_trigger_t::FIFO8);
+        reg_fcr = {};
+        reg_fcr.fifo_en = 1;
+        reg_fcr.fifo_rx_reset = 1;
+        reg_fcr.fifo_tx_reset = 1;
+        reg_fcr.rx_trigger = uint8_t(fcr_rx_trigger_t::FIFO8);
         outp(reg_fcr);
     }
 
     //
     // Unmask interrupts
 
-    reg_ier.value = 0;
-    reg_ier.bits.error = use_irq;
-    reg_ier.bits.status = use_irq;
-    reg_ier.bits.rx_avail = use_irq;
-    reg_ier.bits.tx_empty = use_irq;
+    reg_ier = {};
+    reg_ier.error = use_irq;
+    reg_ier.status = use_irq;
+    reg_ier.rx_avail = use_irq;
+    reg_ier.tx_empty = use_irq;
     outp(reg_ier);
 
     //
     // Configure modem control outputs
 
-    reg_mcr.value = 0;
+    reg_mcr = {};
 
     // Assert DTR, port is now open
-    reg_mcr.bits.dtr = 1;
+    reg_mcr.dtr = 1;
 
     // Disable IRQ
-    reg_mcr.bits.out1 = 0;
-    reg_mcr.bits.int_en = 0;
+    reg_mcr.out1 = 0;
+    reg_mcr.int_en = 0;
 
     // Don't assert RTS immediately when polling
-    reg_mcr.bits.rts = use_irq;
+    reg_mcr.rts = use_irq;
 
     outp(reg_mcr);
 
@@ -571,8 +555,8 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
         irq_hooked = true;
 
         // Enable IRQ if requested
-        reg_mcr.bits.out1 = use_irq;
-        reg_mcr.bits.int_en = use_irq;
+        reg_mcr.out1 = use_irq;
+        reg_mcr.int_en = use_irq;
         outp(reg_mcr);
     }
 
@@ -581,7 +565,7 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
 
 uart_t::~uart_t()
 {
-    reg_mcr.bits.int_en = 0;
+    reg_mcr.int_en = 0;
     outp(reg_mcr);
 }
 
@@ -635,7 +619,7 @@ public:
     void route_irq(int cpu) override final;
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
@@ -691,8 +675,8 @@ uart_async_t::uart_async_t()
     , sending_break(false)
     , sending_data(false)
 {
-    rx_buffer = new uint16_t[1 << log2_buffer_size];
-    tx_buffer = new uint16_t[1 << log2_buffer_size];
+    rx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size];
+    tx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size];
 }
 
 uart_async_t::~uart_async_t()
@@ -784,7 +768,7 @@ void uart_async_t::send_some(scoped_lock const&)
         default:
             if (unlikely(sending_break)) {
                 // Stop sending break
-                reg_lcr.bits.tx_break = 0;
+                reg_lcr.tx_break = 0;
                 outp(reg_lcr);
                 sending_break = false;
             }
@@ -801,7 +785,7 @@ void uart_async_t::send_some(scoped_lock const&)
                 sending_break = true;
 
                 // Start sending break
-                reg_lcr.bits.tx_break = 1;
+                reg_lcr.tx_break = 1;
                 outp(reg_lcr);
             }
 
@@ -863,17 +847,17 @@ void uart_async_t::port_irq_handler()
     bool wake_tx = false;
     bool wake_rx = false;
 
-    for (inp(reg_iir); !reg_iir.bits.nintr && !is_rx_full(); inp(reg_iir)) {
-        switch (reg_iir.bits.source) {
+    for (inp(reg_iir); !reg_iir.nintr && !is_rx_full(); inp(reg_iir)) {
+        switch (reg_iir.source) {
         case uint8_t(iir_source_t::ERROR):
             // Overrun error, parity error, framing error, break
             inp(reg_lsr);
 
-            if (reg_lsr.bits.break_intr)
+            if (reg_lsr.break_intr)
                 rx_enqueue(uint16_t(special_val_t::BREAK));
-            if (reg_lsr.bits.framing_err)
+            if (reg_lsr.framing_err)
                 rx_enqueue(uint16_t(special_val_t::FRAMING_ERR));
-            if (reg_lsr.bits.parity_err)
+            if (reg_lsr.parity_err)
                 rx_enqueue(uint16_t(special_val_t::PARITY_ERR));
 
             wake_rx = true;
@@ -936,7 +920,7 @@ public:
     bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
               uint8_t data_bits, char parity_type,
               uint8_t stop_bits) override final;
-    virtual ssize_t write(const void *buf, size_t size,
+    virtual ssize_t write(void const *buf, size_t size,
                           size_t min_write) override final;
     virtual ssize_t read(void *buf, size_t size,
                          size_t min_read) override final;
@@ -971,14 +955,14 @@ bool uart_poll_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
                         data_bits, parity_type, stop_bits, false);
 }
 
-ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
+ssize_t uart_poll_t::write(void const *buf, size_t size, size_t min_write)
 {
     for (size_t i = 0; i < size; ) {
         // Wait for tx holding register to be empty
         for (;;) {
             inp(reg_lsr);
 
-            if (reg_lsr.bits.tx_hold_empty)
+            if (reg_lsr.tx_hold_empty)
                 break;
 
             if (i >= min_write)
@@ -991,7 +975,7 @@ ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
         for (;;) {
             inp(reg_msr);
 
-            if (reg_msr.bits.cts)
+            if (reg_msr.cts)
                 break;
 
             if (i >= min_write)
@@ -1034,12 +1018,12 @@ ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read)
     while (i < size) {
         inp(reg_lsr);
 
-        if (reg_lsr.bits.rx_data) {
+        if (reg_lsr.rx_data) {
             // Receive incoming byte
             ((uint8_t*)buf)[i++] = in(port_t::DAT);
-        } else if (!reg_mcr.bits.rts) {
+        } else if (!reg_mcr.rts) {
             // Raise RTS
-            reg_mcr.bits.rts = 1;
+            reg_mcr.rts = 1;
             outp(reg_mcr);
         } else if (i >= min_read) {
             // We've read enough, don't poll
@@ -1050,8 +1034,8 @@ ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read)
     }
 
     // Drop RTS when not in read function
-    if (reg_mcr.bits.rts) {
-        reg_mcr.bits.rts = 0;
+    if (reg_mcr.rts) {
+        reg_mcr.rts = 0;
         outp(reg_mcr);
     }
 
@@ -1078,13 +1062,17 @@ static uart_poll_t debug_uart;
 // ===========================================================================
 //
 
+uart_dev_t::~uart_dev_t()
+{
+}
+
 uart_dev_t *uart_dev_t::open(size_t id, bool simple, uint8_t data_bits,
                              char parity_type, uint8_t stop_bits)
 {
     if (!simple)
         return id < uart_defs::uarts.size()
                 ? uart_defs::uarts[id].get()
-                : new uart_defs::uart_async_t();
+                : new (std::nothrow) uart_defs::uart_async_t();
     uart_defs::debug_uart.init(0x3F8, 4, 115200,
                                data_bits, parity_type, stop_bits);
     return &uart_defs::debug_uart;
@@ -1096,8 +1084,10 @@ uart_dev_t *uart_dev_t::open(uint16_t port, uint8_t irq,
                              bool polled)
 {
     uart_dev_t *uart = polled
-            ? static_cast<uart_dev_t*>(new uart_defs::uart_poll_t())
-            : static_cast<uart_dev_t*>(new uart_defs::uart_async_t());
+            ? static_cast<uart_dev_t*>(new (std::nothrow)
+                                       uart_defs::uart_poll_t())
+            : static_cast<uart_dev_t*>(new (std::nothrow)
+                                       uart_defs::uart_async_t());
 
     uart_defs::uarts.emplace_back(static_cast<uart_defs::uart_t*>(uart));
     uart->init(port, irq, baud, data_bits, parity_type, stop_bits);

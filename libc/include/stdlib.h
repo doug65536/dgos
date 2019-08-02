@@ -37,15 +37,17 @@ double        atof(char const *);
 int           atoi(char const *);
 long          atol(char const *);
 long long     atoll(char const *);
-void         *bsearch(const void *, const void *, size_t, size_t,
-                  int (*)(const void *, const void *));
+void         *bsearch(void const *, void const *, size_t, size_t,
+                  int (*)(void const *, void const *));
 void         *calloc(size_t, size_t);
 div_t         div(int, int);
 
 double        drand48(void);
 double        erand48(unsigned short [3]);
 
+__attribute__((__noreturn__))
 void          exit(int);
+
 void          free(void *);
 char         *getenv(char const *);
 
@@ -66,7 +68,7 @@ lldiv_t       lldiv(long long, long long);
 
 long          lrand48(void);
 
-void         *malloc(size_t);
+void         *malloc(size_t sz);
 int           mblen(char const *, size_t);
 size_t        mbstowcs(wchar_t *restrict, char const *restrict, size_t);
 int           mbtowc(wchar_t *restrict, char const *restrict, size_t);
@@ -83,8 +85,8 @@ int           posix_openpt(int);
 char         *ptsname(int);
 int           putenv(char *);
 
-void          qsort(void *, size_t, size_t, int (*)(const void *,
-                  const void *));
+void          qsort(void *, size_t, size_t, int (*)(void const *,
+                  void const *));
 int           rand(void);
 
 int           rand_r(unsigned *);
@@ -120,7 +122,7 @@ int           unlockpt(int);
 
 int           unsetenv(char const *);
 
-size_t        wcstombs(char *restrict, const wchar_t *restrict, size_t);
+size_t        wcstombs(char *restrict, wchar_t const *restrict, size_t);
 int           wctomb(char *, wchar_t);
 
 __END_DECLS

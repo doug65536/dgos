@@ -56,7 +56,7 @@
 .endm
 
 .macro gdt_emit gdt_label gdtr_label
-	.align 8
+    .balign 8
 	\gdt_label :
 		.word 0
 	\gdtr_label :

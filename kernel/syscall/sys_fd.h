@@ -4,6 +4,8 @@
 
 extern "C" {
 
+typedef uint32_t socklen_t;
+
 ssize_t sys_read(int fd, void *bufaddr, size_t count);
 ssize_t sys_write(int fd, void const *bufaddr, size_t count);
 int sys_close(int fd);
@@ -21,8 +23,8 @@ int sys_ftruncate(int fd, off_t size);
 int sys_ioctl(int fd, int cmd, void* arg);
 
 int sys_open(char const *pathname, int flags, mode_t mode);
-int sys_creat(char const *path, mode_t mode);
-int sys_rename(char const *old_path, char const *new_path);
+int sys_creat(char const *pathname, mode_t mode);
+int sys_rename(char const *old_pathname, char const *new_pathname);
 int sys_mkdir(char const *path, mode_t mode);
 int sys_rmdir(char const *path);
 int sys_unlink(char const *path);
@@ -69,3 +71,18 @@ int sys_listxattr(char const *path,
 //    fs_pollhandle_t* ph, unsigned* reventsp) final;
 
 }
+int sys_socket(int domain, int type, int protocol);
+int sys_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int sys_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+ssize_t sys_send(int sockfd, void const *buf, size_t len, int flags);
+ssize_t sys_sendto(int sockfd, void const *buf, size_t len, int flags,
+                   struct sockaddr const *dest_addr, socklen_t addrlen);
+ssize_t sys_recv(int sockfd, void *buf, size_t len, int flags);
+ssize_t sys_recvfrom(int sockfd, void *buf, size_t len, int flags,
+                     struct sockaddr *src_addr, socklen_t *addrlen);
+int sys_shutdown(int sockfd, int how);
+int sys_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int sys_listen(int sockfd, int backlog);
+char *sys_getcwd(char *buf, size_t size);
+
+int sys_fcntl(int fd, int cmd, void *arg);

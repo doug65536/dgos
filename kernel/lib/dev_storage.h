@@ -10,8 +10,39 @@
 
 #include "dev_registration.h"
 
-//
-// Forward declarations
+// Filesystem I/O code builds a list of these to do burst I/O
+struct disk_vec_t {
+    // Start LBA of range
+    uint64_t lba;
+
+    // Number of contiguous sectors
+    uint32_t count;
+
+    // Offset into first sector to transfer
+    // If this is nonzero, count is guaranteed to be 1
+    uint16_t sector_ofs;
+
+    // Number of bytes to transfer.
+    // If count is nonzero, this field is ignored, and count is the number
+    // of whole sectors to transfer.
+    uint16_t byte_count;
+};
+
+struct disk_io_plan_t {
+    void *dest;
+    disk_vec_t *vec;
+    uint16_t count;
+    uint16_t capacity;
+    uint8_t log2_sector_size;
+
+    disk_io_plan_t(void *dest, uint8_t log2_sector_size);
+    disk_io_plan_t(disk_io_plan_t const&) = delete;
+    disk_io_plan_t() = delete;
+    ~disk_io_plan_t();
+
+    bool add(uint32_t lba, uint16_t sector_count,
+             uint16_t sector_ofs, uint16_t byte_count);
+};
 
 //
 // Storage Device (hard drive, CDROM, etc)
@@ -23,16 +54,19 @@ enum storage_dev_info_t : uint32_t {
     STORAGE_INFO_NAME
 };
 
-struct storage_dev_base_t {
-    virtual ~storage_dev_base_t() {}
+struct EXPORT storage_dev_base_t {
+    virtual ~storage_dev_base_t() = 0;
 
     // Startup/shutdown
     virtual void cleanup_dev() = 0;
 
     //
-    // Asynchronous I/O
+    // Asynchronous I/O plan
 
-    typedef void (*completion_callback_t)(errno_t err, uintptr_t arg);
+    //virtual errno_t io(disk_io_plan_t *plan);
+
+    //
+    // Asynchronous I/O
 
     virtual errno_t read_async(void *data, int64_t count,
                                uint64_t lba, iocp_t *iocp) = 0;
@@ -85,18 +119,21 @@ struct storage_dev_base_t {
 
 struct storage_if_base_t;
 
-struct storage_if_factory_t {
+struct EXPORT storage_if_factory_t {
     storage_if_factory_t(char const *factory_name);
+
     virtual std::vector<storage_if_base_t *> detect(void) = 0;
     static void register_factory(void *p);
     char const * const name;
 };
 
-struct storage_if_base_t {
-    virtual ~storage_if_base_t() {}
+#pragma GCC visibility push(default)
+struct EXPORT storage_if_base_t {
+    virtual ~storage_if_base_t() = 0;
     virtual void cleanup_if() = 0;
     virtual std::vector<storage_dev_base_t*> detect_devices() = 0;
 };
+#pragma GCC visibility pop
 
 #define STORAGE_IF_IMPL                         \
     void cleanup_if() override final;           \
@@ -106,8 +143,8 @@ struct storage_if_base_t {
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
         & name##_factory, callout_type_t::late_dev, "000")
 
-void storage_if_register_factory(char const *name,
-                                storage_if_factory_t *factory);
+void storage_if_register_factory(
+        char const *name, storage_if_factory_t *factory);
 
 typedef int dev_t;
 
@@ -201,7 +238,11 @@ struct fs_statvfs_t {
 struct fs_base_t;
 
 struct fs_factory_t {
-    explicit fs_factory_t(char const *factory_name);
+    explicit constexpr fs_factory_t(char const *factory_name)
+        : name(factory_name)
+    {
+    }
+
     virtual fs_base_t *mount(fs_init_info_t *conn) = 0;
     static void register_factory(void *p);
 
@@ -250,9 +291,9 @@ struct fs_base_t {
     //
     // Modify directory entries
 
-    virtual int chmod(fs_cpath_t path,
+    virtual int fchmod(fs_file_info_t *fi,
                  fs_mode_t mode) = 0;
-    virtual int chown(fs_cpath_t path,
+    virtual int fchown(fs_file_info_t *fi,
                  fs_uid_t uid,
                  fs_gid_t gid) = 0;
     virtual int truncate(fs_cpath_t path,
@@ -348,9 +389,9 @@ struct fs_base_t {
     int rename(fs_cpath_t from, fs_cpath_t to) override final;          \
     int link(fs_cpath_t from, fs_cpath_t to) override final;            \
     int unlink(fs_cpath_t path) override final;                         \
-    int chmod(fs_cpath_t path,                                          \
+    int fchmod(fs_file_info_t *fi,                                      \
          fs_mode_t mode) override final;                                \
-    int chown(fs_cpath_t path,                                          \
+    int fchown(fs_file_info_t *fi,                                      \
          fs_uid_t uid,                                                  \
          fs_gid_t gid) override final;                                  \
     int truncate(fs_cpath_t path,                                       \
@@ -415,7 +456,7 @@ struct fs_base_t {
 
 // Base for read-only filesystems,
 // provides implementation for all methods that write
-class fs_base_ro_t : public fs_base_t {
+class EXPORT fs_base_ro_t : public fs_base_t {
     FS_BASE_WR_IMPL
 };
 
@@ -424,7 +465,7 @@ class fs_base_ro_t : public fs_base_t {
 void fs_register_factory(char const *name, fs_factory_t *fs);
 
 //
-// Partitioning scheme (MBR, UEFI, etc)
+// Partitioning scheme (MBR, GPT, and special types like CPIO, etc)
 
 struct part_dev_t {
     storage_dev_base_t *drive;
@@ -434,15 +475,29 @@ struct part_dev_t {
 };
 
 struct part_factory_t {
-    explicit part_factory_t(char const * factory_name);
+    explicit constexpr part_factory_t(char const * factory_name)
+        : name(factory_name)
+    {
+    }
+
     virtual std::vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
     static void register_factory(void *p);
     char const * const name;
 };
 
+struct fs_reg_t {
+    char const *name;
+    fs_factory_t *factory;
+};
+
+__BEGIN_DECLS
+
 void part_register_factory(char const *name, part_factory_t *factory);
 
 void fs_mount(char const *fs_name, fs_init_info_t *info);
+void fs_add(fs_reg_t *reg, fs_base_t *fs);
 fs_base_t *fs_from_id(size_t id);
 
 void probe_storage_factory(storage_if_factory_t *factory);
+
+__END_DECLS

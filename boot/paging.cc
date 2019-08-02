@@ -3,9 +3,10 @@
 #include "malloc.h"
 #include "physmem.h"
 #include "screen.h"
-#include "farptr.h"
+#include "string.h"
 #include "ctors.h"
 #include "assert.h"
+#include "fs.h"
 #include "halt.h"
 
 // Builds 64-bit page tables
@@ -132,12 +133,12 @@ void paging_map_range(
 
     // Scan the region to calculate memory allocation size
     uint64_t needed = 0;
-    for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE) {
+    for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE, ++pte) {
         // Calculate pte pointer at start and at 2MB boundaries
         if (!pte || ((addr & -(1<<21)) == addr))
             pte = paging_find_pte(addr, 12, true);
 
-        if (!(*pte++ & PTE_PRESENT))
+        if (!(*pte & PTE_PRESENT))
             needed += PAGE_SIZE;
     }
 
@@ -165,7 +166,7 @@ void paging_map_range(
     }
 }
 
-int paging_iovec(iovec_t **ret, uint64_t vaddr,
+size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
                  uint64_t size, uint64_t max_chunk)
 {
     size_t capacity = 16;
@@ -196,18 +197,35 @@ int paging_iovec(iovec_t **ret, uint64_t vaddr,
         if (offset + chunk > size)
             chunk = size - offset;
 
-        iovec[count].size = chunk;
-        iovec[count].base = paddr;
+        auto& iovec_curr = iovec[count];
+        iovec_curr.size = chunk;
+        iovec_curr.base = paddr;
         paddr += chunk;
         vaddr += chunk;
 
-        // If this entry is contiguous with the previous entry,
-        // and it would not exceed the specified max chunk size,
-        // then merge them
-        if (count && iovec[count-1].base + iovec[count-1].size ==
-                iovec[count].base &&
-                iovec[count-1].size + chunk <= max_chunk) {
-            iovec[count-1].size += iovec[count].size;
+        if (count) {
+            auto& iovec_last = iovec[count-1];
+
+            // If this entry is contiguous with the previous entry
+            if (iovec_last.base + iovec_last.size == iovec_curr.base) {
+                // Compute how much we can add onto the previous entry
+                auto max_coalesce = max_chunk - iovec_last.size;
+
+                if (max_coalesce >= iovec_curr.size) {
+                    // Coalesce entire incoming chunk with previous one
+                    iovec_last.size += iovec_curr.size;
+                } else if (max_coalesce > 0) {
+                    // Partially extend previous one + another with remainder
+                    iovec_last.size += max_coalesce;
+                    iovec_curr.base += max_coalesce;
+                    iovec_curr.size -= max_coalesce;
+                    ++count;
+                } else {
+                    // Cannot extend previous one at all, it is at max
+                    // Just keep the one we have
+                    ++count;
+                }
+            }
         } else {
             ++count;
         }
@@ -227,10 +245,220 @@ int paging_iovec(iovec_t **ret, uint64_t vaddr,
     return count;
 }
 
+off_t paging_iovec_read(int fd, off_t file_offset,
+                        uint64_t vaddr, uint64_t size,
+                        uint64_t max_chunk)
+{
+    uint64_t offset = 0;
+
+    while (offset < size) {
+        iovec_t *iovec = nullptr;
+        size_t iovec_count = paging_iovec(
+                    &iovec, vaddr + offset, size - offset, max_chunk);
+
+        for (size_t i = 0; i < iovec_count; ++i) {
+            ssize_t read = boot_pread(
+                        fd, (void*)iovec[i].base, iovec[i].size,
+                        file_offset + offset);
+
+            if (read != ssize_t(iovec[i].size))
+                PANIC("Disk read error");
+
+            offset += iovec[i].size;
+        }
+    }
+
+    return offset;
+}
+
+static inline constexpr uint64_t low_bits(uint64_t value, uint8_t log2n)
+{
+    return value & ((1 << log2n) - 1);
+}
+
+static inline constexpr uint64_t round_up(uint64_t value, uint8_t log2n)
+{
+    return (value + ((1 << log2n) - 1)) & -(1 << log2n);
+}
+
+static inline constexpr uint64_t round_dn(uint64_t value, uint8_t log2n)
+{
+    return value & -(1 << log2n);
+}
+
+void paging_map_physical_impl(uint64_t phys_addr, uint64_t linear_base,
+                              uint64_t length, uint64_t pte_flags);
+
 // Incoming pte_flags should be as if 4KB page (bit 7 is PAT bit)
 void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
                          uint64_t length, uint64_t pte_flags)
 {
+    if (unlikely(low_bits(phys_addr, 12) != low_bits(linear_base, 12)))
+    {
+        assert_msg(false,
+                   TSTR "Impossible linear->physical mapping,"
+                   TSTR " bits 11:0 of the physical and linear address"
+                   TSTR " must be equal");
+        return;
+    }
+
+    // -------------------------========---------------------------  //
+    //                                                               //
+    //                          4KB Only                             //
+    //                                                               //
+    //   <- phys_addr                        phys_addr + length ->   //
+    //   <- linear_base                                            B //
+    //                                                             C //
+    //                                                             D //
+    //                                                             E //
+    // A <------------------------ r ----------------------------> F //
+    // |                                                           | //
+    // | L                                                         | //
+    // | |                                                         | //
+    // ↓ ↓                                                         ↓ //
+    // +-----------------------------------------------------------+ //
+    // |                        4K pg ...                          | //
+    // +-----------------------------------------------------------+ //
+    // ↑                                                           ↑ //
+    // |                                                           | //
+    // 4K                                                         4K //
+    // \------------------------ alignment ------------------------/ //
+    //                                                               //
+    //                                                               //
+    // --------------------------=======---------------------------  //
+    //                                                               //
+    //                           4KB/2MB                             //
+    //                                                               //
+    // r_up(A,21) -↘                                   ↙- r_dn(F,21) //
+    //                                                 C             //
+    //             ↙                                   D             //
+    // A <-- r --> B <------------- s ---------------> E <-- v --> F //
+    // |           |                                   |           | //
+    // | L         |                                   |           | //
+    // | |         |                                   |           | //
+    // ↓ ↓         ↓                                   ↓           ↓ //
+    // +-----------+-----------------------------------+-----------+ //
+    // | 4K pg ... |             2M pg ...             | 4K pg ... | //
+    // +-----------+-----------------------------------+-----------+ //
+    // ↑           ↑                                   ↑           ↑ //
+    // |           |                                   |           | //
+    // 4K          2M                                  2M         4K //
+    // \------------------------ alignment ------------------------/ //
+    //                                                               //
+    //                                                               //
+    // ------------------------===========-------------------------  //
+    //                                                               //
+    //                         4KB/2MB/1GB                           //
+    //                                                               //
+    //                                                               //
+    //              r_up(B,30)-↘           ↙-r_dn(E,30)              //
+    //                         |           |                         //
+    // A <-- r --> B <-- s --> C <-- t --> D <-- u --> E <-- v --> F //
+    // |           |           |           |           |           | //
+    // | L         |           |           |           |           | //
+    // | |         |           |           |           |           | //
+    // ↓ ↓         ↓           ↓           ↓           ↓           ↓ //
+    // +-----------+-----------+-----------+-----------+-----------+ //
+    // | 4K pgs... | 2M pgs... | 1G pgs... | 2M pgs... | 4K pgs... | //
+    // +-----------+-----------+-----------+-----------+-----------+ //
+    // ↑           ↑           ↑           ↑           ↑           ↑ //
+    // |           |           |           |           |           | //
+    // 4K          2M          1G          1G          2M         4K //
+    // \------------------------ alignment ------------------------/ //
+    //                                                               //
+    //                                                               //
+    // A is phys_addr rounded down to a 4KB boundary                 //
+    // F is phys_addr + length rounded up to a 4KB boundary          //
+    // B is A rounded up to a 2MB boundary                           //
+    // C is B rounded up to a 1GB boundary                           //
+    // E is F rounded down to a 1MB boundary                         //
+    // D is E rounded down to a 1GB boundary                         //
+    //                                                               //
+    // r = B - A (4KB pages)                                         //
+    // s = C - B (2MB pages)                                         //
+    // t = D - C (1GB pages)                                         //
+    // u = E - D (2MB pages)                                         //
+    // v = F - E (4KB pages)                                         //
+    //                                                               //
+    // Usually, several regions are empty. When alignment permits,   //
+    // only the largest page sizes will be used. It starts as a      //
+    // single run of 4KB pages, then a run of 2MB regions is carved  //
+    // out of it, eliminating some or all 4KB runs, then a run of    //
+    // 1GB pages is carved out of it, eliminating some or all of the //
+    // 2MB runs                                                      //
+
+    // It's impossible to use a 1GB mapping if the low 30 bits of the
+    // physical address and the linear address are not equal
+    bool can_use_1G = low_bits(phys_addr, 30) == low_bits(linear_base, 30);
+
+    // It's impossible to use a 2MB mapping if the low 21 bits of the
+    // physical address and the linear address are not equal
+    bool can_use_2M = low_bits(phys_addr, 21) == low_bits(linear_base, 21);
+
+    uint64_t phys_end = phys_addr + length;
+
+    uint64_t A, B, C, D, E, F, X, Y;
+
+    // Start with a simple run of 4KB pages
+    A = round_dn(phys_addr, 12);
+    F = round_up(phys_end, 12);
+    B = C = D = E = F;
+
+    // Compute 2MB rounded boundaries for B,C/D/E
+    X = round_up(A, 21);
+    Y = round_dn(F, 21);
+
+    if (X < Y && can_use_2M)
+    {
+        B = X;
+        C = D = E = Y;
+    }
+
+    // Compute 1GB rounded boundaries for C,D
+    X = round_up(X, 30);
+    Y = round_dn(Y, 30);
+
+    if (X < Y && can_use_1G)
+    {
+        C = X;
+        D = Y;
+    }
+
+    int64_t r = B - A;  // 4KB
+    int64_t s = C - B;  // 2MB
+    int64_t t = D - C;  // 1GB
+    int64_t u = E - D;  // 2MB
+    int64_t v = F - E;  // 4KB
+
+    int64_t phys_to_virt = linear_base - phys_addr;
+
+    // 4KB page region
+    if (r > 0)
+        paging_map_physical_impl(A, A + phys_to_virt, r, pte_flags);
+
+    // 2MB page region
+    if (s > 0)
+        paging_map_physical_impl(B, B + phys_to_virt, s, pte_flags);
+
+    // 1GB page region
+    if (t > 0)
+        paging_map_physical_impl(C, C + phys_to_virt, t, pte_flags);
+
+    // 2MB page region
+    if (u > 0)
+        paging_map_physical_impl(D, D + phys_to_virt, u, pte_flags);
+
+    // 4KB page region
+    if (v > 0)
+        paging_map_physical_impl(E, E + phys_to_virt, v, pte_flags);
+}
+
+void paging_map_physical_impl(uint64_t phys_addr, uint64_t linear_base,
+                              uint64_t length, uint64_t pte_flags)
+{
+    // Mask off bit 63:48
+    linear_base &= 0xFFFFFFFFFFFF;
+
     // Make sure the flags don't set any address bits
     assert((pte_flags & PTE_ADDR) == 0);
 
@@ -325,5 +553,9 @@ uint64_t paging_physaddr_of(uint64_t linear_addr)
 
     pte_t *p = paging_find_pte(linear_addr - misalignment, 12, false);
 
-    return (p && *p & PTE_PRESENT) ? (*p & PTE_ADDR) + misalignment : -1;
+    return (p && (*p & PTE_PRESENT)) ? (*p & PTE_ADDR) + misalignment : -1U;
+}
+
+page_factory_t::~page_factory_t() noexcept
+{
 }

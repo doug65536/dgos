@@ -1,6 +1,6 @@
 .code64
 
-.section .text.unlikely, "ax"
+.section .text.unlikely, "ax", @progbits
 
 .macro isr_entry has_code int_num
 .global isr_entry_\int_num\()
@@ -99,7 +99,7 @@ isr_common:
 
 	iretq
 
-.align 8
+.balign 8
 
 msg_exception:
 	.string "Exception=0x"

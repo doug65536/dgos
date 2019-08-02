@@ -1,4 +1,5 @@
 #include "mmu.h"
+#include "debug.h"
 #include "assert.h"
 #include "mm.h"
 #include "control_regs.h"
@@ -28,13 +29,14 @@
 #include "contig_alloc.h"
 #include "asan.h"
 #include "unique_ptr.h"
+#include "cxxstring.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
 #define GLOBAL_RECURSIVE_MAPPING    0
 
 #define DEBUG_CREATE_PT         0
-#define DEBUG_PHYS_ALLOC        0
+#define DEBUG_PHYS_ALLOC        1
 #define DEBUG_PAGE_TABLES       0
 #define DEBUG_PAGE_FAULT        0
 
@@ -219,42 +221,52 @@ typedef uintptr_t pte_t;
 extern char ___text_st[];
 extern char ___text_en[];
 
+// Linker script magic
+extern char __nofault_text_st[];
+extern char __nofault_text_en[];
+extern uint64_t __nofault_text_sz;
+
+extern uintptr_t __nofault_tab_st[];
+extern uintptr_t __nofault_tab_en[];
+extern uintptr_t __nofault_tab_lp[];
+extern uint64_t __nofault_tab_sz;
+
 // -512GB
 static uint64_t min_kern_addr = 0xFFFFFF8000000000;
 
-#define PT_KERNBASE     uintptr_t(___text_st);
+#define PT_KERNBASE     uintptr_t(___text_st)
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
 
 // Virtual address space map
 // Low half
-// +---------------+-----------------------------------+
-// |    4M - 128TB | User space                        |
-// +---------------+-----------------------------------+
-// |    1M - 4M    | User guard page                   |
-// +---------------+-----------------------------------+
-// |    4K - 1M    | Boot and legacy                   |
-// +---------------+-----------------------------------+
-// |     0 - 4K    | NULL Guard page                   |
-// +---------------+-----------------------------------+
-// High half
-// +---------------+-----------------------------------+
-// |   -4M - 0     | Reserved per elf64 spec           |
-// +---------------+-----------------------------------+
-// | -512G - -4M   | Reserved for kernel and modules   |
-// +---------------+-----------------------------------+
-// | -513G - -512G | Zeroing page                      |
-// +---------------+-----------------------------------+
-// | -255T - -513G | Kernel heap                       |
-// +---------------+-----------------------------------+
+// +-----------------+---------------------------------+-------+
+// |                 |                                 |       |
+// +-----------------+---------------------------------+-------+
+// |    4M - +128T   | User space                      | <128T |
+// +-----------------+---------------------------------+-------+----+
+// |    0  -   +4M   | NULL Guard page                 |    4M |    |
+// +-----------------+---------------------------------+-------+    |
+// High half                                                   | 8M |<- nullptr
+// +-----------------+---------------------------------+-------+    |
+// |   -4M -    0    | Reserved per elf64 spec (guard) |    4M |    |
+// +-----------------+---------------------------------+-------+----+
+// | -512G -   -4M   | Reserved for kernel and modules | <512G |
+// +-----------------+---------------------------------+-------+
+// | -513G - -512G   | Zeroing page                    |    1G |
+// +-----------------+---------------------------------+-------+
+// | -128T - -513G   | Kernel heap                     | <128T |
+// +-----------------+---------------------------------+-------+
+// | -128T - -127.5T | Recursive map                   |  512G |
+// |                 | FFFF8000...-FFFF8080...            |
+// +-----------------+---------------------------------+-------+
 
 // Page tables for entire address, worst case, consists of
 //  68719476736 4KB pages  (134217728 PT pages,   0x8000000000 bytes, 512GB)
 //    134217728 2MB pages  (   262144 PD pages,     0x40000000 bytes,   1GB)
 //       262144 1GB pages  (      512 PDPT pages,     0x200000 bytes,   4MB)
 //                         (        1 PML4 page,        0x1000 bytes,   4KB)
-//                          ---------
-//                          134480385 total pages, 550,831,656,960 bytes)
+
 
 static format_flag_info_t pte_flags[] = {
     { "XD",     1,                  nullptr, PTE_NX_BIT       },
@@ -347,7 +359,7 @@ struct mmap_device_mapping_t {
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
 static std::vector<mmap_device_mapping_t*> mm_dev_mappings;
-using mm_dev_mapping_lock_type = std::mcslock;
+using mm_dev_mapping_lock_type = ext::mcslock;
 using mm_dev_mapping_scoped_lock = std::unique_lock<mm_dev_mapping_lock_type>;
 static mm_dev_mapping_lock_type mm_dev_mapping_lock;
 
@@ -381,14 +393,14 @@ public:
     static size_t size_from_highest_page(physaddr_t page_index);
 
     void init(void *addr, physaddr_t begin_, size_t highest_usable,
-                  uint8_t log2_pagesz_ = PAGE_SIZE_BIT);
+              uint8_t log2_pagesz_ = PAGE_SIZE_BIT);
 
     void add_free_space(physaddr_t base, size_t size);
 
     // Unreliably peek and see if there might be a free page, outside lock
     operator bool() const
     {
-        return next_free != nullptr;
+        return next_free[0] != -1U && next_free[1] != -1U;
     }
 
     physaddr_t alloc_one(bool low);
@@ -402,22 +414,37 @@ public:
 
     void addref(physaddr_t addr);
 
-    void addref_virtual_range(linaddr_t start, size_t len);
+    void adjref_virtual_range(linaddr_t start, size_t len, int adj);
 
     class free_batch_t {
     public:
         void free(physaddr_t addr)
         {
-            if (count == countof(pages))
+            // Can't free demand page entry
+            if (unlikely(!addr || addr == PTE_ADDR))
+                return;
+
+            if (unlikely(count == countof(pages)))
                 flush();
+
             pages[count++] = addr;
         }
 
         void flush()
         {
             scoped_lock lock(owner.lock);
-            for (size_t i = 0; i < count; ++i)
-                owner.release_one_locked(pages[i]);
+            // Heuristic that weakly attempts to free pages so they will be
+            // linked back into the free chain in an order that causes
+            // subsequent allocations to return blocks in ascending order
+            if (count < 2 || pages[0] > pages[1]) {
+                // Order doesn't matter or first is higher than second
+                for (size_t i = 0; i < count; ++i)
+                    owner.release_one_locked(pages[i]);
+            } else {
+                // Second is higher than first, release in reverse order
+                for (size_t i = count; i > 0; --i)
+                    owner.release_one_locked(pages[i-1]);
+            }
             count = 0;
         }
 
@@ -453,19 +480,27 @@ private:
     _always_inline void release_one_locked(physaddr_t addr)
     {
         size_t index = index_from_addr(addr);
-        unsigned low = addr < 0x100000000;
+        assert(index < highest_usable);
         assert(entries[index] & used_mask);
         if (entries[index] == (1 | used_mask)) {
             // Free the page
+            size_t low = addr < 0x100000000;
             entries[index] = next_free[low];
             next_free[low] = index;
+#if DEBUG_PHYS_ALLOC
+            printdbg("Freed page @ %#zx\n", addr);
+#endif
         } else {
             // Reduce reference count
             --entries[index];
+#if DEBUG_PHYS_ALLOC
+            printdbg("Reduced reference count @ %#zx to %u\n",
+                     addr, entries[index]);
+#endif
         }
     }
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static constexpr entry_t used_mask =
@@ -486,7 +521,7 @@ static linaddr_t linear_base = PT_MAX_ADDR;
 
 mmu_phys_allocator_t phys_allocator;
 
-static uint64_t volatile shootdown_pending;
+static thread_cpu_mask_t volatile shootdown_pending;
 
 static contiguous_allocator_t linear_allocator;
 static contiguous_allocator_t near_allocator;
@@ -506,12 +541,12 @@ static size_t round_down(size_t n)
 //
 // Contiguous physical memory allocator
 
-uintptr_t mm_alloc_contiguous(size_t size)
+EXPORT uintptr_t mm_alloc_contiguous(size_t size)
 {
     return contig_phys_allocator.alloc_linear(round_up(size));
 }
 
-void mm_free_contiguous(uintptr_t addr, size_t size)
+EXPORT void mm_free_contiguous(uintptr_t addr, size_t size)
 {
     contig_phys_allocator.release_linear(addr, round_up(size));
 }
@@ -967,29 +1002,31 @@ static physaddr_t init_take_page(int low)
         }
     }
 
-    physaddr_t addr = range->base +
-            range->size - PAGE_SIZE;
+    physaddr_t addr = range->base + range->size - PAGE_SIZE;
 
-    // Take a page off the size of the range
+    // Take a page off the end of the range
     range->size -= PAGE_SIZE;
 
 #if DEBUG_PHYS_ALLOC
     printdbg("Took early page @ %" PRIx64 "\n", addr);
 #endif
 
-    assert(addr != 0x0000000000101000);
-
     return addr;
 }
 
 // Return a pointer to the initial physical mapping
 template<typename T>
-static _always_inline T *init_phys(uint64_t addr)
+static _always_inline constexpr T *init_phys(uint64_t addr)
 {
-    assert(addr <= 0xFFFFFFFFU);
+//    if (phys_mapping)
+//        return phys_mapping + addr;
 
-    // First 4GB of physical address space is mapped at -518G by bootloader
-    uint64_t physmap = -(UINT64_C(518) << 30);
+    //assert(addr <= 0xFFFFFFFFU);
+
+    // Physical mappings at highest 512GB boundary
+    // that is >= 512GB before .text
+    uint64_t physmap = uintptr_t(___text_st - (UINT64_C(512) << 30)) &
+            -(UINT64_C(512) << 30);
 
     return (T*)(physmap + addr);
 }
@@ -998,7 +1035,7 @@ static _always_inline T *init_phys(uint64_t addr)
 // Zero initialization
 
 struct clear_phys_state_t {
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type locks[64];
 
@@ -1006,8 +1043,10 @@ struct clear_phys_state_t {
     int log2_window_sz;
     int level;
 
-    // 2TB before end of address space
-    static constexpr linaddr_t addr = 0xFFFFFE0000000000;
+    size_t cls_tlb_ver;
+
+    // 3TB before end of address space
+    static constexpr linaddr_t addr = 0xFFFFFD0000000000;
 
     void clear(physaddr_t addr);
     void reserve_addr();
@@ -1035,6 +1074,12 @@ void mm_phys_clear_init()
     ptes_from_addr(ptes, clear_phys_state_t::addr);
 
     pte_t global_mask = ~PTE_GLOBAL;
+
+    // Allocate a CPU-local storage slot for per-cpu TLB invalidation version
+    clear_phys_state.cls_tlb_ver = thread_cls_alloc();
+    thread_cls_init_each_cpu(clear_phys_state.cls_tlb_ver, false, [&] {
+        return nullptr;
+    });
 
     pte_t *page_base = nullptr;
     for (int i = 0; i < clear_phys_state.level; ) {
@@ -1092,6 +1137,7 @@ void clear_phys(physaddr_t addr)
     if (pte != expect)
         pte = expect;
 
+    // Shootdowns for this are never done so just flush that TLB entry
     cpu_page_invalidate(window);
 
     clear64((char*)window + offset, PAGE_SIZE);
@@ -1143,14 +1189,12 @@ static void mmu_tlb_perform_shootdown(void)
 static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 {
     (void)intr;
-    assert(intr == INTR_TLB_SHOOTDOWN);
-
-    apic_eoi(intr);
+    assert(intr == INTR_IPI_TLB_SHTDN);
 
     int cpu_number = thread_cpu_number();
 
     // Clear pending
-    atomic_and(&shootdown_pending, ~(1 << cpu_number));
+    shootdown_pending.atom_clr(cpu_number);
 
     mmu_tlb_perform_shootdown();
 
@@ -1160,16 +1204,18 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 static void mmu_send_tlb_shootdown(bool synchronous = false)
 {
     int cpu_count = thread_cpu_count();
+
+    // Skip if too early
     if (unlikely(cpu_count <= 1))
         return;
 
     cpu_scoped_irq_disable irq_was_enabled;
     int cur_cpu = thread_cpu_number();
-    int all_cpu_mask = (1 << cpu_count) - 1;
-    int cur_cpu_mask = 1 << cur_cpu;
-    int other_cpu_mask = all_cpu_mask & ~cur_cpu_mask;
-    int old_pending = atomic_or(&shootdown_pending, other_cpu_mask);
-    int need_ipi_mask = old_pending & other_cpu_mask;
+    thread_cpu_mask_t all_cpu_mask(-1);
+    thread_cpu_mask_t cur_cpu_mask(cur_cpu);
+    thread_cpu_mask_t other_cpu_mask = all_cpu_mask - cur_cpu_mask;
+    thread_cpu_mask_t new_pending = shootdown_pending.atom_or(other_cpu_mask);
+    thread_cpu_mask_t need_ipi_mask = new_pending & other_cpu_mask;
 
     std::vector<uint64_t> shootdown_counts;
     if (synchronous) {
@@ -1181,15 +1227,16 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
         }
     }
 
-    if (other_cpu_mask) {
+    if (!!other_cpu_mask) {
         if (need_ipi_mask == other_cpu_mask) {
             // Send to all other CPUs
-            apic_send_ipi(-1, INTR_TLB_SHOOTDOWN);
+            apic_send_ipi(-1, INTR_IPI_TLB_SHTDN);
         } else {
             int cpu_mask = 1;
             for (int cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
-                if (!(old_pending & cpu_mask) && (need_ipi_mask & cpu_mask))
-                    thread_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
+                if (!(new_pending & thread_cpu_mask_t(cpu_mask)) &&
+                    !!(need_ipi_mask & thread_cpu_mask_t(cpu_mask)))
+                    thread_send_ipi(cpu, INTR_IPI_TLB_SHTDN);
             }
         }
     }
@@ -1230,7 +1277,7 @@ static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 }
 
 // Page fault
-isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
+isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 {
     if (likely(thread_cpu_count()))
         atomic_inc((cpu_gs_ptr<uint64_t, CPU_INFO_PF_COUNT_OFS>()));
@@ -1280,13 +1327,11 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
         //  - the pte is not present, or,
         //  - the access was a write and the pte is not writable, or,
         //  - the access was an insn fetch and the pte is not executable
-        if (!((err_code & CTX_ERRCODE_PF_R) ||
-              (err_code & CTX_ERRCODE_PF_PK) ||
-              (err_code & CTX_ERRCODE_PF_SGX) ||
-              ((err_code & CTX_ERRCODE_PF_W) &&
-               !(pte & PTE_WRITABLE)) ||
-              ((err_code & CTX_ERRCODE_PF_I) &&
-               (pte & PTE_NX))))
+        if (likely(!((err_code & CTX_ERRCODE_PF_R) ||
+                     (err_code & CTX_ERRCODE_PF_PK) ||
+                     (err_code & CTX_ERRCODE_PF_SGX) ||
+                     ((err_code & CTX_ERRCODE_PF_W) && !(pte & PTE_WRITABLE)) ||
+                     ((err_code & CTX_ERRCODE_PF_I) && (pte & PTE_NX)))))
             return ctx;
     }
 
@@ -1300,16 +1345,20 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
             assert(page != 0);
 
 #if DEBUG_PAGE_FAULT
-            printdbg("Assigning %#p with page %p\n",
-                     (void*)fault_addr, (void*)page);
+            printdbg("Assigning %#zx with page %#zx\n",
+                     fault_addr, page);
 #endif
 
             pte_t page_flags;
 
-            if (err_code & CTX_ERRCODE_PF_W)
+            if (err_code & CTX_ERRCODE_PF_W) {
+                // It was a write fault, mark it dirty. If not done here,
+                // the CPU will beforced to do a locked RMW to set it
+                // when it restarts the instruction
                 page_flags = PTE_PRESENT | PTE_ACCESSED | PTE_DIRTY;
-            else
+            } else {
                 page_flags = PTE_PRESENT | PTE_ACCESSED;
+            }
 
             // Update PTE and restart instruction
             if (atomic_cmpxchg(ptes[3], pte,
@@ -1319,6 +1368,9 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
                 // Another thread beat us to it
                 mmu_free_phys(page);
                 cpu_page_invalidate(fault_addr);
+
+                // If not perfect, it'll fault again and we'll start over
+                // and probably not race that time
             }
 
             return ctx;
@@ -1383,7 +1435,25 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
             // Must wait for another CPU to finish doing something with PTE
             cpu_wait_bit_clear(ptes[3], PTE_EX_WAIT_BIT);
             return ctx;
+        } else if (uintptr_t(ISR_CTX_REG_RIP(ctx)) -
+                   uintptr_t(__nofault_text_st) <
+                   __nofault_text_sz) {
+            //
+            // Fault occurred in nofault code region
+
+            // Figure out which landing pad to use
+            for (size_t i = 0, e = __nofault_tab_sz >> 3,
+                 rip = uintptr_t(ISR_CTX_REG_RIP(ctx)); i < e; ++i) {
+                if (rip >= __nofault_tab_st[i] && rip < __nofault_tab_en[i]) {
+                    // Put CPU on landing pad with rax == -1
+                    ISR_CTX_REG_RAX(ctx) = -1;
+                    ISR_CTX_REG_RIP(ctx) = (int(*)(void*))__nofault_tab_lp[i];
+                    return ctx;
+                }
+            }
+            goto no_landing_pad;
         } else {
+no_landing_pad:
             printdbg("Invalid page fault at %#zx, RIP=%p\n",
                      fault_addr, (void*)ISR_CTX_REG_RIP(ctx));
             if (thread_get_exception_top())
@@ -1401,9 +1471,12 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
 
         assert(!"Invalid page fault path");
     } else if (present_mask == 0x0F &&
-               (pte & PTE_NX)) {
-        printdbg("#PF: Instruction fectch from no-execute page\n");
+               (pte & PTE_NX) &&
+               (err_code & CTX_ERRCODE_PF_I)) {
+        printdbg("#PF: Instruction fetch from no-execute page\n");
     }
+
+    printdbg("#PF: CR2=%#zx\n", fault_addr);
 
     printdbg("#PF: present=%d\n"
              "     write=%d\n"
@@ -1465,10 +1538,10 @@ static void mmu_init_bsp()
 
 void mmu_init()
 {
-    TRACE_INIT("Hooking TLB shootdown\n");
-
     // Hook IPI for TLB shootdown
-    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler, "sw_tlbshoot");
+    TRACE_INIT("Hooking TLB shootdown\n");
+    intr_hook(INTR_IPI_TLB_SHTDN, mmu_tlb_shootdown_handler,
+              "sw_tlbshoot", eoi_lapic);
 
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
            sizeof(*phys_mem_map) * kernel_params->phys_mem_table_size);
@@ -1618,7 +1691,8 @@ void mmu_init()
     printdbg("%" PRIu64 " pages free (%" PRIu64 "MB)\n",
            free_count, free_count >> (20 - PAGE_SIZE_BIT));
 
-    intr_hook(INTR_EX_PAGE, mmu_page_fault_handler, "sw_page");
+    // This isn't actually used. #PF is fast-pathed in ISR handling
+    intr_hook(INTR_EX_PAGE, mmu_page_fault_handler, "sw_page", eoi_none);
 
     malloc_startup(nullptr);
 
@@ -1911,10 +1985,57 @@ static _always_inline T select_mask(bool cond, T true_val, T false_val)
     return (true_val & mask) | (false_val & ~mask);
 }
 
-void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
+static _always_inline bool pte_is_sysmem(pte_t pte)
+{
+    return (pte & (PTE_PRESENT | PTE_EX_PHYSICAL | PTE_EX_DEVICE)) ==
+            PTE_PRESENT;
+}
+
+// True if demand paged
+_const
+static _always_inline bool pte_is_demand(pte_t pte)
+{
+    // Demand paged pages are represented by a not present page
+    // that has a physaddr field equal to the highest possible physaddr
+    // That's 0x000FFFFFFFFFF000
+    return (pte & PTE_ADDR) == PTE_ADDR;
+}
+
+// True if page of address space is dedicated to faulting on every access
+_const
+static _always_inline bool pte_is_guard(pte_t pte)
+{
+    // Guard pages are represented by a not present page
+    // that has a physaddr field of all 1's except 0 in MSB.
+    // That's 0x0007FFFFFFFFF000
+    return (pte & PTE_ADDR) == ((PTE_ADDR >> 1) & PTE_ADDR);
+}
+
+//static void *mm_alloc_address_space(size_t len, bool user)
+//{
+//    contiguous_allocator_t *allocator =
+//            user ? (contiguous_allocator_t*)
+//                thread_current_process()->get_allocator()
+//            : &linear_allocator;
+//    return (void*)allocator->alloc_linear(round_up(len));
+//}
+
+EXPORT void *mm_alloc_space(size_t size)
+{
+    return (void*)linear_allocator.alloc_linear(round_up(size));
+}
+
+EXPORT void *mmap(void *addr, size_t len, int prot,
+                  int flags, int fd, off_t offset)
 {
     (void)offset;
     assert(offset == 0);
+
+    // Special case PROT_NONE, MAP_NOCOMMIT
+//    if (unlikely(addr == nullptr &&
+//                 prot == PROT_NONE &&
+//                 (flags & MAP_NOCOMMIT) == MAP_NOCOMMIT))
+//        return mm_alloc_address_space(len, flags & MAP_USER);
 
     // Fail on invalid protection mask
     if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC))))
@@ -2026,14 +2147,15 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
             bool success;
             success = phys_allocator.alloc_multiple(
-                        low, len, [&](size_t ofs, physaddr_t paddr) {
+                        low, len, [&](size_t idx, uint8_t log2_pagesz,
+                            physaddr_t paddr) {
                 if (likely(!(flags & MAP_UNINITIALIZED)))
                     clear_phys(paddr);
 
-                pte_t old = atomic_xchg(base_pte + (ofs >> 12),
-                                        paddr | page_flags);
+                pte_t old = atomic_xchg(base_pte + idx, paddr | page_flags);
 
-                if (old && ((old & PTE_ADDR) != PTE_ADDR))
+                if (old && (old & (PTE_PRESENT | PTE_EX_PHYSICAL)) ==
+                    PTE_PRESENT)
                     free_batch.free(old & PTE_ADDR);
 
                 return true;
@@ -2051,9 +2173,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
             size_t end = len >> PAGE_SCALE;
 
-            if (flags & MAP_NOCOMMIT) {
-                paddr = PTE_ADDR;
-            } else if (!(flags & MAP_DEVICE)) {
+            if (!(flags & MAP_NOCOMMIT) && !(flags & MAP_DEVICE)) {
                 paddr = mmu_alloc_phys(0);
 
                 if (paddr && !(flags & MAP_UNINITIALIZED))
@@ -2063,27 +2183,32 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             pte = 0;
 
             if (paddr)
-                pte = paddr | page_flags | PTE_PRESENT;
+                pte = paddr | page_flags;
 
-            if (paddr && !(flags & MAP_STACK)) {
-                // Commit first page
-                pte = atomic_xchg(base_pte, pte);
+            if (!(flags & MAP_NOCOMMIT)) {
+                if (paddr && (paddr & PTE_ADDR) != PTE_ADDR)
+                    pte |= PTE_PRESENT;
 
-                ++ofs;
-            } else if (paddr) {
-                // Commit last page
+                if (paddr && !(flags & (MAP_STACK | MAP_NOCOMMIT))) {
+                    // Commit first page
+                    pte = atomic_xchg(base_pte, pte);
 
-                pte = atomic_xchg(base_pte + --end, pte);
+                    ++ofs;
+                } else if (paddr && !(flags & MAP_NOCOMMIT)) {
+                    // Commit last page
+
+                    pte = atomic_xchg(base_pte + --end, pte);
+                }
+
+                if (unlikely(pte_is_sysmem(pte)))
+                    free_batch.free(pte & PTE_ADDR);
             }
-
-            if (unlikely(pte && pte != PTE_ADDR))
-                free_batch.free(pte & PTE_ADDR);
 
             for ( ; ofs < end; ++ofs) {
                 pte = PTE_ADDR | page_flags;
                 pte = atomic_xchg(base_pte + ofs, pte);
 
-                if (unlikely(pte && pte != PTE_ADDR))
+                if (unlikely(pte_is_sysmem(pte)))
                     free_batch.free(pte & PTE_ADDR);
             }
         } else if (flags & MAP_PHYSICAL) {
@@ -2095,7 +2220,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                 pte = paddr | page_flags;
                 pte = atomic_xchg(base_pte + ofs, pte);
 
-                if (pte && pte != PTE_ADDR)
+                if (unlikely(pte_is_sysmem(pte)))
                     free_batch.free(pte & PTE_ADDR);
             }
         } else {
@@ -2103,8 +2228,6 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         }
     } else {
         // Early
-        // Assign entries in reverse because early
-        // physical pages are allocated in reverse order
         for (size_t ofs = len; ofs > 0; ofs -= PAGE_SIZE)
         {
             if (likely(!(flags & MAP_PHYSICAL))) {
@@ -2115,7 +2238,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
                 // If populating, assign physical memory immediately
                 // Always commit first page immediately
-                if (ofs == len || unlikely(flags & MAP_POPULATE)) {
+                if (ofs == PAGE_SIZE || unlikely(flags & MAP_POPULATE)) {
                     page = init_take_page(!!(flags & MAP_32BIT));
                     assert(page != 0);
                     if (likely(!(flags & MAP_UNINITIALIZED)))
@@ -2123,12 +2246,12 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                 }
 
                 mmu_map_page(linear_addr + ofs - PAGE_SIZE, page, page_flags |
-                             ((ofs == len) & PTE_PRESENT));
+                             ((ofs == 0) & PTE_PRESENT));
             } else {
                 // addr is a physical address, caller uses
                 // returned linear address to access it
                 mmu_map_page(linear_addr + ofs - PAGE_SIZE,
-                             (((physaddr_t)addr) + ofs - PAGE_SIZE) & PTE_ADDR,
+                             (((physaddr_t)addr) + ofs) & PTE_ADDR,
                              page_flags);
             }
         }
@@ -2221,7 +2344,7 @@ void *mremap(
                 PTE_WRITABLE | PTE_ADDR;
         for (size_t i = 0, e = new_size >> PAGE_SCALE; i < e; ++i) {
             pte_t pte = atomic_xchg(new_base + i, new_pte);
-            if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+            if (unlikely(pte_is_sysmem(pte)))
                 free_batch.free(pte & PTE_ADDR);
         }
         return (void*)old_st;
@@ -2237,20 +2360,20 @@ void *mremap(
     for (i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
         pte_t pte = atomic_xchg(old_pte[3] + i, 0);
         pte = atomic_xchg(new_base + i, pte);
-        if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+        if (unlikely(pte_is_sysmem(pte)))
             free_batch.free(pte & PTE_ADDR);
     }
 
     for (e = new_size >> PAGE_SCALE; i < e; ++i) {
         pte_t pte = atomic_xchg(new_base + i, PTE_ADDR | PTE_WRITABLE);
-        if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+        if (unlikely(pte_is_sysmem(pte)))
             free_batch.free(pte & PTE_ADDR);
     }
 
     return (void*)new_st;
 }
 
-int munmap(void *addr, size_t size)
+EXPORT int munmap(void *addr, size_t size)
 {
     __asan_freeN_noabort(addr, size);
 
@@ -2280,7 +2403,8 @@ int munmap(void *addr, size_t size)
                 if ((pte & (PTE_EX_PHYSICAL | PTE_PRESENT)) == PTE_PRESENT) {
                     physaddr_t physaddr = pte & PTE_ADDR;
 
-                    if (physaddr && (physaddr != PTE_ADDR)) {
+                    if (physaddr && (((physaddr >> 1) & PTE_ADDR) !=
+                                     (PTE_ADDR >> 1))) {
                         free_batch.free(physaddr);
                         ++freed;
                     }
@@ -2349,7 +2473,7 @@ int munmap(void *addr, size_t size)
     return 0;
 }
 
-int mprotect(void *addr, size_t len, int prot)
+EXPORT int mprotect(void *addr, size_t len, int prot)
 {
     // Fail on invalid protection mask
     if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC)))) {
@@ -2408,9 +2532,15 @@ int mprotect(void *addr, size_t len, int prot)
              ? 0
              : PTE_WRITABLE);
 
+
     pte_t *pt[4];
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
+
+    //uintptr_t orig_addr = uintptr_t(addr);
+    //pte_t *orig_pt3 = pt[3];
+//    printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
+//    hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
 
     while (pt[3] < end)
     {
@@ -2420,7 +2550,7 @@ int mprotect(void *addr, size_t len, int prot)
 
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
-            pte_t demand_paged = ((expect & demand_no_read) == demand_no_read);
+            bool demand_paged = ((expect & demand_no_read) == demand_no_read);
 
             if (expect == 0)
                 return -1;
@@ -2437,7 +2567,7 @@ int mprotect(void *addr, size_t len, int prot)
                 replace = (expect & ~clr_bits) | set_bits;
 
             // Try to update PTE
-            if (atomic_cmpxchg_upd(pt[3], &expect, replace))
+            if (likely(atomic_cmpxchg_upd(pt[3], &expect, replace)))
                 break;
         }
 
@@ -2447,9 +2577,37 @@ int mprotect(void *addr, size_t len, int prot)
         ptes_step(pt);
     }
 
+//    printdbg("PTEs after mprotect(%#zx, %#zx)\n", orig_addr, len);
+//    hex_dump((void*)orig_pt3, (end - orig_pt3) * sizeof(pte_t),
+//             uintptr_t(orig_pt3));
+
     mmu_send_tlb_shootdown();
 
-    return 1;
+    return 0;
+}
+
+// Tell whether an array of 4 PTEs are present, accounting for large page flags
+bool pte_list_present(pte_t **ptes)
+{
+    if (unlikely(!(*ptes[0] & PTE_PRESENT)))
+        return false;
+
+    if (unlikely(!(*ptes[1] & PTE_PRESENT)))
+        return false;
+
+    if (unlikely((*ptes[1] & PTE_PAGESIZE)))
+        return true;
+
+    if (unlikely(!(*ptes[2] & PTE_PRESENT)))
+        return false;
+
+    if (unlikely(*ptes[2] & PTE_PAGESIZE))
+        return true;
+
+    if (unlikely(!(*ptes[2] & PTE_PRESENT)))
+        return false;
+
+    return true;
 }
 
 // Support discarding pages and reverting to demand
@@ -2476,6 +2634,10 @@ int madvise(void *addr, size_t len, int advice)
         order_bits = -1;
         break;
 
+    case MADV_WILLNEED:
+        order_bits = 0;
+        break;
+
     default:
         return 0;
     }
@@ -2484,29 +2646,43 @@ int madvise(void *addr, size_t len, int advice)
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
-
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
-    while (pt[3] < end &&
-           (*pt[0] & PTE_PRESENT) &&
-           (*pt[1] & PTE_PRESENT) &&
-           (*pt[2] & PTE_PRESENT))
-    {
+    while (pt[3] < end && pte_list_present(pt)) {
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
             if (order_bits == pte_t(-1)) {
                 // Discarding
                 physaddr_t page = 0;
-                if (expect && (expect & demand_mask) != demand_mask) {
+                if (pte_is_sysmem(expect)) {
                     page = expect & PTE_ADDR;
-                    replace = expect | PTE_ADDR;
+                    // Replace with demand paged entry
+                    replace = (expect | PTE_ADDR) & ~PTE_PRESENT;
 
                     if (unlikely(!atomic_cmpxchg_upd(pt[3], &expect, replace)))
                         continue;
 
                     free_batch.free(page);
                 }
+                break;
+            } else if (order_bits == pte_t(0)) {
+                // Committing
+                bool success;
+                success = phys_allocator.alloc_multiple(
+                            false, len,
+                            [&](size_t idx, uint8_t, physaddr_t paddr) {
+                    pte_t pte = pt[3][idx];
+                    while (pte_is_demand(pte)) {
+                        pte_t replacement = (pte & ~PTE_ADDR) |
+                            paddr | PTE_PRESENT;
+                        if (likely(atomic_cmpxchg_upd(&pt[3][idx],
+                                   &pte, replacement)))
+                            return true;
+                    }
+                    return false;
+                });
+                if (!success)
+                    return -1;
                 break;
             } else {
                 // Weak/Strong order
@@ -2572,7 +2748,7 @@ static int present_ranges(F callback, linaddr_t rounded_addr, size_t len)
     return result;
 }
 
-int msync(void const *addr, size_t len, int flags)
+EXPORT int msync(void const *addr, size_t len, int flags)
 {
     // Check for validity, particularly accidentally using O_SYNC
     assert((flags & (MS_SYNC | MS_INVALIDATE)) == flags);
@@ -2607,7 +2783,7 @@ int msync(void const *addr, size_t len, int flags)
     return result;
 }
 
-uintptr_t mphysaddr(void volatile *addr)
+EXPORT uintptr_t mphysaddr(void volatile *addr)
 {
     linaddr_t linaddr = linaddr_t(addr);
 
@@ -2625,7 +2801,7 @@ uintptr_t mphysaddr(void volatile *addr)
     physaddr_t page = pte & PTE_ADDR;
 
     // If page is being demand paged
-    if (page == PTE_ADDR) {
+    if (pte_is_demand(pte)) {
         // Commit a page
         page = mmu_alloc_phys(0);
 
@@ -2717,10 +2893,9 @@ static _always_inline int mphysranges_callback(
     return 1;
 }
 
-size_t mphysranges(mmphysrange_t *ranges,
-                   size_t ranges_count,
-                   void const *addr, size_t size,
-                   size_t max_size)
+EXPORT size_t mphysranges(
+        mmphysrange_t *ranges, size_t ranges_count,
+        void const *addr, size_t size, size_t max_size)
 {
     if (unlikely(size == 0))
         return 0;
@@ -2750,8 +2925,8 @@ size_t mphysranges(mmphysrange_t *ranges,
     return state.count;
 }
 
-bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
-                         size_t count_limit, uint8_t log2_boundary)
+EXPORT bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
+                              size_t count_limit, uint8_t log2_boundary)
 {
     if (unlikely(ranges_count == 0))
         return true;
@@ -2783,7 +2958,7 @@ bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
     return true;
 }
 
-void *mmap_register_device(void *context,
+EXPORT void *mmap_register_device(void *context,
                            uint64_t block_size,
                            uint64_t block_count,
                            int prot,
@@ -2796,7 +2971,7 @@ void *mmap_register_device(void *context,
 
     size_t sz = block_size * block_count;
 
-    mmap_device_mapping_t *mapping = new mmap_device_mapping_t{};
+    mmap_device_mapping_t *mapping = new (std::nothrow) mmap_device_mapping_t{};
 
     if (!mapping)
         return nullptr;
@@ -2859,8 +3034,8 @@ void mmu_phys_allocator_t::init(
 void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 {
 #if DEBUG_PHYS_ALLOC
-    printdbg("Adding free space, base=%#p, length=%#zx\n",
-             (void*)base, size);
+    printdbg("Adding free space, base=%#zx, length=%#zx\n",
+             base, size);
 #endif
 
     scoped_lock lock_(lock);
@@ -2868,8 +3043,8 @@ void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
     unsigned low = base < 0x100000000;
     size_t pagesz = uint64_t(1) << log2_pagesz;
     entry_t index = index_from_addr(free_end) - 1;
-    assert(index < highest_usable);
     while (size != 0) {
+        assert(index < highest_usable);
         assert(entries[index] == entry_t(-1));
         entries[index] = next_free[low];
         next_free[low] = index;
@@ -2886,24 +3061,25 @@ physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
 {
     scoped_lock lock_(lock);
 
-    size_t item = next_free[low];
+    size_t index = next_free[low];
 
-    if (unlikely(!item) && !low) {
+    if (unlikely(!index) && !low) {
         low = true;
-        item = next_free[low];
+        index = next_free[low];
     }
 
-    if (unlikely(!assert(item != 0 && item != entry_t(-1))))
+    if (unlikely(!assert(index != 0 && index != entry_t(-1))))
         return 0;
 
-    entry_t new_next = entries[item];
+    entry_t new_next = entries[index];
     assert(!(new_next & used_mask));
     next_free[low] = new_next;
-    entries[item] = used_mask | 1;
+    assert(index < highest_usable);
+    entries[index] = used_mask | 1;
 
     lock_.unlock();
 
-    physaddr_t addr = addr_from_index(item);
+    physaddr_t addr = addr_from_index(index);
 
 #if DEBUG_PHYS_ALLOC
     printdbg("Allocated page, low=%d, page=%p\n", low, (void*)addr);
@@ -2917,6 +3093,7 @@ physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
 template<typename F>
 bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 {
+    assert(!(size & ((size_t(1) << log2_pagesz)-1)));
     size_t count = size >> log2_pagesz;
 
 #if DEBUG_PHYS_ALLOC
@@ -2937,6 +3114,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
         entry_t new_next = first;
         size_t i;
         for (i = 0; i < count && new_next; ++i) {
+            assert(new_next < highest_usable);
             new_next = entries[new_next];
             assert(!(new_next & used_mask));
         }
@@ -2960,6 +3138,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
     for (size_t i = 0; i < count; ++i) {
+        assert(first < highest_usable);
         entry_t next = entries[first];
         assert(!(next & used_mask));
 
@@ -2971,13 +3150,14 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 #endif
 
         // Call callable with physical address
-        if (callback(i << log2_pagesz, paddr)) {
+        if (callback(i, log2_pagesz, paddr)) {
             // Set reference count to 1
             entries[first] = 1 | used_mask;
         } else {
 #if DEBUG_PHYS_ALLOC
             printdbg("......callback didn't need it\n");
 #endif
+            printdbg("Scheduling free for unwanted page %u\n", first);
             free_batch.free(paddr);
         }
 
@@ -2997,12 +3177,14 @@ void mmu_phys_allocator_t::release_one(physaddr_t addr)
 void mmu_phys_allocator_t::addref(physaddr_t addr)
 {
     entry_t index = index_from_addr(addr);
+    assert(index < highest_usable);
     scoped_lock lock_(lock);
     assert(entries[index] & used_mask);
     ++entries[index];
 }
 
-void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
+void mmu_phys_allocator_t::adjref_virtual_range(
+        linaddr_t start, size_t len, int adj)
 {
     unsigned misalignment = start & PAGE_SCALE;
     start -= misalignment;
@@ -3014,33 +3196,51 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
 
     size_t count = len >> log2_pagesz;
 
+    free_batch_t free_batch(phys_allocator);
+
     scoped_lock lock_(lock);
 
-    for (size_t i = 0; i < count; ++i) {
-        physaddr_t addr = *ptes[3] & PTE_ADDR;
+    if (adj > 0) {
+        for (size_t i = 0; i < count; ++i) {
+            physaddr_t addr = *ptes[3] & PTE_ADDR;
 
-        if (addr && addr != PTE_ADDR) {
-            entry_t index = index_from_addr(addr);
-            assert(entries[index] & used_mask);
-            ++entries[index];
+            if (addr && addr != PTE_ADDR) {
+                entry_t index = index_from_addr(addr);
+                assert(index < highest_usable);
+                assert(entries[index] & used_mask);
+                ++entries[index];
+            }
+
+            ++ptes[3];
         }
+    } else if (adj < 0) {
+        for (size_t i = 0; i < count; ++i) {
+            physaddr_t addr = *ptes[3] & PTE_ADDR;
 
-        ++ptes[3];
+            if (pte_is_sysmem(*ptes[3])) {
+                entry_t index = index_from_addr(addr);
+                assert(entries[index] & used_mask);
+                if (--entries[index] == 0)
+                    free_batch.free(addr_from_index(index));
+            }
+
+            ++ptes[3];
+        }
     }
 }
 
-uintptr_t mm_alloc_hole(size_t size)
+EXPORT uintptr_t mm_alloc_hole(size_t size)
 {
     size = (size + 63) & -64;
     return hole_allocator.alloc_linear(size);
 }
 
-void mm_free_hole(uintptr_t addr, size_t size)
+EXPORT void mm_free_hole(uintptr_t addr, size_t size)
 {
     hole_allocator.release_linear(addr, size);
 }
 
-void *mmap_window(size_t size)
+EXPORT void *mmap_window(size_t size)
 {
     size = round_up(size);
 
@@ -3060,8 +3260,9 @@ void munmap_window(void *addr, size_t size)
     linear_allocator.release_linear((uintptr_t)addr, size);
 }
 
-int alias_window(void *addr, size_t size,
-                  mmphysrange_t const *ranges, size_t range_count)
+EXPORT int alias_window(void *addr, size_t size,
+                        mmphysrange_t const *ranges,
+                        size_t range_count)
 {
     linaddr_t base = linaddr_t(addr);
     unsigned misalignment = base & PAGE_MASK;
@@ -3110,7 +3311,24 @@ int alias_window(void *addr, size_t size,
     return 1;
 }
 
-int mlock(const void *addr, size_t len)
+int mlock(void const *addr, size_t len)
+{
+    linaddr_t staddr = linaddr_t(addr);
+    linaddr_t enaddr = staddr + len;
+
+    bool st_kernel = intptr_t(staddr) < 0;
+    bool en_kernel = intptr_t(enaddr-1) < 0;
+
+    // Spans across privilege boundary
+    if (st_kernel != en_kernel)
+        return -int(errno_t::EINVAL);
+
+    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, 1);
+
+    return 0;
+}
+
+int munlock(void const *addr, size_t len)
 {
     linaddr_t staddr = linaddr_t(addr);
     linaddr_t enaddr = staddr + len;
@@ -3118,9 +3336,9 @@ int mlock(const void *addr, size_t len)
     bool kernel = staddr >= 0x800000000000;
 
     if (unlikely(!kernel && enaddr >= 0x800000000000))
-        return int(errno_t::EINVAL);
+        return -int(errno_t::EINVAL);
 
-
+    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, -1);
 
     return 0;
 }
@@ -3222,8 +3440,11 @@ void mm_destroy_process()
 
 void mm_init_process(process_t *process)
 {
-    contiguous_allocator_t *allocator = new contiguous_allocator_t{};
-    allocator->init(0x400000, 0x800000000000 - 0x400000, "process");
+    contiguous_allocator_t *allocator =
+            new (std::nothrow) contiguous_allocator_t{};
+    // 16TB unavailable margin between end of low memory and 128TB
+    allocator->init(0x400000, UINT64_C(0x700000000000) - UINT64_C(0x400000),
+                    "process");
     process->set_allocator(allocator);
 }
 
@@ -3273,10 +3494,8 @@ uintptr_t mm_fork_kernel_text()
             // Copy original to clone
             memcpy(window + 512, window, PAGE_SIZE);
 
-            atomic_barrier();
-
             // Point PTE to clone
-            *pte = page | flags;
+            atomic_st_rel(pte, page | flags);
 
             cpu_tlb_flush();
         }
@@ -3298,45 +3517,16 @@ void mm_set_master_pagedir()
     cpu_page_directory_set(root_physaddr);
 }
 
-bool mm_copy_user_generic(void *dst, void const *src, size_t size)
-{
-    __try {
-        memcpy(dst, src, size);
-    } __catch {
-        return false;
-    }
-
-    return true;
-}
-
-bool mm_copy_user_smap(void *dst, void const *src, size_t size)
-{
-    __try {
-        cpu_stac();
-        memcpy(dst, src, size);
-        cpu_clac();
-    } __catch {
-        return false;
-    }
-
-    return true;
-}
-
-typedef bool (*mm_copy_user_fn)(void *dst, void const *src, size_t size);
-
-extern "C" mm_copy_user_fn mm_copy_to_user_resolver()
-{
-    if (cpuid_has_smap())
-        return mm_copy_user_smap;
-    return mm_copy_user_generic;
-}
-
-_ifunc_resolver(mm_copy_to_user_resolver)
-bool mm_copy_user(void *dst, void const *src, size_t size);
-
-bool mm_is_user_range(void *buf, size_t size)
-{
-    return linaddr_t(buf) >= 0x400000 &&
-            (linaddr_t(buf) < 0x7FFFFFFFFFFF) &&
-            (linaddr_t(buf) + size) <= 0x7FFFFFFFFFFF;
-}
+// Hierarchical bitmap allocator
+//
+// with 64 bit word size
+//
+// +-------+-------+-----------+--------+
+// |levels | Items | Mem 2^(n) |  Mem   |
+// +-------+-------+-----------+--------+
+// |   1   |     8 |      ( 3) |   ~0   |
+// |   2   |   512 |      ( 9) |   ~0   |
+// |   3   |   32K |      (15) |  ~32KB |
+// |   4   |   64G |      (21) |   ~2MB |
+// |   5   |    4T |      (27) | ~128MB |
+// +-------+-------+-----------+--------+

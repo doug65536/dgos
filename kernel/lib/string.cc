@@ -17,8 +17,8 @@ EXPORT size_t strlen(char const *src)
 
 EXPORT void *memchr(void const *mem, int ch, size_t count)
 {
-    for (char const *p = (char const *)mem; count--; ++p)
-        if (*p == (char)ch)
+    for (unsigned char const *p = (unsigned char const *)mem; count--; ++p)
+        if ((unsigned char)*p == (unsigned char)ch)
             return (void *)p;
    return nullptr;
 }
@@ -132,40 +132,7 @@ EXPORT char *strstr(char const *str, char const *substr)
     return nullptr;
 }
 
-static void memset16(char *&d, uint64_t s, size_t n)
-{
-    __asm__ __volatile__ (
-        "rep stosw"
-        : "+D" (d)
-        , "+c" (n)
-        : "a" (s)
-        : "memory"
-    );
-}
-
-static void memset32(char *&d, uint64_t s, size_t n)
-{
-    __asm__ __volatile__ (
-        "rep stosl"
-        : "+D" (d)
-        , "+c" (n)
-        : "a" (s)
-        : "memory"
-    );
-}
-
-static void memset64(char *&d, uint64_t s, size_t n)
-{
-    __asm__ __volatile__ (
-        "rep stosq"
-        : "+D" (d)
-        , "+c" (n)
-        : "a" (s)
-        : "memory"
-    );
-}
-
-static void memset_byte(char *&d, uint64_t s, ptrdiff_t &ofs)
+static _always_inline void memset_byte(char *&d, uint64_t s, ptrdiff_t &ofs)
 {
     __asm__ __volatile__ (
         "movb %b[s],(%[d],%[ofs])\n\t"
@@ -512,7 +479,6 @@ EXPORT size_t strcspn(char const *src, char const *chars)
     return i;
 }
 
-
 EXPORT char *strcat(char *dest, char const *src)
 {
     strcpy(dest + strlen(dest), src);
@@ -593,7 +559,7 @@ EXPORT int ucs4_to_utf8(char *out, int in)
     return len;
 }
 
-EXPORT int ucs4_to_utf16(uint16_t *out, int in)
+EXPORT int ucs4_to_utf16(char16_t *out, int in)
 {
     if ((in > 0 && in < 0xD800) ||
             (in > 0xDFFF && in < 0x10000)) {
@@ -626,7 +592,15 @@ EXPORT int ucs4_to_utf16(uint16_t *out, int in)
 // If the input is a null byte, and ret_end is not null,
 // then *ret_end is set to point to the null byte, it
 // is not advanced
-EXPORT int utf8_to_ucs4(char const *in, char const **ret_end)
+EXPORT char32_t utf8_to_ucs4(char const *in, char const **ret_end)
+{
+    char32_t result = utf8_to_ucs4_upd(in);
+    if (ret_end)
+        *ret_end = in;
+    return result;
+}
+
+EXPORT char32_t utf8_to_ucs4_upd(char const *&in)
 {
     int n;
 
@@ -690,9 +664,6 @@ EXPORT int utf8_to_ucs4(char const *in, char const **ret_end)
         ++in;
         n = -1;
     }
-
-    if (ret_end)
-        *ret_end = in;
 
     return n;
 }

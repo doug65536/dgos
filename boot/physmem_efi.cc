@@ -45,7 +45,7 @@ bool get_ram_regions()
     status = efi_systab->BootServices->GetMemoryMap(
                 &mapsz, memdesc_buf, &mapkey, &descsz, &descver);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         return false;
 
     size_t count = mapsz / descsz;
@@ -57,7 +57,7 @@ bool get_ram_regions()
               in->PhysicalStart, in->NumberOfPages << 12,
               in->Attribute, in->Type,
               in->Type < sizeof(efi_mem_types) / sizeof(*efi_mem_types) ?
-                  efi_mem_types[in->Type] : TSTR "<app defined>");
+                  efi_mem_types[in->Type] : TSTR "<app defined!>");
 
         physmem_range_t entry{};
 
@@ -131,12 +131,12 @@ void take_pages(uint64_t phys_addr, uint64_t size)
 
     assert(size > 0);
 
-    PRINT("Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
+    //PRINT("Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
 
     status = efi_systab->BootServices->AllocatePages(
-                AllocateAddress, EFI_MEMORY_TYPE(0x80000000),
+                AllocateAddress, EfiLoaderData,
                 size >> 12, &addr);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         PANIC("Could not take pages");
 }

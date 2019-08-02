@@ -48,7 +48,7 @@ uint16_t udp_finalize(udp_hdr_t *hdr, void const *end)
     return (char*)end - (char*)&hdr->ipv4_hdr.eth_hdr;
 }
 
-void udp_port_get(ipv4_addr_pair_t *addr, const udp_hdr_t *hdr)
+void udp_port_get(ipv4_addr_pair_t *addr, udp_hdr_t const *hdr)
 {
     memcpy(&addr->s.port, &hdr->s_port, sizeof(addr->s.port));
     memcpy(&addr->d.port, &hdr->d_port, sizeof(addr->d.port));

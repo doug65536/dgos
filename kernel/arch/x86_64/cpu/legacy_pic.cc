@@ -2,7 +2,6 @@
 #include "ioport.h"
 #include "irq.h"
 #include "cpu/halt.h"
-#include "control_regs.h"
 #include "interrupts.h"
 #include "pic.bits.h"
 #include "assert.h"
@@ -178,10 +177,16 @@ static void pic8259_setmask(int irq, bool unmask)
     outb(port, (pic8259_mask >> shift) & 0xFF);
 }
 
+static bool pic8259_islevel(int irq _unused)
+{
+    // Always edge on ISA
+    return false;
+}
+
 // Gets plugged into irq_hook
 static void pic8259_hook(int irq, intr_handler_t handler, char const *name)
 {
-    intr_hook(irq + INTR_PIC1_IRQ_BASE, handler, name);
+    intr_hook(irq + INTR_PIC1_IRQ_BASE, handler, name, eoi_i8259);
 }
 
 // Gets plugged into irq_unhook
@@ -194,7 +199,7 @@ void pic8259_enable(void)
 {
     pic8259_init(INTR_PIC1_IRQ_BASE, INTR_PIC2_IRQ_BASE);
     irq_setmask_set_handler(pic8259_setmask);
+    irq_islevel_set_handler(pic8259_islevel);
     irq_hook_set_handler(pic8259_hook);
     irq_unhook_set_handler(pic8259_unhook);
-    //cpu_irq_enable();
 }

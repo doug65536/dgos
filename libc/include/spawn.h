@@ -36,8 +36,8 @@ typedef struct __posix_spawnattr_t {
 
 int posix_spawn(pid_t *restrict pid,
                 char const *restrict path,
-                const posix_spawn_file_actions_t *file_actions,
-                const posix_spawnattr_t *restrict attr,
+                posix_spawn_file_actions_t const *file_actions,
+                posix_spawnattr_t const *restrict attr,
                 char * const *restrict argv,
                 char *const *restrict envp);
 
@@ -61,36 +61,36 @@ int posix_spawnattr_destroy(
         posix_spawnattr_t *fatt);
 
 int posix_spawnattr_getsigdefault(
-        const posix_spawnattr_t *restrict fatt,
+        posix_spawnattr_t const *restrict fatt,
         sigset_t *restrict set);
 
 int posix_spawnattr_getflags(
-        const posix_spawnattr_t *restrict fatt,
+        posix_spawnattr_t const *restrict fatt,
         short *restrict flags);
 
 int posix_spawnattr_getpgroup(
-        const posix_spawnattr_t *restrict fatt,
+        posix_spawnattr_t const *restrict fatt,
         pid_t *restrict pid);
 
 
 int posix_spawnattr_getschedparam(
-        const posix_spawnattr_t *restrict satt,
+        posix_spawnattr_t const *restrict satt,
         struct sched_param *restrict);
 
 int posix_spawnattr_getschedpolicy(
-        const posix_spawnattr_t *restrict satt,
+        posix_spawnattr_t const *restrict satt,
         int *restrict);
 
 
 int posix_spawnattr_getsigmask(
-        const posix_spawnattr_t *restrict satt,
+        posix_spawnattr_t const *restrict satt,
         sigset_t *restrict);
 
 int posix_spawnattr_init(posix_spawnattr_t *satt);
 
 int posix_spawnattr_setsigdefault(
         posix_spawnattr_t *restrict satt,
-        const sigset_t *restrict);
+        sigset_t const *restrict);
 
 int posix_spawnattr_setflags(
         posix_spawnattr_t *satt,
@@ -112,12 +112,12 @@ int posix_spawnattr_setschedpolicy(
 
 int posix_spawnattr_setsigmask(
         posix_spawnattr_t *restrict satt,
-        const sigset_t *restrict set);
+        sigset_t const *restrict set);
 
 int posix_spawnp(pid_t *restrict pid,
                  char const *restrict path,
-                 const posix_spawn_file_actions_t *fact,
-                 const posix_spawnattr_t *restrict fatt,
+                 posix_spawn_file_actions_t const *fact,
+                 posix_spawnattr_t const *restrict fatt,
                  char * const * restrict argv,
                  char *const * restrict envp);
 

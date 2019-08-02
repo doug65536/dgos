@@ -1678,7 +1678,9 @@ struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
 
 #define EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID \
   { \
-    0x387477c1, 0x69c7, 0x11d2, {0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b } \
+    0x387477c1, 0x69c7, 0x11d2, { \
+        0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b \
+    } \
   }
 
 typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL  EFI_SIMPLE_TEXT_INPUT_PROTOCOL;
@@ -1777,16 +1779,35 @@ struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL {
 };
 
 #define ACPI_20_TABLE_GUID \
-    {0x8868e871,0xe4f1,0x11d3,0xbc,0x22,0x0,0x80,0xc7,0x3c,0x88,0x81}
+    { \
+        0x8868e871,0xe4f1,0x11d3, { \
+            0xbc,0x22,0x0,0x80,0xc7,0x3c,0x88,0x81 \
+        } \
+    }
 #define ACPI_TABLE_GUID \
-    {0xeb9d2d30,0x2d88,0x11d3,0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d}
+    { \
+        0xeb9d2d30,0x2d88,0x11d3, {\
+            0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d \
+        } \
+    }
 #define SAL_SYSTEM_TABLE_GUID \
-    {0xeb9d2d32,0x2d88,0x11d3,0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d}
+    { \
+        0xeb9d2d32,0x2d88,0x11d3, { \
+            0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d \
+        } \
+    }
 #define SMBIOS_TABLE_GUID \
-    {0xeb9d2d31,0x2d88,0x11d3,0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d}
+    { \
+        0xeb9d2d31,0x2d88,0x11d3, { \
+            0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d \
+        } \
+    }
 #define MPS_TABLE_GUID \
-    {0xeb9d2d2f,0x2d88,0x11d3,0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d}
-
+    { \
+        0xeb9d2d2f,0x2d88,0x11d3, { \
+            0x9a,0x16,0x0,0x90,0x27,0x3f,0xc1,0x4d \
+        } \
+    }
 
 //
 // Status codes common to all execution phases
@@ -2848,6 +2869,81 @@ struct _EFI_FILE_PROTOCOL {
   EFI_FILE_WRITE_EX     WriteEx;
   EFI_FILE_FLUSH_EX     FlushEx;
 };
+
+//*******************************************************
+//EFI_TIME
+//*******************************************************
+// This represents the current time information
+typedef struct {
+    UINT16 Year;
+    // 1900 – 9999
+    UINT8 Month;
+    // 1 – 12
+    UINT8 Day;
+    // 1 – 31
+    UINT8 Hour;
+    // 0 – 23
+    UINT8 Minute;
+    // 0 – 59
+    UINT8 Second;
+    // 0 – 59
+    UINT8 Pad1;
+    UINT32 Nanosecond; // 0 – 999,999,999
+    INT16 TimeZone;
+    // -1440 to 1440 or 2047
+    UINT8 Daylight;
+    UINT8 Pad2;
+} EFI_TIME;
+
+//*******************************************************
+// Bit Definitions for EFI_TIME.Daylight. See below.
+//*******************************************************
+
+#define EFI_TIME_ADJUST_DAYLIGHT 0x01
+#define EFI_TIME_IN_DAYLIGHT 0x02
+
+//*******************************************************
+// Value Definition for EFI_TIME.TimeZone. See below.
+//*******************************************************
+
+#define EFI_UNSPECIFIED_TIMEZONE 0x07FF
+
+#define EFI_FILE_INFO_GUID \
+    {0x09576e92,0x6d3f,0x11d2, { \
+        0x8e, 0x39,0x00,0xa0,0xc9,0x69,0x72,0x3b \
+    } \
+}
+
+typedef struct {
+    UINT64 Size;
+    UINT64 FileSize;
+    UINT64 PhysicalSize;
+    EFI_TIME CreateTime;
+    EFI_TIME LastAccessTime;
+    EFI_TIME ModificationTime;
+    UINT64 Attribute;
+    //CHAR16 FileName[];
+} EFI_FILE_INFO;
+
+typedef struct {
+    UINT64 Size;
+    BOOLEAN ReadOnly;
+    UINT64 VolumeSize;
+    UINT64 FreeSpace;
+    UINT32 BlockSize;
+    CHAR16 VolumeLabel[1];
+} EFI_FILE_SYSTEM_INFO;
+
+typedef struct {
+    CHAR16 VolumeLabel[1];
+} EFI_FILE_SYSTEM_VOLUME_LABEL;
+
+
+#define EFI_FILE_SYSTEM_INFO_GUID { \
+    0x09576e93, 0x6d3f, 0x11d2, { \
+        0x8e, 0x39,0x00,0xa0,0xc9,0x69,0x72, 0x3b \
+    } \
+}
 
 //
 // EFI PXE Base Code
@@ -4300,6 +4396,206 @@ struct _EFI_MTFTP4_TOKEN {
     ///
     EFI_MTFTP4_PACKET_NEEDED    PacketNeeded;
 };
+
+#define EFI_SIMPLE_POINTER_PROTOCOL_GUID \
+  { \
+    0x31878c87, 0xb75, 0x11d5, {0x9a, 0x4f, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d } \
+  }
+
+typedef struct _EFI_SIMPLE_POINTER_PROTOCOL  EFI_SIMPLE_POINTER_PROTOCOL;
+
+//
+// Data structures
+//
+typedef struct {
+  ///
+  /// The signed distance in counts that the pointer device has been moved along the x-axis.
+  ///
+  INT32   RelativeMovementX;
+  ///
+  /// The signed distance in counts that the pointer device has been moved along the y-axis.
+  ///
+  INT32   RelativeMovementY;
+  ///
+  /// The signed distance in counts that the pointer device has been moved along the z-axis.
+  ///
+  INT32   RelativeMovementZ;
+  ///
+  /// If TRUE, then the left button of the pointer device is being
+  /// pressed. If FALSE, then the left button of the pointer device is not being pressed.
+  ///
+  BOOLEAN LeftButton;
+  ///
+  /// If TRUE, then the right button of the pointer device is being
+  /// pressed. If FALSE, then the right button of the pointer device is not being pressed.
+  ///
+  BOOLEAN RightButton;
+} EFI_SIMPLE_POINTER_STATE;
+
+typedef struct {
+  ///
+  /// The resolution of the pointer device on the x-axis in counts/mm.
+  /// If 0, then the pointer device does not support an x-axis.
+  ///
+  UINT64  ResolutionX;
+  ///
+  /// The resolution of the pointer device on the y-axis in counts/mm.
+  /// If 0, then the pointer device does not support an x-axis.
+  ///
+  UINT64  ResolutionY;
+  ///
+  /// The resolution of the pointer device on the z-axis in counts/mm.
+  /// If 0, then the pointer device does not support an x-axis.
+  ///
+  UINT64  ResolutionZ;
+  ///
+  /// TRUE if a left button is present on the pointer device. Otherwise FALSE.
+  ///
+  BOOLEAN LeftButton;
+  ///
+  /// TRUE if a right button is present on the pointer device. Otherwise FALSE.
+  ///
+  BOOLEAN RightButton;
+} EFI_SIMPLE_POINTER_MODE;
+
+/**
+  Resets the pointer device hardware.
+  @param  This                  A pointer to the EFI_SIMPLE_POINTER_PROTOCOL
+                                instance.
+  @param  ExtendedVerification  Indicates that the driver may perform a more exhaustive
+                                verification operation of the device during reset.
+  @retval EFI_SUCCESS           The device was reset.
+  @retval EFI_DEVICE_ERROR      The device is not functioning correctly and could not be reset.
+**/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_SIMPLE_POINTER_RESET)(
+  IN EFI_SIMPLE_POINTER_PROTOCOL            *This,
+  IN BOOLEAN                                ExtendedVerification
+  );
+
+/**
+  Retrieves the current state of a pointer device.
+  @param  This                  A pointer to the EFI_SIMPLE_POINTER_PROTOCOL
+                                instance.
+  @param  State                 A pointer to the state information on the pointer device.
+  @retval EFI_SUCCESS           The state of the pointer device was returned in State.
+  @retval EFI_NOT_READY         The state of the pointer device has not changed since the last call to
+                                GetState().
+  @retval EFI_DEVICE_ERROR      A device error occurred while attempting to retrieve the pointer device's
+                                current state.
+**/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_SIMPLE_POINTER_GET_STATE)(
+  IN EFI_SIMPLE_POINTER_PROTOCOL          *This,
+  IN OUT EFI_SIMPLE_POINTER_STATE         *State
+  );
+
+///
+/// The EFI_SIMPLE_POINTER_PROTOCOL provides a set of services for a pointer
+/// device that can use used as an input device from an application written
+/// to this specification. The services include the ability to reset the
+/// pointer device, retrieve get the state of the pointer device, and
+/// retrieve the capabilities of the pointer device.
+///
+struct _EFI_SIMPLE_POINTER_PROTOCOL {
+  EFI_SIMPLE_POINTER_RESET      Reset;
+  EFI_SIMPLE_POINTER_GET_STATE  GetState;
+  ///
+  /// Event to use with WaitForEvent() to wait for input from the pointer device.
+  ///
+  EFI_EVENT                     WaitForInput;
+  ///
+  /// Pointer to EFI_SIMPLE_POINTER_MODE data.
+  ///
+  EFI_SIMPLE_POINTER_MODE       *Mode;
+};
+
+#define EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID \
+    { \
+        0x9042a9de, 0x23dc, 0x4a38, { \
+            0x96,0xfb,0x7a,0xde,0xd0,0x80,0x51,0x6a \
+        } \
+    }
+
+typedef struct EFI_GRAPHICS_OUTPUT_PROTOCOL EFI_GRAPHICS_OUTPUT_PROTOCOL;
+
+typedef struct {
+    UINT32 RedMask;
+    UINT32 GreenMask;
+    UINT32 BlueMask;
+    UINT32 ReservedMask;
+} EFI_PIXEL_BITMASK;
+
+typedef enum {
+    PixelRedGreenBlueReserved8BitPerColor,
+    PixelBlueGreenRedReserved8BitPerColor,
+    PixelBitMask,
+    PixelBltOnly,
+    PixelFormatMax
+} EFI_GRAPHICS_PIXEL_FORMAT;
+
+typedef struct {
+    UINT32 Version;
+    UINT32 HorizontalResolution;
+    UINT32 VerticalResolution;
+    EFI_GRAPHICS_PIXEL_FORMAT PixelFormat;
+    EFI_PIXEL_BITMASK PixelInformation;
+    UINT32 PixelsPerScanLine;
+} EFI_GRAPHICS_OUTPUT_MODE_INFORMATION;
+
+typedef EFI_STATUS (EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE)(
+        IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This,
+        IN UINT32 ModeNumber,
+        OUT UINTN *SizeOfInfo,
+        OUT EFI_GRAPHICS_OUTPUT_MODE_INFORMATION **Info);
+
+typedef EFI_STATUS (EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE)(
+        IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This,
+        IN UINT32 ModeNumber);
+
+typedef struct {
+    UINT8 Blue;
+    UINT8 Green;
+    UINT8 Red;
+    UINT8 Reserved;
+} EFI_GRAPHICS_OUTPUT_BLT_PIXEL;
+
+typedef enum {
+    EfiBltVideoFill,
+    EfiBltVideoToBltBuffer,
+    EfiBltBufferToVideo,
+    EfiBltVideoToVideo,
+    EfiGraphicsOutputBltOperationMax
+} EFI_GRAPHICS_OUTPUT_BLT_OPERATION;
+
+typedef EFI_STATUS (EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT)(
+        IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This,
+        IN OUT EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer OPTIONAL,
+        IN EFI_GRAPHICS_OUTPUT_BLT_OPERATION BltOperation,
+        IN UINTN SourceX, IN UINTN SourceY,
+        IN UINTN DestinationX, IN UINTN DestinationY,
+        IN UINTN Width, IN UINTN Height,
+        IN UINTN Delta OPTIONAL);
+
+typedef struct {
+    UINT32 MaxMode;
+    UINT32 Mode;
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info;
+    UINTN SizeOfInfo;
+    EFI_PHYSICAL_ADDRESS FrameBufferBase;
+    UINTN FrameBufferSize;
+} EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE;
+
+struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE QueryMode;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE SetMode;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT Blt;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *Mode;
+};
+
+extern EFI_GUID gEfiSimplePointerProtocolGuid;
 
 extern EFI_HANDLE efi_image_handle;
 extern EFI_SYSTEM_TABLE *efi_systab;

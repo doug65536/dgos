@@ -286,10 +286,19 @@ static _always_inline uintptr_t cpu_fault_address_get()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
-        "movq %%cr2,%[addr]\n\t"
+        "mov %%cr2,%[addr]\n\t"
         : [addr] "=r" (addr)
     );
     return addr;
+}
+
+static _always_inline void cpu_fault_address_set(uintptr_t addr)
+{
+    __asm__ __volatile__ (
+        "mov %[addr],%%cr2\n\t"
+        :
+        : [addr] "r" (addr)
+    );
 }
 
 static _always_inline void cpu_page_invalidate(uintptr_t addr)
@@ -535,6 +544,19 @@ static _always_inline uint16_t cpu_fcw_get()
     return fcw;
 }
 
+static _always_inline void cpu_vzeroall_safe()
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "vzeroall\n\t"
+        ".byte 0x66, 0x90\n\t"
+        : : :
+    );
+}
+
 static _always_inline void *cpu_stack_ptr_get()
 {
     void *rsp;
@@ -637,6 +659,31 @@ static _always_inline uint32_t cpu_eflags_change(
     return flags;
 }
 
+static _always_inline void cpu_stac_safe()
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "stac"
+        : : :
+    );
+}
+
+static _always_inline void cpu_clac_safe()
+{
+    __asm__ __volatile__ (
+        //insn_fixup
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "clac"
+        : : :
+    );
+}
+
 static _always_inline void cpu_stac()
 {
     __asm__ __volatile__ ("stac");
@@ -654,7 +701,8 @@ static _always_inline void cpu_irq_disable()
     );
 }
 
-static _always_inline bool cpu_irq_save_disable()
+static _always_inline
+bool cpu_irq_save_disable()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
@@ -668,12 +716,47 @@ static _always_inline bool cpu_irq_save_disable()
     return eflags & CPU_EFLAGS_IF;
 }
 
-static _always_inline void cpu_irq_enable()
+static _always_inline _no_instrument
+bool cpu_irq_save_disable_noinst()
+{
+    uint32_t eflags;
+    __asm__ __volatile__ (
+        "pushfq\n\t"
+        "popq %q[eflags]\n\t"
+        "cli\n\t"
+        : [eflags] "=r" (eflags)
+        :
+        : "cc"
+    );
+    return eflags & CPU_EFLAGS_IF;
+}
+
+static _always_inline
+void cpu_irq_enable()
 {
     __asm__ __volatile__ ( "sti" : : : "cc" );
 }
 
+_hot
 static _always_inline void cpu_irq_toggle(bool enable)
+{
+    uint32_t temp;
+    __asm__ __volatile__ (
+        "pushfq\n\t"
+        "popq %q[temp]\n\t"
+        "andl %[not_eflags_if],%k[temp]\n\t"
+        "orl %k[enable],%k[temp]\n\t"
+        "pushq %q[temp]\n\t"
+        "popfq\n\t"
+        : [temp] "=&r" (temp)
+        : [enable] "ir" (enable << CPU_EFLAGS_IF_BIT)
+        , [not_eflags_if] "i" (~CPU_EFLAGS_IF)
+        : "cc"
+    );
+}
+
+_hot _no_instrument
+static _always_inline void cpu_irq_toggle_noinst(bool enable)
 {
     uint32_t temp;
     __asm__ __volatile__ (
@@ -695,7 +778,20 @@ static _always_inline bool cpu_irq_is_enabled()
     return cpu_eflags_get() & CPU_EFLAGS_IF;
 }
 
+_hot
 static _always_inline uint64_t cpu_rdtsc()
+{
+    uint32_t tsc_lo;
+    uint32_t tsc_hi;
+    __asm__ __volatile__ (
+        "rdtsc\n\t"
+        : "=a" (tsc_lo), "=d" (tsc_hi)
+    );
+    return tsc_lo | ((uint64_t)tsc_hi << 32);
+}
+
+_no_instrument
+static _always_inline uint64_t cpu_rdtsc_noinstrument()
 {
     uint32_t tsc_lo;
     uint32_t tsc_hi;
@@ -721,7 +817,7 @@ public:
     _always_inline
     ~cpu_scoped_irq_disable()
     {
-        if (intr_was_enabled)
+        if (intr_was_enabled > 0)
             cpu_irq_toggle(intr_was_enabled > 0);
     }
 
@@ -740,8 +836,63 @@ public:
         }
     }
 
+    _always_inline
+    void redisable()
+    {
+        if (!intr_was_enabled) {
+            intr_was_enabled = (cpu_irq_save_disable() << 1) - 1;
+        }
+    }
+
 private:
+    // -1: IRQs were disabled before
+    //  0: Don't know anything, haven't done anything
+    //  1: IRQs were enabled before
     int8_t intr_was_enabled;
+};
+
+class cpu_scoped_wp_disable
+{
+public:
+    _always_inline
+    cpu_scoped_wp_disable()
+        : wp_was_enabled(init())
+    {
+    }
+
+    _always_inline
+    static int8_t init()
+    {
+        uintptr_t cr0 = cpu_cr0_get();
+        uint8_t result = (cr0 & CPU_CR0_WP_BIT) ? 1 : -1;
+        cpu_cr0_set(cr0 & ~CPU_CR0_WP);
+        return result;
+    }
+
+    _always_inline
+    ~cpu_scoped_wp_disable()
+    {
+        if (wp_was_enabled > 0)
+            cpu_cr0_change_bits(0, CPU_CR0_WP);
+    }
+
+    _always_inline
+    operator bool() const
+    {
+        return wp_was_enabled > 0;
+    }
+
+    _always_inline
+    void restore()
+    {
+        if (wp_was_enabled) {
+            cpu_cr0_change_bits(0, CPU_CR0_WP);
+            wp_was_enabled = 0;
+        }
+    }
+
+private:
+    int8_t wp_was_enabled;
 };
 
 // Monitor/mwait
@@ -781,6 +932,8 @@ static _always_inline void cpu_wait_masked(
 {
     if (cpuid_has_mwait()) {
         while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value)) {
+            pause();
+
             cpu_monitor(value, 0, 0);
 
             if (is_equal != ((atomic_ld_acq(value) & mask) == wait_value))
@@ -803,6 +956,8 @@ static _always_inline void cpu_wait_unmasked(
 {
     if (cpuid_has_mwait()) {
         while (is_equal != (atomic_ld_acq(value) == wait_value)) {
+            pause();
+
             cpu_monitor(value, 0, 0);
 
             if (is_equal != (atomic_ld_acq(value) == wait_value))
@@ -865,6 +1020,3 @@ static _always_inline void cpu_wait_bit_set(
 {
     return cpu_wait_bit_value(value, bit, true);
 }
-
-extern "C" _noinline
-void cpu_debug_break();

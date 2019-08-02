@@ -8,6 +8,7 @@ archives=
 prefixdir=
 logfile=
 cleanbuild=
+extractonly=
 parallel="-j$(which nproc >/dev/null && nproc || echo 1)"
 
 function log() {
@@ -70,6 +71,7 @@ function extract_tool() {
 	local base="$1"
 	local ext="$2"
 	local config="$3"
+	local arch="$4"
 
 	local input=$(fullpath "$base$ext")
 
@@ -105,6 +107,7 @@ function make_tool() {
 	local ext="$2"
 	local target="$3"
 	local config="$4"
+	local arch="$5"
 
 	local name=${base#$archives/}
 
@@ -116,16 +119,17 @@ function make_tool() {
 
 	mkdir -p "$build/$name" || exit
 	pushd "$build/$name" || exit
-	log echo Making "$target" with config "$config" and prefix "$prefixdir" in $(pwd)...
-	if ! [[ -z "${@:5}" ]]
+	log echo Making "$target" with config "$config" \
+		and prefix "$prefixdir" in $(pwd)...
+	if ! [[ -z "${@:6}" ]]
 	then
-		log echo "...with extra configure options: ${@:5}"
+		log echo "...with extra configure options: ${@:6}"
 	fi
 
 	if ! [[ -f "Makefile" ]]
 	then
 	set -x
-		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:5}" || exit
+		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:6}" || exit
 	fi
 	log make $parallel $target || exit
 	popd || exit
@@ -155,6 +159,7 @@ function help() {
 	echo ' -j <#>           use <#> parallel workers to build'
 	echo ' -o <dir>         output directory'
 	echo ' -p <dir>         prefix dir'
+	echo ' -x               extract sources only'
 	echo ' -c               clean the build directory'
 	echo ' -q               quiet'
 	echo ' -h|-?            display this help message'
@@ -162,7 +167,7 @@ function help() {
 }
 
 # Parse arguments
-while getopts a:m:j:o:cp:qh? arg
+while getopts a:m:j:o:cxp:qh? arg
 do
 	case $arg in
 		a ) arches="$OPTARG" ;;
@@ -172,6 +177,7 @@ do
 		p ) prefixdir="$OPTARG" ;;
 		c ) cleanbuild=1 ;;
 		q ) quiet=1 ;;
+		x ) extractonly=1 ;;
 		h ) help ;;
 		? ) help ;;
 		* ) echo "unrecognized option '$arg'" ; exit 1 ;;
@@ -180,7 +186,9 @@ done
 
 require_value "$arches" "Architecture list required, need -a <dir>"
 require_value "$outdir" "Output directory required, need -o <dir>"
-require_value "$prefixdir" "Prefix directory required, need -p <dir>"
+if [[ -z extractonly ]]; then
+	require_value "$prefixdir" "Prefix directory required, need -p <dir>"
+fi
 require_value "$gnu_mirror" "Specified mirror URL is invalid: -m \"$gnu_mirror\""
 
 mkdir -p "$outdir"
@@ -240,7 +248,7 @@ download_file "$gmpurl" "$archives"
 download_file "$mpcurl" "$archives"
 download_file "$mpfurl" "$archives"
 
-toolre='/([^/-]+)-'
+toolre='/([^/-]+)-[^/]+$'
 for tarball in $archives/*.tar.*; do
 	log echo Extracting tarball $tarball
 	if [[ $tarball =~ $toolre ]]; then
@@ -248,6 +256,12 @@ for tarball in $archives/*.tar.*; do
 	else
 		toolname=
 	fi
+
+	if [[ -z "$toolname" ]]; then
+		echo Could not deduce toolname from $tarball
+		exit 1
+	fi
+
 	process_tarball "$tarball" "extract_tool" "$toolname" || exit
 done
 
@@ -258,6 +272,10 @@ ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
 
+if ! [[ -z extractonly ]]; then
+	exit 0
+fi
+
 gcc_config="--target=$arches --with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \
 --with-gnu-as --with-gnu-ld \
@@ -266,6 +284,7 @@ gcc_config="--target=$arches --with-system-zlib \
 --enable-tls \
 --enable-threads \
 --enable-shared \
+--without-headers \
 --with-long-double-128 \
 --disable-nls \
 --enable-system-zlib \
@@ -298,6 +317,8 @@ process_tarball "$archives/$bintar" "make_tool" install "$bin_config" || exit
 
 process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config" || exit
 process_tarball "$archives/$gdbtar" "make_tool" install "$gdb_config" || exit
+
 for target in all-gcc all-target-libgcc install-gcc install-target-libgcc; do
-	process_tarball "$archives/$gcctar" "make_tool" "$target" "$gcc_config" || exit
+	process_tarball "$archives/$gcctar" "make_tool" \
+		"$target" "$gcc_config" || exit
 done

@@ -13,20 +13,20 @@ struct mutex_t;
 
 // Link in chain of waiters
 struct thread_wait_link_t {
-    thread_wait_link_t volatile * next;
-    thread_wait_link_t volatile * prev;
+    thread_wait_link_t * next;
+    thread_wait_link_t * prev;
 };
 
 // An instance of this is maintained by waiting threads
 struct thread_wait_t {
-    thread_wait_link_t volatile link;
+    thread_wait_link_t link;
 
     thread_t thread;
 };
 
 struct condition_var_t {
     // Linked list of threads waiting for the condition variable
-    thread_wait_link_t volatile link;
+    thread_wait_link_t link;
 
     // This lock must be held while adding a
     // thread_wait_t to the wait list
@@ -34,13 +34,11 @@ struct condition_var_t {
 };
 
 struct mutex_t {
-    thread_wait_link_t volatile link;
+    // Linked list of threads waiting for the mutex
+    thread_wait_link_t link;
 
-    thread_t volatile owner;
+    thread_t owner;
     int spin_count;
-
-    // Allows noyield lock acquire to have high priority
-    int noyield_waiting;
 
     // This lock must be held while updating the list
     spinlock_t lock;
@@ -48,10 +46,10 @@ struct mutex_t {
 
 struct rwlock_t {
     // Chain of writer waiters
-    thread_wait_link_t volatile ex_link;
+    thread_wait_link_t ex_link;
 
     // Chain of reader waiters
-    thread_wait_link_t volatile sh_link;
+    thread_wait_link_t sh_link;
 
     // negative=thread id of exclusive owner, 0=unlocked, positive=reader count
     int reader_count;
@@ -64,33 +62,37 @@ void mutex_init(mutex_t *mutex);
 void mutex_destroy(mutex_t *mutex);
 int mutex_held(mutex_t *mutex);
 bool mutex_try_lock(mutex_t *mutex);
-void mutex_lock(mutex_t *mutex);
-void mutex_lock_noyield(mutex_t *mutex);
+bool mutex_lock(mutex_t *mutex, int64_t timeout_time = 0);
 void mutex_unlock(mutex_t *mutex);
 
 void rwlock_init(rwlock_t *rwlock);
 void rwlock_destroy(rwlock_t *rwlock);
 bool rwlock_ex_try_lock(rwlock_t *rwlock);
-void rwlock_ex_lock(rwlock_t *rwlock);
-void rwlock_upgrade(rwlock_t *rwlock);
+bool rwlock_ex_lock(rwlock_t *rwlock, int64_t timeout_time = 0);
+bool rwlock_upgrade(rwlock_t *rwlock, int64_t timeout_time = 0);
 bool rwlock_sh_try_lock(rwlock_t *rwlock);
-void rwlock_sh_lock(rwlock_t *rwlock);
+bool rwlock_sh_lock(rwlock_t *rwlock, int64_t timeout_time = 0);
 void rwlock_ex_unlock(rwlock_t *rwlock);
 void rwlock_sh_unlock(rwlock_t *rwlock);
 bool rwlock_have_ex(rwlock_t *rwlock);
 
 void condvar_init(condition_var_t *var);
 void condvar_destroy(condition_var_t *var);
-void condvar_wait(condition_var_t *var, mutex_t *mutex);
+bool condvar_wait(condition_var_t *var, mutex_t *mutex,
+                  int64_t timeout_time = 0);
 void condvar_wake_one(condition_var_t *var);
 void condvar_wake_all(condition_var_t *var);
+void condvar_wake_n(condition_var_t *var, size_t n);
 
-void condvar_wait_spinlock(condition_var_t *var, spinlock_t *spinlock);
-void condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *spinlock);
-void condvar_wait_mcslock(condition_var_t *var,
+bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *spinlock,
+                           int64_t timeout_time = 0);
+bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *spinlock,
+                             int64_t timeout_time = 0);
+
+bool condvar_wait_mcslock(condition_var_t *var,
                           mcs_queue_ent_t * volatile *root,
-                          mcs_queue_ent_t * node);
-void condvar_wait_noyield(condition_var_t *var, mutex_t *mutex);
+                          mcs_queue_ent_t * node,
+                          int64_t timeout_time = 0);
 
 __END_DECLS
 

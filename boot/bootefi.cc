@@ -9,10 +9,18 @@
 #include "ctors.h"
 #include "cpu.h"
 #include "utf.h"
+#include "bootmenu.h"
 #include "../kernel/lib/bswap.h"
+#include "halt.h"
 
 EFI_HANDLE efi_image_handle;
 EFI_SYSTEM_TABLE *efi_systab;
+
+void * __dso_handle = &__dso_handle;
+
+extern "C" void __cxa_atexit()
+{
+}
 
 #if 1
 #include "fs.h"
@@ -40,6 +48,8 @@ static EFI_GUID const efi_block_io_protocol_guid = {
     }
 };
 
+static EFI_GUID const efi_file_system_info_guid = EFI_FILE_SYSTEM_INFO_GUID;
+
 static EFI_GUID const efi_pxe_base_code_protocol =
         EFI_PXE_BASE_CODE_PROTOCOL_GUID;
 
@@ -52,16 +62,18 @@ class efi_pxe_file_handle_t;
 class file_handle_base_t {
 public:
     static int open(tchar const* filename);
+    static off_t filesize(int fd);
     static int close(int fd);
     static ssize_t pread(int fd, void *buf, size_t bytes, off_t ofs);
     static uint64_t boot_drv_serial();
 
-protected:
     static constexpr int MAX_OPEN_FILES = 16;
+protected:
     static file_handle_base_t *file_handles[];
 
-    virtual ~file_handle_base_t() {}
+    virtual ~file_handle_base_t() = 0;
     virtual bool open_impl(tchar const *filename) = 0;
+    virtual off_t filesize_impl() = 0;
     virtual bool close_impl() = 0;
     virtual bool pread_impl(void *buf, size_t bytes, off_t ofs) = 0;
 
@@ -78,8 +90,11 @@ private:
 file_handle_base_t *
 file_handle_base_t::file_handles[file_handle_base_t::MAX_OPEN_FILES];
 
+static EFI_GUID efi_file_info_guid = EFI_FILE_INFO_GUID;
+
 struct efi_fs_file_handle_t : public file_handle_base_t {
-    EFI_FILE_PROTOCOL *file;
+    EFI_FILE_PROTOCOL *file = nullptr;
+    UINT64 file_size = 0;
 
     bool open_impl(tchar const *filename) override final
     {
@@ -88,10 +103,25 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
         status = efi_root_dir->Open(efi_root_dir, &file,
                                     filename, EFI_FILE_MODE_READ, 0);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
+        UINTN buf_sz = sizeof(EFI_FILE_INFO) + sizeof(CHAR16) * 256;
+        auto info_buffer = (EFI_FILE_INFO*)malloc(buf_sz);
+        status = file->GetInfo(file, &efi_file_info_guid,
+                               &buf_sz, info_buffer);
+
+        if (unlikely(EFI_ERROR(status)))
+            return false;
+
+        file_size = info_buffer->FileSize;
+
         return true;
+    }
+
+    off_t filesize_impl() override final
+    {
+        return file_size;
     }
 
     bool close_impl() override final
@@ -110,13 +140,13 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
 
         status = file->SetPosition(file, ofs);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return -1;
 
         UINTN transferred = bytes;
         status = file->Read(file, &transferred, buf);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         assert(transferred <= bytes);
@@ -144,7 +174,7 @@ private:
     static void initialize()
     {
 
-        EFI_PXE_BASE_CODE_PACKET const *dhcp_packet;
+        EFI_PXE_BASE_CODE_PACKET const *dhcp_packet = nullptr;
 
         static_assert(sizeof(server_addr.ipv4) ==
                       sizeof(efi_pxe->Mode->DhcpAck.Dhcpv4.BootpSiAddr),
@@ -160,6 +190,9 @@ private:
         } else {
             halt(TSTR "Don't know how to handle IPv6 PXE");
         }
+
+        if (unlikely(!dhcp_packet))
+            halt(TSTR "Unable to process DHCP packet");
 
         memcpy(&server_addr.ipv4, &dhcp_packet->Dhcpv4.BootpSiAddr,
                sizeof(server_addr.ipv4));
@@ -237,13 +270,13 @@ private:
                     &server_addr, (UINT8*)utf8_filename,
                     &mtftp_info, false);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         status = efi_systab->BootServices->AllocatePool(
-                    EFI_MEMORY_TYPE(0x80000000), file_size, &data);
+                    EfiRuntimeServicesData, file_size, &data);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         UINTN block_size = 4096;
@@ -256,10 +289,15 @@ private:
 
         free(utf8_filename);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         return true;
+    }
+
+    off_t filesize_impl() override final
+    {
+        return file_size;
     }
 
     bool close_impl() override final
@@ -304,7 +342,7 @@ _constructor(ctor_fs) void register_efi_fs()
                 &efi_loaded_image_protocol_guid,
                 (VOID**)&efi_loaded_image);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
     // Get the vtbl for the simple_filesystem_protocol of this executable
@@ -320,7 +358,7 @@ _constructor(ctor_fs) void register_efi_fs()
         status = efi_simple_filesystem->OpenVolume(
                     efi_simple_filesystem, &efi_root_dir);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             halt(TSTR "OpenVolume for boot partition failed");
 
         status = efi_systab->BootServices->HandleProtocol(
@@ -328,7 +366,7 @@ _constructor(ctor_fs) void register_efi_fs()
                 &efi_block_io_protocol_guid,
                 (VOID**)&efi_blk_io);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             halt(TSTR "HandleProtocol for block_io_protocol failed");
     } else {
         status = efi_systab->BootServices->HandleProtocol(
@@ -336,7 +374,7 @@ _constructor(ctor_fs) void register_efi_fs()
                     &efi_pxe_base_code_protocol,
                     (VOID**)&efi_pxe);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             halt(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
         efi_pxe_file_handle_t::initialize();
@@ -344,6 +382,7 @@ _constructor(ctor_fs) void register_efi_fs()
     }
 
     fs_api.boot_open = file_handle_base_t::open;
+    fs_api.boot_filesize = file_handle_base_t::filesize;
     fs_api.boot_pread = file_handle_base_t::pread;
     fs_api.boot_close = file_handle_base_t::close;
     fs_api.boot_drv_serial = file_handle_base_t::boot_drv_serial;
@@ -352,25 +391,7 @@ _constructor(ctor_fs) void register_efi_fs()
 }
 #endif
 
-extern "C" _noreturn
-EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
-{
-    ::efi_image_handle = image_handle;
-    ::efi_systab = systab;
-
-    PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
-
-    ctors_invoke();
-
-    elf64_run(cpu_choose_kernel());// TSTR "dgos-kernel-generic");
-
-    //dtors_invoke();
-    //
-    //systab->BootServices->Exit(image_handle, 0, 0, nullptr);
-    //return EFI_SUCCESS;
-}
-
-int file_handle_base_t::open(const tchar *filename)
+int file_handle_base_t::open(tchar const *filename)
 {
     int fd = find_unused_handle();
 
@@ -378,9 +399,9 @@ int file_handle_base_t::open(const tchar *filename)
         return fd;
 
     if (!efi_pxe) {
-        file_handles[fd] = new efi_fs_file_handle_t;
+        file_handles[fd] = new (std::nothrow) efi_fs_file_handle_t;
     } else {
-        file_handles[fd] = new efi_pxe_file_handle_t;
+        file_handles[fd] = new (std::nothrow) efi_pxe_file_handle_t;
     }
 
     if (!file_handles[fd]->open_impl(filename)) {
@@ -392,10 +413,26 @@ int file_handle_base_t::open(const tchar *filename)
     return fd;
 }
 
+static bool check_fd(int fd)
+{
+    bool ok = fd >= 0 && fd < file_handle_base_t::MAX_OPEN_FILES;
+    assert(fd >= 0 && fd < file_handle_base_t::MAX_OPEN_FILES);
+    return ok;
+}
+
+off_t file_handle_base_t::filesize(int fd)
+{
+    if (!check_fd(fd))
+        return -1;
+
+    off_t result = file_handles[fd]->filesize_impl();
+
+    return result;
+}
+
 int file_handle_base_t::close(int fd)
 {
-    assert(fd >= 0 && fd < MAX_OPEN_FILES);
-    if (fd < 0 || fd >= MAX_OPEN_FILES || !file_handles[fd])
+    if (!check_fd(fd))
         return -1;
 
     bool result = file_handles[fd]->close_impl();
@@ -406,8 +443,7 @@ int file_handle_base_t::close(int fd)
 
 ssize_t file_handle_base_t::pread(int fd, void *buf, size_t bytes, off_t ofs)
 {
-    assert(fd >= 0 && fd < MAX_OPEN_FILES);
-    if (fd < 0 || fd >= MAX_OPEN_FILES || !file_handles[fd])
+    if (!check_fd(fd))
         return -1;
 
     if (!file_handles[fd]->pread_impl(buf, bytes, ofs))
@@ -423,13 +459,29 @@ uint64_t file_handle_base_t::boot_drv_serial()
 
     EFI_STATUS status;
 
+    {
+        size_t constexpr const sz = 512;
+        void *mem = calloc(1, sz);
+        if (mem == nullptr)
+            PANIC_OOM();
+        EFI_FILE_SYSTEM_INFO *info = new (mem) EFI_FILE_SYSTEM_INFO;
+
+        UINTN info_buffer_size = sz;
+        status = efi_root_dir->GetInfo(
+                    efi_root_dir, &efi_file_system_info_guid,
+                    &info_buffer_size, info);
+
+        info->~EFI_FILE_SYSTEM_INFO();
+        free(info);
+    }
+
     char *buffer = (char*)malloc(efi_blk_io->Media->BlockSize);
 
     status = efi_blk_io->ReadBlocks(efi_blk_io, efi_blk_io->Media->MediaId,
                                     0, efi_blk_io->Media->BlockSize, buffer);
 
     uint64_t serial = 0;
-    if (!EFI_ERROR(status)) {
+    if (likely(!EFI_ERROR(status))) {
         // BPB serial is 32 bit
         memcpy(&serial, buffer + 0x43, sizeof(uint32_t));
     } else {
@@ -439,4 +491,38 @@ uint64_t file_handle_base_t::boot_drv_serial()
     free(buffer);
 
     return serial;
+}
+
+file_handle_base_t::~file_handle_base_t()
+{
+}
+
+extern char __text_st[];
+
+extern "C" _noreturn
+EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
+{
+    ::efi_image_handle = image_handle;
+    ::efi_systab = systab;
+
+    PRINT("efi bootloader .text @ 0x%" PRIx64 "\n", uint64_t(__text_st));
+
+    PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
+
+    PRINT("invoking constructors");
+    ctors_invoke();
+
+//    PRINT("showing boot menu");
+//    kernel_params_t params;
+//    boot_menu_show(params);
+
+    PRINT("running kernel");
+    elf64_run(cpu_choose_kernel());
+
+    PRINT("it returned?");
+
+    //dtors_invoke();
+    //
+    //systab->BootServices->Exit(image_handle, 0, 0, nullptr);
+    //return EFI_SUCCESS;
 }

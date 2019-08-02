@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 
+__BEGIN_DECLS
+
 //
 // Mutex spinlock
 
@@ -10,9 +12,6 @@ typedef spinlock_value_t volatile spinlock_t;
 void spinlock_lock(spinlock_t *lock);
 bool spinlock_try_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
-
-spinlock_value_t spinlock_unlock_save(spinlock_t *lock);
-void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock);
 
 //
 // Reader/writer spinlock
@@ -38,7 +37,7 @@ void rwspinlock_sh_unlock(rwspinlock_t *lock);
 typedef unsigned ticketlock_value_t;
 
 struct ticketlock_t {
-    ticketlock_t()
+    constexpr ticketlock_t()
         : now_serving(0)
         , next_ticket(0)
     {
@@ -61,13 +60,10 @@ struct mcs_queue_ent_t {
     mcs_queue_ent_t * volatile next;
     int thread_id;
     bool volatile locked;
-    bool irq_enabled;
 };
 
 void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
-void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
-                          mcs_queue_ent_t *node);
 bool mcslock_try_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
 void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
-void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
-                         mcs_queue_ent_t *node);
+
+__END_DECLS

@@ -2,6 +2,7 @@
 #include <sys/syscall.h>
 #include <sys/syscall_num.h>
 #include <errno.h>
+#include <sys/likely.h>
 
 int close(int fd)
 {

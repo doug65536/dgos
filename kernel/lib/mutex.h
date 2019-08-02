@@ -1,6 +1,138 @@
 #pragma once
 #include "threadsync.h"
 #include "utility.h"
+#include "export.h"
+#include "chrono.h"
+
+__BEGIN_NAMESPACE_STD
+class mutex;
+class shared_mutex;
+template<typename T> class unique_lock;
+template<typename T> class shared_lock;
+__END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+class irqlock;
+class ticketlock;
+class spinlock;
+class shared_spinlock;
+class mcslock;
+__END_NAMESPACE_EXT
+
+__BEGIN_NAMESPACE_EXT
+// Not a "real" lock, just saves and disables IRQs when locked,
+// and restores saved IRQ mask when unlocked
+class irqlock {
+public:
+    using mutex_type = int;
+
+    constexpr irqlock() {}
+    ~irqlock();
+    irqlock(irqlock const&) = delete;
+
+    void lock();
+    _always_inline bool try_lock() { lock(); return true; }
+    void unlock();
+
+    int& native_handle();
+
+private:
+    // 0 = undefined, -1 = irq was disabled, 1 = irq was enabled
+    mutex_type saved_mask = 0;
+};
+
+// Meets BasicLockable requirements
+class spinlock {
+public:
+    typedef spinlock_t mutex_type;
+
+    constexpr spinlock()
+        : m(0)
+    {
+    }
+
+    ~spinlock();
+
+    spinlock(spinlock const& r) = delete;
+
+    void lock();
+    bool try_lock();
+    void unlock();
+
+    spinlock_t& native_handle();
+
+private:
+    spinlock_t m;
+};
+
+class shared_spinlock {
+public:
+    typedef rwspinlock_t mutex_type;
+
+    constexpr shared_spinlock()
+        : m(0)
+    {
+    }
+
+    void lock();
+    bool try_lock();
+    void unlock();
+    void lock_shared();
+    void try_lock_shared();
+    void unlock_shared();
+    void upgrade_lock();
+    mutex_type& native_handle();
+
+private:
+    rwspinlock_t m;
+};
+__END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+// The size of this thing is two unsigned ints
+class ticketlock {
+public:
+    typedef ticketlock_t mutex_type;
+
+    constexpr ticketlock()
+        : m{}
+    {
+    }
+
+    void lock();
+
+    bool try_lock();
+
+    void unlock();
+
+    ticketlock_t& native_handle();
+
+private:
+    ticketlock_t m;
+};
+
+// Does not meet BasicLockable requirements, lock holder maintains node
+// The size of this thing is the size of one pointer
+class mcslock {
+public:
+    mcslock();
+    ~mcslock();
+
+    using mutex_type = mcs_queue_ent_t * volatile;
+
+    void lock(mcs_queue_ent_t *node);
+    bool try_lock(mcs_queue_ent_t *node);
+    void unlock(mcs_queue_ent_t *node);
+
+    _always_inline mcs_queue_ent_t * volatile &native_handle()
+    {
+        return m;
+    }
+
+private:
+    mcs_queue_ent_t * volatile m;
+};
+__END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_STD
 
@@ -9,34 +141,16 @@ class mutex {
 public:
     typedef mutex_t mutex_type;
 
-    mutex()
-    {
-        mutex_init(&m);
-    }
-
-    ~mutex()
-    {
-        mutex_destroy(&m);
-    }
+    mutex();
+    ~mutex();
 
     mutex(mutex const& r) = delete;
 
-    void lock()
-    {
-        mutex_lock(&m);
-    }
+    void lock();
+    bool try_lock();
+    void unlock();
 
-    bool try_lock()
-    {
-        return mutex_try_lock(&m);
-    }
-
-    void unlock()
-    {
-        mutex_unlock(&m);
-    }
-
-    mutex_type& native_handle()
+    _always_inline mutex_type& native_handle()
     {
         return m;
     }
@@ -45,242 +159,31 @@ private:
     mutex_t m;
 };
 
-class alignas(64) padded_mutex : public mutex {
-};
-
 // Meets SharedMutex requirements
 class shared_mutex {
 public:
     typedef rwlock_t mutex_type;
 
-    shared_mutex()
-    {
-        rwlock_init(&m);
-    }
-
-    ~shared_mutex()
-    {
-        rwlock_destroy(&m);
-    }
+    shared_mutex();
+    ~shared_mutex();
 
     shared_mutex(mutex_type const& r) = delete;
 
-    void lock()
-    {
-        rwlock_ex_lock(&m);
-    }
+    void lock();
+    bool try_lock();
+    void unlock();
+    void lock_shared();
+    void try_lock_shared();
+    void unlock_shared();
+    void upgrade_lock();
 
-    bool try_lock()
-    {
-        return rwlock_ex_try_lock(&m);
-    }
-
-    void unlock()
-    {
-        rwlock_ex_unlock(&m);
-    }
-
-    void lock_shared()
-    {
-        rwlock_sh_lock(&m);
-    }
-
-    void try_lock_shared()
-    {
-        rwlock_sh_try_lock(&m);
-    }
-
-    void unlock_shared()
-    {
-        rwlock_sh_unlock(&m);
-    }
-
-    void upgrade_lock()
-    {
-        rwlock_upgrade(&m);
-    }
-
-    mutex_type& native_handle()
+    _always_inline mutex_type& native_handle()
     {
         return m;
     }
 
 private:
     mutex_type m;
-};
-
-class alignas(64) padded_shared_mutex : public shared_mutex {
-};
-
-class shared_spinlock {
-public:
-    typedef rwspinlock_t mutex_type;
-
-    shared_spinlock()
-        : m(0)
-    {
-    }
-
-    void lock()
-    {
-        rwspinlock_ex_lock(&m);
-    }
-
-    bool try_lock()
-    {
-        return rwspinlock_ex_try_lock(&m);
-    }
-
-    void unlock()
-    {
-        rwspinlock_ex_unlock(&m);
-    }
-
-    void lock_shared()
-    {
-        rwspinlock_sh_lock(&m);
-    }
-
-    void try_lock_shared()
-    {
-        rwspinlock_sh_try_lock(&m);
-    }
-
-    void unlock_shared()
-    {
-        rwspinlock_sh_unlock(&m);
-    }
-
-    void upgrade_lock()
-    {
-        rwspinlock_upgrade(&m);
-    }
-
-    mutex_type& native_handle()
-    {
-        return m;
-    }
-
-private:
-    rwspinlock_t m;
-};
-
-// Meets BasicLockable requirements
-class spinlock {
-public:
-    typedef spinlock_t mutex_type;
-
-    spinlock()
-        : m(0)
-    {
-    }
-
-    ~spinlock()
-    {
-        assert(m == 0);
-    }
-
-    spinlock(spinlock const& r) = delete;
-
-    void lock()
-    {
-        spinlock_lock(&m);
-    }
-
-    bool try_lock()
-    {
-        return spinlock_try_lock(&m);
-    }
-
-    void unlock()
-    {
-        spinlock_unlock(&m);
-    }
-
-    spinlock_t& native_handle()
-    {
-        return m;
-    }
-
-private:
-    spinlock_t m;
-};
-
-struct alignas(64) padded_spinlock : public spinlock {
-};
-
-class ticketlock {
-public:
-    typedef ticketlock_t mutex_type;
-
-    ticketlock()
-        : m{}
-    {
-    }
-
-    void lock()
-    {
-        ticketlock_lock(&m);
-    }
-
-    bool try_lock()
-    {
-        return ticketlock_try_lock(&m);
-    }
-
-    void unlock()
-    {
-        ticketlock_unlock(&m);
-    }
-
-    ticketlock_t& native_handle()
-    {
-        return m;
-    }
-
-private:
-    ticketlock_t m;
-};
-
-struct alignas(64) padded_ticketlock : public ticketlock {
-};
-
-// Does not meet BasicLockable requirements, lock holder maintains node
-class mcslock {
-public:
-    mcslock()
-        : m(nullptr)
-    {
-    }
-
-    ~mcslock()
-    {
-        assert(m == nullptr);
-    }
-
-    using mutex_type = mcs_queue_ent_t * volatile;
-    void lock(mcs_queue_ent_t *node)
-    {
-        mcslock_lock(&m, node);
-    }
-
-    bool try_lock(mcs_queue_ent_t *node)
-    {
-        return mcslock_try_lock(&m, node);
-    }
-
-    void unlock(mcs_queue_ent_t *node)
-    {
-        mcslock_unlock(&m, node);
-    }
-
-    mcs_queue_ent_t * volatile &native_handle()
-    {
-        return m;
-    }
-
-private:
-    mcs_queue_ent_t * volatile m;
 };
 
 struct defer_lock_t {
@@ -290,6 +193,7 @@ template<typename T>
 class unique_lock
 {
 public:
+    _hot
     explicit unique_lock(T& m) noexcept
         : m(&m)
         , locked(false)
@@ -303,6 +207,7 @@ public:
     {
     }
 
+    _hot
     ~unique_lock() noexcept
     {
         unlock();
@@ -335,12 +240,12 @@ public:
         std::swap(rhs.locked, locked);
     }
 
-    typename T::mutex_type& native_handle() noexcept
+    _always_inline typename T::mutex_type& native_handle() noexcept
     {
         return m->native_handle();
     }
 
-    bool is_locked() const noexcept
+    _always_inline bool is_locked() const noexcept
     {
         return locked;
     }
@@ -351,75 +256,48 @@ private:
 };
 
 template<>
-class unique_lock<mcslock>
+class EXPORT unique_lock<ext::mcslock>
 {
 public:
-    explicit unique_lock(mcslock& attached_lock)
-        : m(&attached_lock)
-        , locked(false)
-    {
-        lock();
-    }
+    _hot
+    explicit unique_lock(ext::mcslock& attached_lock);
 
-    explicit unique_lock(mcslock& lock, defer_lock_t) noexcept
-        : m(&lock)
-        , locked(false)
-    {
-    }
+    explicit unique_lock(ext::mcslock& lock, defer_lock_t) noexcept;
 
     unique_lock(unique_lock const&) = delete;
     unique_lock(unique_lock&&) = delete;
     unique_lock& operator=(unique_lock) = delete;
 
-    ~unique_lock() noexcept
-    {
-        unlock();
-    }
+    _hot
+    ~unique_lock() noexcept;
 
-    void lock() noexcept
-    {
-        assert(!locked);
-        m->lock(&node);
-        locked = true;
-    }
+    _hot
+    void lock() noexcept;
 
-    void unlock() noexcept
-    {
-        if (locked) {
-            locked = false;
-            m->unlock(&node);
-        }
-    }
+    _hot
+    void unlock() noexcept;
 
-    void release() noexcept
-    {
-        locked = false;
-        m = nullptr;
-    }
+    void release() noexcept;
 
-    void swap(unique_lock& rhs) noexcept
-    {
-        std::swap(rhs.m, m);
-        std::swap(rhs.locked, locked);
-    }
+    void swap(unique_lock& rhs) noexcept;
 
-    typename mcslock::mutex_type& native_handle() noexcept
+    _always_inline typename ext::mcslock::mutex_type& native_handle() noexcept
     {
         return m->native_handle();
     }
 
-    mcs_queue_ent_t &wait_node()
+    _always_inline mcs_queue_ent_t &wait_node()
     {
         return node;
     }
 
-    bool is_locked() const noexcept
+    _always_inline bool is_locked() const noexcept
     {
         return locked;
     }
 
 private:
-    mcslock *m;
+    ext::mcslock *m;
     mcs_queue_ent_t node;
     bool locked;
 };
@@ -428,6 +306,7 @@ template<typename T>
 class shared_lock
 {
 public:
+    _hot
     shared_lock(T& m)
         : m(&m)
         , locked(false)
@@ -441,6 +320,7 @@ public:
     {
     }
 
+    _hot
     ~shared_lock()
     {
         unlock();
@@ -483,62 +363,108 @@ private:
     bool locked;
 };
 
+enum class cv_status
+{
+    no_timeout,
+    timeout
+};
+
 class condition_variable
 {
 public:
-    condition_variable()
+    condition_variable();
+    ~condition_variable();
+
+    void notify_one();
+    void notify_all();
+
+    // Extension
+    void notify_n(size_t n);
+
+    void wait(unique_lock<mutex>& lock);
+    void wait(unique_lock<ext::spinlock>& lock);
+    void wait(unique_lock<ext::ticketlock>& lock);
+    void wait(unique_lock<ext::mcslock>& lock);
+
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<mutex>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
     {
-        condvar_init(&m);
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
     }
 
-    ~condition_variable()
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<ext::spinlock>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
     {
-        condvar_destroy(&m);
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
     }
 
-    void notify_one()
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<ext::ticketlock>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
     {
-        condvar_wake_one(&m);
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
     }
 
-    void notify_all()
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<ext::mcslock>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
     {
-        condvar_wake_all(&m);
-    }
-
-    void wait(unique_lock<mutex>& lock)
-    {
-        assert(lock.is_locked());
-        condvar_wait(&m, &lock.native_handle());
-        assert(lock.is_locked());
-    }
-
-    void wait(unique_lock<spinlock>& lock)
-    {
-        assert(lock.is_locked());
-        condvar_wait_spinlock(&m, &lock.native_handle());
-        assert(lock.is_locked());
-    }
-
-    void wait(unique_lock<ticketlock>& lock)
-    {
-        assert(lock.is_locked());
-        condvar_wait_ticketlock(&m, &lock.native_handle());
-        assert(lock.is_locked());
-    }
-
-    void wait(unique_lock<mcslock>& lock)
-    {
-        assert(lock.is_locked());
-        condvar_wait_mcslock(&m, &lock.native_handle(), &lock.wait_node());
-        assert(lock.is_locked());
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
     }
 
 private:
+    //
+    // Underlying implementation uses monotonic time_ns time for timeout
+
+    cv_status wait_until(unique_lock<mutex>& lock,
+                         int64_t timeout_time);
+
+    cv_status wait_until(unique_lock<ext::spinlock>& lock,
+                         int64_t timeout_time);
+
+    cv_status wait_until(unique_lock<ext::ticketlock>& lock,
+                         int64_t timeout_time);
+
+    cv_status wait_until(unique_lock<ext::mcslock>& lock,
+                         int64_t timeout_time);
+
+
     condition_var_t m;
 };
 
-struct alignas(64) padded_condition_variable : public condition_variable {
+__END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+struct alignas(64) padded_mutex : public std::mutex {
 };
 
-__END_NAMESPACE_STD
+struct alignas(64) padded_condition_variable : public std::condition_variable {
+};
+
+struct alignas(64) padded_ticketlock : public ticketlock {
+};
+
+struct alignas(64) padded_spinlock : public spinlock {
+};
+
+class alignas(64) padded_shared_mutex : public std::shared_mutex {
+};
+__END_NAMESPACE_EXT
+
+// Explicit instantiations
+
+extern template class std::unique_lock<std::mutex>;
+extern template class std::unique_lock<std::shared_mutex>;
+
+extern template class std::unique_lock<ext::shared_spinlock>;
+extern template class std::unique_lock<ext::ticketlock>;
+extern template class std::unique_lock<ext::spinlock>;
+extern template class std::unique_lock<ext::irqlock>;
+extern template class std::unique_lock<ext::mcslock>;
+

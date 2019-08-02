@@ -1,3 +1,6 @@
+// pci driver: C=STORAGE,S=SATA,I=AHCI
+
+#include "kmodule.h"
 #include "dev_storage.h"
 #include "ata.h"
 #include "ahci.bits.h"
@@ -12,7 +15,6 @@
 #include "cpu/atomic.h"
 #include "time.h"
 #include "threadsync.h"
-#include "cpu/control_regs.h"
 #include "unique_ptr.h"
 #include "inttypes.h"
 #include "work_queue.h"
@@ -23,6 +25,11 @@
 #else
 #define AHCI_TRACE(...) ((void)0)
 #endif
+
+int module_main(int argc, char const * const * argv)
+{
+    return 0;
+}
 
 enum ahci_fis_type_t {
     // Register FIS - host to device
@@ -793,12 +800,12 @@ enum struct slot_op_t {
 };
 
 struct slot_request_t {
-    void *data;
-    int64_t count;
     uint64_t lba;
+    iocp_t *callback;
+    void *data;
+    size_t count;
     slot_op_t op;
     bool fua;
-    iocp_t *callback;
 };
 
 struct hba_port_info_t {
@@ -821,7 +828,7 @@ struct hba_port_info_t {
     std::condition_variable non_ncq_done_cond;
 
     // Keep track of slot order
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 
@@ -841,7 +848,7 @@ struct hba_port_info_t {
 #define AHCI_PE_DBC_BIT     1
 #define AHCI_PE_DBC_n(n)    ((n)-1)
 
-class ahci_if_factory_t : public storage_if_factory_t {
+class ahci_if_factory_t final : public storage_if_factory_t {
 public:
     ahci_if_factory_t() : storage_if_factory_t("ahci") {}
 private:
@@ -852,7 +859,7 @@ static ahci_if_factory_t ahci_if_factory;
 STORAGE_REGISTER_FACTORY(ahci_if);
 
 // AHCI interface instance
-class ahci_if_t : public storage_if_base_t, public zero_init_t {
+class ahci_if_t final : public storage_if_base_t, public zero_init_t {
 public:
     ahci_if_t();
 
@@ -1014,7 +1021,11 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
             slot_request_t &request = pi->slot_requests[slot];
 
-            request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
+            request.callback->set_result(
+                        !error ? dgos::err_sz_pair_t{
+                                 errno_t::OK, request.count }
+                               : dgos::err_sz_pair_t{
+                                 errno_t::EIO, request.count });
 
             // Invoke completion callback
             assert(request.callback);
@@ -1086,7 +1097,11 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
                            error, (void*)this, pi - port_info);
             }
 
-            request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
+            request.callback->set_result(
+                        !error ? dgos::err_sz_pair_t{
+                                 errno_t::OK, request.count }
+                               : dgos::err_sz_pair_t{
+                                 errno_t::EIO, request.count });
 
             // Invoke completion callback
             assert(request.callback);
@@ -1134,7 +1149,7 @@ isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
 
 void ahci_if_t::irq_handler(int irq_ofs)
 {
-    // Call callback on every port that has an interrupt pending
+    // Handle every port that has an interrupt pending
     unsigned port;
     for (uint32_t intr_status = mmio_base->intr_status;
          intr_status != 0; intr_status &= ~(1U << port)) {
@@ -1195,44 +1210,6 @@ void ahci_if_t::port_start_all()
         port = bit_lsb_set(impl);
         port_start(port);
     }
-}
-
-// Must be holding port lock
-void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
-        hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
-        size_t fis_size, hba_prdt_ent_t const *prdts, size_t ranges_count)
-{
-    hba_port_info_t *pi = port_info + port_num;
-    hba_port_t volatile *port = mmio_base->ports + port_num;
-
-    hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
-    hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
-
-    slot_request_t &request = pi->slot_requests[slot];
-
-    if (likely(prdts != nullptr))
-        memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
-    else
-        memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
-
-    memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
-
-    if (atapi_fis)
-        cmd_tbl_ent->atapi_fis = *atapi_fis;
-
-    cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
-            (request.op == slot_op_t::write ? AHCI_CH_WR : 0) |
-            (atapi_fis ? AHCI_CH_ATAPI : 0);
-    cmd_hdr->prdbc = 0;
-    cmd_hdr->prdtl = ranges_count;
-
-    atomic_barrier();
-
-    if (pi->use_ncq)
-        port->sata_act = (1U<<slot);
-
-    atomic_barrier();
-    port->cmd_issue = (1U<<slot);
 }
 
 unsigned ahci_if_t::get_sector_size(unsigned port)
@@ -1412,7 +1389,8 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     if (unlikely((mmio_base->ports[port_num].sata_status & AHCI_HP_SS_DET) !=
                  AHCI_HP_SS_DET_n(AHCI_HP_SS_DET_ONLINE))) {
         // Not established
-        request.callback->set_result(errno_t::ENODEV);
+        request.callback->set_result(dgos::err_sz_pair_t{
+                                         errno_t::ENODEV, 0});
         request.callback->invoke();
         return 0;
     }
@@ -1424,10 +1402,10 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     unsigned chunks;
     for (chunks = 0; count > 0; ++chunks) {
         if (likely(request.data != nullptr)) {
-            ranges_count = mphysranges(ranges, countof(ranges),
-                                       request.data,
-                                       request.count << pi.log2_sector_size,
-                                       4<<20);
+            ranges_count = mphysranges(
+                        ranges, countof(ranges), request.data,
+                        request.count << pi.log2_sector_size,
+                        4 << 20);
         } else {
             ranges_count = 0;
         }
@@ -1483,14 +1461,15 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
             cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
             cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
 
+            // NCQ is always 48 bit so no need to check pi.use_48bit
             cfis.ncq.command = request.op == slot_op_t::read
                     ? ata_cmd_t::READ_DMA_NCQ
                     : ata_cmd_t::WRITE_DMA_NCQ;
             cfis.ncq.set_lba(request.lba);
             cfis.ncq.set_count(transferred_blocks);
             cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
-            cfis.ncq.fua = AHCI_FIS_FUA_LBA | (request.fua
-                                               ? AHCI_FIS_FUA_FUA : 0);
+            cfis.ncq.fua = AHCI_FIS_FUA_LBA |
+                    (request.fua ? AHCI_FIS_FUA_FUA : 0);
             cfis.ncq.prio = 0;
             cfis.ncq.aux = 0;
         } else if (pi.is_atapi) {
@@ -1513,8 +1492,13 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
             cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
 
             cfis.h2d.command = request.op == slot_op_t::read
-                    ? ata_cmd_t::READ_DMA_EXT
-                    : ata_cmd_t::WRITE_DMA_EXT;
+                    ? (pi.use_48bit
+                       ? ata_cmd_t::READ_DMA_EXT
+                       : ata_cmd_t::READ_DMA)
+                    : (pi.use_48bit
+                       ? ata_cmd_t::WRITE_DMA_EXT
+                       : ata_cmd_t::WRITE_DMA);
+
             assert(request.lba < (1UL << 48));
             cfis.h2d.set_lba(request.lba);
             cfis.h2d.set_count(transferred_blocks);
@@ -1541,6 +1525,44 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     return chunks;
 }
 
+// Must be holding port lock
+void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
+        hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
+        size_t fis_size, hba_prdt_ent_t const *prdts, size_t ranges_count)
+{
+    hba_port_info_t *pi = port_info + port_num;
+    hba_port_t volatile *port = mmio_base->ports + port_num;
+
+    hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
+    hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
+
+    slot_request_t &request = pi->slot_requests[slot];
+
+    if (likely(prdts != nullptr))
+        memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
+    else
+        memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
+
+    cmd_tbl_ent->cfis = *cfis;
+
+    if (atapi_fis)
+        cmd_tbl_ent->atapi_fis = *atapi_fis;
+
+    cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
+            (request.op == slot_op_t::write ? AHCI_CH_WR : 0) |
+            (atapi_fis ? AHCI_CH_ATAPI : 0);
+    cmd_hdr->prdbc = 0;
+    cmd_hdr->prdtl = ranges_count;
+
+    atomic_barrier();
+
+    if (pi->use_ncq)
+        port->sata_act = (1U<<slot);
+
+    atomic_barrier();
+    port->cmd_issue = (1U<<slot);
+}
+
 // The command engine must be stopped before calling port_reset
 void ahci_if_t::port_reset(unsigned port_num)
 {
@@ -1554,7 +1576,6 @@ void ahci_if_t::port_reset(unsigned port_num)
             AHCI_HP_SC_DET_n(AHCI_HP_SC_DET_INIT);
 
     // Wait 3x the documented minimum
-    // FIXME: this isn't completely safe from IRQ handler
     nsleep(3000000);
 
     // Put port into normal operation
@@ -1768,12 +1789,24 @@ std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 
         //sleep(3000);
 
-        std::unique_ptr<ahci_if_t> self(new ahci_if_t{});
+        std::unique_ptr<ahci_if_t> self(new (std::nothrow) ahci_if_t{});
 
-        if (self->init(pci_iter)) {
-            ahci_devices.push_back(self);
-            list.push_back(self.release());
+        if (likely(self->init(pci_iter))) {
+            if (likely(list.push_back(self.get()))) {
+                if (likely(ahci_devices.push_back(self))) {
+                    // Success path
+                    self.release();
+                    continue;
+                } else {
+                    // We are letting unique_ptr destroy the
+                    // item we put in here, so take it out
+                    list.pop_back();
+                }
+            }
         }
+
+        // Only reaches here if there was a problem above
+        AHCI_TRACE("Out of memory in push_back!");
     } while (pci_enumerate_next(&pci_iter));
 
     return list;
@@ -1795,7 +1828,7 @@ std::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 
         if (port->sig == ahci_sig_t::SATA_SIG_ATA ||
                 port->sig == ahci_sig_t::SATA_SIG_ATAPI) {
-            std::unique_ptr<ahci_dev_t> drive(new ahci_dev_t{});
+            std::unique_ptr<ahci_dev_t> drive(new (std::nothrow) ahci_dev_t{});
 
             if (drive->init(this, port_num,
                             port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
@@ -1820,7 +1853,8 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
     port = dev_port;
     is_atapi = dev_is_atapi;
 
-    std::unique_ptr<ata_identify_t> identify = new ata_identify_t;
+    std::unique_ptr<ata_identify_t> identify =
+            new (std::nothrow) ata_identify_t;
 
     blocking_iocp_t block;
 
@@ -1830,7 +1864,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
     AHCI_TRACE("Waiting for identify to complete\n");
     block.set_expect(1);
-    status = block.wait();
+    status = block.wait().first;
     if (unlikely(status != errno_t::OK))
         return false;
     AHCI_TRACE("Identify completed successfully\n");

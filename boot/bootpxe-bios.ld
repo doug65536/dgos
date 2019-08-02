@@ -40,7 +40,7 @@ SECTIONS {
 		___smp_en = .;
 
 		/* self relocation code at end to avoid overwriting itself */
-		*(.reloc)
+		*(.text.reloc)
 
 		/* packet align end */
 		. = ALIGN(512);

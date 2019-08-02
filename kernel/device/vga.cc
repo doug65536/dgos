@@ -1,3 +1,5 @@
+// pci driver: C=DISPLAY, S=VGA
+
 #include "dev_text.h"
 
 #include "bios_data.h"
@@ -7,9 +9,11 @@
 #include "time.h"
 #include "callout.h"
 
+
+
 class vga_factory_t : public text_dev_factory_t, public zero_init_t {
 public:
-    vga_factory_t()
+    constexpr vga_factory_t()
         : text_dev_factory_t("vga")
     {
     }
@@ -17,18 +21,18 @@ public:
     int detect(text_dev_base_t ***ptrs) override final;
 };
 
-static vga_factory_t vga_factory;
+//static vga_factory_t vga_factory;
 
 class vga_display_t : public text_dev_base_t {
 public:
-    void *operator new(size_t) noexcept
+    void *operator new(size_t, std::nothrow_t const&) noexcept
     {
         if (instance_count < countof(instances))
             return instances + instance_count++;
         return nullptr;
     }
 
-    void operator delete(void *p)
+    void operator delete(void *p) noexcept
     {
         if (p == instances + instance_count - 1)
             --instance_count;

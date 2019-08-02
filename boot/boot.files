@@ -1,3 +1,7 @@
+gpt.h
+retpoline.S
+vesa_efi.cc
+vesa_bios.cc
 array_list.cc
 array_list.h
 asmstruct.h
@@ -35,8 +39,6 @@ dap.h
 diskio.cc
 diskio.h
 elf64_abstract.h
-elf64_bios.cc
-elf64_efi.cc
 formatter.cc
 formatter.h
 gdt.S
@@ -47,7 +49,6 @@ gdt_sel_pxe.h
 halt.h
 halt_bios.cc
 halt_efi.cc
-include/bootdev_info.h
 include/bootloader.h
 include/boottable.h
 include/inttypes.h

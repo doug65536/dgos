@@ -14,7 +14,7 @@
 //  dl = drive number
 //  ds:si -> partition table entry
 
-.section .early
+.section .early, "wx", @progbits
 .global entry
 entry:
     mov %dl,boot_drive
@@ -27,7 +27,7 @@ entry:
     movl ptbl_ent_stsec(%si),%eax
     xor %edx,%edx
 
-    movl $fat32_boot_partition,%ecx
+    movl $ fat32_boot_partition,%ecx
     movl $ 0f,%ebx
     jmp boot
 0:  hlt

@@ -1,6 +1,6 @@
 #include "gdt_sel.h"
 
-.section .early
+.section .early, "wx", @progbits
 .code16
 
 // Return address in bx
@@ -138,6 +138,8 @@ detect_ancient_cpu:
     test $0xF000,%ax
     jz detected_80286
 
+    // It is safe to use 32 bit instructions now...
+
     // An 80386 has eflags 18 (AC) permanently clear
     or $-1,%ecx
     mov $ 1 << 18,%edx
@@ -258,7 +260,7 @@ idt_init:
 
 0:  movw isr_table(,%ecx,4),%ax
     movw %ax,(%edx,%ecx,8)
-    movw $GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
+    movw $ GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
     movw $0,4(%edx,%ecx,8)
     movw $0x8e,5(%edx,%ecx,8)
     movw $0,6(%edx,%ecx,8)
@@ -321,7 +323,7 @@ cpu_a20_wait:
 1:  jmp 0b
 .code16
 
-.section .early
+.section .early, "wx", @progbits
 
 .global clear_bss
 clear_bss:
@@ -339,5 +341,17 @@ clear_bss:
     popw %di
     ret
 
-.section .bss
+.code32
+.balign 16
+.global __cxa_atexit
+__cxa_atexit:
+    ret
+
+.section .bss, "aw", @nobits
 cpu_a20_chk: .space 1
+
+.section .early, "wx", @progbits
+
+.global __dso_handle
+__dso_handle:
+    .int __dso_handle

@@ -16,6 +16,7 @@
 #define SYS_rt_sigaction            13
 #define SYS_rt_sigprocmask          14
 #define SYS_stub_rt_sigreturn       15
+
 #define SYS_sys_ioctl               16
 #define SYS_pread64                 17
 #define SYS_pwrite64                18
@@ -32,6 +33,7 @@
 #define SYS_shmget                  29
 #define SYS_shmat                   30
 #define SYS_shmctl                  31
+
 #define SYS_dup                     32
 #define SYS_dup2                    33
 #define SYS_pause                   34
@@ -48,6 +50,7 @@
 #define SYS_recvfrom                45
 #define SYS_sendmsg                 46
 #define SYS_recvmsg                 47
+
 #define SYS_shutdown                48
 #define SYS_bind                    49
 #define SYS_listen                  50
@@ -64,6 +67,7 @@
 #define SYS_wait4                   61
 #define SYS_kill                    62
 #define SYS_uname                   63
+
 #define SYS_semget                  64
 #define SYS_semop                   65
 #define SYS_semctl                  66
@@ -80,6 +84,7 @@
 #define SYS_ftruncate               77
 #define SYS_getdents                78
 #define SYS_getcwd                  79
+
 #define SYS_chdir                   80
 #define SYS_fchdir                  81
 #define SYS_rename                  82
@@ -96,6 +101,7 @@
 #define SYS_fchown                  93
 #define SYS_lchown                  94
 #define SYS_umask                   95
+
 #define SYS_gettimeofday            96
 #define SYS_getrlimit               97
 #define SYS_getrusage               98
@@ -112,6 +118,7 @@
 #define SYS_setpgid                 109
 #define SYS_getppid                 110
 #define SYS_getpgrp                 111
+
 #define SYS_setsid                  112
 #define SYS_setreuid                113
 #define SYS_setregid                114
@@ -128,6 +135,7 @@
 #define SYS_capget                  125
 #define SYS_capset                  126
 #define SYS_rt_sigpending           127
+
 #define SYS_rt_sigtimedwait         128
 #define SYS_rt_sigqueueinfo         129
 #define SYS_rt_sigsuspend           130
@@ -315,3 +323,5 @@
 #define SYS_kcmp                    312
 #define SYS_finit_module            313
 #define SYS_fexecve                 314
+#define SYS_probe_pci_for           315
+#define SYS_render_batch            316

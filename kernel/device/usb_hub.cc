@@ -12,7 +12,7 @@ class usb_hub_t {
 public:
     usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status);
 
-    bool init(const usb_config_helper *cfg_hlp);
+    bool init(usb_config_helper const *cfg_hlp);
 
 private:
     enum struct hub_request_t : uint8_t {
@@ -141,7 +141,7 @@ void usb_hub_t::status_completion(const usb_iocp_result_t &result)
 
 bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
-    bool multi_tt = true;
+    //bool multi_tt = true;
 
     // Try to find multi-TT interface
     match_result match = match_config(cfg_hlp, 0, int(usb_class_t::hub),
@@ -151,7 +151,7 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     if (match.dev)
         USBHUB_TRACE("Found Multi-TT hub interface\n");
     else {
-        multi_tt = false;
+        //multi_tt = false;
 
         match = match_config(cfg_hlp, 0, int(usb_class_t::hub), 0, 1,
                              -1, -1, -1);
@@ -164,21 +164,24 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     usb_pipe_t control, status;
 
+    if (!bus->get_pipe(cfg_hlp->slot(), 0, control))
+        return false;
 
-    bus->get_pipe(cfg_hlp->slot(), 0, control);
     assert(control);
 
     usb_desc_ep const *ep = cfg_hlp->find_ep(match.iface, 0);
 
-    usb_desc_ep_companion const* epc = cfg_hlp->get_ep_companion(ep);
-    int max_burst = epc ? epc->max_burst : 1;
+    //usb_desc_ep_companion const* epc = cfg_hlp->get_ep_companion(ep);
+    //int max_burst = epc ? epc->max_burst : 1;
 
-    bus->alloc_pipe(cfg_hlp->slot(), match.iface, ep, status);
+    if (!bus->alloc_pipe(cfg_hlp->slot(), match.iface, ep, status))
+        return false;
 
     assert(status);
 
-    usb_hub_t *hub = new usb_hub_t(control, status);
-    hubs.push_back(hub);
+    usb_hub_t *hub = new (std::nothrow) usb_hub_t(control, status);
+    if (!hubs.push_back(hub))
+        return false;
 
     return hub->init(cfg_hlp);
 }

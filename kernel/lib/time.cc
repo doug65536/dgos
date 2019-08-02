@@ -1,6 +1,5 @@
 #include "time.h"
 #include "cpu/halt.h"
-#include "cpu/control_regs.h"
 #include "thread.h"
 #include "printk.h"
 #include "export.h"
@@ -117,12 +116,12 @@ EXPORT void sleep(int ms)
     thread_sleep_for(ms);
 }
 
-void time_ofday_set_handler(time_ofday_handler_t handler)
+EXPORT void time_ofday_set_handler(time_ofday_handler_t handler)
 {
     time_gettimeofday_vec = handler;
 }
 
-time_of_day_t time_ofday()
+EXPORT time_of_day_t time_ofday()
 {
     return time_gettimeofday_vec();
 }

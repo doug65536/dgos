@@ -1,37 +1,39 @@
 #include "cpu/control_regs_constants.h"
 #include "cpu/interrupts.h"
 #include "cfi_helpers.h"
+#include "cpu_bug.h"
 
-.section .entry, "ax"
-
-.macro debugind ch
-    movb $\ch,0xb8000
-.endm
+.section .entry, "ax", @progbits
 
 // Things that must be done before entering any compiler
 // generated code:
 //  - Set up stack (aligned!)
 //  - Clear EFLAGS.DF
+//  - cs base == es base == ss base
 
-.align 16
+.balign 16
 .global entry
 .hidden entry
 .type entry,@function
 entry:
     .cfi_startproc
 
-    debugind '1'
+    .cfi_undefined rip
+    .cfi_undefined rsp
+    .cfi_undefined rbp
+    .cfi_undefined rbx
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
 
-    // Align the stack
-    andq $-16,%rsp
+    xor %esp,%esp
 
     cld
 
     // Save parameter in call-preserved register
     movl %ecx,%r15d
     xorl %ebp,%ebp
-
-    debugind '2'
 
 #ifdef _CALL_TRACE_ENABLED
     // Enable FSGSBASE ASAP if tracing
@@ -45,6 +47,7 @@ entry:
     cmpl $ 0xB,%eax
     jb .Lapic8bit
 
+    // Read cpuid leaf 0xB, edx[31:0] contains the x2APIC ID
     movl $ 0xB,%eax
     cpuid
     movl %edx,%eax
@@ -52,6 +55,7 @@ entry:
     jmp .Lset_tsc_aux
 
 .Lapic8bit:
+    // Read cpuid leaf 1, ebx[31:24] contains the APIC ID
     movl $ 1,%eax
     cpuid
     shrl $ 24,%ebx
@@ -68,8 +72,6 @@ entry:
     rdmsr
     testl $ CPU_APIC_BASE_BSP,%eax
     jnz bsp_init
-
-    debugind 'Z'
 
 ap_init:
     // This is not the bootstrap CPU
@@ -89,13 +91,11 @@ ap_init:
 
     // mp_main should not return
 0:  call halt_forever
-    // halt_forever should not return either!
+    // halt_forever should not return either! Stop poking at the mainboard
     jmp 0b
 
 bsp_init:
     // This is the bootstrap processor
-
-    debugind '3'
 
     leaq kernel_stack(%rip),%rdx
     movq kernel_stack_size(%rip),%rbx
@@ -104,30 +104,19 @@ bsp_init:
     // Store the kernel parameters passed in from bootloader
     movq %r15,kernel_params(%rip)
 
-    debugind '4'
     call cpuid_init
 
     xorl %edi,%edi
     call cpu_init_early
 
-    debugind '7'
-
-    // Get SSE context offsets
-    xorl %edi,%edi
-    call idt_xsave_detect
-
-    debugind '8'
-
     call e9debug_init
 
-    debugind '9'
-
     // Resolve ifunc
-    leaq __rela_dyn_st(%rip),%r12
-    leaq __rela_dyn_en(%rip),%r13
+    leaq ___rela_plt(%rip),%r12
+    leaq __rela_iplt_end(%rip),%r13
 .Lrela_iplt_next:
     cmpq %r13,%r12
-    jz .Lrela_iplt_done
+    jae .Lrela_iplt_done
 
     movq 8(%r12),%rax
 
@@ -137,8 +126,7 @@ bsp_init:
 
     // Call the resolver
     mov 16(%r12),%rax
-    call __x86_indirect_thunk_rax
-    //call * 16(%r12)
+    indirect_call rax
 
     // Read PLT vector pointer from relocation record
     movq (%r12),%rdx
@@ -161,6 +149,18 @@ bsp_init:
     movl $ 13*8,%esi
     call __asan_storeN_noabort
 
+    // Mark .rodata initialized
+    leaq ___rodata_st(%rip),%rdi
+    leaq ___rodata_en(%rip),%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    // Mark .rodata initialized
+//    leaq __bspstk_st(%rip),%rdi
+//    leaq __bspstk_en(%rip),%rsi
+//    subq %rdi,%rsi
+//    call __asan_storeN_noabort
+
     // Mark .data initialized
     leaq ___data_st(%rip),%rdi
     leaq ___data_en(%rip),%rsi
@@ -171,6 +171,11 @@ bsp_init:
     leaq ___bss_st(%rip),%rdi
     leaq ___bss_en(%rip),%rsi
     subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    // XX: hardcoded
+    movabs $(-(518 << 30)),%rdi
+    movabs $(4 << 30),%rsi
     call __asan_storeN_noabort
 
     // Mark VGA initialized
@@ -189,16 +194,14 @@ bsp_init:
 
     call main
 
-    debugind '?'
-
     movq %rax,%rdi
     call exit
 
     .cfi_endproc
 
-.section .data
+.section .data, "aw", @progbits
 
-.align 16
+.balign 16
     // TSS layout is completely misaligned without nudging it up 4 bytes
     //  uint32_t dummy_align;
     .space 4
@@ -213,10 +216,10 @@ early_tss:
     .quad 0
     .quad 0
     //
-    //  uint64_t ist[8];
+    //  uint64_t ist[8]; 2 emergency stacks in last 8KB of main stack
     .quad 0
-    .quad kernel_stack-32768
-    .quad kernel_stack-32768
+    .quad kernel_stack+8192
+    .quad kernel_stack+4096
     .space 5*8
     //
     //  uint32_t reserved3;
@@ -227,7 +230,7 @@ early_tss:
     //  uint16_t reserved5;
     .short 0
     //  uint16_t iomap_base;
-    .short early_tss_end-early_tss
+    .short early_tss_end - early_tss
     //  uint32_t dummy_align2;
     .int 0
     //
@@ -236,8 +239,8 @@ early_tss:
     .space 8*8
 early_tss_end:
 
-.section .text
-.align 16
+.section .text, "ax", @progbits
+.balign 16
 .global exit
 .hidden exit
 exit:
@@ -250,7 +253,7 @@ exit:
 
     call halt_forever
 
-.align 16
+.balign 16
 invoke_function_array:
     .cfi_startproc
 
@@ -263,8 +266,7 @@ invoke_function_array:
 0:  cmpq %rbx,%rbp
     jbe 0f
     mov (%rbx),%rax
-    call __x86_indirect_thunk_rax
-    //call *(%rbx)
+    indirect_call rax
     addq $8,%rbx
     jmp 0b
 0:  pop_cfi %rbp
@@ -274,29 +276,28 @@ invoke_function_array:
     .cfi_endproc
     ret
 
-.align 16
+.balign 16
 .global register_eh_frame
 register_eh_frame:
     // Register .eh_frame for libgcc unwind
+    leaq ___eh_frame_en(%rip),%rsi
     leaq ___eh_frame_st(%rip),%rdi
+    subq %rdi,%rsi
     jmp __register_frame
 
-.align 16
+.balign 16
 .global __cxa_pure_virtual
-.hidden __cxa_pure_virtual
+// Not .hidden!
 __cxa_pure_virtual:
     leaq pure_call_message(%rip),%rdi
     jmp panic
 
-.align 16
-.global __cxa_atexit
-__cxa_atexit:
-    ret
-
-.section .rodata
+.section .rodata, "", @progbits
 pure_call_message:
     .string "Pure virtual function called"
 
-.align 8
+// hidden by definition, it's the whole point
+.balign 8
 .global __dso_handle
+.hidden __dso_handle
 __dso_handle: .quad __dso_handle

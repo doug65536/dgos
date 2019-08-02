@@ -300,7 +300,7 @@ int ext4_fs_t::mm_fault_handler(
 
 fs_base_t *ext4_factory_t::mount(fs_init_info_t *conn)
 {
-    std::unique_ptr<ext4_fs_t> self(new ext4_fs_t);
+    std::unique_ptr<ext4_fs_t> self(new (std::nothrow) ext4_fs_t);
     if (self->mount(conn)) {
         if (!ext4_mounts.push_back(self)) {
             panic_oom();
@@ -442,16 +442,16 @@ int ext4_fs_t::unlink(fs_cpath_t path)
 //
 // Modify directory entries
 
-int ext4_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
+int ext4_fs_t::fchmod(fs_file_info_t *fi, fs_mode_t mode)
 {
-    (void)path;
+    (void)fi;
     (void)mode;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
+int ext4_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
 {
-    (void)path;
+    (void)fi;
     (void)uid;
     (void)gid;
     return -int(errno_t::ENOSYS);
@@ -464,7 +464,7 @@ int ext4_fs_t::truncate(fs_cpath_t path, off_t size)
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::utimens(fs_cpath_t path, const fs_timespec_t *ts)
+int ext4_fs_t::utimens(fs_cpath_t path, fs_timespec_t const *ts)
 {
     (void)path;
     (void)ts;

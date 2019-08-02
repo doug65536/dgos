@@ -4,7 +4,8 @@
 #include "string.h"
 #include "assert.h"
 #include "vector.h"
-#include "cpu/control_regs.h"
+
+#include "hash_table.h"
 
 #define DEBUG_STORAGE   0
 #if DEBUG_STORAGE
@@ -13,15 +14,17 @@
 #define STORAGE_TRACE(...) ((void)0)
 #endif
 
-struct fs_reg_t {
-    char const *name;
-    fs_factory_t *factory;
-};
-
 struct fs_mount_t {
     fs_reg_t *reg;
     fs_base_t *fs;
 };
+
+using path_table_t = hashtbl_t<fs_mount_t, fs_reg_t*, &fs_mount_t::reg>;
+static path_table_t path_table;
+
+using lock_type = ext::mcslock;
+using scoped_lock = std::unique_lock<lock_type>;
+static lock_type storage_lock;
 
 static std::vector<storage_if_factory_t*> storage_if_factories;
 static std::vector<storage_if_base_t*> storage_ifs;
@@ -32,11 +35,13 @@ static std::vector<fs_mount_t> fs_mounts;
 
 size_t storage_dev_count()
 {
+    scoped_lock lock(storage_lock);
     return storage_devs.size();
 }
 
 storage_dev_base_t *storage_dev_open(dev_t dev)
 {
+    scoped_lock lock(storage_lock);
     assert(size_t(dev) <= storage_devs.size());
     return size_t(dev) < storage_devs.size() ? storage_devs[dev] : nullptr;
 }
@@ -46,14 +51,14 @@ void storage_dev_close(storage_dev_base_t *dev)
     (void)dev;
 }
 
-void storage_if_register_factory(char const *name,
-                                storage_if_factory_t *factory)
+EXPORT void storage_if_register_factory(storage_if_factory_t *factory)
 {
-    (void)name;
+    scoped_lock lock(storage_lock);
 
     if (!storage_if_factories.push_back(factory))
         panic_oom();
     STORAGE_TRACE("Registered storage driver %s\n", name);
+    probe_storage_factory(factory);
 }
 
 void probe_storage_factory(storage_if_factory_t *factory)
@@ -85,30 +90,25 @@ void probe_storage_factory(storage_if_factory_t *factory)
             // Calculate pointer to storage device instance
             storage_dev_base_t *dev = dev_list[k];
             // Store device instance
+            scoped_lock lock(storage_lock);
             if (!storage_devs.push_back(dev))
                 panic_oom();
         }
     }
 }
 
-void invoke_storage_factories(void *)
-{
-    for (storage_if_factory_t* factory : storage_if_factories)
-        probe_storage_factory(factory);
-}
 
-REGISTER_CALLOUT(invoke_storage_factories, nullptr,
-                 callout_type_t::storage_dev, "000");
-
-void fs_register_factory(char const *name, fs_factory_t *fs)
+EXPORT void fs_register_factory(char const *name, fs_factory_t *fs)
 {
-    if (!fs_regs.push_back(new fs_reg_t{ name, fs }))
+    scoped_lock lock(storage_lock);
+    if (!fs_regs.push_back(new (std::nothrow) fs_reg_t{ name, fs }))
         panic_oom();
     printdbg("%s filesystem registered\n", name);
 }
 
 static fs_reg_t *find_fs(char const *name)
 {
+    scoped_lock lock(storage_lock);
     for (fs_reg_t *reg : fs_regs) {
         if (strcmp(reg->name, name))
             continue;
@@ -118,7 +118,19 @@ static fs_reg_t *find_fs(char const *name)
     return nullptr;
 }
 
-void fs_mount(char const *fs_name, fs_init_info_t *info)
+EXPORT void fs_add(fs_reg_t *fs_reg, fs_base_t *fs)
+{
+    if (fs && fs->is_boot()) {
+        scoped_lock lock(storage_lock);
+        fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, fs });
+    } else if (fs) {
+        scoped_lock lock(storage_lock);
+        if (!fs_mounts.push_back(fs_mount_t{ fs_reg, fs }))
+            panic_oom();
+    }
+}
+
+EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
 {
     fs_reg_t *fs_reg = find_fs(fs_name);
 
@@ -134,9 +146,12 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     fs_base_t *mfs = fs_reg->factory->mount(info);
 
-    if (mfs && mfs->is_boot())
+    if (mfs && mfs->is_boot()) {
+        scoped_lock lock(storage_lock);
         fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, mfs });
-    else if (mfs) {
+
+    } else if (mfs) {
+        scoped_lock lock(storage_lock);
         if (!fs_mounts.push_back(fs_mount_t{ fs_reg, mfs }))
             panic_oom();
     }
@@ -144,142 +159,126 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
 fs_base_t *fs_from_id(size_t id)
 {
+    scoped_lock lock(storage_lock);
     return !fs_mounts.empty()
             ? fs_mounts[id].fs
             : nullptr;
 }
 
+static void probe_part_factory_on_drive(
+        part_factory_t *factory, storage_dev_base_t *drive)
+{
+    if (drive) {
+        STORAGE_TRACE("Probing %s for %s partitions...\n",
+                      (char const *)drive->info(STORAGE_INFO_NAME),
+                      factory->name);
+
+        std::vector<part_dev_t*> part_list = factory->detect(drive);
+
+        // Mount partitions
+        for (unsigned i = 0; i < part_list.size(); ++i) {
+            part_dev_t *part = part_list[i];
+            fs_init_info_t info;
+            info.drive = drive;
+            info.part_st = part->lba_st;
+            info.part_len = part->lba_len;
+            fs_mount(part->name, &info);
+        }
+        storage_dev_close(drive);
+
+        STORAGE_TRACE("Found %zu %s partitions\n", part_list.size(),
+                      factory->name);
+    }
+}
+
+// For each storage device
+static void probe_part_factory(part_factory_t *factory)
+{
+    for (storage_dev_base_t *drive : storage_devs)
+        probe_part_factory_on_drive(factory, drive);
+}
+
 void part_register_factory(char const *name, part_factory_t *factory)
 {
+    scoped_lock lock(storage_lock);
     if (!part_factories.push_back(factory))
         panic_oom();
     printk("%s partition type registered\n", name);
+    probe_part_factory(factory);
 }
 
-static void invoke_part_factories(void *arg)
-{
-    (void)arg;
-
-    // For each partition factory
-    for (part_factory_t *factory : part_factories) {
-        // For each storage device
-        for (storage_dev_base_t *drive : storage_devs) {
-            if (drive) {
-                STORAGE_TRACE("Probing %s for %s partitions...\n",
-                              (char const *)drive->info(STORAGE_INFO_NAME),
-                              factory->name);
-
-                std::vector<part_dev_t*> part_list = factory->detect(drive);
-
-                // Mount partitions
-                for (unsigned i = 0; i < part_list.size(); ++i) {
-                    part_dev_t *part = part_list[i];
-                    fs_init_info_t info;
-                    info.drive = drive;
-                    info.part_st = part->lba_st;
-                    info.part_len = part->lba_len;
-                    fs_mount(part->name, &info);
-                }
-                storage_dev_close(drive);
-
-                STORAGE_TRACE("Found %zu %s partitions\n", part_list.size(),
-                              factory->name);
-            }
-        }
-    }
-
-    STORAGE_TRACE("Partition probe complete\n");
-}
-
-REGISTER_CALLOUT(invoke_part_factories, nullptr,
-                 callout_type_t::partition_probe, "000");
-
-fs_factory_t::fs_factory_t(char const *factory_name)
-    : name(factory_name)
-{
-}
-
-void fs_factory_t::register_factory(void *p)
+EXPORT void fs_factory_t::register_factory(void *p)
 {
     fs_factory_t *instance = (fs_factory_t*)p;
     fs_register_factory(instance->name, instance);
 }
 
-storage_if_factory_t::storage_if_factory_t(char const *factory_name)
-    : name(factory_name)
-{
-}
-
-void storage_if_factory_t::register_factory(void *p)
+EXPORT void storage_if_factory_t::register_factory(void *p)
 {
     storage_if_factory_t *instance = (storage_if_factory_t*)p;
-    storage_if_register_factory(instance->name, instance);
+    storage_if_register_factory(instance);
 }
 
-part_factory_t::part_factory_t(char const *factory_name)
-    : name(factory_name)
-{
-}
-
-void part_factory_t::register_factory(void *p)
+EXPORT void part_factory_t::register_factory(void *p)
 {
     part_factory_t *instance = (part_factory_t*)p;
     part_register_factory(instance->name, instance);
 }
 
-int storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
+EXPORT int storage_dev_base_t::read_blocks(
+        void *data, int64_t count, uint64_t lba)
 {
     blocking_iocp_t block;
     errno_t err = read_async(data, count, lba, &block);
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);
-    err = block.wait();
-    if (unlikely(err != errno_t::OK))
-        return -int64_t(err);
-    return count;
+    auto result = block.wait();
+    if (unlikely(result.first != errno_t::OK))
+        return -int64_t(result.first);
+    return result.second;
 }
 
-int storage_dev_base_t::write_blocks(
-        const void *data, int64_t count, uint64_t lba, bool fua)
+EXPORT int storage_dev_base_t::write_blocks(
+        void const *data, int64_t count, uint64_t lba, bool fua)
 {
     blocking_iocp_t block;
     errno_t err = write_async(data, count, lba, fua, &block);
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);
-    err = block.wait();
-    if (unlikely(err != errno_t::OK))
-        return -int64_t(err);
-    return count;
+    auto result = block.wait();
+    if (unlikely(result.first != errno_t::OK))
+        return -int64_t(result.first);
+    return result.second;
 }
-int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
+
+EXPORT int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
 {
     blocking_iocp_t block;
     errno_t err = trim_async(count, lba, &block);
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);
-    err = block.wait();
-    if (unlikely(err != errno_t::OK))
-        return -int64_t(err);
+    auto result = block.wait();
+    if (unlikely(result.first != errno_t::OK))
+        return -int64_t(result.second);
     return count;
 }
 
-int storage_dev_base_t::flush()
+EXPORT int storage_dev_base_t::flush()
 {
     blocking_iocp_t block;
     errno_t err = flush_async(&block);
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);
-    err = block.wait();
-    if (unlikely(err != errno_t::OK))
-        return -int64_t(err);
-    return 0;
+    auto result = block.wait();
+    if (unlikely(result.first != errno_t::OK))
+        return -int64_t(result.first);
+    return result.second;
 }
-
 
 //
 // Modify directories
 
-int fs_base_ro_t::mknod(fs_cpath_t path,
+EXPORT int fs_base_ro_t::mknod(fs_cpath_t path,
                          fs_mode_t mode,
                          fs_dev_t rdev)
 {
@@ -290,7 +289,7 @@ int fs_base_ro_t::mknod(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::mkdir(fs_cpath_t path,
+EXPORT int fs_base_ro_t::mkdir(fs_cpath_t path,
                          fs_mode_t mode)
 {
     (void)path;
@@ -299,14 +298,14 @@ int fs_base_ro_t::mkdir(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::rmdir(fs_cpath_t path)
+EXPORT int fs_base_ro_t::rmdir(fs_cpath_t path)
 {
     (void)path;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::symlink(
+EXPORT int fs_base_ro_t::symlink(
         fs_cpath_t to,
         fs_cpath_t from)
 {
@@ -316,7 +315,7 @@ int fs_base_ro_t::symlink(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::rename(
+EXPORT int fs_base_ro_t::rename(
         fs_cpath_t from,
         fs_cpath_t to)
 {
@@ -326,7 +325,7 @@ int fs_base_ro_t::rename(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::link(
+EXPORT int fs_base_ro_t::link(
         fs_cpath_t from,
         fs_cpath_t to)
 {
@@ -336,7 +335,7 @@ int fs_base_ro_t::link(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::unlink(
+EXPORT int fs_base_ro_t::unlink(
         fs_cpath_t path)
 {
     (void)path;
@@ -347,29 +346,29 @@ int fs_base_ro_t::unlink(
 //
 // Modify directory entries
 
-int fs_base_ro_t::chmod(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::fchmod(
+        fs_file_info_t *fi,
         fs_mode_t mode)
 {
-    (void)path;
+    (void)fi;
     (void)mode;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::chown(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::fchown(
+        fs_file_info_t *fi,
         fs_uid_t uid,
         fs_gid_t gid)
 {
-    (void)path;
+    (void)fi;
     (void)uid;
     (void)gid;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::truncate(
+EXPORT int fs_base_ro_t::truncate(
         fs_cpath_t path,
         off_t size)
 {
@@ -379,9 +378,9 @@ int fs_base_ro_t::truncate(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::utimens(
+EXPORT int fs_base_ro_t::utimens(
         fs_cpath_t path,
-        const fs_timespec_t *ts)
+        fs_timespec_t const *ts)
 {
     (void)path;
     (void)ts;
@@ -389,7 +388,7 @@ int fs_base_ro_t::utimens(
     return -int(errno_t::EROFS);
 }
 
-ssize_t fs_base_ro_t::write(fs_file_info_t *fi,
+EXPORT ssize_t fs_base_ro_t::write(fs_file_info_t *fi,
                              char const *buf,
                              size_t size,
                              off_t offset)
@@ -402,7 +401,7 @@ ssize_t fs_base_ro_t::write(fs_file_info_t *fi,
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::ftruncate(fs_file_info_t *fi,
+EXPORT int fs_base_ro_t::ftruncate(fs_file_info_t *fi,
                              off_t offset)
 {
     (void)offset;
@@ -414,8 +413,8 @@ int fs_base_ro_t::ftruncate(fs_file_info_t *fi,
 //
 // Sync files and directories and flush buffers
 
-int fs_base_ro_t::fsync(fs_file_info_t *fi,
-                         int isdatasync)
+EXPORT int fs_base_ro_t::fsync(fs_file_info_t *fi,
+                               int isdatasync)
 {
     (void)isdatasync;
     (void)fi;
@@ -423,8 +422,8 @@ int fs_base_ro_t::fsync(fs_file_info_t *fi,
     return 0;
 }
 
-int fs_base_ro_t::fsyncdir(fs_file_info_t *fi,
-                            int isdatasync)
+EXPORT int fs_base_ro_t::fsyncdir(fs_file_info_t *fi,
+                                  int isdatasync)
 {
     (void)isdatasync;
     (void)fi;
@@ -432,14 +431,14 @@ int fs_base_ro_t::fsyncdir(fs_file_info_t *fi,
     return 0;
 }
 
-int fs_base_ro_t::flush(fs_file_info_t *fi)
+EXPORT int fs_base_ro_t::flush(fs_file_info_t *fi)
 {
     (void)fi;
     // Do nothing, read only
     return 0;
 }
 
-int fs_base_ro_t::setxattr(
+EXPORT int fs_base_ro_t::setxattr(
         fs_cpath_t path,
         char const* name,
         char const* value,
@@ -454,3 +453,80 @@ int fs_base_ro_t::setxattr(
     // Fail, read only
     return -int(errno_t::EROFS);
 }
+
+EXPORT storage_if_factory_t::storage_if_factory_t(char const *factory_name)
+    : name(factory_name)
+{
+}
+
+EXPORT disk_io_plan_t::disk_io_plan_t(void *dest, uint8_t log2_sector_size)
+    : dest(dest)
+    , vec(nullptr)
+    , count(0)
+    , capacity(0)
+    , log2_sector_size(log2_sector_size)
+{
+}
+
+EXPORT disk_io_plan_t::~disk_io_plan_t()
+{
+    free(vec);
+    vec = nullptr;
+    count = 0;
+    capacity = 0;
+}
+
+EXPORT bool disk_io_plan_t::add(
+        uint32_t lba, uint16_t sector_count,
+        uint16_t sector_ofs, uint16_t byte_count)
+{
+    if (count > 0) {
+        // See if we can coalesce with previous entry
+
+        disk_vec_t &prev = vec[count - 1];
+
+        uint32_t sector_size = UINT32_C(1) << log2_sector_size;;
+
+        if (prev.lba + prev.count == lba &&
+                prev.sector_ofs == 0 &&
+                sector_ofs == 0 &&
+                prev.byte_count == sector_size &&
+                byte_count == sector_size &&
+                0xFFFFFFFFU - count > prev.count) {
+            // Added entry is a sequential run of full sector-aligned sector
+            // which is contiguous with previous run of full sector-aligned
+            // sectors and the sector count won't overflow
+            prev.count += sector_count;
+            return true;
+        }
+    }
+
+    if (count + 1 > capacity) {
+        size_t new_capacity = capacity >= 16 ? capacity * 2 : 16;
+        disk_vec_t *new_vec = (disk_vec_t*)realloc(
+                    vec, new_capacity * sizeof(*vec));
+        if (unlikely(!new_vec))
+            return false;
+        vec = new_vec;
+        capacity = new_capacity;
+    }
+
+    disk_vec_t &item = vec[count++];
+
+    item.lba = lba;
+    item.count = sector_count;
+    item.sector_ofs = sector_ofs;
+    item.byte_count = byte_count;
+
+    return true;
+}
+
+EXPORT storage_dev_base_t::~storage_dev_base_t()
+{
+}
+
+EXPORT storage_if_base_t::~storage_if_base_t()
+{
+}
+
+//std::unique_ptr<storage_if_base_t> dummy;

@@ -2,8 +2,9 @@
 #include "ipv4_frame.h"
 #include "arp_frame.h"
 #include "bswap.h"
+#include "export.h"
 
-void eth_frame_received(ethq_pkt_t *pkt)
+EXPORT void eth_frame_received(ethq_pkt_t *pkt)
 {
     switch (ntohs(pkt->pkt.hdr.len_ethertype)) {
     case ETHERTYPE_IPv4:

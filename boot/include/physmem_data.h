@@ -1,4 +1,5 @@
 #pragma once
+#include "types.h"
 
 struct physmem_range_t {
     uint64_t base;

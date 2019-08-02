@@ -3,6 +3,18 @@
 
 struct tui_str_t
 {
+    constexpr tui_str_t()
+        : len(0)
+        , str(nullptr)
+    {
+    }
+
+    constexpr tui_str_t(tchar const *txt, size_t sz)
+        : len(sz)
+        , str(txt)
+    {
+    }
+
     template<size_t sz>
     constexpr tui_str_t(tchar const(&txt)[sz])
         : len(sz-1)
@@ -20,12 +32,18 @@ struct tui_str_t
         return len;
     }
 
-    size_t const len;
-    tchar const * const str;
+    size_t len;
+    tchar const * str;
 };
 
 template<typename T>
 struct tui_list_t {
+    constexpr tui_list_t()
+        : count{}
+        , items{}
+    {
+    }
+
     template<int sz>
     constexpr tui_list_t(T(&items)[sz])
         : count(sz)
@@ -38,8 +56,8 @@ struct tui_list_t {
         return items[index];
     }
 
-    int const count;
-    T * const items;
+    int count;
+    T * items;
 };
 
 struct tui_menu_item_t {
@@ -71,8 +89,14 @@ private:
 };
 
 int readkey();
-int systime();
+int64_t systime();
 void idle();
 bool pollkey();
+bool wait_input(uint32_t ms_timeout);
 
-
+struct mouse_evt {
+    int32_t x;
+    int32_t y;
+    int lmb;
+    int rmb;
+};

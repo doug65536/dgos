@@ -1,35 +1,15 @@
-#include "dev_storage.h"
+#include "devfs.h"
+#include <cxxstring.h>
 
-struct dev_fs_t final : public fs_base_t {
-    FS_BASE_RW_IMPL
-
-    struct file_handle_t : public fs_file_info_t {
-        enum type_t {
-            NODE,
-            DIR
-        };
-
-        file_handle_t(type_t type)
-            : type(type)
-        {
-        }
-
-        type_t type;
-    };
-
-    struct node_handle_t : public file_handle_t {
-        node_handle_t()
-            : file_handle_t(NODE)
-        {
-        }
-    };
-
-    struct dir_handle_t : public file_handle_t {
-        dir_handle_t()
-            : file_handle_t(DIR)
-        {
-        }
-    };
+struct dev_fs_file_info_t final
+        : public fs_file_info_t
+{
+    // fs_file_info_t interface
+public:
+    ino_t get_inode() const override
+    {
+        return -int(errno_t::ENOSYS);
+    }
 };
 
 static dev_fs_t dev_fs;
@@ -109,13 +89,13 @@ int dev_fs_t::unlink(fs_cpath_t path)
     return -int(errno_t::ENOSYS);
 }
 
-int dev_fs_t::chmod(fs_cpath_t path,
+int dev_fs_t::fchmod(fs_file_info_t *fi,
      fs_mode_t mode)
 {
     return -int(errno_t::ENOSYS);
 }
 
-int dev_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
+int dev_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
 {
     return -int(errno_t::ENOSYS);
 }
@@ -133,6 +113,17 @@ int dev_fs_t::utimens(fs_cpath_t path, fs_timespec_t const *ts)
 int dev_fs_t::open(fs_file_info_t **fi, fs_cpath_t path,
                    int flags, mode_t mode)
 {
+    // Lookup the file info factory for this device name
+
+    size_t name_hash = dev_fs_file_reg_t::hash(path);
+
+    for (dev_fs_file_reg_t *reg : files) {
+        if (reg->name_hash == name_hash && reg->name == path) {
+            *fi = reg->open(flags, mode);
+            return 0;
+        }
+    }
+
     return -int(errno_t::ENOSYS);
 }
 
@@ -221,4 +212,30 @@ int dev_fs_t::ioctl(fs_file_info_t *fi, int cmd, void* arg,
 int dev_fs_t::poll(fs_file_info_t *fi, fs_pollhandle_t* ph, unsigned* reventsp)
 {
     return -int(errno_t::ENOSYS);
+}
+
+static dev_fs_t *devfs_instance;
+
+dev_fs_t *devfs_create()
+{
+    devfs_instance = new (std::nothrow) dev_fs_t();
+    callout_call(callout_type_t::devfs_ready);
+    return devfs_instance;
+}
+
+void devfs_delete(dev_fs_t *dev_fs)
+{
+    delete dev_fs;
+}
+
+void devfs_register(dev_fs_file_reg_t *reg)
+{
+    devfs_instance->register_file(reg);
+}
+dev_fs_file_reg_t::~dev_fs_file_reg_t()
+{
+}
+
+dev_fs_t::device_factory_t::~device_factory_t()
+{
 }

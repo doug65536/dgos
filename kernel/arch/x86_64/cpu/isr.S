@@ -3,6 +3,9 @@
 #include "control_regs_constants.h"
 #include "../cfi_helpers.h"
 #include "interrupts.h"
+#include "cpu_bug.h"
+#include "isr.h"
+#include "fixup.h"
 
 .code64
 
@@ -17,14 +20,62 @@
     frame_ss:   .struct frame_ss+8
     frame_end:
 
-.section .text.isr, "ax"
+.section .text.isr, "ax", @progbits
 
-.macro isr_entry has_code int_num
-.global isr_entry_\int_num\()
-.hidden isr_entry_\int_num\()
-.type isr_entry_\int_num\(),@function
-.align 16
-isr_entry_\int_num\():
+.balign 16
+.global isr_entry_st
+isr_entry_st:
+
+.macro fn_trace fn, op
+#ifdef _CALL_TRACE_ENABLED
+    pushq %rax
+    pushq %rcx
+    pushq %rdx
+    pushq %rsi
+    pushq %rdi
+    pushq %r8
+    pushq %r9
+    pushq %r10
+    pushq %r11
+    sub $8,%rsp
+
+    leaq \fn(%rip),%rdi
+    xor %esi,%esi
+    call __cyg_profile_func_\op
+
+    add $8,%rsp
+    popq %r11
+    popq %r10
+    popq %r9
+    popq %r8
+    popq %rdi
+    popq %rsi
+    popq %rdx
+    popq %rcx
+    popq %rax
+#endif
+.endm
+
+.macro isr_section_name num
+    .if \num < 10
+        .section .text.isr.00\num, "x", @progbits
+    .elseif \num < 100
+        .section .text.isr.0\num, "x", @progbits
+    .else
+        .section .text.isr.\num, "x", @progbits
+    .endif
+.endm
+
+any_intr:
+    ret
+
+.macro isr_entry_impl has_code int_num entryname pathname
+isr_section_name \int_num
+.global \entryname\()_\int_num\()
+.hidden \entryname\()_\int_num\()
+.type \entryname\()_\int_num\(),@function
+.balign 16
+\entryname\()_\int_num\():
     .cfi_startproc
     .cfi_signal_frame
     .if \has_code == 0
@@ -42,6 +93,8 @@ isr_entry_\int_num\():
         .cfi_offset rflags,-3*8
         .cfi_offset cs,-4*8
         .cfi_offset rip,-5*8
+        call any_intr
+        fn_trace \pathname,enter
         push_cfi $0
     .else
         // CFA
@@ -59,106 +112,305 @@ isr_entry_\int_num\():
         .cfi_offset rflags,-3*8
         .cfi_offset cs,-4*8
         .cfi_offset rip,-5*8
+        call any_intr
+        fn_trace \pathname,enter
     .endif
     // Push the interrupt number below the error code
+    // ctx_flags will be zeroed by this too (the upper 32 bits)
     push_cfi $\int_num
-    jmp isr_common
+    jmp \pathname
     .cfi_endproc
 .endm
 
-// Reserved (unused) exception vectors furthest away - should never occur
-.irp int_num,31,30,29,28,27,26,25,24,23,22,21,15
-    isr_entry 0 \int_num
-.endr
+.macro isr_entry_custom has_code int_num handler
+    isr_entry_impl \has_code \int_num isr_entry \handler
+.endm
 
-// Rarely invoked vectors (LAPIC spurious, LAPIC error, LAPIC thermal, reserved)
-.irp int_num,38,37,36,35,34,33
-    isr_entry 0 \int_num
-.endr
+.macro isr_entry has_code int_num
+     isr_entry_impl \has_code \int_num isr_entry isr_common
+.endm
 
-isr_entry 0 INTR_APIC_SPURIOUS
+// Individually to make placing breakpoints trivial
 
-// PIC vectors (typically never invoked)
-.irp int_num,255,254,253,252,251,250,249,248,247,246,245,244,243,242,241,240
-     isr_entry 0 \int_num
-.endr
+// Although every attempt is made to make these lines be written
+// in the order of vector number, the linker script and isr_entry
+// macro are working together to force them all to the correct order
+// anyway, so don't worry if it isn't perfect
 
-// IOAPIC/MSI vectors
-.irp int_num,239,238,237,236,235,234,233,232,231,230,229,228,227,226,225,224
-     isr_entry 0 \int_num
-.endr
-.irp int_num,223,222,221,220,219,218,217,216,215,214,213,212,211,210,209,208
-     isr_entry 0 \int_num
-.endr
-.irp int_num,207,206,205,204,203,202,201,200,199,198,197,196,195,194,193,192
-     isr_entry 0 \int_num
-.endr
-.irp int_num,191,190,189,188,187,186,185,184,183,182,181,180,179,178,177,176
-     isr_entry 0 \int_num
-.endr
-.irp int_num,175,174,173,172,171,170,169,168,167,166,165,164,163,162,161,160
-     isr_entry 0 \int_num
-.endr
-.irp int_num,159,158,157,156,155,154,153,152,151,150,149,148,147,146,145,144
-     isr_entry 0 \int_num
-.endr
-.irp int_num,143,142,141,140,139,138,137,136,135,134,133,132,131,130,129,128
-     isr_entry 0 \int_num
-.endr
-.irp int_num,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112
-     isr_entry 0 \int_num
-.endr
-.irp int_num,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97,96
-     isr_entry 0 \int_num
-.endr
-.irp int_num,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80
-     isr_entry 0 \int_num
-.endr
-.irp int_num,79,78,77,76,75,74,73,72,71,70,69,68,67,66,65,64
-     isr_entry 0 \int_num
-.endr
-.irp int_num,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48
-     isr_entry 0 \int_num
-.endr
-
-// Software interrupt handlers and fixed LAPIC vectors
-// 39 is a hot vector (INTR_APIC_TIMER), below
-.irp int_num,47,46,45,44,43,42
-     isr_entry 0 \int_num
-.endr
-
-// Separate exception entry points for conveniently placing breakpoints
-isr_entry 0 INTR_EX_VIRTUALIZE
-isr_entry 0 INTR_EX_SIMD
-isr_entry 0 INTR_EX_MACHINE
-isr_entry 1 INTR_EX_ALIGNMENT
-isr_entry 0 INTR_EX_MATH
-isr_entry 1 INTR_EX_GPF
-isr_entry 1 INTR_EX_STACK
-isr_entry 1 INTR_EX_SEGMENT
-isr_entry 1 INTR_EX_TSS
-isr_entry 0 INTR_EX_COPR_SEG
-isr_entry 1 INTR_EX_DBLFAULT
-isr_entry 0 INTR_EX_DEV_NOT_AV
-isr_entry 0 INTR_EX_OPCODE
-isr_entry 0 INTR_EX_BOUND
-isr_entry 0 INTR_EX_OVF
-isr_entry 0 INTR_EX_BREAKPOINT
-isr_entry 0 INTR_EX_NMI
-isr_entry 0 INTR_EX_DEBUG
+// Exceptions
 isr_entry 0 INTR_EX_DIV
-
-// Hottest vectors
+isr_entry 0 INTR_EX_DEBUG
+isr_entry 0 INTR_EX_NMI
+isr_entry 0 INTR_EX_BREAKPOINT
+isr_entry 0 INTR_EX_OVF
+isr_entry 0 INTR_EX_BOUND
+isr_entry 0 INTR_EX_OPCODE
+isr_entry 0 INTR_EX_DEV_NOT_AV
+isr_entry 1 INTR_EX_DBLFAULT
+isr_entry 0 INTR_EX_COPR_SEG
+isr_entry 1 INTR_EX_TSS
+isr_entry 1 INTR_EX_SEGMENT
+isr_entry 1 INTR_EX_STACK
+isr_entry 1 INTR_EX_GPF
 isr_entry 1 INTR_EX_PAGE
-isr_entry 0 INTR_TLB_SHOOTDOWN
-isr_entry 0 INTR_THREAD_YIELD
+isr_entry 0 15
+isr_entry 0 INTR_EX_MATH
+isr_entry 1 INTR_EX_ALIGNMENT
+isr_entry 0 INTR_EX_MACHINE
+isr_entry 0 INTR_EX_SIMD
+isr_entry 0 INTR_EX_VIRTUALIZE
+
+// Reserved for CPU
+isr_entry 0 21
+isr_entry 0 22
+isr_entry 0 23
+isr_entry 0 24
+isr_entry 0 25
+isr_entry 0 26
+isr_entry 0 27
+isr_entry 0 28
+isr_entry 0 29
+isr_entry 0 30
+isr_entry 0 31
+
+// Critical priority interrupts
+isr_entry 0 INTR_APIC_SPURIOUS
+isr_entry 0 INTR_APIC_ERROR
+isr_entry 0 INTR_APIC_THERMAL
+
+// Reserved for future critical priority interrupts
+isr_entry 0 35
+isr_entry 0 36
+isr_entry 0 37
+isr_entry 0 38
+isr_entry 0 39
+
+// Very high priority interrupts
+isr_entry 0 40
+isr_entry 0 41
+isr_entry 0 42
+isr_entry 0 43
+// Hitching ride on EOI logic by being adjacent to IOAPIC/MSI vector range
 isr_entry 0 INTR_APIC_TIMER
+isr_entry 0 INTR_IPI_TLB_SHTDN
+isr_entry 0 INTR_IPI_RESCHED
+isr_entry 0 INTR_IPI_FL_TRACE
 
-.section .text.isr
+// APIC and MSI(x) IRQs [48-240) = 192 interrupt vectors available
+isr_entry 0 48
+isr_entry 0 49
+isr_entry 0 50
+isr_entry 0 51
+isr_entry 0 52
+isr_entry 0 53
+isr_entry 0 54
+isr_entry 0 55
+isr_entry 0 56
+isr_entry 0 57
+isr_entry 0 58
+isr_entry 0 59
+isr_entry 0 60
+isr_entry 0 61
+isr_entry 0 62
+isr_entry 0 63
+isr_entry 0 64
+isr_entry 0 65
+isr_entry 0 66
+isr_entry 0 67
+isr_entry 0 68
+isr_entry 0 69
+isr_entry 0 70
+isr_entry 0 71
+isr_entry 0 72
+isr_entry 0 73
+isr_entry 0 74
+isr_entry 0 75
+isr_entry 0 76
+isr_entry 0 77
+isr_entry 0 78
+isr_entry 0 79
+isr_entry 0 80
+isr_entry 0 81
+isr_entry 0 82
+isr_entry 0 83
+isr_entry 0 84
+isr_entry 0 85
+isr_entry 0 86
+isr_entry 0 87
+isr_entry 0 88
+isr_entry 0 89
+isr_entry 0 90
+isr_entry 0 91
+isr_entry 0 92
+isr_entry 0 93
+isr_entry 0 94
+isr_entry 0 95
+isr_entry 0 96
+isr_entry 0 97
+isr_entry 0 98
+isr_entry 0 99
+isr_entry 0 100
+isr_entry 0 101
+isr_entry 0 102
+isr_entry 0 103
+isr_entry 0 104
+isr_entry 0 105
+isr_entry 0 106
+isr_entry 0 107
+isr_entry 0 108
+isr_entry 0 109
+isr_entry 0 110
+isr_entry 0 111
+isr_entry 0 112
+isr_entry 0 113
+isr_entry 0 114
+isr_entry 0 115
+isr_entry 0 116
+isr_entry 0 117
+isr_entry 0 118
+isr_entry 0 119
+isr_entry 0 120
+isr_entry 0 121
+isr_entry 0 122
+isr_entry 0 123
+isr_entry 0 124
+isr_entry 0 125
+isr_entry 0 126
+isr_entry 0 127
+isr_entry 0 128
+isr_entry 0 129
+isr_entry 0 130
+isr_entry 0 131
+isr_entry 0 132
+isr_entry 0 133
+isr_entry 0 134
+isr_entry 0 135
+isr_entry 0 136
+isr_entry 0 137
+isr_entry 0 138
+isr_entry 0 139
+isr_entry 0 140
+isr_entry 0 141
+isr_entry 0 142
+isr_entry 0 143
+isr_entry 0 144
+isr_entry 0 145
+isr_entry 0 146
+isr_entry 0 147
+isr_entry 0 148
+isr_entry 0 149
+isr_entry 0 150
+isr_entry 0 151
+isr_entry 0 152
+isr_entry 0 153
+isr_entry 0 154
+isr_entry 0 155
+isr_entry 0 156
+isr_entry 0 157
+isr_entry 0 158
+isr_entry 0 159
+isr_entry 0 160
+isr_entry 0 161
+isr_entry 0 162
+isr_entry 0 163
+isr_entry 0 164
+isr_entry 0 165
+isr_entry 0 166
+isr_entry 0 167
+isr_entry 0 168
+isr_entry 0 169
+isr_entry 0 170
+isr_entry 0 171
+isr_entry 0 172
+isr_entry 0 173
+isr_entry 0 174
+isr_entry 0 175
+isr_entry 0 176
+isr_entry 0 177
+isr_entry 0 178
+isr_entry 0 179
+isr_entry 0 180
+isr_entry 0 181
+isr_entry 0 182
+isr_entry 0 183
+isr_entry 0 184
+isr_entry 0 185
+isr_entry 0 186
+isr_entry 0 187
+isr_entry 0 188
+isr_entry 0 189
+isr_entry 0 190
+isr_entry 0 191
+isr_entry 0 192
+isr_entry 0 193
+isr_entry 0 194
+isr_entry 0 195
+isr_entry 0 196
+isr_entry 0 197
+isr_entry 0 198
+isr_entry 0 199
+isr_entry 0 200
+isr_entry 0 201
+isr_entry 0 202
+isr_entry 0 203
+isr_entry 0 204
+isr_entry 0 205
+isr_entry 0 206
+isr_entry 0 207
+isr_entry 0 208
+isr_entry 0 209
+isr_entry 0 210
+isr_entry 0 211
+isr_entry 0 212
+isr_entry 0 213
+isr_entry 0 214
+isr_entry 0 215
+isr_entry 0 216
+isr_entry 0 217
+isr_entry 0 218
+isr_entry 0 219
+isr_entry 0 220
+isr_entry 0 221
+isr_entry 0 222
+isr_entry 0 223
+isr_entry 0 224
+isr_entry 0 225
+isr_entry 0 226
+isr_entry 0 227
+isr_entry 0 228
+isr_entry 0 229
+isr_entry 0 230
+isr_entry 0 231
+isr_entry 0 232
+isr_entry 0 233
+isr_entry 0 234
+isr_entry 0 235
+isr_entry 0 236
+isr_entry 0 237
+isr_entry 0 238
+isr_entry 0 239
 
-.type isr_common,@function
-.align 16
-isr_common:
+// PIC IRQs (lowest priority interrupts)
+isr_entry 0 240
+isr_entry 0 241
+isr_entry 0 242
+isr_entry 0 243
+isr_entry 0 244
+isr_entry 0 245
+isr_entry 0 246
+isr_entry 0 247
+isr_entry 0 248
+isr_entry 0 249
+isr_entry 0 250
+isr_entry 0 251
+isr_entry 0 252
+isr_entry 0 253
+isr_entry 0 254
+isr_entry 0 255
+
+.section .text.isr, "ax", @progbits
+
+.macro isr_common_init_cfa
      // Initial CFA using raw stack pointer
      // CFA
      // index
@@ -169,7 +421,7 @@ isr_common:
      // -4    3*8(%rsp) ss
      // -5    2*8(%rsp) rip
      // -6    1*8(%rsp) error code
-     // -7    0*8(%rsp) interrupt number
+     // -7    0*8(%rsp) interrupt number and ctx_flags
 
     .cfi_startproc
     .cfi_signal_frame
@@ -179,6 +431,13 @@ isr_common:
     .cfi_offset rflags,-3*8
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
+.endm
+
+.type isr_common,@function
+.balign 16
+.global isr_common
+isr_common:
+    isr_common_init_cfa
 
     // Use fixed rbp for CFA to save lots of CFA adjustment eh_frame records
 
@@ -197,34 +456,37 @@ isr_common:
 
     // CFA
     // index
-    //   0    8*8(%rbp) <-- CFA
-    //  -1    7*8(%rbp) -> ss            ┐
-    //  -2    6*8(%rbp) -> rsp           │
-    //  -3    5*8(%rbp) -> flags         │
-    //  -4    4*8(%rbp) -> cs            ├ interrupt frame
-    //  -5    3*8(%rbp) -> rip           │
-    //  -6    2*8(%rbp) -> error code    │
-    //  -7    1*8(%rbp) -> interrupt     ┘
-    //  -8    0*8(%rbp) -> caller's rbp  ┐
-    //  -9   -1*8(%rbp) -> rbx           │
-    // -10   -2*8(%rbp) -> r15           ├ call preserved
-    // -11   -3*8(%rbp) -> r14           │
-    // -12   -4*8(%rbp) -> r13           │
-    // -13   -5*8(%rbp) -> r12           ┘
-    // -14   -6*8(%rbp) -> r11           ┐
-    // -15   -7*8(%rbp) -> r10           │
-    // -16   -8*8(%rbp) -> rax           │
-    // -17   -9*8(%rbp) -> r9            │
-    // -18  -10*8(%rbp) -> r8            ├ call clobbered
-    // -19  -11*8(%rbp) -> rcx           │
-    // -20  -12*8(%rbp) -> rdx           │
-    // -21  -13*8(%rbp) -> rsi           │
-    // -22  -14*8(%rbp) -> rdi           ┘
-    // -23  -15*8(%rbp) -> cr3
-    // -24  -16*8(%rbp) -> segments
-    // -25  -17*8(%rbp) -> fpu ctx ptr
-    // -26  -18*8(%rbp) -> cleanup arg
-    // -27  -19*8(%rbp) -> cleanup fn
+    //          frame      raw
+    //   0    8*8(%rbp) 25*8(%rsp) <-- CFA
+    //  -1    7*8(%rbp) 24*8(%rsp) -> ss            ┐
+    //  -2    6*8(%rbp) 23*8(%rsp) -> rsp           │
+    //  -3    5*8(%rbp) 22*8(%rsp) -> flags         │
+    //  -4    4*8(%rbp) 21*8(%rsp) -> cs            ├ interrupt frame
+    //  -5    3*8(%rbp) 20*8(%rsp) -> rip           │
+    //  -6    2*8(%rbp) 19*8(%rsp) -> error code    │
+    //  -7    1*8(%rbp) 18*8(%rsp) -> interrupt     ┘
+    //  -8    0*8(%rbp) 17*8(%rsp) -> caller's rbp  ┐
+    //  -9   -1*8(%rbp) 16*8(%rsp) -> rbx           │
+    // -10   -2*8(%rbp) 15*8(%rsp) -> r15           ├ call preserved
+    // -11   -3*8(%rbp) 14*8(%rsp) -> r14           │
+    // -12   -4*8(%rbp) 13*8(%rsp) -> r13           │
+    // -13   -5*8(%rbp) 12*8(%rsp) -> r12           ┘
+    // -14   -6*8(%rbp) 11*8(%rsp) -> r11           ┐
+    // -15   -7*8(%rbp) 10*8(%rsp) -> r10           │
+    // -16   -8*8(%rbp)  9*8(%rsp) -> rax           │
+    // -17   -9*8(%rbp)  8*8(%rsp) -> r9            │
+    // -18  -10*8(%rbp)  7*8(%rsp) -> r8            ├ call clobbered
+    // -19  -11*8(%rbp)  6*8(%rsp) -> rcx           │
+    // -20  -12*8(%rbp)  5*8(%rsp) -> rdx           │
+    // -21  -13*8(%rbp)  4*8(%rsp) -> rsi           │
+    // -22  -14*8(%rbp)  3*8(%rsp) -> rdi           ┘
+    // -23  -15*8(%rbp)  2*8(%rsp) -> cr3
+    // -24  -16*8(%rbp)  1*8(%rsp) -> segments
+    // -25  -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr   < Saved thread rsp
+
+    /// Register usage:
+    ///  r15 accumulates segment registers
+    ///  rbx used to shift segment values into place before merge into r15
 
     pushq %rbx
     .cfi_offset rbx,-9*8
@@ -232,63 +494,59 @@ isr_common:
     pushq %r15
     .cfi_offset r15,-10*8
 
-    // r15d=ds, r14d=es, r13d=fs, r12d=gs
+    // r15 = ds | es << 16 | fs << 32 | gs << 48
     movl %ds,%r15d
 
     pushq %r14
     .cfi_offset r14,-11*8
 
-    movl %es,%r14d
+    movl %es,%ebx
 
     pushq %r13
     .cfi_offset r13,-12*8
 
-    movl %fs,%r13d
+    shl $16,%ebx
 
     pushq %r12
     .cfi_offset r12,-13*8
 
-    movl %gs,%r12d
+    or %ebx,%r15d
 
     pushq %r11
     .cfi_offset r11,-14*8
 
-    // shift es, fs, gs into position to pack into r13
-    shll $16,%r14d
+    mov %fs,%ebx
 
     pushq %r10
     .cfi_offset r10,-15*8
 
-    shlq $32,%r13
+    shl $32,%rbx
 
     pushq %rax
     .cfi_offset rax,-16*8
 
-    shlq $48,%r12
+    or %rbx,%r15
 
     movq %cr3,%rax
 
-    // Merge ds,es into r15
-    orl %r14d,%r15d
+    mov %gs,%ebx
 
     cld
     pushq %r9
     .cfi_offset r9,-17*8
 
-    // Merge fs,gs into r13
-    orq %r12,%r13
+    shl $48,%rbx
 
     pushq %r8
     .cfi_offset r8,-18*8
 
-    // Merge ds|es,fs|gs into r13
-    orq %r15,%r13
+    or %rbx,%r15
 
     pushq %rcx
     .cfi_offset rcx,-19*8
 
-    // Get interrupted code segment
-    movzwl frame_cs(%rbp),%ecx
+    /// Register usage:
+    ///  Finished with rbx, r15 now has all segment registers
 
     pushq %rdx
     .cfi_offset rdx,-20*8
@@ -299,43 +557,60 @@ isr_common:
     pushq %rdi
     .cfi_offset rdi,-22*8
 
-    // Assume null FPU context pointer
+    // Zero constant
     xorl %edi,%edi
+
+    /// Register usage:
+    ///  Finished with rbx, r15 now has all segment registers
+    ///  rdi = 0
 
     // Save CR3
     pushq %rax
 
     // Save segments
-    pushq %r13
-
-    // Check for doublefault nonsense cs
-    testl %ecx,%ecx
-    jz .Lfrom_kernel
+    pushq %r15
 
     // See if we are coming from kernel code
-    cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
-    je .Lfrom_kernel
+    // Handles doublefault nonsense 0 cs too
+    testl $ 3,frame_cs(%rbp)
+    jz .Lfrom_kernel
 
-    // ...came from user code
+    // ...came from user code, fastest most common case falling right through
+
+    insn_fixup
+    rdfsbase %r13
+    rdgsbase %r14
+
     swapgs
 
-.align 16
+    // Flush indirect branch prediction data because the cpu
+    // is tainted by user mode process
+    // This could be patched to a long nop
+    insn_fixup
+    call protection_barrier
+
+    mov %gs:CPU_INFO_CURTHREAD_OFS(%rdi),%r12
+
+    /// Register usage:
+    ///  rdi = 0
+    ///  r12 = this_cpu()->cur_thread
+    ///  r13 = caller fsbase
+    ///  r14 = caller gsbase
+
+    mov %r13,THREAD_FSBASE_OFS(%r12)
+    mov %r14,THREAD_GSBASE_OFS(%r12)
+
+.Lthread_bases_done:
 .Lfrom_kernel:
     // Push FPU context pointer field, initially null
     pushq $0
 
-    // Outgoing cleanup
-    pushq $0
-    pushq $0
-
-    // Hold isr_context_t pointer in r12
-    // Hold interrupt number in ebx
+    /// Register usage:
+    ///  Hold isr_context_t pointer in r12
+    ///  Hold interrupt number in ebx
 
     movq %rsp,%r12
     movl frame_intr(%rbp),%ebx
-
-    // Align stack pointer
-    subq $8,%rsp
 
     // Interrupt dispatch
     // 0x00-0x1F -> exception_isr_handler
@@ -358,7 +633,7 @@ isr_common:
 
     // 0x30-0xEF -> apic_dispatcher
     leaq apic_dispatcher(%rip),%rcx
-    cmpl $ INTR_APIC_IRQ_BASE,%ebx
+    cmpl $ INTR_APIC_DSP_BASE,%ebx
     cmovaeq %rcx,%rax
 
     // 0xF0-0xFF -> pic_dispatcher
@@ -372,29 +647,42 @@ isr_common:
     movq %r12,%rsi
 
     // Call handler
-    call __x86_indirect_thunk_rax
-    //call *%rax
+    indirect_call rax
 
     // If context pointer is null, invoke the exception handler for this thread
     test %rax,%rax
     jz .Linvoke_catch
+
+    // If we are restoring a fast context then jump to simpler code
+    // Fast context will have sign bit of ctx flag field set
+    // (packed in interrupt value)
+    movl ISR_CTX_OFS_INTERRUPT(%rax),%edi
+    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
+    jc .Lrestore_fast_ctx
+
+    // Branches here from fast switcher if we switched to a slow context
+.Lrestore_slow_ctx:
+    // Load a zero to use much smaller encodings for gs acccesses below
+    xor %ecx,%ecx
 
     // isr can return a new stack pointer, or just return
     // the passed one to continue with this thread
     mov %rax,%rsp
 
     // Infer pointer to incoming thread's interrupt frame from ctx pointer
-    lea 19*8(%rax),%rbp
+    lea ISR_CTX_OFS_RBP(%rax),%rbp
 
-    // Pop outgoing cleanup data
+    // Run cpu-local outgoing cleanup after stack switch (now)
     // Used to adjust outgoing thread state after switching stack
-    popq %rax
-    popq %rdi
-    testq %rax,%rax
+    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
+    test %rax,%rax
     jz .Lno_cleanup_call
-    call __x86_indirect_thunk_rax
-    //call *%rax
+    movq %rcx,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
+    mov %rcx,%gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
+    indirect_call rax
 .Lno_cleanup_call:
+    xor %eax,%eax
 
     // Pop the pointer to the FPU context
     popq %rdi
@@ -406,98 +694,104 @@ isr_common:
     //   if any data segment is not GDT_SEL_USER_DATA | 3
     //     load all segment registers with GDT_SEL_USER_DATA | 3
     //   endif
-    //   restore fsbase
+    //   restore fsgsbase
     // endif
-
-    // Load return cs
-    movzwl frame_cs(%rbp),%ecx
 
     // Pop segments
     popq %rdx
 
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%r15
+    // r13 = current thread (maybe changed since last loaded)
+    movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r13
 
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
-    cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
-    je .Lreturning_to_kernel
+    testl $ 3,frame_cs(%rbp)
+    jz .Lreturning_to_kernel
 
     // ...returning to user code
 
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
-    movq %gs:CPU_INFO_TSS_PTR_OFS,%rcx
-    leaq frame_end(%rbp),%rax
+    movq %gs:CPU_INFO_TSS_PTR_OFS(%rax),%rcx
+    movq THREAD_PRIV_CHG_STACK_OFS(%r13),%rax
     movq %rax,TSS_RSP0_OFS(%rcx)
 
     // Restore user gs
     swapgs
 
     // If segments are not changing, avoid 136*4 cycles
-    cmpq %r13,%rdx
+    cmpq %r15,%rdx
     jnz .Lsegments_changed
 
 .Lsegments_restored:
-    movq THREAD_FSBASE_OFS(%r15),%r13
-    movq THREAD_GSBASE_OFS(%r15),%r14
+    movq THREAD_GSBASE_OFS(%r13),%r14
+    movq THREAD_FSBASE_OFS(%r13),%r13
 
-    // Load fsbase and gsbase
-    // NOTE: this may be patched to call
-    // .Lload_fs_gs_fast (to use wr(fs|gs)base)
-    // rax, rcx, rdx may be clobbered here
-    call .Lload_fs_gs_slow
-.Lpatch_fsgsbase_csw_end:
+    insn_fixup
+    wrfsbase %r13
+    wrgsbase %r14
 
 .Lreturning_to_kernel:
 
     .cfi_remember_state
 
+    // Read eflags, toggle always set flag (becomes 0 in valid case),
+    // Mask out all bits that are allowed to be nonzero, make sure it is zero
+    movq frame_efl(%rbp),%rdi
+    xor $ CPU_EFLAGS_ALWAYS,%rdi
+    and $(CPU_EFLAGS_NEVER | CPU_EFLAGS_ALWAYS),%rdi
+    jz .Lgood_flags2
+    call cpu_debug_break
+.Lgood_flags2:
+
     // Restore CR3
-    popq %rax
-    movq %rax,%cr3
+    popq %rbx
 
     popq %rdi
-    .cfi_restore rdi
+    .cfi_same_value rdi
 
     popq %rsi
-    .cfi_restore rsi
+    .cfi_same_value rsi
 
     popq %rdx
-    .cfi_restore rdx
+    .cfi_same_value rdx
 
     popq %rcx
-    .cfi_restore rcx
+    .cfi_same_value rcx
 
     popq %r8
-    .cfi_restore r8
+    .cfi_same_value r8
 
     popq %r9
-    .cfi_restore r9
+    .cfi_same_value r9
 
     popq %rax
-    .cfi_restore rax
+    .cfi_same_value rax
 
     popq %r10
-    .cfi_restore r10
+    .cfi_same_value r10
 
     popq %r11
-    .cfi_restore r11
+    .cfi_same_value r11
 
     popq %r12
-    .cfi_restore r12
+    .cfi_same_value r12
 
     popq %r13
-    .cfi_restore r13
+    .cfi_same_value r13
 
     popq %r14
-    .cfi_restore r14
+    .cfi_same_value r14
 
     popq %r15
-    .cfi_restore r15
+    .cfi_same_value r15
+
+    movq %rbx,%cr3
 
     popq %rbx
-    .cfi_restore rbx
+    .cfi_same_value rbx
 
     popq %rbp
+    .cfi_same_value rbp
 
     // rbp has been restored, back to raw rsp-relative CFA
     .cfi_def_cfa rsp,7*8
@@ -507,11 +801,17 @@ isr_common:
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
 
-    add_rsp 16
+    // This could be patched to a long nop
+    insn_fixup
+    call protection_barrier
+
+    fn_trace isr_common,exit
+
+    adj_rsp 16
 
     iretq
 
-.align 16
+.balign 16
 .Lsegments_changed:
     .cfi_restore_state
     // Restore segments
@@ -524,42 +824,399 @@ isr_common:
     movw %dx,%gs
     jmp .Lsegments_restored
 
-    .cfi_endproc
-
-// Quickly load FS/GS base
-// Expects r13=user_fsbase, r14=user_gsbase
-.align 16
-.Lload_fs_gs_fast:
-    .cfi_startproc
-
-    wrfsbase %r13
-    wrgsbase %r14
-    ret
+.balign 16
+.Lthread_bases_changed:
+    mov %r13,THREAD_FSBASE_OFS(%r12)
+    mov %r14,THREAD_GSBASE_OFS(%r12)
+    jmp .Lthread_bases_done
 
     .cfi_endproc
 
-// Slow load FS/GS base for processors that don't support wrfsbase/wrgsbase
-// Reaches here with r13=user_fsbase, r14=user_gsbase
-.align 16
-.Lload_fs_gs_slow:
+// Yield as efficiently as possible
+// Assumes yielding thread is in kernel mode
+.balign 16
+.global thread_yield
+thread_yield:
     .cfi_startproc
 
-    movl $ CPU_MSR_FSBASE,%ecx
-    movq %r13,%rdx
-    movl %r13d,%eax
-    shrq $32,%rdx
-    wrmsr
-    movl $ CPU_MSR_GSBASE,%ecx
-    movq %r14,%rdx
-    movl %r14d,%eax
-    shrq $32,%rdx
-    wrmsr
-    // Clear registers for sysret scenario
+    // Snag return address from the stack,
+    // we're replacing that with a synthetic interrupt frame
+    pop_cfi %rcx
+
+    // Switch to getting return address from a register
+    .cfi_register rip,rcx
+
+    // At this point, the stack pointer conveniently has
+    // the value it will have when the thread resumes
+    // Save caller's rsp in rax
+    movq %rsp,%rax
+
+    // push ss:rsp
+    push_cfi $GDT_SEL_KERNEL_DATA
+    push_cfi %rax
+
+    // push eflags
+    pushfq_cfi
+
+    // Segments (hardcoded kernel ones) (scheduled far ahead)
+    movabs $ (GDT_SEL_USER_DATA | 3) * 0x0001000100010001,%rdx
+
+    // rax remains a zero constant for a while
     xor %eax,%eax
-    mov %eax,%edx
-    mov %eax,%ecx
+
+    cli
+
+    // push cs:rip
+    push_cfi $GDT_SEL_KERNEL_CODE64
+    push_cfi %rcx
+
+    // Switch back to getting return address from stack
+    .cfi_offset rip,-5*8
+
+    //          frame      raw
+    //   0   8*8(%rbp) 25*8(%rsp) <-- CFA
+    //  -1   7*8(%rbp) 24*8(%rsp) -> ss            ┐
+    //  -2   6*8(%rbp) 23*8(%rsp) -> rsp           │
+    //  -3   5*8(%rbp) 22*8(%rsp) -> flags         │
+    //  -4   4*8(%rbp) 21*8(%rsp) -> cs            ├ interrupt frame
+    //  -5   3*8(%rbp) 20*8(%rsp) -> rip           │
+    //  -6   2*8(%rbp) 19*8(%rsp) -> error code    │
+    //  -7   1*8(%rbp) 18*8(%rsp) -> interrupt     ┘ <- has fast ctx bit set
+    //  -8   0*8(%rbp) 17*8(%rsp) -> caller's rbp  ┐
+    //  -9  -1*8(%rbp) 16*8(%rsp) -> rbx           │
+    // -10  -2*8(%rbp) 15*8(%rsp) -> r15           ├ call preserved
+    // -11  -3*8(%rbp) 14*8(%rsp) -> r14           │
+    // -12  -4*8(%rbp) 13*8(%rsp) -> r13           │
+    // -13  -5*8(%rbp) 12*8(%rsp) -> r12           ┘
+    // -14  -6*8(%rbp) 11*8(%rsp) -> r11  XXX      ┐
+    // -15  -7*8(%rbp) 10*8(%rsp) -> r10  XXX      │
+    // -16  -8*8(%rbp)  9*8(%rsp) -> rax  XXX      │
+    // -17  -9*8(%rbp)  8*8(%rsp) -> r9   XXX      │
+    // -18 -10*8(%rbp)  7*8(%rsp) -> r8   XXX      ├ call clobbered
+    // -19 -11*8(%rbp)  6*8(%rsp) -> rcx  XXX      │ (garbage)
+    // -20 -12*8(%rbp)  5*8(%rsp) -> rdx  XXX      │
+    // -21 -13*8(%rbp)  4*8(%rsp) -> rsi  XXX      │
+    // -22 -14*8(%rbp)  3*8(%rsp) -> rdi  XXX      ┘
+    // -23 -15*8(%rbp)  2*8(%rsp) -> cr3
+    // -24 -16*8(%rbp)  1*8(%rsp) -> segments
+    // -25 -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr
+
+
+
+
+
+    // Push zero error code
+    push_cfi %rax
+
+    // Save PDBR (scheduled ahead)
+    mov %cr3,%rcx
+
+    // Push interrupt number
+    push_cfi $(INTR_THREAD_YIELD|(1<<ISR_CTX_CTX_FLAGS_FAST_QWBIT))
+
+    // Save caller rbp
+    push_cfi %rbp
+    .cfi_offset rbp,-8*8
+
+    // Switch to rbp-relative frame, avoid CFA adjustments I hope
+    movq %rsp,%rbp
+    .cfi_def_cfa rbp,8*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+
+    .cfi_offset rbp,-8*8
+
+    // Push call preserved registers
+    pushq %rbx
+    .cfi_offset rbx,-9*8
+    pushq %r15
+    .cfi_offset r15,-10*8
+    pushq %r14
+    .cfi_offset r14,-11*8
+    pushq %r13
+    .cfi_offset r13,-12*8
+    pushq %r12
+    .cfi_offset r12,-13*8
+
+    sub $ 9*8,%rsp
+
+    // Save CR3
+    push %rcx
+
+    // Push segments
+    push %rdx
+
+    // FPU context pointer is initially null
+    push $ 0
+
+    // Reschedule directly, bypassing everything to do with interrupts
+    movq %rsp,%rdi
+    call thread_schedule
+
+    // See if we are restoring a fast context
+    movl ISR_CTX_OFS_INTERRUPT(%rax),%edi
+    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
+    jnc .Lrestore_slow_ctx
+
+    // Could branch here from full interrupt handler to restore a fast context
+.Lrestore_fast_ctx:
+    // Zero constant
+    xor %ecx,%ecx
+
+    mov %rax,%rsp
+
+    // Run cpu-local outgoing cleanup after stack switch (now)
+    // Used to adjust outgoing thread state after switching stack
+    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
+    test %rax,%rax
+    jz .Lno_cleanup_call_fast
+    movq %rdi,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
+    mov %rcx,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+    mov %rcx,%gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
+    indirect_call rax
+.Lno_cleanup_call_fast:
+
+    // Discard FPU ctx and segments
+    add $ 2*8,%rsp
+
+    // Pop CR3
+    popq %rax
+
+    // Throw away call clobbered registers
+    addq $ 9*8,%rsp
+
+    popq %r12
+    .cfi_same_value r12
+
+    popq %r13
+    .cfi_same_value r13
+
+    popq %r14
+    .cfi_same_value r14
+
+    popq %r15
+    .cfi_same_value r15
+
+    popq %rbx
+    .cfi_same_value rbx
+
+    popq %rbp
+    .cfi_same_value rbp
+
+    // rbp has been restored, back to raw rsp-relative CFA
+    .cfi_def_cfa rsp,7*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+
+    // Load CR3
+    movq %rax,%cr3
+
+    // Error code is wakeup return value
+    mov 8(%rsp),%rax
+
+    // Load flags from interrupt frame (reach over intr+errcode+rip+cs)
+    movq 8*4(%rsp),%rdi
+
+    // Read eflags, toggle always set flag (becomes 0 in valid case),
+    // Mask out all bits that are allowed to be nonzero, make sure it is zero
+    xor $ CPU_EFLAGS_ALWAYS,%rdi
+    and $(CPU_EFLAGS_NEVER | CPU_EFLAGS_ALWAYS),%rdi
+    jz .Lgood_flags1
+    call cpu_debug_break
+.Lgood_flags1:
+
+    push_cfi %rdi
+    popfq_cfi
+
+    // Zero all clobbered registers
+    movl %ecx,%edx
+    movl %ecx,%esi
+    movl %ecx,%edi
+    movl %ecx,%r8d
+    movl %ecx,%r9d
+    movl %ecx,%r10d
+    movl %ecx,%r11d
+
+    adj_rsp 16
+
+    // Return and pop cs, eflags, rsp, ss
+    retq $((5-1)*8)
+
+    .cfi_endproc
+
+.balign 16
+.global cpu_clear_fpu
+.hidden cpu_clear_fpu
+cpu_clear_fpu:
+    vzeroall_insn
+    emms
+    pxor %mm0,%mm0
+    movq %mm0,%mm1
+    movq %mm0,%mm2
+    movq %mm0,%mm3
+    movq %mm0,%mm4
+    movq %mm0,%mm5
+    movq %mm0,%mm6
+    movq %mm0,%mm7
+    fcom %st(0)
+    emms
     ret
 
+.balign 16
+.global soft_vzeroall
+.hidden soft_vzeroall
+soft_vzeroall:
+    pxor   %xmm0, %xmm0
+    movdqa %xmm0, %xmm1
+    movdqa %xmm0, %xmm2
+    movdqa %xmm0, %xmm3
+    movdqa %xmm0, %xmm4
+    movdqa %xmm0, %xmm5
+    movdqa %xmm0, %xmm6
+    movdqa %xmm0, %xmm7
+    movdqa %xmm0, %xmm8
+    movdqa %xmm0, %xmm9
+    movdqa %xmm0,%xmm10
+    movdqa %xmm0,%xmm11
+    movdqa %xmm0,%xmm12
+    movdqa %xmm0,%xmm13
+    movdqa %xmm0,%xmm14
+    movdqa %xmm0,%xmm15
+    ret
+
+.balign 16
+.global soft_rdfsgsbase_r13r14
+.hidden soft_rdfsgsbase_r13r14
+soft_rdfsgsbase_r13r14:
+    .cfi_startproc
+    push_cfi %rcx
+    mov $ CPU_MSR_FSBASE,%ecx
+    push_cfi %rdx
+    push_cfi %rax
+    rdmsr
+    mov $ CPU_MSR_GSBASE,%ecx
+    shl $ 32,%rdx
+    mov %eax,%r13d
+    or %rdx,%r13
+    rdmsr
+    shl $ 32,%rdx
+    mov %eax,%r14d
+    pop_cfi %rax
+    or %rdx,%r14
+    pop_cfi %rdx
+    pop_cfi %rcx
+    ret
+    .cfi_endproc
+
+.balign 16
+.global soft_wrfsgsbase_r13r14
+.hidden soft_wrfsgsbase_r13r14
+soft_wrfsgsbase_r13r14:
+    .cfi_startproc
+    push_cfi %rcx
+    mov $ CPU_MSR_FSBASE,%ecx
+    push_cfi %rdx
+    mov %r13,%rdx
+    push_cfi %rax
+    mov %r13d,%eax
+    shr $ 32,%rdx
+    wrmsr
+    mov $ CPU_MSR_GSBASE,%ecx
+    mov %r14,%rdx
+    mov %r14d,%eax
+    shr $ 32,%rdx
+    wrmsr
+    pop_cfi %rax
+    pop_cfi %rdx
+    pop_cfi %rcx
+    ret
+    .cfi_endproc
+
+// Replaces opcodes sequence f3 49 0f ae d5: wrfsbase %r13
+.balign 16
+.global soft_wrfsbase_r13
+.hidden soft_wrfsbase_r13
+soft_wrfsbase_r13:
+    .cfi_startproc
+    push_cfi %rcx
+    movl $ CPU_MSR_FSBASE,%ecx
+    push_cfi %rax
+    movl %r13d,%eax
+    push_cfi %rdx
+    movq %r13,%rdx
+    shrq $ 32,%rdx
+    wrmsr
+    pop_cfi %rdx
+    pop_cfi %rax
+    pop_cfi %rcx
+    ret
+    .cfi_endproc
+
+// Replaces opcodes sequence f3 49 0f ae de: wrgsbase %r14
+.balign 16
+.global soft_wrgsbase_r14
+.hidden soft_wrgsbase_r14
+soft_wrgsbase_r14:
+    .cfi_startproc
+    push_cfi %rax
+    movl %r14d,%eax
+    push_cfi %rdx
+    movq %r14,%rdx
+    push_cfi %rcx
+    shrq $ 32,%rdx
+    movl $ CPU_MSR_GSBASE,%ecx
+    wrmsr
+    pop_cfi %rcx
+    pop_cfi %rdx
+    pop_cfi %rax
+    ret
+    .cfi_endproc
+
+// Replaces opcodes sequence f3 49 0f ae c5: rdfsbase %r13
+.balign 16
+.global soft_rdfsbase_r13
+.hidden soft_rdfsbase_r13
+soft_rdfsbase_r13:
+    .cfi_startproc
+    push_cfi %rdx
+    push_cfi %rax
+    push_cfi %rcx
+    movl $ CPU_MSR_FSBASE,%ecx
+    rdmsr
+    shlq $ 32,%rdx
+    pop_cfi %rcx
+    orq %rax,%rdx
+    pop_cfi %rax
+    mov %rdx,%r13
+    pop_cfi %rdx
+    ret
+    .cfi_endproc
+
+// Replaces opcodes sequence f3 49 0f ae ce: rdgsbase %r14
+.balign 16
+.global soft_rdgsbase_r14
+.hidden soft_rdgsbase_r14
+soft_rdgsbase_r14:
+    .cfi_startproc
+    push_cfi %rdx
+    push_cfi %rax
+    push_cfi %rcx
+    movl $ CPU_MSR_GSBASE,%ecx
+    rdmsr
+    shlq $ 32,%rdx
+    pop_cfi %rcx
+    orq %rax,%rdx
+    pop_cfi %rax
+    mov %rdx,%r14
+    pop_cfi %rdx
+    ret
     .cfi_endproc
 
 // Pass thread_info_t pointer in rdi
@@ -568,174 +1225,204 @@ isr_common:
 .macro xsave_ctx insn
     .cfi_startproc
 
-    // Set all bits of edx:eax
-    movl $-1,%eax
-    movl %eax,%edx
-
     // Read xsave stack pointer from thread
     movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
     subq sse_context_size(%rip),%rsi
 
+    // Set all bits of edx:eax
+    movl $-1,%eax
+    movl %eax,%edx
+
     // Save context using instruction passed to macro
+    // replaced with best supported instruction
+    insn_fixup
     \insn (%rsi)
 
     // Update xsave stack pointer in thread
     movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
+    movq %rsi,%rax
     ret
 
     .cfi_endproc
 .endm
 
 // Expects rdi to point to saved context
-// Clobbers eax,edx,ecx
+// Clobbers eax,edx,ecx, returns new xsave stack pointer
 .macro xrstor_ctx insn
     .cfi_startproc
+
+    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
 
     // Set all bits of edx:eax
     movl $-1,%eax
     movl %eax,%edx
 
-    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
-
     // Restore context using instruction passed to macro
+    // replaced with best supported instruction
+    insn_fixup
     \insn (%rsi)
 
     addq sse_context_size(%rip),%rsi
     movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
+    movq %rsi,%rax
 
     ret
 
     .cfi_endproc
 .endm
 
-// Branch directly to appropriate save/restore
+.section .text.isr, "ax", @progbits
 
-.align 16
-.global isr_save_fpu_ctx
-.hidden isr_save_fpu_ctx
-isr_save_fpu_ctx:
-    jmp isr_save_fxsave
-.Lsse_context_save_jmp:
-
-.align 16
-.global isr_restore_fpu_ctx
-.hidden isr_restore_fpu_ctx
-isr_restore_fpu_ctx:
-    jmp isr_restore_fxrstor
-.Lsse_context_restore_jmp:
-
-// Save/restore implementations
-
-.align 16
-.global isr_save_xsaveopt
-.hidden isr_save_xsaveopt
-isr_save_xsaveopt:
-    xsave_ctx xsaveopt64
-
-.align 16
-.global isr_save_xsave
-.hidden isr_save_xsave
-isr_save_xsave:
-    xsave_ctx xsave64
-
-.align 16
-.global isr_save_xsavec
-.hidden isr_save_xsavec
-isr_save_xsavec:
-    xsave_ctx xsavec64
-
-.align 16
-.global isr_save_xsaves
-.hidden isr_save_xsaves
-isr_save_xsaves:
-    xsave_ctx xsaves64
-
-.align 16
-.global isr_restore_xrstors
-.hidden isr_restore_xrstors
-isr_restore_xrstors:
-    xrstor_ctx xrstors64
-
-.align 16
-.global isr_restore_xrstor
-.hidden isr_restore_xrstor
-isr_restore_xrstor:
-    xrstor_ctx xrstor64
-
-.align 16
-.global isr_save_fxsave
-.hidden isr_save_fxsave
-isr_save_fxsave:
+.balign 16
+.global isr_save_fpu_ctx64
+.hidden isr_save_fpu_ctx64
+isr_save_fpu_ctx64:
     xsave_ctx fxsave64
 
-.align 16
-.global isr_restore_fxrstor
-.hidden isr_restore_fxrstor
-isr_restore_fxrstor:
+.balign 16
+.global isr_save_fpu_ctx32
+.hidden isr_save_fpu_ctx32
+isr_save_fpu_ctx32:
+    xsave_ctx fxsave
+
+.balign 16
+.global isr_restore_fpu_ctx64
+.hidden isr_restore_fpu_ctx64
+isr_restore_fpu_ctx64:
     xrstor_ctx fxrstor64
 
+.balign 16
+.global isr_restore_fpu_ctx32
+.hidden isr_restore_fpu_ctx32
+isr_restore_fpu_ctx32:
+    xrstor_ctx fxrstor
+
+.balign 16
+.hidden protection_barrier
+.global protection_barrier
+protection_barrier:
+    // Might be called early, but later, calls to this are NOP'd out
+    // Just return if it is getting called before patching to IBPB version
+    ret
+
+.hidden protection_barrier_ibpb
+.global protection_barrier_ibpb
+.balign 16
+protection_barrier_ibpb:
+    .cfi_startproc
+
+    push_cfi %rax
+    mov $ CPU_MSR_PRED_CMD_IBPB,%eax
+
+    push_cfi %rdx
+    xor %edx,%edx
+
+    push_cfi %rcx
+    mov $ CPU_MSR_PRED_CMD,%ecx
+
+    wrmsr
+
+    pop_cfi %rcx
+    pop_cfi %rdx
+    pop_cfi %rax
+
+    ret
+
+    .cfi_endproc
+
 // on entry, ebx=intr, r12=ctx
+.balign 16
 exception_isr_handler:
     .cfi_startproc
-    .cfi_def_cfa rbp,4*8
-    .cfi_offset ss,3*8
-    .cfi_offset rsp,2*8
-    .cfi_offset rflags,1*8
-    .cfi_offset cs,0*8
-    .cfi_offset rip,-1*8
+    .cfi_def_cfa rbp,8*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
 
-    leaq intr_has_handler(%rip),%rax
+    .cfi_offset rbp,-8*8
+    .cfi_offset rbx,-9*8
+    .cfi_offset r15,-10*8
+    .cfi_offset r14,-11*8
+    .cfi_offset r13,-12*8
+    .cfi_offset r12,-13*8
+    .cfi_offset r11,-14*8
+    .cfi_offset r10,-15*8
+    .cfi_offset rax,-16*8
+    .cfi_offset r9,-17*8
+    .cfi_offset r8,-18*8
+    .cfi_offset rcx,-19*8
+    .cfi_offset rdx,-20*8
+    .cfi_offset rsi,-21*8
+    .cfi_offset rdi,-22*8
 
-    // If there is no handler...
-    call __x86_indirect_thunk_rax
-    //callq *%rax
+    call intr_has_handler
     testl %eax,%eax
     jz .Lno_handler
 
     // There is a handler
-    leaq intr_invoke(%rip),%rax
     movl %ebx,%edi
     movq %r12,%rsi
-    call __x86_indirect_thunk_rax
-    //callq *%rax
+    call intr_invoke
 
     movq %r12,%rax
     retq
 
-.Lno_handler:
-
-// fall through...
-
-.align 16
 .Linvoke_catch:
+     nop
+
+.balign 16
+.Lno_handler:
     // ...no handler or handler rejected it
-    leaq __exception_handler_invoke(%rip),%rax
     movl %ebx,%edi
+    call __exception_handler_invoke
 
-    call __x86_indirect_thunk_rax
-    //callq *%rax
-    testl %eax,%eax
-    jnz 2f
+    call cpu_debug_break
 
-    leaq cpu_debug_break(%rip),%rax
-    call *%rax
+    // (not Tail) call to unhandled_exception_handler
+    // tail call breaks the backtrace, which is bad and not worth
+    // an insignificant tail call optimization  on an already
+    // expensive code path
+.balign 16
+2:  movq %r12,%rdi
+    call unhandled_exception_handler
+    ret
 
-    // Tail call to unhandled_exception_handler
-.align 16
-2:  leaq unhandled_exception_handler(%rip),%rax
-    movq %r12,%rdi
-    jmpq *%rax
+    .cfi_endproc
+
+//thread_fn_t fn, void *p, thread_t id
+.global thread_entry
+.balign 16
+thread_entry:
+    .cfi_startproc
+
+    // Stop the stack trace
+    .cfi_undefined rip
+    .cfi_undefined rsp
+    .cfi_undefined rbp
+    .cfi_undefined rbx
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
+
+    call thread_startup
+    ud2
 
     .cfi_endproc
 
 // _noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
 .hidden isr_sysret64
 .global isr_sysret64
+.balign 16
 isr_sysret64:
     .cfi_startproc
 
     push_cfi %rbx
     .cfi_offset rbx,-2*8
+
+    xorl %eax,%eax
 
     push_cfi %rbp
     .cfi_offset rbp,-3*8
@@ -753,11 +1440,11 @@ isr_sysret64:
     .cfi_offset r15,-7*8
 
     mov %rdi,%rcx
-    mov $ CPU_EFLAGS_IF | 2,%r11d
+    mov $ CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS,%r11d
 
     // Initialize kernel stack pointer for this thread
     // cpu_info_t *rbx = this_cpu()
-    movq %gs:CPU_INFO_SELF_OFS,%rbx
+    movq %gs:CPU_INFO_SELF_OFS(%rax),%rbx
 
     // tss_t *rdx = rbx->tss_ptr
     movq CPU_INFO_TSS_PTR_OFS(%rbx),%rdx
@@ -771,14 +1458,13 @@ isr_sysret64:
     // void *gs_base = rbx->gsbase
     movq THREAD_GSBASE_OFS(%rbx),%r14
 
-    // void *rbx = rbx->stack
-    movq THREAD_STACK_OFS(%rbx),%rbx
+    // rbx->priv_chg_stack = rsp (interrupts use kernel stack below this point)
+    movq %rsp,THREAD_PRIV_CHG_STACK_OFS(%rbx)
 
     // rdx->rsp0 = rbx
-    movq %rbx,TSS_RSP0_OFS(%rdx)
+    movq %rsp,TSS_RSP0_OFS(%rdx)
 
     // Avoid leaking any register values to user code
-    mov %eax,%ebx
     // not ecx
     mov %eax,%edx
     // not esi
@@ -796,9 +1482,20 @@ isr_sysret64:
     // Prevent IRQ while swapped to user gs or using user stack
     // in kernel mode
     cli
+
+    //ldmxcsr THREAD_SC_MXCSR_OFS(%rbx)
+    //fldcw THREAD_SC_FCW87_OFS(%rbx)
+    //call cpu_clear_fpu
+    mov %eax,%ebx
+
+    // Protect kernel gs before loading user gs
     swapgs
-    call .Lload_fs_gs_slow
-.Lpatch_fsgsbase_sysret_end:
+    swapgs_boundary
+
+    insn_fixup
+    wrfsbase %r13
+    wrgsbase %r14
+
     mov %rsi,%rsp
     .cfi_undefined rip
     .cfi_undefined rsp
@@ -808,9 +1505,187 @@ isr_sysret64:
     .cfi_undefined r13
     .cfi_undefined r14
     .cfi_undefined r15
+    // goto user mode with rip=rcx and load rflags=r11, cs and ss from STAR MSR
+
     sysretq
 
+    swapgs_boundary
+
     .cfi_endproc
+
+/// Note! This code assumes -mno-red-zone
+.global __module_dynlink_plt_thunk
+.balign 16
+__module_dynlink_plt_thunk:
+    .cfi_startproc
+    .cfi_def_cfa_offset 8*3
+
+    // Stack
+    // +-------------+ <-- CFA
+    // | return_addr | <-- return address from call to @plt stub
+    // +=============+
+    // | plt_index   | <-- pushed by PLT stub
+    // *-------------*
+    // | dl_ctx      | <-- from GOT[1]
+    // +-------------+ <-- rsp at entry
+    // | result_buf  | <-- dynamic linker writes resolved address here, init 0
+    // *-------------*
+    // | rflags      |
+    // +-------------+
+    // | r11         |
+    // *-------------*
+    // | r10         |
+    // +-------------+
+    // | r9          |
+    // *-------------*
+    // | r8          |
+    // +-------------+
+    // | rcx         |
+    // *-------------*
+    // | rdx         |
+    // +-------------+
+    // | rsi         |
+    // *-------------*
+    // | rdi         |
+    // +-------------+
+    // | rax         |
+    // *-------------*
+
+    push_cfi $0
+
+    pushfq_cfi
+    .cfi_offset rflags,-5*8
+
+    push_cfi %r11
+    .cfi_offset r11,-6*8
+
+    push_cfi %r10
+    .cfi_offset r10,-7*8
+
+    push_cfi %r9
+    .cfi_offset r9,-8*8
+
+    push_cfi %r8
+    .cfi_offset r8,-9*8
+
+    push_cfi %rcx
+    .cfi_offset rcx,-10*8
+
+    push_cfi %rdx
+    .cfi_offset rdx,-11*8
+
+    push_cfi %rsi
+    .cfi_offset rsi,-12*8
+
+    push_cfi %rdi
+    .cfi_offset rdi,-13*8
+
+    push_cfi %rax
+    .cfi_offset rax,-14*8
+
+    movq %rsp,%rdi
+    call __module_dynamic_linker
+
+    pop_cfi %rax
+    .cfi_same_value rax
+
+    pop_cfi %rdi
+    .cfi_same_value rdi
+
+    pop_cfi %rsi
+    .cfi_same_value rsi
+
+    pop_cfi %rdx
+    .cfi_same_value rdx
+
+    pop_cfi %rcx
+    .cfi_same_value rcx
+
+    pop_cfi %r8
+    .cfi_same_value r8
+
+    pop_cfi %r9
+    .cfi_same_value r9
+
+    pop_cfi %r10
+    .cfi_same_value r10
+
+    pop_cfi %r11
+    .cfi_same_value r11
+
+    popfq_cfi
+    .cfi_same_value rflags
+
+    // Balance the RSB so this false call matches up with the hacked return
+    // on first entry to the function, and when that returns it returns to the
+    // actual caller nicely (RSB continues working fine from there on)
+
+    call 0f
+    nop
+.balign 16
+0:  lea 8(%rsp),%rsp
+
+    // The ret is going to mispredict, minimize dispatch of incorrect path
+    // The return stack is not correct
+    lfence
+
+    // "return" is really tail calling to the entry point of the dynamically
+    // linked function that has been written to the GOT for next time.
+    // This pops the return address from the stack, then adds 16 to rsp.
+    // 16 to throw away the two things the PLT stub pushed that told us
+    // the PLT index to which function we're lazy linking and gave us
+    // an opaque callback context pointer
+    // The CPU lands on the dynamically linked function with CPU registers
+    // precisely as they were when the caller called the function
+    retq $16
+
+    .cfi_endproc
+
+// This unblocks context switches and forces a switch if one was deferred
+.global cs_leave_asm
+.balign 16
+cs_leave_asm:
+    .cfi_startproc
+    xorl %eax,%eax
+    subl $1,%gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
+    jb .Lpanic
+    jnz .Lreturn
+
+    // Making it here means we just left the outermost critical section
+    cmpl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS(%rax)
+    jz .Lreturn
+
+.Lis_deferred_csw:
+    // Making it here means a context switch was deferred, reset flag
+    movl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS(%rax)
+
+    // Tail call
+    jmp thread_yield
+
+.Lpanic:
+    lea .Lpanic_msg(%rip),%rdi
+    call panic
+    jmp .Lpanic
+
+    .cfi_endproc
+
+// Entering N critical sections requires you to leave N to get out
+.global cs_enter_asm
+.balign 16
+cs_enter_asm:
+    .cfi_startproc
+    xor %eax,%eax
+    addl $1,%gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
+    jz .Lpanic
+.Lreturn:
+    ret
+    .cfi_endproc
+
+.section .rodata, "", @progbits
+.Lpanic_msg:
+.asciz "Counter out of range"
+
+.section .text.isr, "ax", @progbits
 
 // Retpoline. Works on the principle that the return stack overrides other
 // branch prediction information. Cause it to mispredict into a pause loop
@@ -819,41 +1694,405 @@ isr_sysret64:
 // location.
 .macro make_retpoline_thunk reg
 .global __x86_indirect_thunk_\reg
-.align 16
+.balign 16
 __x86_indirect_thunk_\reg:
+    .cfi_startproc
+    .cfi_def_cfa rsp,8
     call 0f
 1:  lfence
     pause
     jmp 1b
-0:  movq %\reg,(%rsp)
+0:  .cfi_adjust_cfa_offset 8
+    movq %\reg,(%rsp)
     // This will speculatively return to the 1 label, but at retirement
     // it will see that it should have branched to *%\reg
     ret
+    .cfi_endproc
 .endm
 
 .irp reg,rax,rcx,rdx,rbx,rbp,r8,r9,r10,r11,r12,r13,r14,r15
     make_retpoline_thunk \reg
 .endr
 
-.section .rodata
-.align 8
+// Each fault resistant function consists of an address range where faults
+// are dismissed and handled. Each range has a landing pad. When a fault
+// occurs in that range, the rax register is reset to -1, and the
+// instruction pointer is reset to the landing pad (*_faulted location)
 
-// Pointers to patch points
-.hidden sse_context_save
-.global sse_context_save
-sse_context_save:
-    .quad .Lsse_context_save_jmp
+.macro nofault_define_region name
 
-.hidden sse_context_restore
-.global sse_context_restore
-sse_context_restore:
-    .quad .Lsse_context_restore_jmp
+.pushsection .nofault.tab.st
+.balign 8
+.quad \name
+.popsection
 
-.hidden load_fsgsbase_range
-.global load_fsgsbase_range
-load_fsgsbase_range:
-    // Implementations
-    .quad .Lload_fs_gs_fast
-    // Patch points
-    .quad .Lpatch_fsgsbase_csw_end
-    .quad .Lpatch_fsgsbase_sysret_end
+.pushsection .nofault.tab.en
+.balign 8
+.quad .L\name\()_end
+.popsection
+
+.pushsection .nofault.tab.lp
+.balign 8
+.quad .L\name\()_faulted
+.popsection
+
+.endm
+
+.section .nofault.text, "ax", @progbits
+
+// uint128_t nofault_rdmsr(uint32_t msr)
+// returns 128 bit result in rax,rdx
+// upper 64 bits (rdx) is is zero on success, lower 64 bits (rax) is value
+.global nofault_rdmsr
+.hidden nofault_rdmsr
+.balign 16
+nofault_rdmsr:
+    .cfi_startproc
+
+    // Register number into ecx for rdmsr instruction
+    mov %edi,%ecx
+    rdmsr
+
+    // edx:eax -> rax
+    shl $ 32,%rdx
+    or %rdx,%rax
+
+    // Zero upper half means success
+    xor %edx,%edx
+
+    ret
+
+.Lnofault_rdmsr_faulted:
+    // Put -1 into upper half and return 0 value
+    mov %rax,%rdx
+    xor %eax,%eax
+    ret
+
+.Lnofault_rdmsr_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_rdmsr
+
+// Returns 0 on success
+// int nofault_wrmsr(uint32_t msr, uint64_t value)
+.global nofault_wrmsr
+.hidden nofault_wrmsr
+.balign 16
+nofault_wrmsr:
+    .cfi_startproc
+
+    mov %rsi,%rdx
+    mov %edi,%ecx
+    mov %esi,%eax
+    shr $ 32,%rdx
+    wrmsr
+    shl $ 32,%rdx
+    or %rdx,%rax
+    xor %eax,%eax
+.Lnofault_wrmsr_faulted:
+    ret
+
+.Lnofault_wrmsr_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_wrmsr
+
+
+
+// ptrdiff_t nofault_strncpy(char *dest, char const *value, size_t size);
+.global nofault_strncpy
+.hidden nofault_strncpy
+.balign 16
+nofault_strncpy:
+    .cfi_startproc
+
+    insn_fixup
+    stac
+
+    xor %eax,%eax
+
+.Lnofault_strncpy_loop:
+    mov (%rsi,%rax),%cl
+    movb %cl,(%rdi,%rax)
+    test %cl,%cl
+    jz .Lnofault_strncpy_done
+    inc %rax
+    cmp %rdx,%rax
+    jb .Lnofault_strncpy_loop
+
+    // Failed! String too long (-2 long, get it?)
+    mov $-2,%rax
+
+.Lnofault_strncpy_faulted:
+.Lnofault_strncpy_done:
+    insn_fixup
+    clac
+
+    ret
+
+.Lnofault_strncpy_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_strncpy
+
+
+
+// Returns offset to the byte matching the low byte of value
+// If not found, returns -2
+// If faults, returns -1
+// ptrdiff_t nofault_offsetof(char const *s, int value, size_t size)
+.global nofault_offsetof
+.hidden nofault_offsetof
+.balign 16
+nofault_offsetof:
+    .cfi_startproc
+
+    insn_fixup
+    stac
+
+    mov %esi,%eax
+    mov %rdx,%rcx
+    repne scasb
+    jne .Lnofault_offsetof_nomatch
+
+    sub %rcx,%rdx
+    dec %rdx
+    mov %rdx,%rax
+
+.Lnofault_offsetof_done:
+    insn_fixup
+    clac
+
+    ret
+
+.Lnofault_offsetof_nomatch:
+    mov $ -2,%rax
+.Lnofault_offsetof_faulted:
+    jmp .Lnofault_offsetof_done
+
+.Lnofault_offsetof_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_offsetof
+
+
+// Returns the length if the string fits in a max_size buffer with null
+// Returns -2 if string too long
+// Returns -1 if faulted
+// ptrdiff_t nofault_strnlen(char const *s, size_t max_size)
+.global nofault_strnlen
+.hidden nofault_strnlen
+.balign 16
+nofault_strnlen:
+    .cfi_startproc
+
+    xor %eax,%eax
+
+.Lnofault_strnlen_loop:
+    movb (%rdi,%rax),%cl
+
+    // If the value that was loaded was zero then done
+    test %cl,%cl
+    jz .Lnofault_strnlen_done
+
+    // Rather use simplest addressing mode above and increment two registers
+    inc %rax
+
+    // Continue looping if the offset has not reached the maximum yet
+    cmp %rax,%rsi
+    jb .Lnofault_strnlen_loop
+
+    // Max length! Return -2 (to differentiate it from -1 from fault)
+    // -2 for "too" long
+    mov $-2,%rax
+
+.Lnofault_strnlen_done:
+.Lnofault_strnlen_faulted:// crash will resume here with -1 in rax
+    ret
+
+.Lnofault_strnlen_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_strnlen
+
+
+
+// Returns 0 on success
+// Returns -1 if faulted
+// int nofault_memset(void *dest, int value, size_t size) noexcept;
+.global nofault_memset
+.hidden nofault_memset
+.balign 16
+nofault_memset:
+    .cfi_startproc
+
+    insn_fixup
+    stac
+
+    mov %rdx,%rcx
+    mov %esi,%eax
+    rep stosb
+
+    xor %eax,%eax
+.Lnofault_memset_faulted:
+
+    insn_fixup
+    clac
+
+    ret
+
+    .cfi_endproc
+
+.Lnofault_memset_end:
+
+
+
+// Returns 0 on success
+// Returns -1 if faulted
+// int nofault_memcpy(void *dest, void const *src, size_t size) noexcept;
+.global nofault_memcpy
+.hidden nofault_memcpy
+.balign 16
+nofault_memcpy:
+    .cfi_startproc
+
+#if 0
+
+    insn_fixup
+    stac
+
+    mov %rdx,%rcx
+    xor %eax,%eax
+    rep movsb
+
+.Lnofault_memcpy_faulted:
+
+    insn_fixup
+    clac
+
+    ret
+
+#else
+
+    // To test against -64 and to adjust loop counters/pointers
+    mov $-64,%rcx
+
+    // Becomes nop if cpu does not support SMAP
+    insn_fixup
+    stac
+
+    // Handle zero size copy
+    test %rdx,%rdx
+    jz .Lnofault_memcpy_done
+
+    // branch to alignment loop if not 64-bit aligned
+.Lnofault_memcpy_misaligned_mainloop:
+    test $7,%rdi
+    jnz .Lmisaligned_dest
+
+    // At this point, the destination is guaranteed to be 64-bit aligned
+
+.Lnofault_memcpy_fast_mainloop:
+    // See if >= 64 bytes remaining
+    test %rcx,%rdx
+    jz .Lnofault_memcpy_little_remaining
+
+    // At least 64 bytes remaining and destination is 64 bit aligned
+
+    // Copy 64 bytes unconditionally
+    mov (%rsi),%rax
+    mov %rax,(%rdi)
+    mov 1*8(%rsi),%rax
+    mov %rax,1*8(%rdi)
+    mov 2*8(%rsi),%rax
+    mov %rax,2*8(%rdi)
+    mov 3*8(%rsi),%rax
+    mov %rax,3*8(%rdi)
+    mov 4*8(%rsi),%rax
+    mov %rax,4*8(%rdi)
+    mov 5*8(%rsi),%rax
+    mov %rax,5*8(%rdi)
+    mov 6*8(%rsi),%rax
+    mov %rax,6*8(%rdi)
+    mov 7*8(%rsi),%rax
+    mov %rax,7*8(%rdi)
+
+    sub %rcx,%rdi
+    sub %rcx,%rsi
+    add %rcx,%rdx
+    jnz .Lnofault_memcpy_fast_mainloop
+
+.Lnofault_memcpy_done:
+    mov $1,%eax
+.Lnofault_memcpy_faulted:
+
+    // Becomes nop if cpu does not support SMAP
+    insn_fixup
+    clac
+
+    ret
+
+.Lmisaligned_dest:
+    movzbl (%rsi),%eax
+    add $1,%rsi
+    movb %al,(%rdi)
+    add $1,%rdi
+    add $-1,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_misaligned_mainloop
+
+.Lnofault_memcpy_little_remaining:
+    // See if any number of 64 bit chunks are remaining
+    test $-8,%rdx
+    jz .Lnofault_memcpy_little_remaining_not64
+
+    // Copy a 64 bit chunk
+    mov (%rsi),%rax
+    add $8,%rsi
+    mov %rax,(%rdi)
+    add $8,%rdi
+    add $-8,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_little_remaining
+
+.Lnofault_memcpy_little_remaining_not64:
+    // See if any number of 32 bit chunks are remaining
+    test $-4,%rdx
+    jz .Lnofault_memcpy_little_remaining_not32
+
+    // Copy a 32 bit chunk
+    mov (%rsi),%eax
+    add $4,%rsi
+    mov %eax,(%rdi)
+    add $4,%rdi
+    add $-4,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_little_remaining_not64
+
+.Lnofault_memcpy_little_remaining_not32:
+    movzbl (%rsi),%eax
+    add $1,%rsi
+    mov %al,(%rdi)
+    add $1,%rdi
+    add $-1,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_little_remaining_not32
+#endif
+
+.Lnofault_memcpy_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_memcpy
+
+
+
+.global __module_unwind_resume
+.balign 16
+__module_unwind_resume:
+    jmp _Unwind_Resume

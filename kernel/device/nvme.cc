@@ -1,3 +1,6 @@
+// pci driver: C=STORAGE, S=NVM, I=NVME
+
+#include "kmodule.h"
 #include "dev_storage.h"
 #include "nvmedecl.h"
 #include "device/pci.h"
@@ -9,7 +12,6 @@
 #include "utility.h"
 #include "thread.h"
 #include "vector.h"
-#include "cpu/control_regs.h"
 #include "mutex.h"
 #include "inttypes.h"
 #include "work_queue.h"
@@ -20,6 +22,11 @@
 #else
 #define NVME_TRACE(...) ((void)0)
 #endif
+
+int module_main(int argc, char const * const * argv)
+{
+    return 0;
+}
 
 // 5.11 Identify command
 nvme_cmd_t nvme_cmd_t::create_identify(
@@ -36,6 +43,7 @@ nvme_cmd_t nvme_cmd_t::create_identify(
     return cmd;
 }
 
+// Create a "create submission queue" command
 nvme_cmd_t nvme_cmd_t::create_sub_queue(
         void *addr, uint32_t size,
         uint16_t sqid, uint16_t cqid, uint8_t prio)
@@ -54,6 +62,7 @@ nvme_cmd_t nvme_cmd_t::create_sub_queue(
     return cmd;
 }
 
+// Create a "create completion queue" command
 nvme_cmd_t nvme_cmd_t::create_cmp_queue(
         void *addr, uint32_t size,
         uint16_t cqid, uint16_t intr)
@@ -72,6 +81,7 @@ nvme_cmd_t nvme_cmd_t::create_cmp_queue(
     return cmd;
 }
 
+// Create a read command
 nvme_cmd_t nvme_cmd_t::create_read(uint64_t lba, uint32_t count, uint8_t ns)
 {
     nvme_cmd_t cmd{};
@@ -87,6 +97,7 @@ nvme_cmd_t nvme_cmd_t::create_read(uint64_t lba, uint32_t count, uint8_t ns)
     return cmd;
 }
 
+// Create a write command
 nvme_cmd_t nvme_cmd_t::create_write(uint64_t lba, uint32_t count,
                                uint8_t ns, bool fua)
 {
@@ -104,6 +115,7 @@ nvme_cmd_t nvme_cmd_t::create_write(uint64_t lba, uint32_t count,
     return cmd;
 }
 
+// Create a trim command
 nvme_cmd_t nvme_cmd_t::create_trim(uint64_t lba, uint32_t count,
                                    uint8_t ns)
 {
@@ -125,6 +137,7 @@ nvme_cmd_t nvme_cmd_t::create_trim(uint64_t lba, uint32_t count,
     return cmd;
 }
 
+// Create a flush command
 nvme_cmd_t nvme_cmd_t::create_flush(uint8_t ns)
 {
     nvme_cmd_t cmd{};
@@ -134,6 +147,7 @@ nvme_cmd_t nvme_cmd_t::create_flush(uint8_t ns)
     return cmd;
 }
 
+// Create a setfeatures command
 nvme_cmd_t nvme_cmd_t::create_setfeatures(uint16_t ncqr, uint16_t nsqr)
 {
     nvme_cmd_t cmd{};
@@ -380,7 +394,7 @@ public:
     uint8_t cur_ns;
 
 private:
-    using lock_t = std::mcslock;
+    using lock_t = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_t>;
     uint64_t identify_data_physaddr;
     lock_t lock;
@@ -480,7 +494,7 @@ public:
     nvme_cmp_t *cmp_queue_ptr();
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     sub_queue_t sub_queue;
@@ -502,7 +516,7 @@ private:
 // ---------------------------------------------------------------------------
 // VFS
 
-class nvme_if_factory_t : public storage_if_factory_t {
+class nvme_if_factory_t final : public storage_if_factory_t {
 public:
     nvme_if_factory_t() : storage_if_factory_t("nvme") {}
 private:
@@ -513,7 +527,7 @@ static nvme_if_factory_t nvme_if_factory;
 STORAGE_REGISTER_FACTORY(nvme_if);
 
 // NVMe interface instance
-class nvme_if_t : public storage_if_base_t {
+class nvme_if_t final : public storage_if_base_t {
 public:
     bool init(const pci_dev_iterator_t &pci_dev);
     size_t get_queue_count() const;
@@ -524,7 +538,7 @@ private:
     friend class nvme_dev_t;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
-    void irq_handler(int irq_offset);
+    void deferred_irq_handler(int irq_offset);
 
     uint32_t volatile* doorbell_ptr(bool completion, size_t queue);
 
@@ -618,7 +632,7 @@ std::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 
         NVME_TRACE("found device!\n");
 
-        std::unique_ptr<nvme_if_t> self(new nvme_if_t{});
+        std::unique_ptr<nvme_if_t> self(new (std::nothrow) nvme_if_t{});
 
         nvme_devices.push_back(self);
         if (self->init(pci_iter)) {
@@ -770,7 +784,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     nvme_cmp_t *cmp_queue_ptr = (nvme_cmp_t*)
             (sub_queue_ptr + requested_queue_count * queue_slots);
 
-    queues.reset(new nvme_queue_state_t[requested_queue_count]);
+    queues.reset(new (std::nothrow) nvme_queue_state_t[requested_queue_count]);
 
     nvme_queue_state_t& admin_queue = queues[0];
 
@@ -794,7 +808,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
                            (iocp_t*)&blocking_setfeatures);
 
     blocking_setfeatures.set_expect(1);
-    errno_t status = blocking_setfeatures.wait();
+    errno_t status = blocking_setfeatures.wait().first;
 
     if (status != errno_t::OK)
         return false;
@@ -893,7 +907,7 @@ void nvme_if_t::identify_ns_handler(
     uint32_t lba_format = ns_ident->lbaf[cur_format_index];
     uint8_t log2_sectorsize = NVME_NS_IDENT_LBAF_LBADS_GET(lba_format);
 
-    std::unique_ptr<nvme_dev_t> drive(new nvme_dev_t{});
+    std::unique_ptr<nvme_dev_t> drive(new (std::nothrow) nvme_dev_t{});
 
     drive->init(this, namespaces[ctx->cur_ns], log2_sectorsize);
 
@@ -976,14 +990,14 @@ isr_context_t *nvme_if_t::irq_handler(int irq, isr_context_t *ctx)
             continue;
 
         workq::enqueue([=] {
-            dev->irq_handler(irq_offset);
+            dev->deferred_irq_handler(irq_offset);
         });
     }
 
     return ctx;
 }
 
-void nvme_if_t::irq_handler(int irq_offset)
+void nvme_if_t::deferred_irq_handler(int irq_offset)
 {
     //NVME_TRACE("received IRQ\n");
 
@@ -1084,14 +1098,14 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
     return expect;
 }
 
-void nvme_if_t::io_handler(void *data, nvme_cmp_t&,
+void nvme_if_t::io_handler(void *data, nvme_cmp_t& cmp,
                            uint16_t, int status_type, int status)
 {
     iocp_t* iocp = (iocp_t*)data;
 
     errno_t err = status_to_errno(status_type, status);
 
-    iocp->set_result(err);
+    iocp->set_result({err, 0});
     iocp->invoke();
 }
 
@@ -1113,7 +1127,7 @@ void nvme_if_t::setfeat_queues_handler(
 
     errno_t err = status_to_errno(status_type, status);
 
-    iocp->set_result(err);
+    iocp->set_result({ err, 0 });
     iocp->invoke();
 }
 

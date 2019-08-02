@@ -31,7 +31,7 @@ diff -durN gcc-6.2.0/gcc/config.gcc gcc-6.2.0.patched/gcc/config.gcc
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h"
 	;;
  x86_64-*-elf*)
-+	tmake_file="${tmake_file} i386/t-x86_64-elf"
++	tmake_file="${tmake_file} i386/t-x86_64-elf i386/t-crtstuff"
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
 	;;
  x86_64-*-rtems*)

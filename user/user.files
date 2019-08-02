@@ -1,6 +1,14 @@
+crt0/crt0pc32.S
+crt0/crt0pc64.S
+crt0/crt0pc80.S
+user64_phdrs.ld
+init/init.cc
+user64.ld
 bin/dhcpclient/main.cc
 bin/ls/ls.cc
 crt0/crt0.S
+shell/parser.cc
+shell/parser.h
 test/test.S
 shell/grammar.y
 shell/lemon_highlight.xml

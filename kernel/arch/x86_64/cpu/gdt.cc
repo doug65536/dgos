@@ -1,5 +1,4 @@
 #include "gdt.h"
-#include "control_regs.h"
 #include "mm.h"
 #include "string.h"
 #include "printk.h"
@@ -7,16 +6,17 @@
 #include "callout.h"
 #include "mutex.h"
 #include "inttypes.h"
+#include "stdlib.h"
 
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
 C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
-#define TSS_STACK_SIZE (32 << 10)
+#define TSS_STACK_SIZE (64 << 10)
 
 // Must match control_regs_constants.h GDT_SEL_* defines!
 __aligned(64) gdt_entry_combined_t gdt[24] = {
-    // --- cache line ---
+    // --- cache line 0x00 ---
 
     // 0x00
     GDT_MAKE_EMPTY(),
@@ -34,7 +34,7 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY(),
 
-    // --- cache line ---
+    // --- cache line 0x40 ---
 
     // 32 bit user code
     // 0x40, 0x48, 0x50
@@ -50,11 +50,11 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     GDT_MAKE_CODESEG64(0),
     GDT_MAKE_DATASEG(0),
 
-    // 0x68, 0x70, 0x78
+    // 0x70, 0x78
     GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY(),
 
-    // --- cache line ---
+    // --- cache line 0x80 ---
 
     // CPU task selector
     // 0x80-0x8F
@@ -68,7 +68,7 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY()
 
-    // --- cache line ---
+    // --- cache line 0xc0 ---
 };
 
 C_ASSERT(GDT_SEL_KERNEL_CODE64 == 12*8);
@@ -78,7 +78,7 @@ C_ASSERT(sizeof(gdt) == GDT_SEL_END);
 
 // Holds exclusive access to TSS segment descriptor
 // while loading task register
-static std::spinlock gdt_tss_lock;
+static ext::spinlock gdt_tss_lock;
 tss_t tss_list[MAX_CPUS];
 table_register_64_t gdtr;
 
@@ -91,36 +91,73 @@ void gdt_init(int)
 
 static void gdt_set_tss_base(tss_t *base)
 {
-    gdt_entry_combined_t gdt_ent_lo =
-            GDT_MAKE_TSS_DESCRIPTOR(
-                uintptr_t(&base->reserved0),
-                sizeof(*base)-1, 1, 0, 0);
+    if (base) {
+        gdt_entry_t tss_lo;
+        gdt_entry_tss_ldt_t tss_hi;
 
-    gdt_entry_combined_t gdt_ent_hi =
-            GDT_MAKE_TSS_HIGH_DESCRIPTOR(
-                uintptr_t(&base->reserved0));
+        tss_lo.set_type(GDT_TYPE_TSS);
+        uintptr_t tss_addr = uintptr_t(&base->reserved0);
+        tss_lo.set_base(uint32_t(tss_addr & 0xFFFFFFFF));
+        tss_hi.set_base(tss_addr);
+        tss_lo.set_limit(sizeof(*base) - 1);
 
-    gdt[GDT_SEL_TSS >> 3] = gdt_ent_lo;
-    gdt[(GDT_SEL_TSS >> 3) + 1] = gdt_ent_hi;
+        //new (&gdt[(GDT_SEL_TSS >> 3)]) gdt_entry_t(tss_lo);
+        //new (&gdt[(GDT_SEL_TSS >> 3) + 1]) gdt_entry_tss_ldt_t(tss_hi);
+
+        gdt_entry_combined_t gdt_ent_lo =
+                GDT_MAKE_TSS_DESCRIPTOR(
+                    uintptr_t(&base->reserved0),
+                    sizeof(*base)-1, 1, 0, 0);
+
+        gdt_entry_combined_t gdt_ent_hi =
+                GDT_MAKE_TSS_HIGH_DESCRIPTOR(
+                    uintptr_t(&base->reserved0));
+
+        printdbg("no ub\n");
+        hex_dump(&tss_lo, sizeof(tss_lo));
+        hex_dump(&tss_hi, sizeof(tss_lo));
+
+        printdbg("ub\n");
+        hex_dump(&gdt_ent_lo, sizeof(tss_lo));
+        hex_dump(&gdt_ent_hi, sizeof(tss_hi));
+
+        gdt[GDT_SEL_TSS >> 3] = gdt_ent_lo;
+        gdt[(GDT_SEL_TSS >> 3) + 1] = gdt_ent_hi;
+    } else {
+        gdt[GDT_SEL_TSS >> 3].raw = 0;
+        gdt[(GDT_SEL_TSS >> 3) + 1].raw = 0;
+    }
 }
 
-void gdt_init_tss(int cpu_count)
+void gdt_init_tss(size_t cpu_count)
 {
     //tss_list = (tss_t*)mmap(nullptr, sizeof(*tss_list) * cpu_count,
     //                       PROT_READ | PROT_WRITE,
     //                       MAP_POPULATE, -1, 0);
 
-    for (int i = 0; i < cpu_count; ++i) {
+    size_t constexpr stack_count_per_cpu = 5;
+
+    size_t stacks_nr = cpu_count * stack_count_per_cpu;
+    size_t stacks_sz = TSS_STACK_SIZE * stacks_nr;
+
+    // Map space for all the stacks
+    char *stacks_base = (char*)mmap(
+                nullptr, stacks_sz, PROT_READ | PROT_WRITE,
+                MAP_POPULATE, -1, 0);
+    char *stacks_alloc = stacks_base;
+
+    for (size_t i = 0; i < cpu_count; ++i) {
         tss_t *tss = tss_list + i;
 
-        for (int st = 0; st < 3; ++st) {
-            void *stack = mmap(nullptr, TSS_STACK_SIZE,
-                               PROT_READ | PROT_WRITE,
-                               MAP_POPULATE, -1, 0);
+        for (size_t st = 0; st < stack_count_per_cpu; ++st) {
+            void *stack = stacks_alloc;
+
+            stacks_alloc += TSS_STACK_SIZE;
+
             madvise(stack, PAGESIZE, MADV_DONTNEED);
             mprotect(stack, PAGESIZE, PROT_NONE);
 
-            printdbg("Allocated IST cpu=%d slot=%d at %#" PRIx64 "\n",
+            printdbg("Allocated IST cpu=%zu slot=%zu at %#zx\n",
                      i, st, (uintptr_t)stack);
 
             tss->stack[st] = stack;
@@ -149,12 +186,12 @@ void gdt_init_tss_early()
     gdt_set_tss_base(&early_tss);
     assert(gdt[GDT_SEL_TSS >> 3].mem.get_type() == GDT_TYPE_TSS);
     cpu_tr_set(GDT_SEL_TSS);
-    gdt[GDT_SEL_TSS >> 3].mem.set_type(GDT_TYPE_TSS);
+    gdt[GDT_SEL_TSS >> 3].raw = 0;
 }
 
 void gdt_load_tr(int cpu_number)
 {
-    std::unique_lock<std::spinlock> lock(gdt_tss_lock);
+    std::unique_lock<ext::spinlock> lock(gdt_tss_lock);
 
     gdt_set_tss_base(tss_list + cpu_number);
     assert(gdt[GDT_SEL_TSS >> 3].mem.get_type() == GDT_TYPE_TSS);

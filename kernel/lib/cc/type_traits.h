@@ -1,5 +1,10 @@
 #pragma once
+
+#ifdef __DGOS_KERNEL__
 #include "types.h"
+#else
+#include <stdint.h>
+#endif
 
 __BEGIN_NAMESPACE_STD
 
@@ -246,6 +251,9 @@ struct remove_reference<_T&&>
     using type = _T;
 };
 
+__END_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
+
 template<int size, bool uns = true> struct type_from_size { };
 template<> struct type_from_size<1, true> { using type = uint8_t; };
 template<> struct type_from_size<2, true> { using type = uint16_t; };
@@ -265,20 +273,24 @@ private:
     struct helper;
 
     template<typename _U>
-    struct helper<_U, true_type>
+    struct helper<_U, std::true_type>
     {
-        using type = typename underlying_type<_U>::type;
+        using type = typename std::underlying_type<_U>::type;
     };
 
     template<typename _U>
-    struct helper<_U, false_type>
+    struct helper<_U, std::false_type>
     {
         using type = _U;
     };
 
 public:
-    using type = typename helper<_T, typename is_enum<_T>::type>::type;
+    using type = typename helper<_T, typename std::is_enum<_T>::type>::type;
 };
+
+__END_NAMESPACE_EXT
+
+__BEGIN_NAMESPACE_STD
 
 template<size_t _Len, size_t _Align = alignof(max_align_t)>
 struct aligned_storage {
@@ -286,5 +298,80 @@ struct aligned_storage {
         alignas(_Align) unsigned char data[_Len];
     };
 };
+
+
+__BEGIN_NAMESPACE_DETAIL
+
+template<typename T>
+struct type_identity {
+    using type = T;
+};
+
+template<typename T>
+auto try_add_lvalue_reference(int) -> type_identity<T&>;
+
+template<typename T>
+auto try_add_lvalue_reference(...) -> type_identity<T>;
+
+template<typename T>
+auto try_add_rvalue_reference(int) -> type_identity<T&&>;
+
+template<typename T>
+auto try_add_rvalue_reference(...) -> type_identity<T>;
+
+__END_NAMESPACE // detail
+
+template<typename T>
+struct add_lvalue_reference : decltype(detail::try_add_lvalue_reference<T>(0)) {};
+
+template<typename T>
+struct add_rvalue_reference : decltype(detail::try_add_rvalue_reference<T>(0)) {};
+
+
+template<typename T>
+typename add_rvalue_reference<T>::type declval() noexcept;
+
+__BEGIN_NAMESPACE_DETAIL
+
+template<typename _T1, typename _T2, typename ..._Rest>
+auto select_common(_T1&&, _T2&&, _Rest&& ...rest) ->
+decltype(select_common(sum_result(declval<_T1>(), declval<_T2>()),
+                    declval<_Rest>()...));
+
+template<typename _T1, typename _T2>
+auto select_common(_T1&&, _T2&&) -> decltype(declval<_T1>() + declval<_T2>());
+
+template<typename _T1, typename _T2>
+auto select_common(_T1&&, _T2&&) -> decltype(declval<_T1>() + declval<_T2>());
+
+__END_NAMESPACE
+
+template<typename... _Types>
+class common_type
+{
+public:
+    using type = decltype(detail::select_common(declval<_Types>()...));
+};
+
+template<typename T>
+struct is_integral : public false_type {};
+
+template<> struct is_integral<signed char> : public true_type {};
+template<> struct is_integral<int> : public true_type {};
+template<> struct is_integral<short> : public true_type {};
+template<> struct is_integral<long> : public true_type {};
+template<> struct is_integral<long long> : public true_type {};
+
+template<> struct is_integral<unsigned char> : public true_type {};
+template<> struct is_integral<unsigned short> : public true_type {};
+template<> struct is_integral<unsigned int> : public true_type {};
+template<> struct is_integral<unsigned long> : public true_type {};
+template<> struct is_integral<unsigned long long> : public true_type {};
+
+template<typename T>
+struct remove_cvref {
+    using type = typename remove_cv<typename remove_reference<T>::type>::type;
+};
+
 
 __END_NAMESPACE_STD
