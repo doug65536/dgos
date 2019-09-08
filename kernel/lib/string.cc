@@ -108,6 +108,19 @@ EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
 #endif
 }
 
+// Security enhanced memcmp which prevents inferring how many characters match
+EXPORT int const_time_memcmp(void const *lhs, void const *rhs, size_t count)
+{
+    uint8_t const *blhs = (uint8_t const *)lhs;
+    uint8_t const *brhs = (uint8_t const *)rhs;
+    int result = 0;
+    for (size_t i = 0; i < count; ++i) {
+        int diff = *brhs - *blhs;
+        result = result ? result : diff;
+    }
+    return result;
+}
+
 EXPORT char *strstr(char const *str, char const *substr)
 {
     // If substr is empty string, return str
