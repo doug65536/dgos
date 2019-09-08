@@ -248,6 +248,8 @@ download_file "$gmpurl" "$archives"
 download_file "$mpcurl" "$archives"
 download_file "$mpfurl" "$archives"
 
+log echo Extracting tarballs...
+
 toolre='/([^/-]+)-[^/]+$'
 for tarball in $archives/*.tar.*; do
 	log echo Extracting tarball $tarball
@@ -265,6 +267,8 @@ for tarball in $archives/*.tar.*; do
 	process_tarball "$tarball" "extract_tool" "$toolname" || exit
 done
 
+log echo Symlinking gmp, mpc, mpfr...
+
 ln -sf $(fullpath "$outdir/src/gmp-$gmpver") \
 	$(fullpath "$outdir/src/gcc-$gccver/gmp") || exit
 ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
@@ -272,7 +276,8 @@ ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
 
-if ! [[ -z extractonly ]]; then
+if [[ -z extractonly ]]; then
+	log echo 'Just extracting, done'
 	exit 0
 fi
 
