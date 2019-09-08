@@ -97,7 +97,7 @@ public:
     static heap_t *create();
     static void destroy(heap_t *heap);
     static uint32_t get_heap_id(heap_t *heap);
-//protected:
+
     heap_t();
     ~heap_t();
     void *operator new(size_t) noexcept;
@@ -113,7 +113,7 @@ public:
     void *large_alloc(size_t size, uint32_t heap_id);
     void large_free(heap_hdr_t *hdr, size_t size);
     _noinline
-    bool validate_failed() const;    
+    bool validate_failed() const;
 
     heap_hdr_t *create_arena(uint8_t log2size, scoped_lock const& lock);
 
@@ -524,7 +524,7 @@ void *heap_t::realloc(void *block, size_t size)
             void *new_block = alloc(size);
 
             // If allocation fails, leave original block unaffected
-            if (!new_block)
+            if (unlikely(!new_block))
                 return nullptr;
 
             // Copy the original to the new block

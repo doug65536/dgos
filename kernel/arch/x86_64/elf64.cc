@@ -952,7 +952,7 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
     dyn_seg = nullptr;
 
-    // Pass 2, map sections    
+    // Pass 2, map sections
     errno_t err = map_sections();
     if (unlikely(err != errno_t::OK))
         return err;
@@ -1083,7 +1083,8 @@ void __module_dynamic_linker(plt_stub_data_t *data)
     data->result = sym->st_value;
 }
 
-EXPORT void __module_register_frame(void const * const *__module_dso_handle, void *__frame)
+EXPORT void __module_register_frame(void const * const *__module_dso_handle,
+                                    void *__frame)
 {
 
 }
