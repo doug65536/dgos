@@ -37,7 +37,7 @@
 
 #define DEBUG_CREATE_PT         0
 #define DEBUG_PHYS_ALLOC        1
-#define DEBUG_PAGE_TABLES       0
+#define DEBUG_PAGE_TABLES       1
 #define DEBUG_PAGE_FAULT        0
 
 #define PROFILE_PHYS_ALLOC      0
@@ -996,11 +996,15 @@ static physaddr_t init_take_page(int low)
     physmem_range_t *range = nullptr;
     for (size_t i = usable_mem_ranges; i > 0; --i) {
         auto& chk = mem_ranges[i - 1];
-        if (chk.base <= 0xFFFFFFFFU && chk.size >= PAGE_SIZE) {
+        if ((!low || chk.base < 0xFFFFFFFFU) && chk.size >= PAGE_SIZE) {
             range = &chk;
             break;
         }
     }
+
+    assert(range);
+    if (unlikely(!range))
+        return 0;
 
     physaddr_t addr = range->base + range->size - PAGE_SIZE;
 
@@ -1056,6 +1060,8 @@ static clear_phys_state_t clear_phys_state;
 
 void mm_phys_clear_init()
 {
+    printdbg("Initializing physical memory clearing\n");
+
     if (cpuid_has_1gpage()) {
         clear_phys_state.log2_window_sz = 30;
         clear_phys_state.level = 1;
@@ -1110,7 +1116,7 @@ void clear_phys(physaddr_t addr)
     pte_t page_flags;
     size_t offset;
     physaddr_t base;
-    if (clear_phys_state.log2_window_sz == 30) {
+    if (likely(clear_phys_state.log2_window_sz == 30)) {
         base = addr & -(1 << 30);
         page_flags = PTE_PAGESIZE;
     } else if (clear_phys_state.log2_window_sz == 21) {
@@ -1361,10 +1367,9 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
             }
 
             // Update PTE and restart instruction
-            if (atomic_cmpxchg(ptes[3], pte,
-                               (pte & ~PTE_ADDR) |
-                               (page & PTE_ADDR) |
-                               page_flags) != pte) {
+            if (unlikely(atomic_cmpxchg(
+                             ptes[3], pte, (pte & ~PTE_ADDR) |
+                             (page & PTE_ADDR) | page_flags) != pte)) {
                 // Another thread beat us to it
                 mmu_free_phys(page);
                 cpu_page_invalidate(fault_addr);
@@ -1543,8 +1548,14 @@ void mmu_init()
     intr_hook(INTR_IPI_TLB_SHTDN, mmu_tlb_shootdown_handler,
               "sw_tlbshoot", eoi_lapic);
 
+    if (unlikely(sizeof(*phys_mem_map) * kernel_params->phys_mem_table_size >
+                 sizeof(phys_mem_map))) {
+        printk("Warning: Memory map is too large to fit\n");
+    }
+
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
-           sizeof(*phys_mem_map) * kernel_params->phys_mem_table_size);
+           std::min(sizeof(phys_mem_map), sizeof(*phys_mem_map) *
+                           kernel_params->phys_mem_table_size));
     phys_mem_map_count = kernel_params->phys_mem_table_size;
 
     usable_mem_ranges = mmu_fixup_mem_map(phys_mem_map);
@@ -1577,8 +1588,7 @@ void mmu_init()
             if (mem->type == PHYSMEM_TYPE_NORMAL) {
                 usable_pages += mem->size >> PAGE_SIZE_BIT;
 
-                if (highest_usable < end)
-                    highest_usable = end;
+                highest_usable = std::max(highest_usable, end);
             }
         }
     }
@@ -1725,6 +1735,9 @@ void mmu_init()
     // from all process contexts
     master_pagedir = (pte_t*)mmap((void*)root_physaddr, PAGE_SIZE,
                                   PROT_READ, MAP_PHYSICAL, -1, 0);
+
+    if (unlikely(master_pagedir == MAP_FAILED))
+        panic("Insufficient memory to initialize memory allocator!");
 
     current_pagedir = PT0_PTR;
 
@@ -1917,6 +1930,11 @@ bool mwritable(uintptr_t addr, size_t size)
     return true;
 }
 
+static void mm_destroy_pagetables_aligned(uintptr_t start, size_t size)
+{
+    // TODO: implement
+}
+
 static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 {
     pte_t *pte_st[4];
@@ -1954,6 +1972,10 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
             pte_t old = base[i];
             if (!(old & PTE_PRESENT)) {
                 physaddr_t const page = mmu_alloc_phys(0);
+
+                assert(page);
+                if (unlikely(!page))
+                    return nullptr;
 
                 clear_phys(page);
 
@@ -2053,7 +2075,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     if (unlikely((flags & MAP_USER) && (flags & user_prohibited)))
         return MAP_FAILED;
 
-    if (len == 0)
+    if (unlikely(len == 0))
         return nullptr;
 
     PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
@@ -2062,7 +2084,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     assert((flags & MAP_DEVICE) || (fd < 0));
 
 #if DEBUG_PAGE_TABLES
-    printdbg("Mapping len=%zx prot=%x flags=%x addr=%#" PRIx64 "\n",
+    printdbg("Mapping len=%#zx prot=%#x flags=%#x addr=%#" PRIx64 "\n",
              len, prot, flags, (uintptr_t)addr);
 #endif
 
@@ -2079,14 +2101,14 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     page_flags |= zero_if_false(flags & MAP_PHYSICAL,
                                 PTE_EX_PHYSICAL | PTE_PRESENT);
 
-    if (unlikely(flags & MAP_WEAKORDER)) {
+    if (likely(!(flags & MAP_WEAKORDER))) {
+        page_flags |= zero_if_false(flags & MAP_NOCACHE, PTE_PCD);
+        page_flags |= zero_if_false(flags & MAP_WRITETHRU, PTE_PWT);
+    } else {
         // Weakly ordered memory, set write combining in PTE if capable
         page_flags |= select_mask(mmu_have_pat(),
                                   PTE_PTEPAT_n(PAT_IDX_WC),
                                   PTE_PCD | PTE_PWT);
-    } else {
-        page_flags |= zero_if_false(flags & MAP_NOCACHE, PTE_PCD);
-        page_flags |= zero_if_false(flags & MAP_WRITETHRU, PTE_PWT);
     }
 
     page_flags |= zero_if_false(flags & MAP_POPULATE, PTE_PRESENT);
@@ -2136,6 +2158,12 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
     if (likely(!usable_mem_ranges)) {
         pte_t *base_pte = mm_create_pagetables_aligned(linear_addr, len);
+
+        if (unlikely(!base_pte)) {
+            mm_destroy_pagetables_aligned(linear_addr, len);
+            munmap((void*)linear_addr, len);
+            return MAP_FAILED;
+        }
 
         //printdbg("mmap %zx bytes at %zx-%zx\n",
         //         len, linear_addr, linear_addr + len);
@@ -3068,6 +3096,8 @@ physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
         index = next_free[low];
     }
 
+//    if (index != 0 && index != entry_t(-1))
+//        return 0;
     if (unlikely(!assert(index != 0 && index != entry_t(-1))))
         return 0;
 
@@ -3508,7 +3538,12 @@ uintptr_t mm_fork_kernel_text()
 void clear_phys_state_t::reserve_addr()
 {
     bool ok;
-    ok = linear_allocator.take_linear(addr, size_t(1) << log2_window_sz, true);
+    size_t size = size_t(1) << log2_window_sz;
+    linear_allocator.dump("before reserve_addr"
+                          " take_linear(addr=%#zx, size=%#zx\n",
+                          addr, size);
+    ok = linear_allocator.take_linear(addr, size, true);
+    linear_allocator.dump("after reserve_addr take_linear\n");
     assert(ok);
 }
 

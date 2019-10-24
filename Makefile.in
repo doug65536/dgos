@@ -946,6 +946,7 @@ am_unittest_km_OBJECTS =  \
 	kernel/unittest/unittest_km-unittest.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_threads.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_allocator.$(OBJEXT) \
+	kernel/unittest/unittest_km-test_malloc.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_sort.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_vector.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_set.$(OBJEXT) \
@@ -2781,6 +2782,7 @@ unittest_km_SOURCES = \
 	kernel/unittest/unittest.h \
 	kernel/unittest/test_threads.cc \
 	kernel/unittest/test_allocator.cc \
+	kernel/unittest/test_malloc.cc \
 	kernel/unittest/test_sort.cc \
 	kernel/unittest/test_vector.cc \
 	kernel/unittest/test_set.cc \
@@ -3004,7 +3006,7 @@ QEMU_CPUS = $(shell $(NPROC))
 QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
-QEMU_RAM = 2G
+QEMU_RAM = 128M
 QEMU_MEMFILL = 
 QEMU_USB = \
 	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
@@ -5461,6 +5463,9 @@ kernel/unittest/unittest_km-test_threads.$(OBJEXT):  \
 kernel/unittest/unittest_km-test_allocator.$(OBJEXT):  \
 	kernel/unittest/$(am__dirstamp) \
 	kernel/unittest/$(DEPDIR)/$(am__dirstamp)
+kernel/unittest/unittest_km-test_malloc.$(OBJEXT):  \
+	kernel/unittest/$(am__dirstamp) \
+	kernel/unittest/$(DEPDIR)/$(am__dirstamp)
 kernel/unittest/unittest_km-test_sort.$(OBJEXT):  \
 	kernel/unittest/$(am__dirstamp) \
 	kernel/unittest/$(DEPDIR)/$(am__dirstamp)
@@ -6030,6 +6035,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_allocator.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_chrono.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_nofault.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_printk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_set.Po@am__quote@
@@ -15848,6 +15854,20 @@ kernel/unittest/unittest_km-test_allocator.obj: kernel/unittest/test_allocator.c
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/unittest/test_allocator.cc' object='kernel/unittest/unittest_km-test_allocator.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/unittest/unittest_km-test_allocator.obj `if test -f 'kernel/unittest/test_allocator.cc'; then $(CYGPATH_W) 'kernel/unittest/test_allocator.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/unittest/test_allocator.cc'; fi`
+
+kernel/unittest/unittest_km-test_malloc.o: kernel/unittest/test_malloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/unittest/unittest_km-test_malloc.o -MD -MP -MF kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Tpo -c -o kernel/unittest/unittest_km-test_malloc.o `test -f 'kernel/unittest/test_malloc.cc' || echo '$(srcdir)/'`kernel/unittest/test_malloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Tpo kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/unittest/test_malloc.cc' object='kernel/unittest/unittest_km-test_malloc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/unittest/unittest_km-test_malloc.o `test -f 'kernel/unittest/test_malloc.cc' || echo '$(srcdir)/'`kernel/unittest/test_malloc.cc
+
+kernel/unittest/unittest_km-test_malloc.obj: kernel/unittest/test_malloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/unittest/unittest_km-test_malloc.obj -MD -MP -MF kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Tpo -c -o kernel/unittest/unittest_km-test_malloc.obj `if test -f 'kernel/unittest/test_malloc.cc'; then $(CYGPATH_W) 'kernel/unittest/test_malloc.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/unittest/test_malloc.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Tpo kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/unittest/test_malloc.cc' object='kernel/unittest/unittest_km-test_malloc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/unittest/unittest_km-test_malloc.obj `if test -f 'kernel/unittest/test_malloc.cc'; then $(CYGPATH_W) 'kernel/unittest/test_malloc.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/unittest/test_malloc.cc'; fi`
 
 kernel/unittest/unittest_km-test_sort.o: kernel/unittest/test_sort.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/unittest/unittest_km-test_sort.o -MD -MP -MF kernel/unittest/$(DEPDIR)/unittest_km-test_sort.Tpo -c -o kernel/unittest/unittest_km-test_sort.o `test -f 'kernel/unittest/test_sort.cc' || echo '$(srcdir)/'`kernel/unittest/test_sort.cc

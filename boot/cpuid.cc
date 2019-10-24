@@ -1,4 +1,5 @@
 #include "cpuid.h"
+#include "likely.h"
 
 // Returns true if the CPU supports that leaf
 // Hypervisor leaves are asinine and it always returns true for them
@@ -58,7 +59,7 @@ bool cpu_has_global_pages()
 {
     static int has;
 
-    if (has)
+    if (likely(has))
         return has > 0;
 
     cpuid_t cpuinfo;
@@ -76,7 +77,7 @@ bool cpu_has_bmi()
 
     static int has;
 
-    if (has)
+    if (likely(has))
         return has > 0;
 
     bool result = true;

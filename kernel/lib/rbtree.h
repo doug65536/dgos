@@ -61,8 +61,8 @@ public:
 
     iter_t insert(_Tkey __key, _Tval __val);
 
-    kvp_t *find(kvp_t *__kvp, iter_t *__iter);
-    kvp_t *find(kvp_t *__kvp, iter_t *__iter) const;
+    size_t find(kvp_t *__kvp, iter_t *__iter);
+    size_t find(kvp_t *__kvp, iter_t *__iter) const;
 
     _pure iter_t first(iter_t __start);
     _pure iter_t next(iter_t __n);
@@ -557,9 +557,21 @@ template<typename _Tkey, typename _Tval>
 typename rbtree_t<_Tkey,_Tval>::iter_t
 rbtree_t<_Tkey,_Tval>::lower_bound_pair(kvp_t *__kvp)
 {
-    iter_t iter = 0;
-    find(__kvp, &iter);
-    return iter;
+    iter_t __iter = 0;
+
+    if (find(__kvp, &__iter))
+        return __iter;
+
+    __node_t const *__node = _NODE(__iter);
+
+    if (__cmp(__kvp, &__node->__kvp, __cmp_param) > 0) {
+        __iter = next(__iter);
+
+        // debug
+        __node = _NODE(__iter);
+    }
+
+    return __iter;
 }
 
 template<typename _Tkey, typename _Tval>
@@ -682,15 +694,17 @@ rbtree_t<_Tkey,_Tval>::last(iter_t __start)
 }
 
 template<typename _Tkey, typename _Tval>
-typename rbtree_t<_Tkey,_Tval>::kvp_t *
-rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter)
+size_t rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter)
 {
-    iter_t n = __root;
+    if (unlikely(!__root))
+        return 0;
+
+    iter_t __n = __root;
     iter_t __next;
     int __cmp_result = -1;
 
-    for (; n; n = __next) {
-        __node_t const *__node = _NODE(n);
+    for (; __n; __n = __next) {
+        __node_t const *__node = _NODE(__n);
 
         __cmp_result = __cmp(__kvp, &__node->__kvp, __cmp_param);
 
@@ -703,14 +717,13 @@ rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter)
             break;
     }
 
-    *__iter = __iter ? n : 0;
+    *__iter = __iter ? __n : 0;
 
-    return __cmp_result ? nullptr : &_NODE(n)->__kvp;
+    return __cmp_result ? 0 : __n;
 }
 
 template<typename _Tkey, typename _Tval>
-typename rbtree_t<_Tkey,_Tval>::kvp_t *
-rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter) const
+size_t rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter) const
 {
     return const_cast<rbtree_t<_Tkey,_Tval>*>(this)->find(__kvp, __iter);
 }
@@ -875,7 +888,7 @@ template<typename _Tkey, typename _Tval>
 int rbtree_t<_Tkey,_Tval>::delete_pair(kvp_t *__kvp)
 {
     iter_t __n;
-    if (find(__kvp, &__n))
+    if (likely(find(__kvp, &__n)))
         return __delete_at(__n);
     return 0;
 }

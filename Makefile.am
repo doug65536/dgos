@@ -1748,6 +1748,7 @@ unittest_km_SOURCES = \
 	kernel/unittest/unittest.h \
 	kernel/unittest/test_threads.cc \
 	kernel/unittest/test_allocator.cc \
+	kernel/unittest/test_malloc.cc \
 	kernel/unittest/test_sort.cc \
 	kernel/unittest/test_vector.cc \
 	kernel/unittest/test_set.cc \
@@ -2125,7 +2126,7 @@ QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
-QEMU_RAM = 2G
+QEMU_RAM = 128M
 
 QEMU_MEMFILL =
 #QEMU_MEMFILL = \

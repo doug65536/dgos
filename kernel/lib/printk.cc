@@ -681,9 +681,16 @@ intptr_t formatter(
             break;
 
         case arg_type_char_ptr:
-            len = strlen(flags.arg.char_ptr_value);
-            if (flags.limit_string && len > flags.precision)
-                len = flags.precision;
+            if (!flags.limit_string) {
+                len = strlen(flags.arg.char_ptr_value);
+            } else {
+                char const *end = (char const *)
+                        memchr(flags.arg.char_ptr_value, 0, flags.max_chars);
+                if (end)
+                    len = end - flags.arg.char_ptr_value;
+                else
+                    len = flags.max_chars;
+            }
 
             if (flags.min_width > len)
                 flags.pending_padding = flags.min_width - len;

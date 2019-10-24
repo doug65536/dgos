@@ -149,13 +149,15 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 
         tree_t::kvp_t by_size = free_addr_by_size.item(place);
 
-        while (by_size.key < size) {
-            free_addr_by_size.dump();
-            place = free_addr_by_size.next(place);
-            if (unlikely(!place))
-                return 0;
-            by_size = free_addr_by_size.item(place);
-        }
+        assert(by_size.key >= size);
+
+//        while (by_size.key < size) {
+//            free_addr_by_size.dump();
+//            place = free_addr_by_size.next(place);
+//            if (unlikely(!place))
+//                return 0;
+//            by_size = free_addr_by_size.item(place);
+//        }
 
         assert(by_size.key >= size);
 
@@ -222,7 +224,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
  *  |  -1   |   0   | <---------> |   0   | Replace obstacle, done         |
  *  |       |       |       <xxx> |       |                                |
  *  |       |       |             |       |                                |
- *  |  -1   |   1   | <---------> |   0   | Replace obstacle               |
+ *  |  -1   |   1   | <---------> |   0   | Replace obstacle, continue     |
  *  |       |       |    <xxx>    |       |                                |
  *  |       |       |             |       |                                |
  *  |   0   |  -1   | <--->       |   1   | Clip obstacle start, done      |
@@ -231,7 +233,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
  *  |   0   |   0   | <--->       |   0   | Replace obstacle, done         |
  *  |       |       | <xxx>       |       |                                |
  *  |       |       |             |       |                                |
- *  |   0   |   1   | <---------> |   0   | Replace obstacle               |
+ *  |   0   |   1   | <---------> |   0   | Replace obstacle, continue     |
  *  |       |       | <xxx>       |       |                                |
  *  |       |       |             |       |                                |
  *  |   1   |  -1   |   <--->     |   2   | Duplicate obstacle, clip end   |
@@ -241,13 +243,15 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
  *  |   1   |   0   |   <--->     |   1   | Clip obstacle end, done        |
  *  |       |       | <--xxx>     |       |                                |
  *  |       |       |             |       |                                |
- *  |   1   |   1   |     <-----> |   1   | Clip obstacle end              |
+ *  |   1   |   1   |     <-----> |   1   | Clip obstacle end, continue    |
  *  |       |       |   <--xx>    |       |                                |
  *  |       |       |             |       |                                |
  *  +-------+-------+-------------+-------+--------------------------------+
  *
  * "done" means, there is no point in continuing to iterate forward in the
  * range query results, there is no way it could overlap any more items.
+ * "continue" means, there may be more blocks that overlap the range,
+ * continue with the next block, which may be another relevant obstacle.
  *
  */
 

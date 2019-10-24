@@ -23,9 +23,6 @@ template<typename _T>
 class rbtree_policy_t
 {
 public:
-    //
-    // Delete
-
     static constexpr int _RED = 1;
     static constexpr int _BLACK = 0;
 
@@ -126,6 +123,9 @@ public:
         else
             __rotate_left(__g);
     }
+
+    //
+    // Delete
 
     static void __delete_case6(_T *__n)
     {
@@ -1251,29 +1251,30 @@ public:
 private:
     void __swap_nodes(node_t *__a, node_t *__b)
     {
-        node_t **a_ptr = __a->__parent
-                ? &__a->select_lr(__a->is_left_child())
-                : &__root;
-
-        // Same for B
-        node_t **b_ptr = __b->__parent
-                ? &__b->select_lr(__b->is_left_child())
-                : &__root;
-
         // Handle both cases with one implementation (__a is always parent)
         if (unlikely(__b == __a->__parent)) {
             assert(!"Unlikely eh?");
             std::swap(__a, __b);
         }
 
+        // Find the pointer that points to A
+        node_t **a_ptr = likely(__a->__parent)
+                ? &__a->select_lr(__a->is_left_child())
+                : &__root;
+
+        // Find the pointer that points to B
+        node_t **b_ptr = likely(__b->__parent)
+                ? &__b->select_lr(__b->is_left_child())
+                : &__root;
+
         if (__a == __b->__parent) {
             //          W           W      //         W           W      //
             // W_child->|           |      //         |           |      //
-            //        __a         __b               __a         __b      //
-            //       /   \  ->   /   \     OR      /   \  ->   /   \     //
-            //      __b   X     __a   X           __b   X     __a   X    //
-            //     /   \       /   \       //    /   \       /   \       //
-            //    Y     Z     Y     Z      //   Y     Z     Y     Z      //
+            //          a           b                 a           b      //
+            //         / \   ->    / \     OR        / \   ->    / \     //
+            //        b   X       a   X             b   X       a   X    //
+            //       / \         / \       //      / \         / \       //
+            //      Y   Z       Y   Z      //     Y   Z       Y   Z      //
 
             dump();
 

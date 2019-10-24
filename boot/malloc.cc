@@ -102,12 +102,13 @@ _noreturn void malloc_panic()
 static blk_hdr_t *malloc_coalesce(blk_hdr_t *blk, blk_hdr_t *next)
 {
     // Coalesce adjacent consecutive free blocks
-    while (blk->sig == blk_hdr_t::FREE && next->sig == blk_hdr_t::FREE) {
+    while (unlikely(blk->sig == blk_hdr_t::FREE &&
+                    next->sig == blk_hdr_t::FREE)) {
         blk->set_size(blk->size + next->size);
 
         next->make_invalid();
 
-        // Enforce that malloc_rover is always pointing to a block header
+        // Enforce that malloc rover is always pointing to a block header
         if (first_free == next)
             first_free = blk;
 

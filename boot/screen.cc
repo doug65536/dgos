@@ -4,10 +4,11 @@
 #include "bioscall.h"
 #include "malloc.h"
 #include "screen_abstract.h"
+#include "likely.h"
 
 static void buffer_char(tchar *buf, tchar **pptr, tchar c)
 {
-    if (*pptr - buf == 80 || c == '\n')
+    if (unlikely(*pptr - buf == 80 || c == '\n'))
     {
         scroll_screen(0x07);
         *(*pptr) = 0;
@@ -15,7 +16,7 @@ static void buffer_char(tchar *buf, tchar **pptr, tchar c)
         debug_out(buf, *pptr - buf);
         *pptr = buf;
     }
-    if (c >= 32)
+    if (likely(c >= 32))
         *(*pptr)++ = c;
 }
 
@@ -43,6 +44,10 @@ void print_line(tchar const *format, ...)
 
     for (p = format; *p; ++p) {
         switch (*p) {
+        default:
+            buffer_char(buf, &out, *p);
+            continue;
+
         case '%':
             flags = 0;
 
@@ -157,10 +162,6 @@ void print_line(tchar const *format, ...)
             while (*s)
                 buffer_char(buf, &out, *s++);
 
-            break;
-
-        default:
-            buffer_char(buf, &out, *p);
             break;
         }
     }

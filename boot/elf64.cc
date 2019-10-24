@@ -200,7 +200,8 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
-    paging_map_physical(0, (0xFFFFFFFF80000000ULL - PAGE_SIZE) + base_adj,
+    paging_map_physical(0, (UINT64_C(0xFFFFFFFF80000000) -
+                            PAGE_SIZE) + base_adj,
                         PAGE_SIZE, PTE_PRESENT |
                         PTE_WRITABLE | PTE_EX_PHYSICAL);
 
@@ -331,6 +332,7 @@ void elf64_run(tchar const *filename)
 
     elf64_context_t *ctx = load_kernel_begin();
 
+    // Calculate the total bytes to be read for I/O progress bar
     for (unsigned i = 0; i < file_hdr.e_phnum; ++i) {
         if ((program_hdrs[i].p_flags & (PF_R | PF_W | PF_X)) != 0)
             ctx->total_bytes += program_hdrs[i].p_memsz;
