@@ -11,22 +11,24 @@
 #define DEBUG_PHYSMAP 0
 
 static physmem_range_t *physalloc_ranges;
-static int physalloc_count;
-static int physalloc_capacity;
+static uint32_t physalloc_count;
+static uint32_t physalloc_capacity;
 
 // Keep track of the first index in the map for 20 and 64 bit entries
-static int physalloc_20bit_st;
-static int physalloc_64bit_st;
+static uint32_t physalloc_20bit_st;
+static uint32_t physalloc_64bit_st;
 
 // Keep track of the first free block in 20 bit range
-static int physalloc_20bit_1st;
+static uint32_t physalloc_20bit_1st;
 
 // Special block for taking pages from the top of 32 bit range
-static int physalloc_20bit_pt;
+static uint32_t physalloc_20bit_pt;
 
-static void physmap_realloc(int capacity_hint);
-static int physmap_replace(int index, physmem_range_t const& entry);
-static void physmap_delete(int index);
+static uint64_t physmap_top;
+
+static void physmap_realloc(uint32_t capacity_hint);
+static uint32_t physmap_replace(uint32_t index, physmem_range_t const& entry);
+static void physmap_delete(uint32_t index);
 
 static bool physmap_init()
 {
@@ -40,12 +42,21 @@ static bool physmap_init()
     physmem_range_t entry1{}, entry2{};
 
     do {
-        int count = 0;
+        size_t count = 0;
         physmem_range_t *ranges = physmap_get(&count);
+
+        for (size_t i = 1; i < count && !did_something; ++i) {
+            if (!ranges[i].valid)
+                continue;
+
+            uint64_t top = ranges[i].base + ranges[i].size;
+            if (physmap_top < top)
+                physmap_top = top;
+        }
 
         did_something = false;
 
-        for (int i = 1; i < count && !did_something; ++i) {
+        for (size_t i = 1; i < count && !did_something; ++i) {
             physmem_range_t & prev = ranges[i - 1];
             physmem_range_t & curr = ranges[i];
 
@@ -170,17 +181,17 @@ static bool physmap_init()
 
 _constructor((ctor_physmem)) void physmap_startup()
 {
-    if (!physmap_init())
+    if (unlikely(!physmap_init()))
         PANIC("Could not initialize physical memory map");
 }
 
-physmem_range_t *physmap_get(int *ret_count)
+physmem_range_t *physmap_get(size_t *ret_count)
 {
     *ret_count = physalloc_count;
     return physalloc_ranges;
 }
 
-static void physmap_realloc(int capacity_hint)
+static void physmap_realloc(uint32_t capacity_hint)
 {
     if (capacity_hint < 16)
         capacity_hint = 16;
@@ -188,7 +199,7 @@ static void physmap_realloc(int capacity_hint)
     physalloc_ranges = (physmem_range_t*)realloc(
                 physalloc_ranges, sizeof(*physalloc_ranges) * capacity_hint);
 
-    if (!physalloc_ranges)
+    if (unlikely(!physalloc_ranges))
         PANIC("Could not allocate memory for physical allocation map");
 
     physalloc_capacity = capacity_hint;
@@ -201,9 +212,8 @@ static void physmap_grow()
     physmap_realloc(physalloc_capacity * 2);
 }
 
-static void physmap_delete(int index)
+static void physmap_delete(uint32_t index)
 {
-    assert(index >= 0);
     assert(index < physalloc_count);
 
     physalloc_64bit_st -= (physalloc_64bit_st < index);
@@ -214,15 +224,14 @@ static void physmap_delete(int index)
             sizeof(*physalloc_ranges) * --physalloc_count - index);
 }
 
-static int physmap_replace(int index, physmem_range_t const& entry)
+static uint32_t physmap_replace(uint32_t index, physmem_range_t const& entry)
 {
     physmap_delete(index);
     return physmap_insert(entry);
 }
 
-static int physmap_insert_at(int index, physmem_range_t const& entry)
+static int physmap_insert_at(uint32_t index, physmem_range_t const& entry)
 {
-    assert(index >= 0);
     assert(index <= physalloc_count);
 
     // Grow the map if necessary
@@ -312,9 +321,9 @@ phys_alloc_t alloc_phys(uint64_t size)
     if (unlikely(physalloc_20bit_1st == 0))
         physalloc_20bit_1st = physalloc_20bit_st;
 
-    size = (size + 4095) & -4096;
+    size = (size + (PAGE_SIZE - 1)) & -PAGE_SIZE;
 
-    for (int i = physalloc_20bit_1st; i < physalloc_64bit_st; ++i) {
+    for (uint32_t i = physalloc_20bit_1st; i < physalloc_64bit_st; ++i) {
         physmem_range_t &entry1 = physalloc_ranges[i];
 
         if (entry1.type == PHYSMEM_TYPE_NORMAL) {
@@ -388,7 +397,7 @@ int physmap_take_range(uint64_t base, uint64_t size, uint32_t type)
 {
     uint64_t end = base + size;
 
-    int index = physmap_find_insertion_point(base);
+    uint32_t index = physmap_find_insertion_point(base);
 
     // Bulldoze all entries that end at or before the end of taken range
     while (index < physalloc_count &&
@@ -462,4 +471,9 @@ int physmap_take_range(uint64_t base, uint64_t size, uint32_t type)
     entry.type = type;
     entry.valid = 1;
     return physmap_insert_at(index, entry);
+}
+
+uint64_t physmap_top_addr()
+{
+    return physmap_top;
 }

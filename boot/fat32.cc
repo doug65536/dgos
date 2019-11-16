@@ -36,16 +36,24 @@ static uint32_t next_cluster(uint32_t current_cluster,
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
+_use_result
 static bool read_bpb(uint64_t partition_lba)
 {
     sector_sz = disk_sector_size();
     log2_sector_sz = bit_log2_n(sector_sz);
 
     sector_buffer = (char*)malloc(sector_sz);
+
+    if (unlikely(!sector_buffer))
+        return false;
+
     fat_buffer = (char*)malloc(sector_sz);
 
-    if (!disk_read_lba(uint64_t(sector_buffer),
-                       partition_lba, log2_sector_sz, 1))
+    if (unlikely(!fat_buffer))
+        return false;
+
+    if (unlikely(!disk_read_lba(uint64_t(sector_buffer),
+                                partition_lba, log2_sector_sz, 1)))
         return false;
 
     fat32_parse_bpb(&bpb, partition_lba, sector_buffer);
@@ -93,7 +101,7 @@ static int fat32_sector_iterator_begin(
     iter->cluster_count = cluster_count;
     iter->clusters = new (std::nothrow) uint32_t[cluster_count];
 
-    if (!iter->clusters)
+    if (unlikely(!iter->clusters))
         PANIC_OOM();
 
     cluster_count = 0;
@@ -586,6 +594,9 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
     } else {
         // Short filename optimization
         match = (fat32_dir_union_t*)malloc(sizeof(*match));
+
+        if (unlikely(!match))
+            return 0;
 
         fill_short_filename(match, filename);
 

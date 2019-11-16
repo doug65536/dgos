@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "malloc.h"
+#include "likely.h"
 
 template<typename T, typename S = size_t>
 class array_list
@@ -74,9 +75,9 @@ array_list<T, S>::~array_list()
 template<typename T, typename S>
 bool array_list<T, S>::add(T&& item)
 {
-    S new_capacity = capacity ? capacity << 1 : 4;
+    S new_capacity = capacity ? (capacity << 1) : 4;
     T *new_items = malloc(sizeof(T) * new_capacity);
-    if (!new_items)
+    if (unlikely(!new_items))
         return false;
     for (S i = 0; i < count; ++i) {
         new_items[i] = static_cast<T&&>(items[i]);

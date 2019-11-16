@@ -149,7 +149,7 @@ void paging_map_range(
     for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE, ++pte) {
         // Calculate pte pointer at start and at 2MB boundaries
         if (!pte || ((addr & -(1<<21)) == addr))
-            pte = paging_find_pte(addr, 12, true);
+            pte = paging_find_pte(addr, 12, false);
 
         if ((*pte & PTE_PRESENT))
             continue;
@@ -167,14 +167,19 @@ void paging_map_range(
 }
 
 size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
-                 uint64_t size, uint64_t max_chunk)
+                    uint64_t size, uint64_t max_chunk)
 {
     size_t capacity = 16;
     iovec_t *iovec = (iovec_t*)malloc(sizeof(**ret) * capacity);
 
+    if (unlikely(!iovec))
+        PANIC("Out of memory allocating I/O vector");
+
     size_t count = 0;
     size_t misalignment = vaddr & PAGE_MASK;
     uint64_t offset = 0;
+
+//    size_t step = 0;
 
     for (pte_t *pte = nullptr; offset < size; ++pte) {
         if (unlikely(!pte || ((vaddr & -(1 << 21)) == vaddr)))
@@ -186,7 +191,7 @@ size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
         if (unlikely(count + 1 > capacity)) {
             iovec = (iovec_t*)realloc(iovec, sizeof(*iovec) * (capacity *= 2));
 
-            if (!iovec)
+            if (unlikely(!iovec))
                 PANIC("Out of memory growing iovec array");
         }
 
@@ -194,27 +199,32 @@ size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
         uint64_t chunk = PAGE_SIZE - misalignment;
         misalignment = 0;
 
-        if (offset + chunk > size)
+        if (unlikely(chunk > max_chunk))
+            chunk = max_chunk;
+
+        if (unlikely(offset + chunk > size))
             chunk = size - offset;
 
         auto& iovec_curr = iovec[count];
         iovec_curr.size = chunk;
         iovec_curr.base = paddr;
-        paddr += chunk;
-        vaddr += chunk;
 
-        if (count) {
+        if (likely(count)) {
             auto& iovec_last = iovec[count-1];
 
             // If this entry is contiguous with the previous entry
-            if (iovec_last.base + iovec_last.size == iovec_curr.base) {
+            if (likely(iovec_last.base + iovec_last.size == iovec_curr.base)) {
                 // Compute how much we can add onto the previous entry
                 auto max_coalesce = max_chunk - iovec_last.size;
 
-                if (max_coalesce >= iovec_curr.size) {
+                if (likely(max_coalesce >= iovec_curr.size)) {
                     // Coalesce entire incoming chunk with previous one
                     iovec_last.size += iovec_curr.size;
                 } else if (max_coalesce > 0) {
+                    // Cannot coalesce entire chunk,
+                    // coalesce as much as possible
+                    chunk = max_chunk - chunk;
+
                     // Partially extend previous one + another with remainder
                     iovec_last.size += max_coalesce;
                     iovec_curr.base += max_coalesce;
@@ -225,11 +235,28 @@ size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
                     // Just keep the one we have
                     ++count;
                 }
+            } else {
+                // Non-coontiguous
+                ++count;
             }
         } else {
+            // First chunk
             ++count;
         }
 
+//        ++step;
+
+//        PRINT("(%zd) iovec[%zu]"
+//              " base=0x%" PRIx64
+//              " sz=0x%" PRIx64
+//              " offset=0x%" PRIx64
+//              " chunk=0x%" PRIx64
+//              "\n",
+//              step, count - 1, iovec[count-1].base,
+//              iovec[count-1].size, offset, chunk);
+
+        paddr += chunk;
+        vaddr += chunk;
         offset += chunk;
     }
 
@@ -261,7 +288,7 @@ off_t paging_iovec_read(int fd, off_t file_offset,
                         fd, (void*)iovec[i].base, iovec[i].size,
                         file_offset + offset);
 
-            if (read != ssize_t(iovec[i].size))
+            if (unlikely(read != ssize_t(iovec[i].size)))
                 PANIC("Disk read error");
 
             offset += iovec[i].size;
@@ -273,17 +300,17 @@ off_t paging_iovec_read(int fd, off_t file_offset,
 
 static inline constexpr uint64_t low_bits(uint64_t value, uint8_t log2n)
 {
-    return value & ((1 << log2n) - 1);
+    return value & ((UINT64_C(1) << log2n) - 1);
 }
 
 static inline constexpr uint64_t round_up(uint64_t value, uint8_t log2n)
 {
-    return (value + ((1 << log2n) - 1)) & -(1 << log2n);
+    return (value + ((UINT64_C(1) << log2n) - 1)) & -(UINT64_C(1) << log2n);
 }
 
 static inline constexpr uint64_t round_dn(uint64_t value, uint8_t log2n)
 {
-    return value & -(1 << log2n);
+    return value & -(UINT64_C(1) << log2n);
 }
 
 void paging_map_physical_impl(uint64_t phys_addr, uint64_t linear_base,

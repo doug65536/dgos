@@ -327,7 +327,7 @@ void *calloc(size_t num, size_t size)
 
 bool malloc_validate_or_panic()
 {
-    if (!malloc_validate())
+    if (unlikely(!malloc_validate()))
         PANIC("Heap validation failed");
     return true;
 }
@@ -347,8 +347,8 @@ bool malloc_validate()
             return false;
         }
 
-        if (blk > heap_en) {
-            PRINT("Fell off the end of the heap\n");
+        if (blk < heap_st || blk > heap_en) {
+            PRINT("Went off the the heap into the weeds\n");
             return false;
         }
 

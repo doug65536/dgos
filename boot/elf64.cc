@@ -36,33 +36,63 @@ extern char ___smp_en[];
 
 elf64_context_t *load_kernel_begin()
 {
+    ELF64_TRACE("constructing new context\n");
+
     elf64_context_t *ctx = new (std::nothrow) elf64_context_t{};
     return ctx;
 }
 
 void load_kernel_end(elf64_context_t *ctx)
 {
+    ELF64_TRACE("deleting context\n");
+
     delete ctx;
 }
 
 bool load_kernel_chunk(Elf64_Phdr *blk, int file, elf64_context_t *ctx)
 {
+    ELF64_TRACE("loading kernel chunk"
+                ", vaddr=0x%" PRIx64
+                ", memsz=0x%" PRIx64
+                ", page_flags=0x%" PRIx64,
+                blk->p_vaddr,
+                blk->p_memsz,
+                ctx->page_flags);
+
     alloc_page_factory_t allocator;
 
     paging_map_range(&allocator, blk->p_vaddr, blk->p_memsz,
                      ctx->page_flags);
 
     iovec_t *iovec;
-    int iovec_count = paging_iovec(&iovec, blk->p_vaddr,
+    size_t iovec_count = paging_iovec(&iovec, blk->p_vaddr,
                                    blk->p_filesz, 1 << 30);
 
     uint64_t offset = 0;
-    for (int i = 0; i < iovec_count; ++i) {
+    for (size_t i = 0; i < iovec_count; ++i) {
+        PRINT("iovec[%zu] base=%" PRIx64 " sz=%" PRIx64 "\n",
+              i, iovec[i].base, iovec[i].size);
+
+        offset += iovec[i].size;
+    }
+    PRINT("Total offset=%" PRIx64 "\n", offset);
+
+    assert(offset == blk->p_filesz);
+    __asm__ __volatile__ ("" : : : "memory");
+
+    offset = 0;
+    for (size_t i = 0; i < iovec_count; ++i) {
         assert(iovec[i].base < 0x100000000);
 
-        ssize_t read = boot_pread(
-                    file, (void*)iovec[i].base, iovec[i].size,
-                    blk->p_offset + offset);
+        uint64_t file_ofs = blk->p_offset + offset;
+
+        ELF64_TRACE("scatter to paddr=0x%" PRIx64
+                    ", size=0x%" PRIx64
+                    ", fpos=0x%" PRIx64,
+                    iovec[i].base, iovec[i].size, file_ofs);
+
+        ssize_t read = boot_pread(file, (void*)iovec[i].base,
+                                  iovec[i].size, file_ofs);
 
         if (unlikely(read != ssize_t(iovec[i].size)))
             PANIC("Disk error");
@@ -70,24 +100,32 @@ bool load_kernel_chunk(Elf64_Phdr *blk, int file, elf64_context_t *ctx)
         offset += iovec[i].size;
     }
 
-    if (offset < blk->p_memsz) {
+    PRINT("offset=%" PRIx64 "\n", offset);
+    PRINT("blk->p_filesz=%" PRIx64 "\n", blk->p_filesz);
+    assert(offset == blk->p_filesz);
+
+    if (blk->p_filesz < blk->p_memsz) {
         free(iovec);
+        iovec = nullptr;
+
         iovec_count = paging_iovec(&iovec, blk->p_vaddr + blk->p_filesz,
-                                   blk->p_memsz - offset, 1 << 30);
-        for (int i = 0; i < iovec_count; ++i) {
+                                   blk->p_memsz - blk->p_filesz, 1 << 30);
+
+        for (size_t i = 0; i < iovec_count; ++i) {
             assert(iovec[i].base < 0x100000000);
             memset((void*)iovec[i].base, 0, iovec[i].size);
         }
     }
 
     free(iovec);
+    iovec = nullptr;
 
     // Clear modified bits if uninitialized data
-    if (blk->p_memsz > blk->p_filesz) {
-        paging_modify_flags(blk->p_vaddr + blk->p_filesz,
-                            blk->p_memsz - blk->p_filesz,
-                            PTE_DIRTY | PTE_ACCESSED, 0);
-    }
+//    if (blk->p_memsz > blk->p_filesz) {
+//        paging_modify_flags(blk->p_vaddr + blk->p_filesz,
+//                            blk->p_memsz - blk->p_filesz,
+//                            PTE_DIRTY | PTE_ACCESSED, 0);
+//    }
 
     return true;
 }
@@ -141,6 +179,14 @@ static kernel_params_t *prompt_kernel_param(
         // Place framebuffer at -2TB
         uint64_t linear_addr = (-UINT64_C(2) << 40);
 
+        PRINT("Mapping framebuffer"
+              " vaddr=%" PRIx64
+              ", paddr=%" PRIx64
+              ", size=%" PRIx64 "\n",
+              linear_addr,
+              mode.framebuffer_addr,
+              mode.framebuffer_bytes);
+
         paging_map_physical(mode.framebuffer_addr,
                             linear_addr,
                             mode.framebuffer_bytes, PTE_EX_PHYSICAL |
@@ -151,17 +197,6 @@ static kernel_params_t *prompt_kernel_param(
         mode.framebuffer_addr = linear_addr;
     }
 
-//    PRINT("           ap_entry: 0x%llx\n", uint64_t(params->ap_entry));
-//    PRINT("     phys_mem_table: 0x%llx\n",
-//          uint64_t(params->phys_mem_table));
-//    PRINT("phys_mem_table_size: 0x%llx\n", params->phys_mem_table_size);
-//    PRINT("  vbe_selected_mode: 0x%llx\n",
-//               uint64_t(params->vbe_selected_mode));
-//    PRINT("    boot_drv_serial: 0x%llx\n", params->boot_drv_serial);
-//    PRINT("    serial_debugout: 0x%llx\n",
-//               uint64_t(params->serial_debugout));
-//    PRINT("           wait_gdb: 0x%x\n", params->wait_gdb);
-
     return params;
 }
 
@@ -171,32 +206,33 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     //
     // Relocate MP entry trampoline to 4KB boundary in the heap
 
-    void *ap_entry_ptr = malloc_aligned(___smp_en - ___smp_st, PAGE_SIZE);
+    size_t smp_sz = ___smp_en - ___smp_st;
 
-    //PRINT("SMP trampoline at 0x%zx:%zx",
-    //      uintptr_t(ap_entry_ptr) >> 4,
-    //      uintptr_t(ap_entry_ptr) & 0xF);
+    void *ap_entry_ptr = malloc_aligned(smp_sz, PAGE_SIZE);
 
-    memcpy(ap_entry_ptr, ___smp_st, ___smp_en - ___smp_st);
+    memcpy(ap_entry_ptr, ___smp_st, smp_sz);
 
     //
     // Build physical memory table
 
-    int phys_mem_table_size = 0;
+    size_t phys_mem_table_size = 0;
     void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
-    //PRINT("Mapping low memory\n");
+    uint64_t top_addr = physmap_top_addr();
+
+    // Round up to a 1GB boundary
+    top_addr = (top_addr + (UINT64_C(1) << 30) - 1) & -(UINT64_C(1) << 30);
 
     uint64_t physmap_addr = (base - (UINT64_C(512) << 30)) &
             -(UINT64_C(512) << 30);
 
+    PRINT("Physical mapping, base=%" PRIx64 ", size=%" PRIx64 "\n",
+          physmap_addr, top_addr);
+
     // Map first 512GB of physical addresses
     // at 512GB boundary >= 512GB before load address
-    paging_map_physical(0, physmap_addr,
-                        UINT64_C(512) << 30,
+    paging_map_physical(0, physmap_addr, top_addr,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
-
-    //PRINT("Mapping dynamic frame\n");
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
@@ -220,12 +256,10 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 
     // This check is done late to make debugging easier
     // It is impossible to debug 32 bit code on qemu-x86_64 target
-    if (!cpu_has_long_mode())
+    if (unlikely(!cpu_has_long_mode()))
         PANIC("Need 64-bit CPU");
 
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
-
-    //PRINT("Entering kernel at 0x%llx\n", entry_point);
 
     run_kernel(entry_point, params);
 }
@@ -258,9 +292,8 @@ void load_initrd()
 
     auto read_size = paging_iovec_read(
                 initrd_fd, 0, initrd_base, initrd_size, 1 << 30);
-    if (initrd_size != read_size) {
+    if (unlikely(initrd_size != read_size))
         PANIC("Could not load initrd file\n");
-    }
 
     boot_close(initrd_fd);
 }
@@ -270,24 +303,16 @@ void elf64_run(tchar const *filename)
     cpu_init();
 
     uint64_t pge_page_flags = 0;
-    if (cpu_has_global_pages())
+    if (likely(cpu_has_global_pages()))
         pge_page_flags |= PTE_GLOBAL;
 
     uint64_t nx_page_flags = 0;
-    if (cpu_has_no_execute())
+    if (likely(cpu_has_no_execute()))
         nx_page_flags = PTE_NX;
-
-    // Map the screen for debugging convenience
-    paging_map_physical(0xA0000, 0xA0000, 0x20000,
-                        PTE_PRESENT | PTE_WRITABLE |
-                        (-cpu_has_global_pages() & PTE_GLOBAL) |
-                        PTE_PCD | PTE_PWT);
-
-    //PRINT("Loading %s...\n", filename);
 
     int file = boot_open(filename);
 
-    if (file < 0)
+    if (unlikely(file < 0))
         PANIC("Could not open kernel file");
 
     ssize_t read_size;
@@ -295,7 +320,7 @@ void elf64_run(tchar const *filename)
 
     read_size = boot_pread(file, &file_hdr, sizeof(file_hdr), 0);
 
-    if (read_size != sizeof(file_hdr))
+    if (unlikely(read_size != sizeof(file_hdr)))
         PANIC("Could not read ELF header");
 
     //
@@ -306,7 +331,7 @@ void elf64_run(tchar const *filename)
 
     if (unlikely(memcmp(&file_hdr.e_ident[EI_MAG0],
                         elf_magic, sizeof(elf_magic))))
-        PANIC("Could not read magic number");
+        PANIC("Executable has incorrect magic number");
 
     if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr)))
         PANIC("Executable has unexpected program header size");
@@ -323,11 +348,10 @@ void elf64_run(tchar const *filename)
     program_hdrs = (Elf64_Phdr*)malloc(read_size);
     if (unlikely(!program_hdrs))
         PANIC("Insufficient memory for program headers");
+
     if (unlikely(read_size != boot_pread(
-                     file,
-                     program_hdrs,
-                     read_size,
-                     file_hdr.e_phoff)))
+                     file, program_hdrs,
+                     read_size, file_hdr.e_phoff)))
         PANIC("Could not read program headers");
 
     elf64_context_t *ctx = load_kernel_begin();
@@ -342,7 +366,11 @@ void elf64_run(tchar const *filename)
     ssize_t shbytes = file_hdr.e_shentsize * file_hdr.e_shnum;
     Elf64_Shdr *shdrs = (Elf64_Shdr*)malloc(shbytes);
 
-    if (shbytes != boot_pread(file, shdrs, shbytes, file_hdr.e_shoff))
+    if (unlikely(!shdrs))
+        PANIC("Insufficient memory for section headers");
+
+    if (unlikely(shbytes != boot_pread(
+                     file, shdrs, shbytes, file_hdr.e_shoff)))
         PANIC("Could not read section headers\n");
 
     uint64_t new_base = 0xFFFFFFFF80000000;
@@ -358,10 +386,10 @@ void elf64_run(tchar const *filename)
 
         // If it is not readable, writable or executable, ignore
         if ((blk->p_flags & (PF_R | PF_W | PF_X)) != 0) {
-            ELF64_TRACE("vaddr=0x%llx, filesz=0x%llx,"
-                        " memsz=0x%llx, paddr=0x%llx",
-                       blk->p_vaddr, blk->p_filesz,
-                       blk->p_memsz, blk->p_paddr);
+            ELF64_TRACE("hdr[%zu]: vaddr=0x%" PRIx64
+                        ", filesz=0x%" PRIx64
+                        ", memsz=0x%" PRIx64 "\n",
+                       i, blk->p_vaddr, blk->p_filesz, blk->p_memsz);
 
             if (blk->p_memsz == 0)
                 continue;
@@ -400,10 +428,15 @@ void elf64_run(tchar const *filename)
 
         if (shdrs[i].sh_type == SHT_RELA) {
             Elf64_Rela *rela = (Elf64_Rela*)malloc(shdrs[i].sh_size);
+
+            if (unlikely(!rela))
+                PANIC("Insufficient memory for relocation section");
+
             size_t relcnt = shdrs[i].sh_size / sizeof(*rela);
 
-            if (ssize_t(shdrs[i].sh_size) != boot_pread(
-                        file, rela, shdrs[i].sh_size, shdrs[i].sh_offset))
+            if (unlikely(ssize_t(shdrs[i].sh_size) != boot_pread(
+                             file, rela,
+                             shdrs[i].sh_size, shdrs[i].sh_offset)))
                 PANIC("Could not read relocation section");
 
             reloc_kernel(base_adj, rela, relcnt);

@@ -235,7 +235,7 @@ void pxe_init_tftp()
     gci.packet_type = PXENV_PACKET_TYPE_DHCP_CACHED_REPLY;
     result = pxe_call(PXENV_GET_CACHED_INFO, &gci);
 
-    if (result != PXENV_EXIT_SUCCESS)
+    if (unlikely(result != PXENV_EXIT_SUCCESS))
         PANIC("Failed to get cached network info!");
 
     memcpy(pxe_server_ip, buf + 20, sizeof(pxe_server_ip));
