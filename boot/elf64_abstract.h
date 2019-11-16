@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "elf64decl.h"
+#include "screen.h"
 
 #define ELF64_DEBUG    0
 #if ELF64_DEBUG
