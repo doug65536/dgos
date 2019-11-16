@@ -7,7 +7,7 @@ extern char __int15_handler[];
 extern "C" far_ptr_t __int15_old;
 
 __asm__(
-".section .early, \"ax\"\n"
+".section .early, \"ax\", @progbits\n"
 ".code16\n"
 ".balign 16\n"
 ".global __int15_handler\n"
@@ -21,7 +21,7 @@ __asm__(
 "__int15_old:\n"
 ".space 4\n"
 ".code32\n"
-".section .text, \"ax\"\n"
+".section .text, \"ax\", @progbits\n"
 );
 
 _constructor(ctor_console) void init_console()
@@ -42,6 +42,7 @@ int readkey()
     return regs.eax & 0xFFFF;
 }
 
+_const
 mouse_evt readmouse()
 {
     return {};
