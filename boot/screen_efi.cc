@@ -3,6 +3,7 @@
 #include "ctors.h"
 #include "likely.h"
 #include "screen_abstract.h"
+#include "halt.h"
 
 tchar const boxchars[] = TSTR "╔╗║╚╝═█";
 
@@ -29,7 +30,7 @@ _constructor(ctor_console) void conout_init()
                 &efi_text_output_handles);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Unable to query text output handle");
+        PANIC(TSTR "Unable to query text output handle");
 
     status = efi_systab->BootServices->HandleProtocol(
                 efi_text_output_handles[0],
@@ -37,7 +38,7 @@ _constructor(ctor_console) void conout_init()
             (VOID**)&efi_simple_text_output);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Unable to query text output interface");
+        PANIC(TSTR "Unable to query text output interface");
 
     efi_simple_text_output->SetMode(efi_simple_text_output, 0);
 }

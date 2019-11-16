@@ -6,6 +6,7 @@
 #include "cpu.h"
 #include "fs.h"
 #include "elf64.h"
+#include "halt.h"
 
 struct uint8_both_t {
     uint8_t le;
@@ -453,7 +454,13 @@ void iso9660_boot_partition(uint32_t pvd_lba)
     file_handles = (iso9660_sector_iterator_t *)
             calloc(MAX_HANDLES, sizeof(*file_handles));
 
+    if (unlikely(!file_handles))
+        PANIC_OOM();
+
     iso9660_sector_buffer = (char *)malloc(2048);
+
+    if (unlikely(!iso9660_sector_buffer))
+        PANIC_OOM();
 
     iso9660_pvd_t *pvd = (iso9660_pvd_t*)iso9660_sector_buffer;
     uint32_t best_ofs = 0;

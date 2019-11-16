@@ -4,6 +4,7 @@
 #include "likely.h"
 #include "../kernel/lib/bitsearch.h"
 #include "malloc.h"
+#include "halt.h"
 
 static constexpr EFI_GUID efi_graphics_output_protocol_guid =
         EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
@@ -157,7 +158,7 @@ _constructor(ctor_graphics) void vbe_init()
                 &efi_graphics_output_handles);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Unable to query graphics output handle");
+        PANIC(TSTR "Unable to query graphics output handle");
 
     status = efi_systab->BootServices->HandleProtocol(
                 efi_graphics_output_handles[0],
@@ -165,7 +166,7 @@ _constructor(ctor_graphics) void vbe_init()
             (VOID**)&efi_graphics_output);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Unable to query graphics output interface");
+        PANIC(TSTR "Unable to query graphics output interface");
 
     //efi_graphics_output->SetMode(efi_graphics_output, 0);
 }

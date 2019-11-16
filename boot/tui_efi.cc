@@ -4,6 +4,7 @@
 #include "tui_scancode.h"
 #include "likely.h"
 #include "debug.h"
+#include "halt.h"
 
 static EFI_GUID efi_simple_text_input_protocol_guid =
         EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
@@ -143,7 +144,7 @@ _constructor(ctor_console) void conin_init()
                 &efi_text_input_handles);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Unable to query text input handle");
+        PANIC(TSTR "Unable to query text input handle");
 
     status = efi_systab->BootServices->HandleProtocol(
                 efi_text_input_handles[0],
@@ -151,7 +152,7 @@ _constructor(ctor_console) void conin_init()
             (VOID**)&efi_simple_text_input);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Unable to query text output interface");
+        PANIC(TSTR "Unable to query text output interface");
 
     EFI_HANDLE *efi_pointer_handles = nullptr;
     UINTN efi_num_pointer_handles = 0;
@@ -173,7 +174,7 @@ _constructor(ctor_console) void conin_init()
                 efi_timer_callback, nullptr, &efi_timer_event);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Could not create timer event");
+        PANIC(TSTR "Could not create timer event");
 
     // Set timer tick period to 59.4ms
     status = efi_systab->BootServices->SetTimer(
@@ -181,7 +182,7 @@ _constructor(ctor_console) void conin_init()
                 TimerPeriodic, 549000);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Could not set timer");
+        PANIC(TSTR "Could not set timer");
 }
 
 int readkey()
@@ -232,14 +233,14 @@ bool wait_input(uint32_t ms_timeout)
                 nullptr, nullptr, &efi_timeout_event);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Could not create timeout event");
+        PANIC(TSTR "Could not create timeout event");
 
     // Set the timer to fire at the passed timeout
     status = efi_systab->BootServices->SetTimer(
                 efi_timeout_event, TimerRelative, ms_timeout * 10000);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Could not set timeout timer");
+        PANIC(TSTR "Could not set timeout timer");
 
     // Array of events to be waited
     EFI_EVENT events[] = {
@@ -253,13 +254,13 @@ bool wait_input(uint32_t ms_timeout)
                 countof(events), events, &index);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Could not wait for events");
+        PANIC(TSTR "Could not wait for events");
 
     // Close the timeout event
     status = efi_systab->BootServices->CloseEvent(efi_timeout_event);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "Could not close timeout event");
+        PANIC(TSTR "Could not close timeout event");
 
     return index < 2;
 }
