@@ -45,6 +45,7 @@ cpuid: fsgsbase=1, smep=1, smap=1, mwait=1
 print_timestamps: enabled=0
 magic_break: enabled=0
 port_e9_hack: enabled=1
+port_e9_file: path=dump/qemu-debug-out
 private_colormap: enabled=0
 clock: sync=none, time0=utc, rtc_sync=0
 # no cmosimage

@@ -1,4 +1,4 @@
 u switch-mode
-ldsym global "bootiso.sym"
+ldsym global "sym/bootiso.sym"
 lb "cpu_debug_break"
 #lb "elf64_run"

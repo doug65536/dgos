@@ -25,8 +25,7 @@ BUILT_SOURCES = \
 	$(DUMPDIR)/call-trace-out \
 	$(generated_headers) \
 	$(STARTUP_FILES_INSTALLED) \
-	$(STDLIB_FILES_INSTALLED) \
-	$(top_builddir)/trace-tool
+	$(STDLIB_FILES_INSTALLED)
 
 BOOTLOADER_COMMON_FLAGS = \
 	-D__DGOS__
@@ -413,12 +412,16 @@ $(top_builddir)/bootpxe-bios-bin: $(top_builddir)/bootpxe-bios-elf
 
 # efi
 
+# Workaround ld bugs that screw up position independent instruction relax
+# Avoid PIC and use large model
 BOOTLOADER_EFI_FLAGS = \
 	-D__efi \
 	-fshort-wchar \
 	-I$(top_srcdir)/boot \
 	-I$(top_srcdir)/boot/include \
 	-Wl,--no-dynamic-linker \
+	-mcmodel=large \
+	$(INVISIBILITY_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -435,6 +438,7 @@ BOOTLOADER_EFI_FLAGS = \
 bin_PROGRAMS += bootefi-amd64
 
 bootefi_amd64_SOURCES = \
+	boot/bootentry_efi.S \
 	boot/bootefi.cc \
 	boot/ctors.cc \
 	boot/fs.cc \
@@ -603,6 +607,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/isr.S \
 	kernel/arch/x86_64/cpu/except_asm.S \
 	kernel/arch/x86_64/cpu/syscall.S \
+	kernel/arch/x86_64/cpu/nofault.cc \
+	kernel/arch/x86_64/cpu/nofault.h \
 	kernel/arch/x86_64/user_mem.cc \
 	kernel/main.cc \
 	kernel/lib/assert.cc \
@@ -628,6 +634,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/memory.cc \
 	kernel/lib/cc/utility.h \
 	kernel/lib/cc/utility.cc \
+	kernel/lib/cc/permute.h \
+	kernel/lib/cc/permute.cc \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
 	kernel/lib/debug.cc \
@@ -707,6 +715,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/zlib_helper.cc \
 	kernel/lib/zlib_helper.h \
 	kernel/lib/asan.cc \
+	kernel/lib/ubsan.cc \
 	kernel/lib/contig_alloc.cc \
 	kernel/lib/contig_alloc.h \
 	kernel/lib/user_mem.h \
@@ -863,19 +872,21 @@ KERNEL_CXXFLAGS_SHARED = \
 	-D__DGOS__ \
 	-D__DGOS_KERNEL__=0x00000001 \
 	-fPIE \
+	$(FREESTANDING_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_RTTI_FLAGS) \
+	$(YES_EXCEPTIONS) \
 	$(NO_COMMON_FLAGS) \
-	-fvisibility=hidden \
-	-fvisibility-inlines-hidden \
+	$(INVISIBILITY_FLAGS) \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
-	$(FREESTANDING_FLAGS)
+	-fsanitize=undefined
 
+#-fsanitize-undefined-trap-on-error
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_RTTI_FLAGS)
 
@@ -1628,6 +1639,7 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-D__DGOS_KERNEL__ \
 	$(INVISIBILITY_FLAGS) \
 	$(NO_RTTI_FLAGS) \
+	$(YES_EXCEPTIONS) \
 	-fPIC \
 	-ggdb \
 	-I$(top_srcdir)/boot/include \
@@ -1638,7 +1650,8 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	-fsanitize=undefined
 
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_RTTI_FLAGS)
@@ -1748,6 +1761,7 @@ unittest_km_SOURCES = \
 	kernel/unittest/unittest.h \
 	kernel/unittest/test_threads.cc \
 	kernel/unittest/test_allocator.cc \
+	kernel/unittest/test_bit.cc \
 	kernel/unittest/test_malloc.cc \
 	kernel/unittest/test_sort.cc \
 	kernel/unittest/test_vector.cc \
@@ -1965,8 +1979,7 @@ init_CFLAGS = \
 init_SOURCES = \
 	user/init/init.cc
 
-init_LDFLAGS = \
-	$(USER64_FLAGS)
+init_LDFLAGS =
 
 init_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -2126,7 +2139,7 @@ QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
-QEMU_RAM = 128M
+QEMU_RAM = 1G
 
 QEMU_MEMFILL =
 #QEMU_MEMFILL = \
@@ -2309,6 +2322,8 @@ QL_EM = kvm tcg mttcg
 define qemu_launcher =
 $(1)-$(2)-$(3)-$(4)-$(5)-$(6)-$(7)-$(8): \
 		$$(call QEMU_IMAGE,$(5)) $$(QEMU_EXTRA_DEPS)
+	echo -e -n '\ec'
+	echo 'Run make monitor-debug-output in another terminal if progress stops'
 	echo -e -n '\ec' >> dump/qemu-debug-out
 	echo Running $$@
 	$$(QEMU_SUDO) $$(QEMU) \
@@ -2357,7 +2372,7 @@ BOCHS=bochs
 
 # Generate the makefile targets for all the variations of bochs launch
 
-BOCHS_MEDIA = fat iso
+BOCHS_MEDIA = gpt mbr iso
 BOCHS_FW = bios efi
 BOCHS_PART = kernel boot
 
@@ -2365,7 +2380,8 @@ BOCHS_PART = kernel boot
 define bochs_launcher =
 $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
-	cp "$<" "$@"
+	cp "$$<" "$$@"
+
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
 		$(SYMBOL_FILES_INSTALLED) \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \

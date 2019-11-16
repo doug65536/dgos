@@ -1,4 +1,4 @@
 u switch-mode
-ldsym global "bootx64-efi.sym"
+ldsym global "sym/bootx64-efi.sym"
 lb "cpu_debug_break"
 lb "efi_main"
