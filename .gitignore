@@ -83,3 +83,7 @@ m4/
 *.creator.user
 *.user
 *.user.c2fe216
+
+Makefile.in
+configure
+

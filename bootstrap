@@ -19,6 +19,8 @@ export AR
 export RANLIB
 export NM
 
+(cd -- "$scriptroot" && autoreconf -f)
+
 if [[ ! -f sysroot/libc/libc.a ]]; then
 	echo Bootstrapping sysroot
 	compileflags=( "-nostdlib" "-nostartfiles" )

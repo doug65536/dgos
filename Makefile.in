@@ -424,7 +424,8 @@ am__DEPENDENCIES_1 =
 boot1_elf_DEPENDENCIES = $(am__DEPENDENCIES_1)
 boot1_elf_LINK = $(CCLD) $(boot1_elf_CFLAGS) $(CFLAGS) \
 	$(boot1_elf_LDFLAGS) $(LDFLAGS) -o $@
-am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
+am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootentry_efi.$(OBJEXT) \
+	boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-ctors.$(OBJEXT) \
 	boot/bootefi_amd64-fs.$(OBJEXT) \
 	boot/bootefi_amd64-cpu_efi.$(OBJEXT) \
@@ -522,6 +523,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_asan-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_asan-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_asan-syscall.$(OBJEXT) \
+	kernel/arch/x86_64/cpu/kernel_asan-nofault.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_asan-user_mem.$(OBJEXT) \
 	kernel/kernel_asan-main.$(OBJEXT) \
 	kernel/lib/kernel_asan-assert.$(OBJEXT) \
@@ -535,6 +537,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-exception.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-memory.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-utility.$(OBJEXT) \
+	kernel/lib/cc/kernel_asan-permute.$(OBJEXT) \
 	kernel/lib/kernel_asan-conio.$(OBJEXT) \
 	kernel/lib/kernel_asan-debug.$(OBJEXT) \
 	kernel/lib/kernel_asan-desc_alloc.$(OBJEXT) \
@@ -571,6 +574,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/lib/kernel_asan-work_queue.$(OBJEXT) \
 	kernel/lib/kernel_asan-zlib_helper.$(OBJEXT) \
 	kernel/lib/kernel_asan-asan.$(OBJEXT) \
+	kernel/lib/kernel_asan-ubsan.$(OBJEXT) \
 	kernel/lib/kernel_asan-contig_alloc.$(OBJEXT) \
 	kernel/fs/kernel_asan-ext4.$(OBJEXT) \
 	kernel/fs/kernel_asan-devfs.$(OBJEXT) \
@@ -652,6 +656,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-syscall.$(OBJEXT) \
+	kernel/arch/x86_64/cpu/kernel_generic-nofault.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_generic-user_mem.$(OBJEXT) \
 	kernel/kernel_generic-main.$(OBJEXT) \
 	kernel/lib/kernel_generic-assert.$(OBJEXT) \
@@ -665,6 +670,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-exception.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-memory.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-utility.$(OBJEXT) \
+	kernel/lib/cc/kernel_generic-permute.$(OBJEXT) \
 	kernel/lib/kernel_generic-conio.$(OBJEXT) \
 	kernel/lib/kernel_generic-debug.$(OBJEXT) \
 	kernel/lib/kernel_generic-desc_alloc.$(OBJEXT) \
@@ -701,6 +707,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-work_queue.$(OBJEXT) \
 	kernel/lib/kernel_generic-zlib_helper.$(OBJEXT) \
 	kernel/lib/kernel_generic-asan.$(OBJEXT) \
+	kernel/lib/kernel_generic-ubsan.$(OBJEXT) \
 	kernel/lib/kernel_generic-contig_alloc.$(OBJEXT) \
 	kernel/fs/kernel_generic-ext4.$(OBJEXT) \
 	kernel/fs/kernel_generic-devfs.$(OBJEXT) \
@@ -781,6 +788,7 @@ am__objects_7 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_tracing-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_tracing-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_tracing-syscall.$(OBJEXT) \
+	kernel/arch/x86_64/cpu/kernel_tracing-nofault.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_tracing-user_mem.$(OBJEXT) \
 	kernel/kernel_tracing-main.$(OBJEXT) \
 	kernel/lib/kernel_tracing-assert.$(OBJEXT) \
@@ -794,6 +802,7 @@ am__objects_7 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-exception.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-memory.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-utility.$(OBJEXT) \
+	kernel/lib/cc/kernel_tracing-permute.$(OBJEXT) \
 	kernel/lib/kernel_tracing-conio.$(OBJEXT) \
 	kernel/lib/kernel_tracing-debug.$(OBJEXT) \
 	kernel/lib/kernel_tracing-desc_alloc.$(OBJEXT) \
@@ -830,6 +839,7 @@ am__objects_7 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/kernel_tracing-work_queue.$(OBJEXT) \
 	kernel/lib/kernel_tracing-zlib_helper.$(OBJEXT) \
 	kernel/lib/kernel_tracing-asan.$(OBJEXT) \
+	kernel/lib/kernel_tracing-ubsan.$(OBJEXT) \
 	kernel/lib/kernel_tracing-contig_alloc.$(OBJEXT) \
 	kernel/fs/kernel_tracing-ext4.$(OBJEXT) \
 	kernel/fs/kernel_tracing-devfs.$(OBJEXT) \
@@ -946,6 +956,7 @@ am_unittest_km_OBJECTS =  \
 	kernel/unittest/unittest_km-unittest.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_threads.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_allocator.$(OBJEXT) \
+	kernel/unittest/unittest_km-test_bit.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_malloc.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_sort.$(OBJEXT) \
 	kernel/unittest/unittest_km-test_vector.$(OBJEXT) \
@@ -1256,6 +1267,7 @@ VECTORIZE_FLAGS = @VECTORIZE_FLAGS@
 VERSION = @VERSION@
 VISIBILITY_FLAGS = @VISIBILITY_FLAGS@
 YACC = @YACC@
+YES_EXCEPTIONS_FLAGS = @YES_EXCEPTIONS_FLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -1333,8 +1345,7 @@ BUILT_SOURCES = \
 	$(DUMPDIR)/call-trace-out \
 	$(generated_headers) \
 	$(STARTUP_FILES_INSTALLED) \
-	$(STDLIB_FILES_INSTALLED) \
-	$(top_builddir)/trace-tool
+	$(STDLIB_FILES_INSTALLED)
 
 BOOTLOADER_COMMON_FLAGS = \
 	-D__DGOS__
@@ -1690,12 +1701,17 @@ EXTRA_bootpxe_bios_elf_DEPENDENCIES = \
 
 
 # efi
+
+# Workaround ld bugs that screw up position independent instruction relax
+# Avoid PIC and use large model
 BOOTLOADER_EFI_FLAGS = \
 	-D__efi \
 	-fshort-wchar \
 	-I$(top_srcdir)/boot \
 	-I$(top_srcdir)/boot/include \
 	-Wl,--no-dynamic-linker \
+	-mcmodel=large \
+	$(INVISIBILITY_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -1708,6 +1724,7 @@ BOOTLOADER_EFI_FLAGS = \
 	$(FREESTANDING_FLAGS)
 
 bootefi_amd64_SOURCES = \
+	boot/bootentry_efi.S \
 	boot/bootefi.cc \
 	boot/ctors.cc \
 	boot/fs.cc \
@@ -1863,6 +1880,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/isr.S \
 	kernel/arch/x86_64/cpu/except_asm.S \
 	kernel/arch/x86_64/cpu/syscall.S \
+	kernel/arch/x86_64/cpu/nofault.cc \
+	kernel/arch/x86_64/cpu/nofault.h \
 	kernel/arch/x86_64/user_mem.cc \
 	kernel/main.cc \
 	kernel/lib/assert.cc \
@@ -1888,6 +1907,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/memory.cc \
 	kernel/lib/cc/utility.h \
 	kernel/lib/cc/utility.cc \
+	kernel/lib/cc/permute.h \
+	kernel/lib/cc/permute.cc \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
 	kernel/lib/debug.cc \
@@ -1967,6 +1988,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/zlib_helper.cc \
 	kernel/lib/zlib_helper.h \
 	kernel/lib/asan.cc \
+	kernel/lib/ubsan.cc \
 	kernel/lib/contig_alloc.cc \
 	kernel/lib/contig_alloc.h \
 	kernel/lib/user_mem.h \
@@ -2123,20 +2145,22 @@ KERNEL_CXXFLAGS_SHARED = \
 	-D__DGOS__ \
 	-D__DGOS_KERNEL__=0x00000001 \
 	-fPIE \
+	$(FREESTANDING_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_RTTI_FLAGS) \
+	$(YES_EXCEPTIONS) \
 	$(NO_COMMON_FLAGS) \
-	-fvisibility=hidden \
-	-fvisibility-inlines-hidden \
+	$(INVISIBILITY_FLAGS) \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
-	$(FREESTANDING_FLAGS)
+	-fsanitize=undefined
 
 
+#-fsanitize-undefined-trap-on-error
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_RTTI_FLAGS)
 
@@ -2683,6 +2707,7 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-D__DGOS_KERNEL__ \
 	$(INVISIBILITY_FLAGS) \
 	$(NO_RTTI_FLAGS) \
+	$(YES_EXCEPTIONS) \
 	-fPIC \
 	-ggdb \
 	-I$(top_srcdir)/boot/include \
@@ -2693,7 +2718,8 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	-fsanitize=undefined
 
 
 #$(NO_EXCEPTIONS_FLAGS)
@@ -2782,6 +2808,7 @@ unittest_km_SOURCES = \
 	kernel/unittest/unittest.h \
 	kernel/unittest/test_threads.cc \
 	kernel/unittest/test_allocator.cc \
+	kernel/unittest/test_bit.cc \
 	kernel/unittest/test_malloc.cc \
 	kernel/unittest/test_sort.cc \
 	kernel/unittest/test_vector.cc \
@@ -2950,9 +2977,7 @@ init_CFLAGS = \
 init_SOURCES = \
 	user/init/init.cc
 
-init_LDFLAGS = \
-	$(USER64_FLAGS)
-
+init_LDFLAGS = 
 init_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
@@ -3006,7 +3031,7 @@ QEMU_CPUS = $(shell $(NPROC))
 QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
-QEMU_RAM = 128M
+QEMU_RAM = 1G
 QEMU_MEMFILL = 
 QEMU_USB = \
 	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
@@ -3162,7 +3187,7 @@ QL_EM = kvm tcg mttcg
 BOCHS = bochs
 
 # Generate the makefile targets for all the variations of bochs launch
-BOCHS_MEDIA = fat iso
+BOCHS_MEDIA = gpt mbr iso
 BOCHS_FW = bios efi
 BOCHS_PART = kernel boot
 all: $(BUILT_SOURCES)
@@ -4150,6 +4175,8 @@ boot/boot1_elf-boot1.$(OBJEXT): boot/$(am__dirstamp) \
 boot1-elf$(EXEEXT): $(boot1_elf_OBJECTS) $(boot1_elf_DEPENDENCIES) $(EXTRA_boot1_elf_DEPENDENCIES) 
 	@rm -f boot1-elf$(EXEEXT)
 	$(AM_V_CCLD)$(boot1_elf_LINK) $(boot1_elf_OBJECTS) $(boot1_elf_LDADD) $(LIBS)
+boot/bootefi_amd64-bootentry_efi.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-bootefi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-ctors.$(OBJEXT): boot/$(am__dirstamp) \
@@ -4335,6 +4362,9 @@ kernel/arch/x86_64/cpu/kernel_asan-except_asm.$(OBJEXT):  \
 kernel/arch/x86_64/cpu/kernel_asan-syscall.$(OBJEXT):  \
 	kernel/arch/x86_64/cpu/$(am__dirstamp) \
 	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
+kernel/arch/x86_64/cpu/kernel_asan-nofault.$(OBJEXT):  \
+	kernel/arch/x86_64/cpu/$(am__dirstamp) \
+	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
 kernel/arch/x86_64/kernel_asan-user_mem.$(OBJEXT):  \
 	kernel/arch/x86_64/$(am__dirstamp) \
 	kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
@@ -4372,6 +4402,9 @@ kernel/lib/cc/kernel_asan-memory.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_asan-utility.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_asan-permute.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_asan-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -4455,6 +4488,8 @@ kernel/lib/kernel_asan-zlib_helper.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_asan-asan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_asan-ubsan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_asan-contig_alloc.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
@@ -4694,6 +4729,9 @@ kernel/arch/x86_64/cpu/kernel_generic-except_asm.$(OBJEXT):  \
 kernel/arch/x86_64/cpu/kernel_generic-syscall.$(OBJEXT):  \
 	kernel/arch/x86_64/cpu/$(am__dirstamp) \
 	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
+kernel/arch/x86_64/cpu/kernel_generic-nofault.$(OBJEXT):  \
+	kernel/arch/x86_64/cpu/$(am__dirstamp) \
+	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
 kernel/arch/x86_64/kernel_generic-user_mem.$(OBJEXT):  \
 	kernel/arch/x86_64/$(am__dirstamp) \
 	kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
@@ -4729,6 +4767,9 @@ kernel/lib/cc/kernel_generic-memory.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_generic-utility.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_generic-permute.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -4824,6 +4865,8 @@ kernel/lib/kernel_generic-zlib_helper.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-asan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_generic-ubsan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-contig_alloc.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
@@ -5045,6 +5088,9 @@ kernel/arch/x86_64/cpu/kernel_tracing-except_asm.$(OBJEXT):  \
 kernel/arch/x86_64/cpu/kernel_tracing-syscall.$(OBJEXT):  \
 	kernel/arch/x86_64/cpu/$(am__dirstamp) \
 	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
+kernel/arch/x86_64/cpu/kernel_tracing-nofault.$(OBJEXT):  \
+	kernel/arch/x86_64/cpu/$(am__dirstamp) \
+	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
 kernel/arch/x86_64/kernel_tracing-user_mem.$(OBJEXT):  \
 	kernel/arch/x86_64/$(am__dirstamp) \
 	kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
@@ -5080,6 +5126,9 @@ kernel/lib/cc/kernel_tracing-memory.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_tracing-utility.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_tracing-permute.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -5175,6 +5224,8 @@ kernel/lib/kernel_tracing-zlib_helper.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-asan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_tracing-ubsan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-contig_alloc.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
@@ -5463,6 +5514,9 @@ kernel/unittest/unittest_km-test_threads.$(OBJEXT):  \
 kernel/unittest/unittest_km-test_allocator.$(OBJEXT):  \
 	kernel/unittest/$(am__dirstamp) \
 	kernel/unittest/$(DEPDIR)/$(am__dirstamp)
+kernel/unittest/unittest_km-test_bit.$(OBJEXT):  \
+	kernel/unittest/$(am__dirstamp) \
+	kernel/unittest/$(DEPDIR)/$(am__dirstamp)
 kernel/unittest/unittest_km-test_malloc.$(OBJEXT):  \
 	kernel/unittest/$(am__dirstamp) \
 	kernel/unittest/$(DEPDIR)/$(am__dirstamp)
@@ -5559,6 +5613,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/boot1_elf-boot1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-assert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-bootefi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-bootentry_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-bootmenu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-boottable.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-boottable_efi.Po@am__quote@
@@ -5683,6 +5738,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-legacy_pit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-math.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-mmu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nofault.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nontemporal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-segrw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-spinlock.Po@am__quote@
@@ -5709,6 +5765,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-legacy_pit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-math.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-mmu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nofault.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nontemporal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-segrw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-spinlock.Po@am__quote@
@@ -5735,6 +5792,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-legacy_pit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-math.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-mmu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nofault.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nontemporal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-segrw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-spinlock.Po@am__quote@
@@ -5860,6 +5918,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-threadsync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-time.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-ubsan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-unique_ptr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-work_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-zlib_helper.Po@am__quote@
@@ -5904,6 +5963,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-threadsync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-time.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-ubsan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-unique_ptr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-work_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-zlib_helper.Po@am__quote@
@@ -5948,6 +6008,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-threadsync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-time.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-ubsan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-unique_ptr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-work_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-zlib_helper.Po@am__quote@
@@ -5957,14 +6018,17 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-algorithm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-memory.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-permute.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-utility.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-algorithm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-memory.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-permute.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-utility.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-algorithm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-memory.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-permute.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-utility.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/libkei_a-cxxexception.Po@am__quote@
@@ -6034,6 +6098,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_allocator.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_bit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_chrono.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/unittest/$(DEPDIR)/unittest_km-test_nofault.Po@am__quote@
@@ -6372,6 +6437,20 @@ boot/boot1_elf-boot1.obj: boot/boot1.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/boot1.S' object='boot/boot1_elf-boot1.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(boot1_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/boot1_elf-boot1.obj `if test -f 'boot/boot1.S'; then $(CYGPATH_W) 'boot/boot1.S'; else $(CYGPATH_W) '$(srcdir)/boot/boot1.S'; fi`
+
+boot/bootefi_amd64-bootentry_efi.o: boot/bootentry_efi.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-bootentry_efi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-bootentry_efi.Tpo -c -o boot/bootefi_amd64-bootentry_efi.o `test -f 'boot/bootentry_efi.S' || echo '$(srcdir)/'`boot/bootentry_efi.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-bootentry_efi.Tpo boot/$(DEPDIR)/bootefi_amd64-bootentry_efi.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bootentry_efi.S' object='boot/bootefi_amd64-bootentry_efi.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-bootentry_efi.o `test -f 'boot/bootentry_efi.S' || echo '$(srcdir)/'`boot/bootentry_efi.S
+
+boot/bootefi_amd64-bootentry_efi.obj: boot/bootentry_efi.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-bootentry_efi.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-bootentry_efi.Tpo -c -o boot/bootefi_amd64-bootentry_efi.obj `if test -f 'boot/bootentry_efi.S'; then $(CYGPATH_W) 'boot/bootentry_efi.S'; else $(CYGPATH_W) '$(srcdir)/boot/bootentry_efi.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-bootentry_efi.Tpo boot/$(DEPDIR)/bootefi_amd64-bootentry_efi.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bootentry_efi.S' object='boot/bootefi_amd64-bootentry_efi.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-bootentry_efi.obj `if test -f 'boot/bootentry_efi.S'; then $(CYGPATH_W) 'boot/bootentry_efi.S'; else $(CYGPATH_W) '$(srcdir)/boot/bootentry_efi.S'; fi`
 
 boot/bootefi_amd64-retpoline.o: boot/retpoline.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-retpoline.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-retpoline.Tpo -c -o boot/bootefi_amd64-retpoline.o `test -f 'boot/retpoline.S' || echo '$(srcdir)/'`boot/retpoline.S
@@ -10689,6 +10768,20 @@ kernel/fs/iso9660_km-iso9660_part.obj: kernel/fs/iso9660_part.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(iso9660_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/iso9660_km-iso9660_part.obj `if test -f 'kernel/fs/iso9660_part.cc'; then $(CYGPATH_W) 'kernel/fs/iso9660_part.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/iso9660_part.cc'; fi`
 
+kernel/arch/x86_64/cpu/kernel_asan-nofault.o: kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/cpu/kernel_asan-nofault.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nofault.Tpo -c -o kernel/arch/x86_64/cpu/kernel_asan-nofault.o `test -f 'kernel/arch/x86_64/cpu/nofault.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nofault.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nofault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/arch/x86_64/cpu/nofault.cc' object='kernel/arch/x86_64/cpu/kernel_asan-nofault.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_asan-nofault.o `test -f 'kernel/arch/x86_64/cpu/nofault.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/nofault.cc
+
+kernel/arch/x86_64/cpu/kernel_asan-nofault.obj: kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/cpu/kernel_asan-nofault.obj -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nofault.Tpo -c -o kernel/arch/x86_64/cpu/kernel_asan-nofault.obj `if test -f 'kernel/arch/x86_64/cpu/nofault.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/nofault.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/nofault.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nofault.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_asan-nofault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/arch/x86_64/cpu/nofault.cc' object='kernel/arch/x86_64/cpu/kernel_asan-nofault.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_asan-nofault.obj `if test -f 'kernel/arch/x86_64/cpu/nofault.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/nofault.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/nofault.cc'; fi`
+
 kernel/arch/x86_64/kernel_asan-user_mem.o: kernel/arch/x86_64/user_mem.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/kernel_asan-user_mem.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_asan-user_mem.Tpo -c -o kernel/arch/x86_64/kernel_asan-user_mem.o `test -f 'kernel/arch/x86_64/user_mem.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/user_mem.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/$(DEPDIR)/kernel_asan-user_mem.Tpo kernel/arch/x86_64/$(DEPDIR)/kernel_asan-user_mem.Po
@@ -10870,6 +10963,20 @@ kernel/lib/cc/kernel_asan-utility.obj: kernel/lib/cc/utility.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/utility.cc' object='kernel/lib/cc/kernel_asan-utility.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_asan-utility.obj `if test -f 'kernel/lib/cc/utility.cc'; then $(CYGPATH_W) 'kernel/lib/cc/utility.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/utility.cc'; fi`
+
+kernel/lib/cc/kernel_asan-permute.o: kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_asan-permute.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_asan-permute.Tpo -c -o kernel/lib/cc/kernel_asan-permute.o `test -f 'kernel/lib/cc/permute.cc' || echo '$(srcdir)/'`kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_asan-permute.Tpo kernel/lib/cc/$(DEPDIR)/kernel_asan-permute.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/permute.cc' object='kernel/lib/cc/kernel_asan-permute.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_asan-permute.o `test -f 'kernel/lib/cc/permute.cc' || echo '$(srcdir)/'`kernel/lib/cc/permute.cc
+
+kernel/lib/cc/kernel_asan-permute.obj: kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_asan-permute.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_asan-permute.Tpo -c -o kernel/lib/cc/kernel_asan-permute.obj `if test -f 'kernel/lib/cc/permute.cc'; then $(CYGPATH_W) 'kernel/lib/cc/permute.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/permute.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_asan-permute.Tpo kernel/lib/cc/$(DEPDIR)/kernel_asan-permute.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/permute.cc' object='kernel/lib/cc/kernel_asan-permute.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_asan-permute.obj `if test -f 'kernel/lib/cc/permute.cc'; then $(CYGPATH_W) 'kernel/lib/cc/permute.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/permute.cc'; fi`
 
 kernel/lib/kernel_asan-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-conio.Tpo -c -o kernel/lib/kernel_asan-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
@@ -11374,6 +11481,20 @@ kernel/lib/kernel_asan-asan.obj: kernel/lib/asan.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_asan-asan.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
+
+kernel/lib/kernel_asan-ubsan.o: kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-ubsan.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-ubsan.Tpo -c -o kernel/lib/kernel_asan-ubsan.o `test -f 'kernel/lib/ubsan.cc' || echo '$(srcdir)/'`kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_asan-ubsan.Tpo kernel/lib/$(DEPDIR)/kernel_asan-ubsan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/ubsan.cc' object='kernel/lib/kernel_asan-ubsan.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-ubsan.o `test -f 'kernel/lib/ubsan.cc' || echo '$(srcdir)/'`kernel/lib/ubsan.cc
+
+kernel/lib/kernel_asan-ubsan.obj: kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-ubsan.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-ubsan.Tpo -c -o kernel/lib/kernel_asan-ubsan.obj `if test -f 'kernel/lib/ubsan.cc'; then $(CYGPATH_W) 'kernel/lib/ubsan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/ubsan.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_asan-ubsan.Tpo kernel/lib/$(DEPDIR)/kernel_asan-ubsan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/ubsan.cc' object='kernel/lib/kernel_asan-ubsan.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-ubsan.obj `if test -f 'kernel/lib/ubsan.cc'; then $(CYGPATH_W) 'kernel/lib/ubsan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/ubsan.cc'; fi`
 
 kernel/lib/kernel_asan-contig_alloc.o: kernel/lib/contig_alloc.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-contig_alloc.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-contig_alloc.Tpo -c -o kernel/lib/kernel_asan-contig_alloc.o `test -f 'kernel/lib/contig_alloc.cc' || echo '$(srcdir)/'`kernel/lib/contig_alloc.cc
@@ -12369,6 +12490,20 @@ kernel/syscall/kernel_asan-sys_render.obj: kernel/syscall/sys_render.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_asan-sys_render.obj `if test -f 'kernel/syscall/sys_render.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_render.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_render.cc'; fi`
 
+kernel/arch/x86_64/cpu/kernel_generic-nofault.o: kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/cpu/kernel_generic-nofault.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nofault.Tpo -c -o kernel/arch/x86_64/cpu/kernel_generic-nofault.o `test -f 'kernel/arch/x86_64/cpu/nofault.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nofault.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nofault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/arch/x86_64/cpu/nofault.cc' object='kernel/arch/x86_64/cpu/kernel_generic-nofault.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-nofault.o `test -f 'kernel/arch/x86_64/cpu/nofault.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/nofault.cc
+
+kernel/arch/x86_64/cpu/kernel_generic-nofault.obj: kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/cpu/kernel_generic-nofault.obj -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nofault.Tpo -c -o kernel/arch/x86_64/cpu/kernel_generic-nofault.obj `if test -f 'kernel/arch/x86_64/cpu/nofault.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/nofault.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/nofault.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nofault.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-nofault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/arch/x86_64/cpu/nofault.cc' object='kernel/arch/x86_64/cpu/kernel_generic-nofault.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-nofault.obj `if test -f 'kernel/arch/x86_64/cpu/nofault.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/nofault.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/nofault.cc'; fi`
+
 kernel/arch/x86_64/kernel_generic-user_mem.o: kernel/arch/x86_64/user_mem.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/kernel_generic-user_mem.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_generic-user_mem.Tpo -c -o kernel/arch/x86_64/kernel_generic-user_mem.o `test -f 'kernel/arch/x86_64/user_mem.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/user_mem.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/$(DEPDIR)/kernel_generic-user_mem.Tpo kernel/arch/x86_64/$(DEPDIR)/kernel_generic-user_mem.Po
@@ -12550,6 +12685,20 @@ kernel/lib/cc/kernel_generic-utility.obj: kernel/lib/cc/utility.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/utility.cc' object='kernel/lib/cc/kernel_generic-utility.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-utility.obj `if test -f 'kernel/lib/cc/utility.cc'; then $(CYGPATH_W) 'kernel/lib/cc/utility.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/utility.cc'; fi`
+
+kernel/lib/cc/kernel_generic-permute.o: kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_generic-permute.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_generic-permute.Tpo -c -o kernel/lib/cc/kernel_generic-permute.o `test -f 'kernel/lib/cc/permute.cc' || echo '$(srcdir)/'`kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_generic-permute.Tpo kernel/lib/cc/$(DEPDIR)/kernel_generic-permute.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/permute.cc' object='kernel/lib/cc/kernel_generic-permute.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-permute.o `test -f 'kernel/lib/cc/permute.cc' || echo '$(srcdir)/'`kernel/lib/cc/permute.cc
+
+kernel/lib/cc/kernel_generic-permute.obj: kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_generic-permute.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_generic-permute.Tpo -c -o kernel/lib/cc/kernel_generic-permute.obj `if test -f 'kernel/lib/cc/permute.cc'; then $(CYGPATH_W) 'kernel/lib/cc/permute.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/permute.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_generic-permute.Tpo kernel/lib/cc/$(DEPDIR)/kernel_generic-permute.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/permute.cc' object='kernel/lib/cc/kernel_generic-permute.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-permute.obj `if test -f 'kernel/lib/cc/permute.cc'; then $(CYGPATH_W) 'kernel/lib/cc/permute.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/permute.cc'; fi`
 
 kernel/lib/kernel_generic-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-conio.Tpo -c -o kernel/lib/kernel_generic-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
@@ -13054,6 +13203,20 @@ kernel/lib/kernel_generic-asan.obj: kernel/lib/asan.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_generic-asan.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
+
+kernel/lib/kernel_generic-ubsan.o: kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-ubsan.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-ubsan.Tpo -c -o kernel/lib/kernel_generic-ubsan.o `test -f 'kernel/lib/ubsan.cc' || echo '$(srcdir)/'`kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-ubsan.Tpo kernel/lib/$(DEPDIR)/kernel_generic-ubsan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/ubsan.cc' object='kernel/lib/kernel_generic-ubsan.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-ubsan.o `test -f 'kernel/lib/ubsan.cc' || echo '$(srcdir)/'`kernel/lib/ubsan.cc
+
+kernel/lib/kernel_generic-ubsan.obj: kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-ubsan.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-ubsan.Tpo -c -o kernel/lib/kernel_generic-ubsan.obj `if test -f 'kernel/lib/ubsan.cc'; then $(CYGPATH_W) 'kernel/lib/ubsan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/ubsan.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-ubsan.Tpo kernel/lib/$(DEPDIR)/kernel_generic-ubsan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/ubsan.cc' object='kernel/lib/kernel_generic-ubsan.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-ubsan.obj `if test -f 'kernel/lib/ubsan.cc'; then $(CYGPATH_W) 'kernel/lib/ubsan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/ubsan.cc'; fi`
 
 kernel/lib/kernel_generic-contig_alloc.o: kernel/lib/contig_alloc.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-contig_alloc.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Tpo -c -o kernel/lib/kernel_generic-contig_alloc.o `test -f 'kernel/lib/contig_alloc.cc' || echo '$(srcdir)/'`kernel/lib/contig_alloc.cc
@@ -14049,6 +14212,20 @@ kernel/syscall/kernel_generic-sys_render.obj: kernel/syscall/sys_render.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_generic-sys_render.obj `if test -f 'kernel/syscall/sys_render.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_render.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_render.cc'; fi`
 
+kernel/arch/x86_64/cpu/kernel_tracing-nofault.o: kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/cpu/kernel_tracing-nofault.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nofault.Tpo -c -o kernel/arch/x86_64/cpu/kernel_tracing-nofault.o `test -f 'kernel/arch/x86_64/cpu/nofault.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nofault.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nofault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/arch/x86_64/cpu/nofault.cc' object='kernel/arch/x86_64/cpu/kernel_tracing-nofault.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_tracing-nofault.o `test -f 'kernel/arch/x86_64/cpu/nofault.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/nofault.cc
+
+kernel/arch/x86_64/cpu/kernel_tracing-nofault.obj: kernel/arch/x86_64/cpu/nofault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/cpu/kernel_tracing-nofault.obj -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nofault.Tpo -c -o kernel/arch/x86_64/cpu/kernel_tracing-nofault.obj `if test -f 'kernel/arch/x86_64/cpu/nofault.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/nofault.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/nofault.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nofault.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-nofault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/arch/x86_64/cpu/nofault.cc' object='kernel/arch/x86_64/cpu/kernel_tracing-nofault.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_tracing-nofault.obj `if test -f 'kernel/arch/x86_64/cpu/nofault.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/nofault.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/nofault.cc'; fi`
+
 kernel/arch/x86_64/kernel_tracing-user_mem.o: kernel/arch/x86_64/user_mem.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/kernel_tracing-user_mem.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_tracing-user_mem.Tpo -c -o kernel/arch/x86_64/kernel_tracing-user_mem.o `test -f 'kernel/arch/x86_64/user_mem.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/user_mem.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/$(DEPDIR)/kernel_tracing-user_mem.Tpo kernel/arch/x86_64/$(DEPDIR)/kernel_tracing-user_mem.Po
@@ -14230,6 +14407,20 @@ kernel/lib/cc/kernel_tracing-utility.obj: kernel/lib/cc/utility.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/utility.cc' object='kernel/lib/cc/kernel_tracing-utility.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-utility.obj `if test -f 'kernel/lib/cc/utility.cc'; then $(CYGPATH_W) 'kernel/lib/cc/utility.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/utility.cc'; fi`
+
+kernel/lib/cc/kernel_tracing-permute.o: kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_tracing-permute.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_tracing-permute.Tpo -c -o kernel/lib/cc/kernel_tracing-permute.o `test -f 'kernel/lib/cc/permute.cc' || echo '$(srcdir)/'`kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_tracing-permute.Tpo kernel/lib/cc/$(DEPDIR)/kernel_tracing-permute.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/permute.cc' object='kernel/lib/cc/kernel_tracing-permute.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-permute.o `test -f 'kernel/lib/cc/permute.cc' || echo '$(srcdir)/'`kernel/lib/cc/permute.cc
+
+kernel/lib/cc/kernel_tracing-permute.obj: kernel/lib/cc/permute.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_tracing-permute.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_tracing-permute.Tpo -c -o kernel/lib/cc/kernel_tracing-permute.obj `if test -f 'kernel/lib/cc/permute.cc'; then $(CYGPATH_W) 'kernel/lib/cc/permute.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/permute.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_tracing-permute.Tpo kernel/lib/cc/$(DEPDIR)/kernel_tracing-permute.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/permute.cc' object='kernel/lib/cc/kernel_tracing-permute.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-permute.obj `if test -f 'kernel/lib/cc/permute.cc'; then $(CYGPATH_W) 'kernel/lib/cc/permute.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/permute.cc'; fi`
 
 kernel/lib/kernel_tracing-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-conio.Tpo -c -o kernel/lib/kernel_tracing-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
@@ -14734,6 +14925,20 @@ kernel/lib/kernel_tracing-asan.obj: kernel/lib/asan.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_tracing-asan.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
+
+kernel/lib/kernel_tracing-ubsan.o: kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-ubsan.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-ubsan.Tpo -c -o kernel/lib/kernel_tracing-ubsan.o `test -f 'kernel/lib/ubsan.cc' || echo '$(srcdir)/'`kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-ubsan.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-ubsan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/ubsan.cc' object='kernel/lib/kernel_tracing-ubsan.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-ubsan.o `test -f 'kernel/lib/ubsan.cc' || echo '$(srcdir)/'`kernel/lib/ubsan.cc
+
+kernel/lib/kernel_tracing-ubsan.obj: kernel/lib/ubsan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-ubsan.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-ubsan.Tpo -c -o kernel/lib/kernel_tracing-ubsan.obj `if test -f 'kernel/lib/ubsan.cc'; then $(CYGPATH_W) 'kernel/lib/ubsan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/ubsan.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-ubsan.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-ubsan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/ubsan.cc' object='kernel/lib/kernel_tracing-ubsan.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-ubsan.obj `if test -f 'kernel/lib/ubsan.cc'; then $(CYGPATH_W) 'kernel/lib/ubsan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/ubsan.cc'; fi`
 
 kernel/lib/kernel_tracing-contig_alloc.o: kernel/lib/contig_alloc.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-contig_alloc.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Tpo -c -o kernel/lib/kernel_tracing-contig_alloc.o `test -f 'kernel/lib/contig_alloc.cc' || echo '$(srcdir)/'`kernel/lib/contig_alloc.cc
@@ -15855,6 +16060,20 @@ kernel/unittest/unittest_km-test_allocator.obj: kernel/unittest/test_allocator.c
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/unittest/unittest_km-test_allocator.obj `if test -f 'kernel/unittest/test_allocator.cc'; then $(CYGPATH_W) 'kernel/unittest/test_allocator.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/unittest/test_allocator.cc'; fi`
 
+kernel/unittest/unittest_km-test_bit.o: kernel/unittest/test_bit.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/unittest/unittest_km-test_bit.o -MD -MP -MF kernel/unittest/$(DEPDIR)/unittest_km-test_bit.Tpo -c -o kernel/unittest/unittest_km-test_bit.o `test -f 'kernel/unittest/test_bit.cc' || echo '$(srcdir)/'`kernel/unittest/test_bit.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/unittest/$(DEPDIR)/unittest_km-test_bit.Tpo kernel/unittest/$(DEPDIR)/unittest_km-test_bit.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/unittest/test_bit.cc' object='kernel/unittest/unittest_km-test_bit.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/unittest/unittest_km-test_bit.o `test -f 'kernel/unittest/test_bit.cc' || echo '$(srcdir)/'`kernel/unittest/test_bit.cc
+
+kernel/unittest/unittest_km-test_bit.obj: kernel/unittest/test_bit.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/unittest/unittest_km-test_bit.obj -MD -MP -MF kernel/unittest/$(DEPDIR)/unittest_km-test_bit.Tpo -c -o kernel/unittest/unittest_km-test_bit.obj `if test -f 'kernel/unittest/test_bit.cc'; then $(CYGPATH_W) 'kernel/unittest/test_bit.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/unittest/test_bit.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/unittest/$(DEPDIR)/unittest_km-test_bit.Tpo kernel/unittest/$(DEPDIR)/unittest_km-test_bit.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/unittest/test_bit.cc' object='kernel/unittest/unittest_km-test_bit.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/unittest/unittest_km-test_bit.obj `if test -f 'kernel/unittest/test_bit.cc'; then $(CYGPATH_W) 'kernel/unittest/test_bit.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/unittest/test_bit.cc'; fi`
+
 kernel/unittest/unittest_km-test_malloc.o: kernel/unittest/test_malloc.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(unittest_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/unittest/unittest_km-test_malloc.o -MD -MP -MF kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Tpo -c -o kernel/unittest/unittest_km-test_malloc.o `test -f 'kernel/unittest/test_malloc.cc' || echo '$(srcdir)/'`kernel/unittest/test_malloc.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Tpo kernel/unittest/$(DEPDIR)/unittest_km-test_malloc.Po
@@ -16783,7 +17002,7 @@ $(top_builddir)/fatpart.img: \
 			$(top_builddir)/mbrdisk.img \
 			$(top_builddir)/gptdisk.img && \
 		\
-		truncate --size=48M $(top_builddir)/fatpart.img && \
+		truncate --size=96M $(top_builddir)/fatpart.img && \
 		\
 		mkfs.vfat \
 			-F 32 \
@@ -16828,7 +17047,7 @@ $(top_builddir)/fatpart.img: \
 
 $(top_builddir)/mbrdisk.img: \
 		fatpart.img
-	truncate --size=64M $(top_builddir)/mbrdisk.img && \
+	truncate --size=128M $(top_builddir)/mbrdisk.img && \
 		\
 		printf 'label: dos\nlength=2048, uuid=%s, name=DGOS, bootable\n' \
 				$(DGOS_GUID) | \
@@ -16854,7 +17073,7 @@ $(top_builddir)/mbrdisk.img: \
 			conv=notrunc
 
 $(top_builddir)/gptdisk.img: fatpart.img
-	truncate --size=64M $(top_builddir)/gptdisk.img && \
+	truncate --size=128M $(top_builddir)/gptdisk.img && \
 	\
 		printf 'label: gpt\n2048,,U,*' | \
 			sfdisk $(top_builddir)/gptdisk.img && \
@@ -17026,6 +17245,8 @@ monitor-connect:
 define qemu_launcher =
 $(1)-$(2)-$(3)-$(4)-$(5)-$(6)-$(7)-$(8): \
 		$$(call QEMU_IMAGE,$(5)) $$(QEMU_EXTRA_DEPS)
+	echo -e -n '\ec'
+	echo 'Run make monitor-debug-output in another terminal if progress stops'
 	echo -e -n '\ec' >> dump/qemu-debug-out
 	echo Running $$@
 	$$(QEMU_SUDO) $$(QEMU) \
@@ -17071,7 +17292,8 @@ debug-tcg: debug-smp-bios-hd-gpt-nvme-vga-tcg
 define bochs_launcher =
 $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
-	cp "$<" "$@"
+	cp "$$<" "$$@"
+
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
 		$(SYMBOL_FILES_INSTALLED) \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \

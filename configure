@@ -591,6 +591,7 @@ DISABLE_OPTIMIZATION_FLAGS
 NO_SIBLING_CALLS_FLAGS
 VECTORIZE_FLAGS
 NO_COMMON_FLAGS
+YES_EXCEPTIONS_FLAGS
 NO_EXCEPTIONS_FLAGS
 NO_UNWIND_TABLES_FLAGS
 NO_RTTI_FLAGS
@@ -7823,13 +7824,13 @@ for flag in \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Warray-bounds Wformat-overflow \
 		Wno-address-of-packed-member \
+		Wno-maybe-uninitialized \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
 		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack \
-		Wsuggest-attribute=const Wsuggest-attribute=pure \
 		Wno-unused-parameter fno-eliminate-unused-debug-types \
-		fno-eliminate-unused-debug-symbols
+		fno-eliminate-unused-debug-symbols fno-plt fvar-tracking
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -7870,6 +7871,7 @@ fi
 
 done
 
+#Wsuggest-attribute=const Wsuggest-attribute=pure
 #fvar-tracking
 #fvar-tracking-assignments
 #Wno-overlength-strings
@@ -8408,7 +8410,7 @@ for flag in \
 	mpreferred-stack-boundary=4 \
 	fPIE \
 	Wl,--no-eh-frame-hdr \
-	Wl,-T$srcdir/user/user64.ld \
+	Wl,-T$srcdir/user/user64_phdrs.ld \
 	fno-exceptions fno-rtti \
 	Wl,-z,max-page-size=4096 \
 	Wl,-z,separate-code \
@@ -9210,6 +9212,45 @@ fi
 $as_echo "$ax_cv_check_cxxflags___fno_exceptions" >&6; }
 if test "x$ax_cv_check_cxxflags___fno_exceptions" = xyes; then :
   NO_EXCEPTIONS_FLAGS=" -fno-exceptions"
+
+else
+  :
+fi
+
+
+
+YES_EXCEPTIONS_FLAGS=
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fexceptions" >&5
+$as_echo_n "checking whether C++ compiler accepts -fexceptions... " >&6; }
+if ${ax_cv_check_cxxflags___fexceptions+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fexceptions"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fexceptions=yes
+else
+  ax_cv_check_cxxflags___fexceptions=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fexceptions" >&5
+$as_echo "$ax_cv_check_cxxflags___fexceptions" >&6; }
+if test "x$ax_cv_check_cxxflags___fexceptions" = xyes; then :
+  YES_EXCEPTIONS_FLAGS=" -fexceptions"
 
 else
   :
