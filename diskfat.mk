@@ -45,7 +45,7 @@ $(top_builddir)/fatpart.img: \
 			$(top_builddir)/mbrdisk.img \
 			$(top_builddir)/gptdisk.img && \
 		\
-		truncate --size=48M $(top_builddir)/fatpart.img && \
+		truncate --size=96M $(top_builddir)/fatpart.img && \
 		\
 		mkfs.vfat \
 			-F 32 \
@@ -92,7 +92,7 @@ DGOS_UUID=0615151f-d802-4edf-914a-734dc4f03687
 
 $(top_builddir)/mbrdisk.img: \
 		fatpart.img
-	truncate --size=64M $(top_builddir)/mbrdisk.img && \
+	truncate --size=128M $(top_builddir)/mbrdisk.img && \
 		\
 		printf 'label: dos\nlength=2048, uuid=%s, name=DGOS, bootable\n' \
 				$(DGOS_GUID) | \
@@ -118,7 +118,7 @@ $(top_builddir)/mbrdisk.img: \
 			conv=notrunc
 
 $(top_builddir)/gptdisk.img: fatpart.img
-	truncate --size=64M $(top_builddir)/gptdisk.img && \
+	truncate --size=128M $(top_builddir)/gptdisk.img && \
 	\
 		printf 'label: gpt\n2048,,U,*' | \
 			sfdisk $(top_builddir)/gptdisk.img && \
