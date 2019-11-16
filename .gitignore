@@ -74,8 +74,8 @@ Thumbs.db
 # ----------------
 .d/*
 
-# Annoying qtcreator file
-boot/boot.creator.user
+# Annoying qtcreator files
+**/*.creator.user*
 
 autom4te.cache/
 aclocal.m4
