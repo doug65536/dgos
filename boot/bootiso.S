@@ -51,47 +51,47 @@ entry_start:
     xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
-    
+
     // Store boot drive passed in from BIOS to unrelocated "boot_drive"
     movb %dl,UNRELOCATED(boot_drive)
-    
+
     // Initialize relocated stack
     movw %ax,%ss
     movl $ ___initial_stack,%esp
-    
+
     // Don't touch the stack until "relocate" is done!
-    
+
     // Calculate unrelocated linear address of relocate_farptr -> bx
     movw $ UNRELOCATED(relocate_farptr),%bx
-    
+
     //
     // Copy the code between "relocate" and "relocate_end"
     // to unrelocated ___end
     //
-    
+
     // Calculate unrelocated seg:off of "___end" symbol into ax:edi
     movl $ UNRELOCATED(___end),%edi
     movl %edi,%eax
     andw $0xF,%di
     shrl $4,%eax
     movw %ax,%es
-    
+
     // Store the far pointer to the relocated "relocate" to relocate_farptr
     movw %di,(%bx)
     movw %ax,2(%bx)
-    
+
     // Destination segment is ax
     movw %ax,%es
-    
+
     // es:di now points to unrelocated ___end
-    
+
     // Copy code
     movw $ UNRELOCATED(relocate),%si
     movw $ ZEROBASED(relocate_end),%cx
     subw $ ZEROBASED(relocate),%cx
     cld
     rep movsb
-    
+
     // Far jump into copied relocate code
     // Note that we went to all this trouble because it ends up above 64KB line
     // and we move it to utterly guarantee relocate won't overwrite itself in
@@ -112,7 +112,7 @@ relocate:
     movw $ UNRELOCATED(___initialized_data_st),%si
     cld
     rep movsl
-    
+
     // Jump into relocate. All the craziness is now over, symbols are correct
     // and everything is < 64KB line
     ljmpw $0,$reloc_entry
@@ -122,7 +122,7 @@ relocate_end:
 .section .early, "wx", @progbits
 reloc_entry:
     callw clear_bss
-    
+
 .Lretry_io:
     // Load the rest of bootiso-bin
     movw $ dap,%si
@@ -143,18 +143,18 @@ reloc_entry:
     xorl %edx,%edx
     movl %eax,dap_lba(%si)
     movl %edx,dap_lba+4(%si)
-    
+
     movw $0x4200,%ax
     movb boot_drive,%dl
     int $0x13
-    jnc load_done	
-    
+    jnc load_done
+
 load_done:	// utility label for placing debugger breakpoint
-    
+
     callw detect_ancient_cpu
-    
+
     fninit
-    
+
     movl bootinfo_primary_volume_desc,%eax
     xorl %edx,%edx
     movl $iso9660_boot_partition,%ecx
@@ -169,7 +169,7 @@ load_done:	// utility label for placing debugger breakpoint
 boot_drive:
     .byte 0
 
-.section .bss, "aw", @progbits
+.section .bss, "aw", @nobits
 dap:
     .space dap_length
-    
+
