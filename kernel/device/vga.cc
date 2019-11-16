@@ -475,10 +475,12 @@ void vga_display_t::remap()
                         PROT_READ | PROT_WRITE,
                         MAP_POPULATE, -1, 0);
 
-    memcpy(shadow, old_shadow,
-           width * height * sizeof(*shadow));
-    memset(old_shadow, 0,
-           width * height * sizeof(*shadow));
+    if (old_shadow) {
+        memcpy(shadow, old_shadow,
+               width * height * sizeof(*shadow));
+        memset(old_shadow, 0,
+               width * height * sizeof(*shadow));
+    }
 }
 
 REGISTER_CALLOUT(vga_remap_callback, nullptr,

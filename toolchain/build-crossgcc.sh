@@ -286,6 +286,7 @@ gcc_config="--target=$arches --with-system-zlib \
 --with-gnu-as --with-gnu-ld \
 --enable-initfini-array \
 --enable-gnu-indirect-function \
+--enable-__cxa_atexit \
 --enable-tls \
 --enable-threads \
 --enable-shared \

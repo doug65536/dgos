@@ -391,8 +391,72 @@ template<typename _RandomIt, typename _Compare >
 constexpr void sort(_RandomIt __first, _RandomIt __last, _Compare __is_less)
 {
     size_t __sz = __last - __first;
-    if (__sz) {
-        detail::quicksort(&*__first, 0, __sz - 1, std::forward<_Compare>(__is_less));
+    if (__sz)
+        detail::quicksort(&*__first, 0, __sz - 1, __is_less);
+}
+
+template<typename _ForwardIt1, typename _ForwardIt2>
+constexpr void iter_swap(_ForwardIt1 a, _ForwardIt2 b)
+{
+   swap(*a, *b);
+}
+
+template<typename _BidirIt>
+void reverse(_BidirIt __first, _BidirIt __last)
+{
+    while ((__first != __last) && (__first != --__last))
+        iter_swap(__first++, __last);
+}
+
+template<typename _BidirIt>
+bool next_permutation(_BidirIt __first, _BidirIt __last)
+{
+    if (__first == __last) return false;
+    _BidirIt __i = __last;
+    if (__first == --__i) return false;
+
+    while (true) {
+        _BidirIt __i1, __i2;
+
+        __i1 = __i;
+        if (*--__i < *__i1) {
+            __i2 = __last;
+            while (!(*__i < *--__i2))
+                ;
+            iter_swap(__i, __i2);
+            reverse(__i1, __last);
+            return true;
+        }
+        if (__i == __first) {
+            reverse(__first, __last);
+            return false;
+        }
+    }
+}
+
+template<typename _BidirIt>
+bool prev_permutation(_BidirIt __first, _BidirIt __last)
+{
+    if (__first == __last) return false;
+    _BidirIt __i = __last;
+    if (__first == --__i) return false;
+
+    while (1) {
+        _BidirIt __i1, __i2;
+
+        __i1 = __i;
+        if (*__i1 < *--__i) {
+            __i2 = __last;
+            while (!(*--__i2 < *__i))
+                ;
+            iter_swap(__i, __i2);
+            reverse(__i1, __last);
+            return true;
+        }
+        if (__i == __first) {
+            reverse(__first, __last);
+            return false;
+        }
     }
 }
 

@@ -16,9 +16,9 @@ std::nothrow_t const std::nothrow;
 #define HEAP_PAGEONLY 0
 
 static heap_t **default_heaps;
-static size_t heap_count;
 
 #if !HEAP_PAGEONLY
+static size_t heap_count;
 
 void malloc_startup(void*)
 {
@@ -29,11 +29,11 @@ void malloc_startup(void*)
     default_heaps = (heap_t**)heap_alloc(
                 default_heap, sizeof(*default_heaps) * 1);
 
-    if (unlikely(!default_heaps))
-        panic_oom();
-
     // Place the BSP heap pointer as the CPU0 heap
     default_heaps[0] = default_heap;
+
+    if (unlikely(!default_heaps))
+        panic_oom();
 
     // Announce that we have a working heap
     callout_call(callout_type_t::heap_ready);
@@ -75,7 +75,7 @@ static heap_t *this_cpu_heap()
 {
     auto cpu = thread_cpu_number();
     assert(heap_count == 0 || size_t(cpu) < heap_count);
-    return default_heaps[cpu];
+    return likely(default_heaps) ? default_heaps[cpu] : nullptr;
 }
 
 static heap_t *heap_get_block_heap(void *block)

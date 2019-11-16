@@ -13,7 +13,7 @@ protected:
     typedef typename ext::type_from_size<size, true>::type value_type;
 
     acpi_gas_mask_t(int bitofs, int bitwidth)
-        : mask(size != bitwidth * 8
+        : mask(size != (bitwidth >> 3)
             ? ~(value_type(-1) << bitwidth) : ~value_type(0))
         , bit(bitofs)
     {

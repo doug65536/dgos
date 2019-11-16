@@ -585,11 +585,6 @@ private:
     int config_work_thread();
 };
 
-static void virtio_gpu_startup(void*)
-{
-    virtio_gpu_factory.detect();
-}
-
 int virtio_gpu_factory_t::detect()
 {
     return detect_virtio(PCI_DEV_CLASS_DISPLAY, VIRTIO_DEVICE_GPU,

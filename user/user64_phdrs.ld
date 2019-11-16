@@ -1,18 +1,19 @@
 ENTRY(_start)
 
 PHDRS {
-	hdr PT_PHDR FILEHDR PHDRS FLAGS(4);
 	read PT_LOAD FLAGS(4);
+	hdr PT_PHDR FILEHDR PHDRS FLAGS(4);
 	tls PT_TLS FLAGS(0);
 	exec PT_LOAD FLAGS(5);
-	writ PT_LOAD FLAGS(6);
+	data PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
 	PROVIDE_HIDDEN(__image_start = .);
 
 	.rodata 0x400000 : {
-		. = . + SIZEOF_HEADERS;
+		. += SIZEOF_HEADERS;
+
 		PROVIDE_HIDDEN(__rodata_start = .);
 		*(.rodata)
 		*(.rodata.*)
@@ -78,7 +79,7 @@ SECTIONS {
 		*(.data)
 		*(.data.*)
 		PROVIDE_HIDDEN(___data_en = .);
-	} :writ
+	} :data
 
 	/* 64-bit align */
 	.init_array ALIGN(8) : {
@@ -86,7 +87,7 @@ SECTIONS {
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		PROVIDE_HIDDEN(__init_array_end = .);
-	} :writ
+	} :data
 
 	/* 64-bit align */
 	.fini_array ALIGN(8) : {
@@ -94,38 +95,38 @@ SECTIONS {
 		KEEP(*(.fini_array))
 		KEEP(*(SORT_BY_INIT_PRIORITY(.fnit_array.*)))
 		PROVIDE_HIDDEN(__fini_array_end = .);
-	} :writ
+	} :data
 
 	.got : {
 		*(.got)
-	} :writ
+	} :data
 
 	.got.plt : {
 		*(.got.plt)
-	} :writ
+	} :data
 
 	.igot.plt : {
 		*(.igot.plt)
-	} :writ
+	} :data
 
 	.tdata : {
 		PROVIDE_HIDDEN(___tdata_st = .);
 		*(.tdata .tdata.* .gnu.linkonce.td.*)
 		PROVIDE_HIDDEN(___tdata_en = .);
-	} :writ :tls
+	} :data :tls
 
 	.tbss (NOLOAD) : {
 		PROVIDE_HIDDEN(___tbss_st = .);
 		*(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon)
 		PROVIDE_HIDDEN(___tbss_en = .);
-	} :writ :tls
+	} :data :tls
 
 	.bss (NOLOAD) : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(.bss.*)
 		PROVIDE_HIDDEN(___bss_en = .);
-	} :writ
+	} :data
 
 	. = ALIGN(4K);
 

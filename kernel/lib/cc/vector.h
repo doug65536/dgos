@@ -169,14 +169,17 @@ public:
 
     // Iterator
     template<int _Dir, bool _Is_const>
-    class vector_iter
+    class vector_iter : public contiguous_iterator_tag
     {
     private:
         friend class vector;
         _always_inline explicit constexpr vector_iter(pointer __ip);
 
     public:
-        _always_inline constexpr vector_iter();
+        _always_inline constexpr vector_iter()
+            : __p(nullptr)
+        {
+        }
 
         template<bool _RhsIsConst>
         _always_inline constexpr vector_iter(
@@ -321,7 +324,7 @@ vector<_T,_Allocator>::vector(
     , __sz(0)
     , __alloc(__alloc_)
 {
-    if (!reserve(__count))
+    if (unlikely(!reserve(__count)))
         panic_oom();
     // Default construct in-place, no copy
     ext::uninitialized_emplace<_T>(__m, __m + __count);

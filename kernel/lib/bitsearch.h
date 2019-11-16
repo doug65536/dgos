@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "cc/type_traits.h"
+#include "assert.h"
 
 // Return bit number of least significant set bit
 _const
@@ -160,7 +161,7 @@ _const
 static constexpr _always_inline _flatten uint8_t bit_log2_n_64(int64_t n)
 {
     uint8_t top = bit_msb_set_64(n);
-    return top + !!(~(uint64_t(-1) << top) & n);
+    return top + !!(~(~UINT64_C(0) << top) & n);
 }
 
 // return ceil(log(n) / log(2))
@@ -168,7 +169,7 @@ _const
 static constexpr _always_inline _flatten uint8_t bit_log2_n_32(int32_t n)
 {
     uint8_t top = bit_msb_set_32(n);
-    return top + !!(~(uint32_t(-1) << top) & n);
+    return top + !!(~(~UINT32_C(0) << top) & n);
 }
 
 template<typename T>
@@ -207,6 +208,7 @@ template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_log2(T const& n)
 {
+    assert(n != 0);
     return bit_log2_n(n, typename std::integral_constant<
                       uint8_t, sizeof(T)>::type());
 }

@@ -160,7 +160,9 @@ void workq::enqueue_on_all_barrier(T &&functor)
     size_t done_count = 0;
 
     for (size_t i = 0; i != cpu_count; ++i) {
-        functor(i);
+        enqueue_on_cpu(i, [=] {
+            functor(i);
+        });
 
         workq_impl::scoped_lock lock(wait_lock);
         if (++done_count == cpu_count) {

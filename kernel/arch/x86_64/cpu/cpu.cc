@@ -22,6 +22,8 @@
 #include "except.h"
 #include "work_queue.h"
 #include "utility.h"
+#include "irq.h"
+#include "nofault.h"
 
 uint32_t default_mxcsr_mask;
 
@@ -472,6 +474,28 @@ static void cpu_init_bsp()
     cpu_init(0);
 }
 
+static isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
+{
+    // Handle nofault functions
+    if (nofault_ip_in_range(uintptr_t(ISR_CTX_REG_RIP(ctx)))) {
+        //
+        // Fault occurred in nofault code region
+
+        // Figure out which landing pad to use
+        uintptr_t landing_pad = nofault_find_landing_pad(
+                    uintptr_t(ISR_CTX_REG_RIP(ctx)));
+
+        if (likely(landing_pad)) {
+            // Put CPU on landing pad with rax == -1
+            ISR_CTX_REG_RAX(ctx) = -1;
+            ISR_CTX_REG_RIP(ctx) = (int(*)(void*))landing_pad;
+            return ctx;
+        }
+    }
+
+    return nullptr;
+}
+
 _noreturn
 void cpu_init_ap()
 {
@@ -574,7 +598,7 @@ void cpu_init(int ap)
     cpu_msr_change_bits(CPU_MSR_EFER, clr, set);
 
     // Configure syscall
-    // Clear the alighment check, direction flag, trap flag, interrupt flag,
+    // Clear the alignment check, direction flag, trap flag, interrupt flag,
     // resume flag, v86 flag
     cpu_msr_set(CPU_MSR_FMASK, CPU_EFLAGS_AC | CPU_EFLAGS_DF |
                 CPU_EFLAGS_TF | CPU_EFLAGS_IF | CPU_EFLAGS_RF |
@@ -598,11 +622,12 @@ void cpu_init(int ap)
     static_assert(GDT_SEL_KERNEL_DATA == GDT_SEL_KERNEL_CODE64 + 8,
                   "GDT inconsistent with SYSCALL/SYSRET behaviour");
 
-
     // Configure sysenter
-    cpu_msr_set(CPU_MSR_SYSENTER_CS, 0);
-    cpu_msr_set(CPU_MSR_SYSENTER_EIP, uint64_t(0));
-    cpu_msr_set(CPU_MSR_SYSENTER_ESP, 0);
+    if (!cpuid_is_amd()) {
+        cpu_msr_set(CPU_MSR_SYSENTER_CS, 0);
+        cpu_msr_set(CPU_MSR_SYSENTER_EIP, uint64_t(0));
+        cpu_msr_set(CPU_MSR_SYSENTER_ESP, 0);
+    }
 
     // Configure security features/workarounds
     clr = 0;
@@ -626,6 +651,8 @@ void cpu_init(int ap)
 
     // Load null LDT
     cpu_ldt_set(0);
+
+    intr_hook(INTR_EX_GPF, cpu_gpf_handler, "cpu_gpf_handler", eoi_none);
 }
 
 _constructor(ctor_cpu_hw_init)
@@ -788,19 +815,12 @@ bool cpu_patch_jmp(void *addr, size_t size, void const *jmp_target)
     return false;
 }
 
+extern "C" int nofault_wrmsr(uint32_t msr, uint64_t value);
+
 bool cpu_msr_set_safe(uint32_t msr, uint64_t value)
 {
-    bool result = true;
-    try {
-        cpu_msr_set(msr, value);
-    } catch (ext::gpf_exception const&) {
-        result = false;
-    }
-
-    return result;
+    return nofault_wrmsr(msr, value) == 0;
 }
-
-
 
 extern "C" uint128_t nofault_rdmsr(uint32_t msr);
 
@@ -828,7 +848,7 @@ static void cpu_init_late_msrs_one_cpu()
 
 void cpu_init_late_msrs()
 {
-    workq::enqueue_on_all_barrier([=] (size_t) {
+    workq::enqueue_on_all_barrier([=] (int cpu) {
         cpu_init_late_msrs_one_cpu();
     });
 }

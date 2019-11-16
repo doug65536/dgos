@@ -58,7 +58,7 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
 
     // CPU task selector
     // 0x80-0x8F
-    GDT_MAKE_TSSSEG(0L, sizeof(tss_t)),
+    GDT_MAKE_TSSSEG(0, 0, sizeof(tss_t)),
 
     // 0x90-0xBF
     GDT_MAKE_EMPTY(),
@@ -97,8 +97,13 @@ static void gdt_set_tss_base(tss_t *base)
 
         tss_lo.set_type(GDT_TYPE_TSS);
         uintptr_t tss_addr = uintptr_t(&base->reserved0);
-        tss_lo.set_base(uint32_t(tss_addr & 0xFFFFFFFF));
-        tss_hi.set_base(tss_addr);
+
+        // Get low and high halves of address
+        uint32_t tss_addr_lo = tss_addr & 0xFFFFFFFF;
+        uint32_t tss_addr_hi = tss_addr >> 32;
+
+        tss_lo.set_base(tss_addr_lo);
+        tss_hi.set_base_hi(tss_addr_hi);
         tss_lo.set_limit(sizeof(*base) - 1);
 
         //new (&gdt[(GDT_SEL_TSS >> 3)]) gdt_entry_t(tss_lo);
@@ -106,16 +111,15 @@ static void gdt_set_tss_base(tss_t *base)
 
         gdt_entry_combined_t gdt_ent_lo =
                 GDT_MAKE_TSS_DESCRIPTOR(
-                    uintptr_t(&base->reserved0),
+                    tss_addr_lo,
                     sizeof(*base)-1, 1, 0, 0);
 
         gdt_entry_combined_t gdt_ent_hi =
-                GDT_MAKE_TSS_HIGH_DESCRIPTOR(
-                    uintptr_t(&base->reserved0));
+                GDT_MAKE_TSS_HIGH_DESCRIPTOR(tss_addr_hi);
 
         printdbg("no ub\n");
         hex_dump(&tss_lo, sizeof(tss_lo));
-        hex_dump(&tss_hi, sizeof(tss_lo));
+        hex_dump(&tss_hi, sizeof(tss_hi));
 
         printdbg("ub\n");
         hex_dump(&gdt_ent_lo, sizeof(tss_lo));

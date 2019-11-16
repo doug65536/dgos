@@ -910,10 +910,11 @@ static void acpi_parse_rsdt()
          rsdp_ptr < rsdp_end; rsdp_ptr += (acpi_rsdt_ptrsz >> 2)) {
         uint64_t hdr_addr;
 
-        if (acpi_rsdt_ptrsz == sizeof(uint32_t))
+        if (acpi_rsdt_ptrsz == sizeof(uint32_t)){
             hdr_addr = *rsdp_ptr;
-        else
-            hdr_addr = *(uint64_t*)rsdp_ptr;
+        } else {
+            memcpy(&hdr_addr, rsdp_ptr, sizeof(uint64_t));
+        }
 
         acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
                 mmap((void*)hdr_addr,
@@ -1024,10 +1025,10 @@ static void acpi_parse_rsdt()
                                    mem_rec->range_base,
                                    mem_rec->range_length);
 
-                        if (!acpi_mem_affinity.
-                                push_back({mem_rec->range_base,
-                                          mem_rec->range_length,
-                                          mem_rec->domain}))
+                        if (unlikely(!acpi_mem_affinity.
+                                     push_back({mem_rec->range_base,
+                                               mem_rec->range_length,
+                                               mem_rec->domain})))
                             panic_oom();
 
                         break;
@@ -1044,9 +1045,9 @@ static void acpi_parse_rsdt()
                                    x2apic_rec->x2apic_id,
                                    x2apic_rec->flags);
 
-                        if (!acpi_apic_affinity.
-                                push_back({x2apic_rec->domain,
-                                          x2apic_rec->x2apic_id}))
+                        if (unlikely(!acpi_apic_affinity.
+                                     push_back({x2apic_rec->domain,
+                                               x2apic_rec->x2apic_id})))
                             panic_oom();
 
                         break;
@@ -1062,10 +1063,11 @@ static void acpi_parse_rsdt()
             acpi_slit_t *slit = (acpi_slit_t *)hdr;
 
             acpi_slit_localities = slit->locality_count;
-            if (!acpi_slit_table.assign((char*)(slit + 1),
-                                        (char*)(slit + 1) +
-                                        (acpi_slit_localities *
-                                         acpi_slit_localities)))
+            if (unlikely(!acpi_slit_table.assign(
+                             (char*)(slit + 1),
+                             (char*)(slit + 1) +
+                             (acpi_slit_localities *
+                              acpi_slit_localities))))
                 panic_oom();
         } else {
             if (acpi_chk_hdr(hdr) == 0) {

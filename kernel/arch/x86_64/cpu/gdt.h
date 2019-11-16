@@ -89,15 +89,15 @@ struct gdt_entry_tss_ldt_t {
     {
     }
 
-    constexpr gdt_entry_tss_ldt_t(uint64_t base)
-        : base_high2((base >> 32) & 0xFFFFFFFFU)
+    constexpr gdt_entry_tss_ldt_t(uint32_t high)
+        : base_high2(high)
         , reserved(0)
     {
     }
 
-    constexpr gdt_entry_tss_ldt_t& set_base(uint64_t base)
+    constexpr gdt_entry_tss_ldt_t& set_base_hi(uint32_t high)
     {
-        base_high2 = (base >> 32) & 0xFFFFFFFFU;
+        base_high2 = high;
         return *this;
     }
 
@@ -148,14 +148,14 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
     granularity, is32, is64)
 
 #define GDT_MAKE_TSS_DESCRIPTOR( \
-    base, limit, present, privilege, granularity) \
+    base_lo, limit, present, privilege, granularity) \
     GDT_MAKE_SEGMENT_DESCRIPTOR( \
-    base, limit, present, privilege, \
+    base_lo, limit, present, privilege, \
     GDT_TYPE_TSS, \
     granularity, 0, 0)
 
-#define GDT_MAKE_TSS_HIGH_DESCRIPTOR(base) \
-    gdt_entry_combined_t(gdt_entry_tss_ldt_t(base))
+#define GDT_MAKE_TSS_HIGH_DESCRIPTOR(base_hi) \
+    gdt_entry_combined_t(gdt_entry_tss_ldt_t(base_hi))
 
 #if 0
 #define GDT_MAKE_TSS_HIGH_DESCRIPTOR(base) \
@@ -183,9 +183,9 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 #define GDT_MAKE_DATASEG(ring) \
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 1, 0)
 
-#define GDT_MAKE_TSSSEG(base, limit) \
-    GDT_MAKE_TSS_DESCRIPTOR(base, limit, 1, 0, 0), \
-    GDT_MAKE_TSS_HIGH_DESCRIPTOR(base)
+#define GDT_MAKE_TSSSEG(base_lo, base_hi, limit) \
+    GDT_MAKE_TSS_DESCRIPTOR(base_lo, limit, 1, 0, 0), \
+    GDT_MAKE_TSS_HIGH_DESCRIPTOR(base_hi)
 
 //
 // 32-bit descriptors
@@ -205,7 +205,7 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
 // Task State Segment (64-bit)
-struct alignas(64) tss_t {
+struct tss_t {
     // EVERYTHING is misaligned without dummy_align
     uint32_t dummy_align;
 

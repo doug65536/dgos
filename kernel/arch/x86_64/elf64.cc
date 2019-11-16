@@ -324,6 +324,7 @@ static constexpr char const *get_relocation_type(size_t type) {
 
 // This function's purpose is to act as a place to put a breakpoint
 // with commands that magically load the symbols for a module when loaded
+
 void modload_load_symbols(char const *path, uintptr_t addr)
 {
     // Automated breakpoint is placed here to load symbols

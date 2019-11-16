@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/likely.h>
 #include "bits/cfile.h"
 
 char *fgets(char * restrict str, int count, FILE * restrict s)
@@ -44,7 +45,7 @@ char *fgets(char * restrict str, int count, FILE * restrict s)
                 s->buffer = (char*)malloc(s->buf_sz);
                 s->buf_owned = true;
 
-                if (!s->buffer) {
+                if (unlikely(!s->buffer)) {
                     s->error = ENOMEM; return nullptr;
                 }
             }

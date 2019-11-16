@@ -388,18 +388,22 @@ bool pci_config_mmio::copy(pci_addr_t addr, void *dest,
 
     uint64_t ecam_offset = ecamofs(addr, ent->st_bus, offset);
 
+    uint32_t value;
     switch (size) {
     case sizeof(uint8_t):
-        *(uint8_t*)dest = mm_rd(*(uint8_t volatile const *)
-                                (ent->mapping + ecam_offset));
+        value = mm_rd(*(uint8_t volatile const *)
+                      (ent->mapping + ecam_offset));
+        memcpy(dest, &value, sizeof(uint8_t));
         return true;
     case sizeof(uint16_t):
-        *(uint16_t*)dest = mm_rd(*(uint16_t volatile const *)
-                                (ent->mapping + ecam_offset));
+        value = mm_rd(*(uint16_t volatile const *)
+                      (ent->mapping + ecam_offset));
+        memcpy(dest, &value, sizeof(uint16_t));
         return true;
     case sizeof(uint32_t):
-        *(uint32_t*)dest = mm_rd(*(uint32_t volatile const *)
-                                (ent->mapping + ecam_offset));
+        value = mm_rd(*(uint32_t volatile const *)
+                      (ent->mapping + ecam_offset));
+        memcpy(dest, &value, sizeof(uint32_t));
         return true;
     }
 

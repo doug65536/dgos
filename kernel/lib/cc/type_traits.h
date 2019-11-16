@@ -115,6 +115,17 @@ struct is_same<_T1, _T1> : public true_type
 };
 
 template<typename _T>
+struct is_pointer : public false_type
+{
+};
+
+template<typename _T>
+struct is_pointer<_T*> : public true_type
+{
+};
+
+
+template<typename _T>
 using is_trivial = bool_constant<__is_trivial(_T)>;
 
 template<typename _T>

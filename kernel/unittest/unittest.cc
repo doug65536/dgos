@@ -121,18 +121,18 @@ void unittest::unit::eq(char const *expect, char *value,
 {
     if (strcmp(expect, value)) {
         dbgout << name << " expected \"" << expect <<
-                  " but got " << value << "\n";
+                  " but got " << value << '\n';
         fail(file, line);
     }
 }
 
-template void unittest::unit::eq(int&&, int&&,
+template void unittest::unit::eq(int const&, int const&,
     const char *file, int line);
-template void unittest::unit::eq(uint32_t&&, uint32_t&&,
+template void unittest::unit::eq(uint32_t const&, uint32_t const&,
     const char *file, int line);
-template void unittest::unit::eq(bool&&, bool&&,
+template void unittest::unit::eq(bool const&, bool const&,
     const char *file, int line);
-template void unittest::unit::eq(size_t&&, size_t&&,
+template void unittest::unit::eq(size_t const&, size_t const&,
     const char *file, int line);
 
 const char *unittest::unit::get_name() const
@@ -162,10 +162,10 @@ void unittest::unit::run_all(unit_ctx *ctx)
         size_t prev_failures = ctx->failure_count();
         it->set_ctx(ctx);
         it->invoke();
-        if (prev_failures != ctx->failure_count()) {
-            printk("*** FAILED! %s\n", it->get_name());
+        if (likely(prev_failures == ctx->failure_count())) {
+            printk("%s: OK\n", it->get_name());
         } else {
-            printk("%s: OK!\n", it->get_name());
+            printk("*** FAILED! %s\n", it->get_name());
         }
     }
 }

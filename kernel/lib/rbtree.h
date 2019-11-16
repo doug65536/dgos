@@ -208,7 +208,7 @@ rbtree_t<_Tkey,_Tval>::alloc_node()
         __capacity = _RBTREE_NEXT_CAPACITY(__capacity);
         __node_t *__new_nodes = (__node_t*)realloc(
                     __nodes, sizeof(*__nodes) * __capacity);
-        if (!__new_nodes)
+        if (unlikely(!__new_nodes))
             return 0;
 
 

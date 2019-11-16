@@ -57,6 +57,8 @@ void load_module(char const *path, char const *parameters = nullptr)
 
 int main(int argc, char **argv, char **envp)
 {
+    load_module("unittest.km");
+
     // fixme: check ACPI
     load_module("keyb8042.km");
 
@@ -93,6 +95,4 @@ int main(int argc, char **argv, char **envp)
                       PCI_DEV_CLASS_NETWORK,
                       PCI_SUBCLASS_NETWORK_ETHERNET, -1))
         load_module("rtl8139.km");
-
-    load_module("unittest.km");
 }

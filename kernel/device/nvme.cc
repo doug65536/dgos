@@ -357,7 +357,7 @@ public:
         NVME_TRACE("namespace identify data at physaddr=%#" PRIx64 "\n",
                    identify_data_physaddr);
 
-        if (!identify_data_physaddr)
+        if (unlikely(!identify_data_physaddr))
             panic("Insufficient contiguous memory!\n");
 
         identify_data = mmap((void*)identify_data_physaddr, 4096,
@@ -365,7 +365,7 @@ public:
 
         NVME_TRACE("namespace identify data at vaddr=%p\n", identify_data);
 
-        if (!identify_data_physaddr)
+        if (unlikely(!identify_data_physaddr))
             panic("Failed to map identify data!\n");
     }
 

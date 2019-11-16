@@ -5,7 +5,6 @@
 #include "string.h"
 
 __BEGIN_NAMESPACE_STD
-void terminate();
 class type_info;
 __END_NAMESPACE_STD
 

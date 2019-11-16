@@ -394,13 +394,19 @@ DISABLED_UNITTEST(test_vector_lifecycle)
     std::vector<MockItem> v;
     bool ok = v.emplace_back(&stats);
     eq(true, ok);
+    eq(size_t(1), stats.nr_construct);
+
     MockItem proto(&stats);
+    eq(size_t(2), stats.nr_construct);
+
     ok = v.resize(42, proto);
+    eq(41U, stats.nr_copycon);
+    eq(1U, stats.nr_movecon);
     eq(true, ok);
 
     std::vector<MockItem> v2 = std::move(v);
 
-    eq(42U, stats.nr_construct);
+    eq(1U, stats.nr_construct);
 }
 
 #include "rand.h"

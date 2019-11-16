@@ -38,10 +38,12 @@ EXPORT void udp_frame_received(ethq_pkt_t *pkt)
     (void)p;
 }
 
-EXPORT int udp_bind(ipv4_addr_pair_t const *pair)
+EXPORT bool udp_bind(ipv4_addr_pair_t const *pair)
 {
     int handle = atomic_xadd(&next_handle, 1);
     udp_bind_t *bind = (udp_bind_t*)malloc(sizeof(*bind));
+    if (unlikely(!bind))
+        return false;
     bind->handle = handle;
     bind->pair = *pair;
     return udp_handle_lookup.insert(bind) && udp_addr_lookup.insert(bind);

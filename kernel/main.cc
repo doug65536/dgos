@@ -258,7 +258,8 @@ void test_read_stress()
     int dev_cnt = storage_dev_count();
     std::vector<read_stress_thread_t*> *read_stress_threads =
             new (std::nothrow) std::vector<read_stress_thread_t*>();
-    if (!read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD))
+    if (unlikely(!read_stress_threads->reserve(
+                     dev_cnt * ENABLE_READ_STRESS_THREAD)))
         panic("Out of memory");
 
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
@@ -268,7 +269,7 @@ void test_read_stress()
                      devid, i);
             read_stress_thread_t *thread =
                     new (std::nothrow) read_stress_thread_t();
-            if (!read_stress_threads->push_back(thread))
+            if (unlikely(!read_stress_threads->push_back(thread)))
                 panic_oom();
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
             thread_t tid = thread->start(devid, indicator, i);
@@ -1032,22 +1033,89 @@ private:
     lock_type some_lock;
 };
 
+
+class test_object {
+public:
+    char const *name;
+
+    test_object(char const *name)
+    {
+        this->name = name;
+        printdbg("test_object constructed: %s\n", name);
+    }
+
+    ~test_object()
+    {
+        printdbg("test_object destructed: %s\n", name);
+    }
+};
+
+class test_exception : public std::exception {
+public:
+    test_exception(int n) : std::exception() {}
+};
+
+_noreturn
+void test4()
+{
+    test_object a("test3");
+    printdbg("Throwing\n");
+    throw test_exception(42);
+}
+
+_noreturn
+void test3()
+{
+    test4();
+}
+
+_noreturn
+void test2()
+{
+    test_object a("test2");
+    test3();
+}
+
+_noreturn
+void test1()
+{
+    test_object a("test1");
+    test2();
+}
+
+void test_cxx_except()
+{
+    try {
+        test1();
+    } catch (test_exception const& ex) {
+        printdbg("Caught\n");
+    }
+}
+
+//int fixme_waste_bloat[4 << 18] = {1};
+
 extern "C" _noreturn int main(void)
 {
-    //bool caught = false;
-    //try {
-    //    throw something();
-    //} catch (something const& e) {
-    //    caught = true;
-    //}
-    //
-    //caught = false;
-    //try {
-    //    locked thing;
-    //    thing.do_thing();
-    //} catch (something const& e) {
-    //    caught = true;
-    //}
+    //test_cxx_except();
+
+//    bool caught = false;
+//    try {
+//        throw something();
+//    } catch (something const& e) {
+//        caught = true;
+//    }
+
+//    assert(caught);
+
+//    caught = false;
+//    try {
+//        locked thing;
+//        thing.do_thing();
+//    } catch (something const& e) {
+//        caught = true;
+//    }
+
+//    assert(caught);
 
     if (!kernel_params->wait_gdb)
         thread_create(init_thread, nullptr, 0, false);

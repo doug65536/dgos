@@ -204,9 +204,9 @@ bsp_init:
 .balign 16
     // TSS layout is completely misaligned without nudging it up 4 bytes
     //  uint32_t dummy_align;
+early_tss:
     .space 4
     .global early_tss
-early_tss:
     // TSS structure
     //  uint32_t reserved0;
     .int 0

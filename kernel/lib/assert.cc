@@ -13,7 +13,7 @@ EXPORT int assert_failed(char const *expr,
     printdbg("\n** ASSERT FAILED: %s(%d): %s %s\n",
              file, line, expr, msg ? msg : "");
     cpu_debug_break();
-    cpu_irq_disable();
+    //cpu_irq_disable();
     // volatile because I might change it in the debugger and I want control
     // flow to appear to be able to return and continue
     bool volatile keep_waiting = true;

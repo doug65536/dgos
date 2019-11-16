@@ -150,6 +150,10 @@ SECTIONS {
 		*(.got.plt)
 	} :data
 
+	.igot.plt : {
+		*(.igot.plt)
+	} :data
+
 	.dynamic : {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);

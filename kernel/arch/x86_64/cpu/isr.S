@@ -85,7 +85,7 @@ isr_section_name \int_num
         // -1    4*8(%rsp) ss
         // -2    3*8(%rsp) rsp
         // -3    2*8(%rsp) rflags
-        // -4    1*8(%rsp) ss
+        // -4    1*8(%rsp) cs
         // -5    0*8(%rsp) rip
         .cfi_def_cfa rsp,5*8
         .cfi_offset ss,-1*8
@@ -93,9 +93,10 @@ isr_section_name \int_num
         .cfi_offset rflags,-3*8
         .cfi_offset cs,-4*8
         .cfi_offset rip,-5*8
+        // Push 0 error code to normalize
+        push_cfi $0
         call any_intr
         fn_trace \pathname,enter
-        push_cfi $0
     .else
         // CFA
         // index
@@ -745,6 +746,7 @@ isr_common:
 
     // Restore CR3
     popq %rbx
+    movq %rbx,%cr3
 
     popq %rdi
     .cfi_same_value rdi
@@ -785,8 +787,6 @@ isr_common:
     popq %r15
     .cfi_same_value r15
 
-    movq %rbx,%cr3
-
     popq %rbx
     .cfi_same_value rbx
 
@@ -805,9 +805,9 @@ isr_common:
     insn_fixup
     call protection_barrier
 
-    fn_trace isr_common,exit
-
     adj_rsp 16
+
+    fn_trace isr_common,exit
 
     iretq
 
@@ -842,6 +842,7 @@ thread_yield:
     // Snag return address from the stack,
     // we're replacing that with a synthetic interrupt frame
     pop_cfi %rcx
+    .cfi_same_value rsp
 
     // Switch to getting return address from a register
     .cfi_register rip,rcx
@@ -850,27 +851,29 @@ thread_yield:
     // the value it will have when the thread resumes
     // Save caller's rsp in rax
     movq %rsp,%rax
+    .cfi_register rsp,rax
 
     // push ss:rsp
     push_cfi $GDT_SEL_KERNEL_DATA
+    .cfi_offset ss,-1*8
     push_cfi %rax
+    .cfi_offset rsp,-2*8
 
     // push eflags
     pushfq_cfi
+    .cfi_offset rflags,-3*8
+    cli
 
     // Segments (hardcoded kernel ones) (scheduled far ahead)
     movabs $ (GDT_SEL_USER_DATA | 3) * 0x0001000100010001,%rdx
 
     // rax remains a zero constant for a while
-    xor %eax,%eax
-
-    cli
+    xorl %eax,%eax
 
     // push cs:rip
     push_cfi $GDT_SEL_KERNEL_CODE64
+    .cfi_offset cs,-4*8
     push_cfi %rcx
-
-    // Switch back to getting return address from stack
     .cfi_offset rip,-5*8
 
     //          frame      raw
@@ -901,15 +904,11 @@ thread_yield:
     // -24 -16*8(%rbp)  1*8(%rsp) -> segments
     // -25 -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr
 
-
-
-
-
     // Push zero error code
     push_cfi %rax
 
     // Save PDBR (scheduled ahead)
-    mov %cr3,%rcx
+    movq %cr3,%rcx
 
     // Push interrupt number
     push_cfi $(INTR_THREAD_YIELD|(1<<ISR_CTX_CTX_FLAGS_FAST_QWBIT))
@@ -921,13 +920,13 @@ thread_yield:
     // Switch to rbp-relative frame, avoid CFA adjustments I hope
     movq %rsp,%rbp
     .cfi_def_cfa rbp,8*8
-    .cfi_offset ss,-1*8
-    .cfi_offset rsp,-2*8
-    .cfi_offset rflags,-3*8
-    .cfi_offset cs,-4*8
-    .cfi_offset rip,-5*8
+//    .cfi_offset ss,-1*8
+//    .cfi_offset rsp,-2*8
+//    .cfi_offset rflags,-3*8
+//    .cfi_offset cs,-4*8
+//    .cfi_offset rip,-5*8
 
-    .cfi_offset rbp,-8*8
+//    .cfi_offset rbp,-8*8
 
     // Push call preserved registers
     pushq %rbx
@@ -1334,6 +1333,7 @@ protection_barrier_ibpb:
 .balign 16
 exception_isr_handler:
     .cfi_startproc
+    .cfi_signal_frame
     .cfi_def_cfa rbp,8*8
     .cfi_offset ss,-1*8
     .cfi_offset rsp,-2*8
@@ -1366,7 +1366,6 @@ exception_isr_handler:
     movq %r12,%rsi
     call intr_invoke
 
-    movq %r12,%rax
     retq
 
 .Linvoke_catch:
@@ -1378,7 +1377,7 @@ exception_isr_handler:
     movl %ebx,%edi
     call __exception_handler_invoke
 
-    call cpu_debug_break
+    //call cpu_debug_break
 
     // (not Tail) call to unhandled_exception_handler
     // tail call breaks the backtrace, which is bad and not worth
@@ -1647,13 +1646,17 @@ __module_dynlink_plt_thunk:
 cs_leave_asm:
     .cfi_startproc
     xorl %eax,%eax
-    subl $1,%gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
-    jb .Lpanic
+    decl %gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
+    js .Lpanic
     jnz .Lreturn
 
     // Making it here means we just left the outermost critical section
     cmpl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS(%rax)
-    jz .Lreturn
+    jnz .Lis_deferred_csw
+
+    // Making it here means there was no deferred context switch
+.Lreturn:
+    ret
 
 .Lis_deferred_csw:
     // Making it here means a context switch was deferred, reset flag
@@ -1669,17 +1672,17 @@ cs_leave_asm:
 
     .cfi_endproc
 
+// Not used, now inline assembly single inc instruction
 // Entering N critical sections requires you to leave N to get out
-.global cs_enter_asm
-.balign 16
-cs_enter_asm:
-    .cfi_startproc
-    xor %eax,%eax
-    addl $1,%gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
-    jz .Lpanic
-.Lreturn:
-    ret
-    .cfi_endproc
+//.global cs_enter_asm
+//.balign 16
+//cs_enter_asm:
+//    .cfi_startproc
+//    incl %gs:CPU_INFO_LOCKS_HELD_OFS
+//    //jz .Lpanic
+//.Lreturn:
+//    ret
+//    .cfi_endproc
 
 .section .rodata, "", @progbits
 .Lpanic_msg:

@@ -2158,7 +2158,7 @@ bool gdb_cpu_ctrl_t::breakpoint_add(
     if (it != list.end())
         return true;
 
-    if (!list.emplace_back(type, addr, page_dir, size, 0, false))
+    if (unlikely(!list.emplace_back(type, addr, page_dir, size, 0, false)))
         panic_oom();
 
     // If it is a software breakpoint, and it didn't apply,
@@ -2489,13 +2489,13 @@ void gdb_cpu_ctrl_t::start()
 
     int cpu_count = thread_cpu_count();
 
-    if (!cpus.reserve(cpu_count - 1))
+    if (unlikely(!cpus.reserve(cpu_count - 1)))
         panic_oom();
 
     // Dedicate the last CPU to qemu stub
     for (int cpu = 0; cpu < cpu_count - 1; ++cpu) {
         uint32_t apic_id = thread_get_cpu_apic_id(cpu);
-        if (!cpus.emplace_back(apic_id, cpu + 1))
+        if (unlikely(!cpus.emplace_back(apic_id, cpu + 1)))
             panic_oom();
     }
 

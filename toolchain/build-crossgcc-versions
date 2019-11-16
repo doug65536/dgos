@@ -1,5 +1,5 @@
-gccver=9.1.0
-binver=2.32
+gccver=9.2.0
+binver=2.33.1
 gdbver=8.3
 gmpver=6.1.2
 mpcver=1.1.0

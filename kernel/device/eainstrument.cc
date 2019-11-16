@@ -34,7 +34,7 @@ _no_instrument
 static void eainst_lock_release(uintptr_t flags)
 {
     __asm__ __volatile__ (
-        "pushq %[flags]\n\t"
+        "pushq %q[flags]\n\t"
         "popfq\n\t"
         :
         : [flags] "r" (flags)

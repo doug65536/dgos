@@ -37,6 +37,14 @@ struct allocator
         using other = allocator<_U>;
     };
 
+    allocator() = default;
+    allocator(allocator const& __other) = default;
+
+    template<typename _U>
+    allocator(allocator<_U> const& __other)
+    {
+    }
+
     value_type *allocate(size_t __n) const
     {
         return (value_type*)malloc(__n * sizeof(value_type));

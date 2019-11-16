@@ -17,6 +17,9 @@
 // and filling allocated memory with 0xf0
 #define HEAP_DEBUG  1
 
+// Enable an extremely large number of validations to occur around things
+#define HEAP_EXCESSIVE_VALIDATION  0
+
 // Don't free virtual address ranges, just free physical pages
 #define HEAP_NOVFREE 0
 
@@ -46,13 +49,15 @@ static constexpr uint32_t HEAP_BLK_TYPE_FREE = 0x0cb1eefe;  // "feeeb10c"
 /// [11] ->   65536   65520     1     99.98%
 /// .... -> use mmap
 
+static constexpr size_t HEAP_1ST_BUCKET = 5;
+
 static constexpr size_t HEAP_BUCKET_COUNT = 12;
 
 static constexpr size_t HEAP_MMAP_THRESHOLD =
-        (size_t(1)<<(5+HEAP_BUCKET_COUNT-1));
+        (size_t(1)<<(HEAP_1ST_BUCKET + HEAP_BUCKET_COUNT - 1));
 
 static constexpr size_t HEAP_BUCKET_SIZE =
-        (size_t(1)<<(HEAP_BUCKET_COUNT+5-1));
+        (size_t(1)<<(HEAP_BUCKET_COUNT + HEAP_1ST_BUCKET - 1));
 
 struct heap_page_t {
     void *mem;
@@ -141,10 +146,12 @@ uint32_t heap_t::get_heap_id(heap_t *heap)
 
 uint32_t heap_get_block_heap_id(void *block)
 {
-    heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
 
-    if (block)
+    if (likely(block)) {
+        heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
+
         return hdr->heap_id;
+    }
 
     return thread_cpu_number();
 }
@@ -203,7 +210,8 @@ void heap_t::destroy(heap_t *heap)
 
 heap_hdr_t *heap_t::create_arena(uint8_t log2size, scoped_lock const& lock)
 {
-    assert(true == lock.is_locked());
+    assert(log2size >= HEAP_1ST_BUCKET);
+    assert(lock.is_locked());
 
     size_t *arena_count_ptr;
     heap_page_t *arena_list_ptr;
@@ -236,26 +244,26 @@ heap_hdr_t *heap_t::create_arena(uint8_t log2size, scoped_lock const& lock)
         arena_list_ptr = new_list->arenas;
     }
 
-    size_t bucket = log2size - 5;
+    size_t bucket = log2size - HEAP_1ST_BUCKET;
 
     char *arena = (char*)mmap(nullptr, HEAP_BUCKET_SIZE,
                               PROT_READ | PROT_WRITE,
-                       MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+                              MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
     char *arena_end = arena + HEAP_BUCKET_SIZE;
 
     size_t slot = (*arena_count_ptr)++;
     arena_list_ptr[slot].mem = arena;
     arena_list_ptr[slot].slot_size = log2size;
 
-    size_t size = 1U << log2size;
+    size_t size = size_t(1) << log2size;
 
     heap_hdr_t *hdr = nullptr;
     heap_hdr_t *first_free = free_chains[bucket];
     for (char *fill = arena_end - size; fill >= arena; fill -= size) {
         hdr = (heap_hdr_t*)fill;
         hdr->size_next = uintptr_t(first_free);
-        hdr->sig1 = HEAP_BLK_TYPE_FREE;
         first_free = hdr;
+        hdr->sig1 = HEAP_BLK_TYPE_FREE;
 #if HEAP_DEBUG
         memset(hdr + 1, 0xFE, size - sizeof(heap_hdr_t));
 #endif
@@ -313,8 +321,8 @@ void *heap_t::alloc(size_t size)
     size = size_t(1) << log2size;
 
     // Bucket 0 is 32 bytes
-    assert(log2size >= 5);
-    size_t bucket = log2size - 5;
+    assert(log2size >= HEAP_1ST_BUCKET);
+    size_t bucket = log2size - HEAP_1ST_BUCKET;
 
     heap_hdr_t *first_free;
 
@@ -324,8 +332,8 @@ void *heap_t::alloc(size_t size)
     {
         scoped_lock lock(heap_lock);
 
-#if HEAP_DEBUG
-        validate_locked(false, lock);
+#if HEAP_EXCESSIVE_VALIDATION
+        assert(validate_locked(false, lock));
 #endif
 
         // Try to take a free item
@@ -334,6 +342,10 @@ void *heap_t::alloc(size_t size)
         if (!first_free) {
             // Create a new bucket
             first_free = create_arena(log2size, lock);
+
+#if HEAP_EXCESSIVE_VALIDATION
+            assert(validate_locked(false, lock));
+#endif
         }
 
         // Remove block from chain
@@ -351,6 +363,10 @@ void *heap_t::alloc(size_t size)
 
 #if HEAP_DEBUG
         memset(first_free + 1, 0xf0, size - sizeof(*first_free));
+#endif
+
+#if HEAP_EXCESSIVE_VALIDATION
+        assert(malloc_validate(false));
 #endif
 
         return first_free + 1;
@@ -373,15 +389,15 @@ void heap_t::free(void *block)
 #endif
 
     uint8_t log2size = bit_log2(hdr->size_next);
-    assert(log2size >= 5 && log2size < 32);
-    size_t bucket = log2size - 5;
+    assert(log2size >= HEAP_1ST_BUCKET && log2size < 32);
+    size_t bucket = log2size - HEAP_1ST_BUCKET;
 
     if (bucket < HEAP_BUCKET_COUNT) {
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
 
         scoped_lock lock(heap_lock);
 
-#if HEAP_DEBUG
+#if HEAP_EXCESSIVE_VALIDATION
         validate_locked(false, lock);
 #endif
 
@@ -437,7 +453,7 @@ bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
         heap_hdr_t *st = (heap_hdr_t*)arenas[i].mem;
         heap_hdr_t *en = (heap_hdr_t*)((char*)arenas[i].mem + HEAP_BUCKET_SIZE);
 
-        if (dump)
+        if (unlikely(dump))
             dbgout << "Processing  bucket, " << sz << " bytes per slot\n";
 
         for (heap_hdr_t *next, *blk = st; blk < en; blk = next) {
@@ -447,6 +463,7 @@ bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
                 if (unlikely(dump))
                     hex_dump(blk, sz);
                 break;
+
             case HEAP_BLK_TYPE_FREE:
 #if HEAP_DEBUG
                 // Must be full of 0xFE
@@ -463,6 +480,7 @@ bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
                     hex_dump(blk, sz);
 #endif
                 break;
+
             default:
                 dbgout << "Invalid heap block header\n";
                 return validate_failed();
@@ -472,12 +490,10 @@ bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
 
     for (heap_ext_arena_t *prev, *ext = last_ext_arena; ext; ext = prev) {
         prev = ext->prev;
-        for (size_t i = 0; i < arena_count; ++i) {
-            size_t sz = size_t(1) << arenas[i].slot_size;
-            heap_hdr_t *st = (heap_hdr_t*)
-                    (uintptr_t(ext->arenas[i].mem) + i * sz);
-            heap_hdr_t *en = (heap_hdr_t*)
-                    ((char*)ext->arenas[i].mem + HEAP_BUCKET_SIZE);
+        for (size_t i = 0; i < ext->arena_count; ++i) {
+            size_t sz = size_t(1) << ext->arenas[i].slot_size;
+            heap_hdr_t *st = (heap_hdr_t*)ext->arenas[i].mem;
+            heap_hdr_t *en = (heap_hdr_t*)((char*)st + HEAP_BUCKET_SIZE);
 
             for (heap_hdr_t *next, *blk = st; blk < en; blk = next) {
                 next = (heap_hdr_t*)(uintptr_t(blk) + sz);
@@ -495,7 +511,12 @@ bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
                     }
 #endif
                     break;
+
                 case HEAP_BLK_TYPE_USED:
+                    if (unlikely(dump))
+                        hex_dump(blk, sz);
+                    break;
+
                 default:
                     dbgout << "Invalid heap block signature\n";
                     return validate_failed();
@@ -509,7 +530,7 @@ bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
 
 void *heap_t::realloc(void *block, size_t size)
 {
-    if (block && size) {
+    if (likely(block && size)) {
         heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
 
         assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
@@ -700,5 +721,7 @@ bool heap_maybe_blk(heap_t *heap, void *block)
 
 bool heap_validate(heap_t *heap, bool dump)
 {
-    return heap->validate(dump);
+    if (likely(heap))
+        return heap->validate(dump);
+    return true;
 }

@@ -320,9 +320,9 @@ std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
         // Enable bus master DMA and I/O ports, disable MMIO
         pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_IOSE, PCI_CMD_MSE);
 
-        if (!ide_ifs.push_back(if_))
+        if (unlikely(!ide_ifs.push_back(if_)))
             panic_oom();
-        if (!list.push_back(if_.release()))
+        if (unlikely(!list.push_back(if_.release())))
             panic_oom();
     } while (pci_enumerate_next(&pci_iter));
 
@@ -620,9 +620,9 @@ void ide_if_t::ide_chan_t::detect_devices(
         dev->chan = this;
         dev->slave = slave;
         dev->is_atapi = is_atapi;
-        if (!ide_devs.push_back(dev))
+        if (unlikely(!ide_devs.push_back(dev)))
             panic_oom();
-        if (!list.push_back(dev.release()))
+        if (unlikely(!list.push_back(dev.release())))
             panic_oom();
 
         std::unique_ptr<ata_identify_t> ident =

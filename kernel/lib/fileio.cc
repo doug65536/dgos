@@ -65,7 +65,7 @@ static dev_fs_t *dev_fs;
 static void file_init(void *)
 {
     file_table_scoped_lock lock(file_table_lock);
-    if (!file_table.reserve(1000))
+    if (unlikely(!file_table.reserve(1000)))
         panic_oom();
 }
 

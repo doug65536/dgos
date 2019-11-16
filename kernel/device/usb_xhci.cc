@@ -1231,7 +1231,7 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
 
             void *bos_mem = malloc(bos_hdr.total_len);
 
-            if (!bos_mem)
+            if (unlikely(!bos_mem))
                 break;
 
             bos.reset(new (bos_mem) usb_desc_bos{});

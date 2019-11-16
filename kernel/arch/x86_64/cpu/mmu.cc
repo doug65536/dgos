@@ -30,14 +30,15 @@
 #include "asan.h"
 #include "unique_ptr.h"
 #include "cxxstring.h"
+#include "nofault.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
 #define GLOBAL_RECURSIVE_MAPPING    0
 
 #define DEBUG_CREATE_PT         0
-#define DEBUG_PHYS_ALLOC        1
-#define DEBUG_PAGE_TABLES       1
+#define DEBUG_PHYS_ALLOC        0
+#define DEBUG_PAGE_TABLES       0
 #define DEBUG_PAGE_FAULT        0
 
 #define PROFILE_PHYS_ALLOC      0
@@ -220,16 +221,6 @@ typedef uintptr_t pte_t;
 
 extern char ___text_st[];
 extern char ___text_en[];
-
-// Linker script magic
-extern char __nofault_text_st[];
-extern char __nofault_text_en[];
-extern uint64_t __nofault_text_sz;
-
-extern uintptr_t __nofault_tab_st[];
-extern uintptr_t __nofault_tab_en[];
-extern uintptr_t __nofault_tab_lp[];
-extern uint64_t __nofault_tab_sz;
 
 // -512GB
 static uint64_t min_kern_addr = 0xFFFFFF8000000000;
@@ -516,7 +507,7 @@ private:
 };
 
 extern char ___init_brk[];
-static linaddr_t near_base = (linaddr_t)___init_brk;
+//static linaddr_t near_base = (linaddr_t)___init_brk;
 static linaddr_t linear_base = PT_MAX_ADDR;
 
 mmu_phys_allocator_t phys_allocator;
@@ -524,7 +515,7 @@ mmu_phys_allocator_t phys_allocator;
 static thread_cpu_mask_t volatile shootdown_pending;
 
 static contiguous_allocator_t linear_allocator;
-static contiguous_allocator_t near_allocator;
+//static contiguous_allocator_t near_allocator;
 static contiguous_allocator_t contig_phys_allocator;
 static contiguous_allocator_t hole_allocator;
 
@@ -1110,7 +1101,7 @@ void mm_phys_clear_init()
 
 void clear_phys(physaddr_t addr)
 {
-    unsigned index = 0;
+    size_t index = 0;
     pte_t& pte = clear_phys_state.pte[index << 3];
 
     pte_t page_flags;
@@ -1440,22 +1431,21 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
             // Must wait for another CPU to finish doing something with PTE
             cpu_wait_bit_clear(ptes[3], PTE_EX_WAIT_BIT);
             return ctx;
-        } else if (uintptr_t(ISR_CTX_REG_RIP(ctx)) -
-                   uintptr_t(__nofault_text_st) <
-                   __nofault_text_sz) {
+        } else if (nofault_ip_in_range(uintptr_t(ISR_CTX_REG_RIP(ctx)))) {
             //
             // Fault occurred in nofault code region
 
             // Figure out which landing pad to use
-            for (size_t i = 0, e = __nofault_tab_sz >> 3,
-                 rip = uintptr_t(ISR_CTX_REG_RIP(ctx)); i < e; ++i) {
-                if (rip >= __nofault_tab_st[i] && rip < __nofault_tab_en[i]) {
-                    // Put CPU on landing pad with rax == -1
-                    ISR_CTX_REG_RAX(ctx) = -1;
-                    ISR_CTX_REG_RIP(ctx) = (int(*)(void*))__nofault_tab_lp[i];
-                    return ctx;
-                }
+            uintptr_t landing_pad = nofault_find_landing_pad(
+                        uintptr_t(ISR_CTX_REG_RIP(ctx)));
+
+            if (likely(landing_pad)) {
+                // Put CPU on landing pad with rax == -1
+                ISR_CTX_REG_RAX(ctx) = -1;
+                ISR_CTX_REG_RIP(ctx) = (int(*)(void*))landing_pad;
+                return ctx;
             }
+
             goto no_landing_pad;
         } else {
 no_landing_pad:
@@ -1665,7 +1655,7 @@ void mmu_init()
     }
 
     linear_allocator.set_early_base(&linear_base);
-    near_allocator.set_early_base(&near_base);
+    //near_allocator.set_early_base(&near_base);
     contig_phys_allocator.set_early_base(&contiguous_start);
     //hole_allocator;
 
@@ -1710,12 +1700,14 @@ void mmu_init()
     // allocator with a capacity of 128
     contig_phys_allocator.early_init(4 << 20, "contig_phys_allocator");
 
+    assert(malloc_validate(false));
+
     linear_allocator.early_init(min_kern_addr - linear_base,
                                 "linear_allocator");
 
     clear_phys_state.reserve_addr();
 
-    near_allocator.early_init(-(4ULL << 20) - near_base, "near_allocator");
+    //near_allocator.early_init(-(4ULL << 20) - near_base, "near_allocator");
 
     // Allocate guard page
     linear_allocator.alloc_linear(PAGE_SIZE);
@@ -1785,6 +1777,8 @@ void mmu_init()
     cpu_tlb_flush();
 
     callout_call(callout_type_t::vmm_ready);
+
+    assert(malloc_validate(false));
 
 #if 0 // Hack
     printdbg("Allocating and filling all memory with garbage\n");
@@ -2127,12 +2121,12 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
             (flags & MAP_USER) ?
                 (contiguous_allocator_t*)
                 thread_current_process()->get_allocator()
-            : (flags & MAP_NEAR) ? &near_allocator
+            //: (flags & MAP_NEAR) ? &near_allocator
             : &linear_allocator;
 
     PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
     linaddr_t linear_addr;
-    if (!addr || (flags & MAP_PHYSICAL)) {
+    if (likely(!addr || (flags & MAP_PHYSICAL))) {
         linear_addr = allocator->alloc_linear(len);
     } else {
         linear_addr = (linaddr_t)addr;
@@ -2493,7 +2487,7 @@ EXPORT int munmap(void *addr, size_t size)
             (a < 0x800000000000U) ?
                 (contiguous_allocator_t*)
                 thread_current_process()->get_allocator()
-            : (a >= uintptr_t(___text_st)) ? &near_allocator
+            //: (a >= uintptr_t(___text_st)) ? &near_allocator
             : &linear_allocator;
 
     allocator->release_linear((linaddr_t)addr - misalignment, size);
@@ -2510,7 +2504,7 @@ EXPORT int mprotect(void *addr, size_t len, int prot)
     }
 
     // Fail on invalid address
-    if (!addr)
+    if (unlikely(!addr))
         return -1;
 
     unsigned misalignment = (uintptr_t)addr & PAGE_MASK;
@@ -2534,32 +2528,16 @@ EXPORT int mprotect(void *addr, size_t len, int prot)
 
     // Bits to set in PTE
     pte_t set_bits =
-            ((prot & PROT_EXEC)
-             ? 0
-             : no_exec) |
-            ((prot & PROT_READ)
-             ? PTE_PRESENT
-             : 0) |
-            ((prot & PROT_WRITE)
-             ? PTE_WRITABLE
-             : 0);
+            (-(!(prot & PROT_EXEC)) & no_exec) |
+            (-(!!(prot & PROT_READ)) & PTE_PRESENT) |
+            (-(!!(prot & PROT_WRITE)) & PTE_WRITABLE);
 
     // Bits to clear in PTE
     // If the protection is no-read,
     // we clear the highest bit in the physical address.
     // This invalidates the demand paging value without
     // invalidating the
-    pte_t clr_bits =
-            ((prot & PROT_EXEC)
-             ? no_exec
-             : 0) |
-            ((prot & PROT_READ)
-             ? 0
-             : PTE_PRESENT) |
-            ((prot & PROT_WRITE)
-             ? 0
-             : PTE_WRITABLE);
-
+    pte_t clr_bits = set_bits ^ (no_exec | PTE_PRESENT | PTE_WRITABLE);
 
     pte_t *pt[4];
     ptes_from_addr(pt, linaddr_t(addr));
@@ -2567,8 +2545,8 @@ EXPORT int mprotect(void *addr, size_t len, int prot)
 
     //uintptr_t orig_addr = uintptr_t(addr);
     //pte_t *orig_pt3 = pt[3];
-//    printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
-//    hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
+    //printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
+    //hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
 
     while (pt[3] < end)
     {
@@ -3155,7 +3133,8 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
             free_page_count -= count;
             break;
         } else if (low) {
-            assert(!"Out of memory!");
+            //assert(!"Out of memory!");
+            printdbg("Out of memory! Continuing...");
             return false;
         } else {
             low = true;
@@ -3417,6 +3396,7 @@ void mm_destroy_process()
         for (physaddr_t physaddr : pending_frees)
             free_batch.free(physaddr);
         pending_frees.clear();
+        free_batch.flush();
 
         if (addr == 0x800000000000)
             break;
@@ -3442,25 +3422,25 @@ void mm_destroy_process()
             }
         }
 
-        // If level 0 is not present, advance 512GB
+        // If level 0 is not present, advance 512GB (2^39)
         if (unlikely(!(present_mask & 1))) {
             addr += 1L << (12 + (9*3));
             continue;
         }
 
-        // If level 1 is not present, advance 1GB
+        // If level 1 is not present, advance 1GB   (2^30)
         if (unlikely(!(present_mask & 2))) {
             addr += 1L << (12 + (9*2));
             continue;
         }
 
-        // If level 2 is not present, advance 2MB
+        // If level 2 is not present, advance 2MB   (2^21)
         if (unlikely(!(present_mask & 4))) {
             addr += 1L << (12 + (9*1));
             continue;
         }
 
-        addr += 1L << (12 + (9*0));
+        addr += 1L << (12 + (9*0)); // 2^12
     }
 
     cpu_page_directory_set(root_physaddr);

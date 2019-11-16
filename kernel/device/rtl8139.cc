@@ -678,7 +678,7 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
             continue;
 
         // Make sure we have an ethernet packet pool
-        if (!ethq_init())
+        if (unlikely(!ethq_init()))
             panic("Out of memory!\n");
 
         printdbg("Detected PCI device %d/%d/%d"

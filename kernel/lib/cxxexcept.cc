@@ -1,4 +1,5 @@
 #include "cxxexcept.h"
+#include "exception.h"
 #include "printk.h"
 #include "stdlib.h"
 #include "likely.h"
@@ -98,7 +99,16 @@ static void __cxa_cleanup(_Unwind_Reason_Code reason, _Unwind_Exception *ex)
     free(cxa);
 }
 
+_noreturn
+static void __throw_failed(_Unwind_Exception *__thrown_exception)
+{
+    __cxa_begin_catch(__thrown_exception);
+    printdbg("Unhandled C++ exception!\n");
+    std::terminate();
+}
+
 // used by 'throw' keyword
+_noreturn
 void __cxa_throw(void* __thrown_exception,
                  std::type_info * __tinfo,
                  void (*__destructor)(void*))
@@ -121,6 +131,7 @@ void __cxa_throw(void* __thrown_exception,
     __header->unwindHeader.exception_cleanup = __cxa_cleanup;
 
     _Unwind_RaiseException(&__header->unwindHeader);
+    __throw_failed(&__header->unwindHeader);
 }
 
 void *__cxa_begin_catch(void *__thrown_exception)
@@ -201,6 +212,10 @@ void *__cxa_allocate_exception(size_t thrown_size)
     TRACE_CXXEXCEPT("allocating thrown_size=%#zx\n", thrown_size);
 
     char *mem = (char*)calloc(1, sizeof(__cxa_exception) + thrown_size);
+
+    if (unlikely(!mem))
+        panic_oom();
+
     new (mem) __cxa_exception{};
 
     if (mem)
@@ -365,21 +380,35 @@ _Unwind_Reason_Code __gxx_personality_v0(
     int r0 = __builtin_eh_return_data_regno(0);
     int r1 = __builtin_eh_return_data_regno(1);
 
-    if (unlikely(version != 1))
-        return _URC_FATAL_PHASE1_ERROR;
-
-    if (unlikely(unwind_exception->exception_class != our_exception_class))
-        return _URC_FOREIGN_EXCEPTION_CAUGHT;
-
-    __cxa_exception *cxx_ex = (__cxa_exception*)(unwind_exception + 1) - 1;
-
-    // What can I do without a context? Nothing!
-    if (unlikely(!context)) {
-        TRACE_CXXEXCEPT("...no context! returning _URC_FATAL_PHASE1_ERROR\n");
+    if (unlikely(version != 1)) {
+        TRACE_CXXEXCEPT("...unexpected version!"
+                        " returning _URC_FATAL_PHASE1_ERROR\n");
         return _URC_FATAL_PHASE1_ERROR;
     }
 
-    uintptr_t throw_ip = _Unwind_GetIP(context) - 1;
+    if (unlikely(!unwind_exception)) {
+        TRACE_CXXEXCEPT("...no unwind_exception!"
+                        " returning _URC_FATAL_PHASE1_ERROR\n");
+        return _URC_FATAL_PHASE1_ERROR;
+    }
+
+    if (unlikely(!context)) {
+        TRACE_CXXEXCEPT("...no context!"
+                        " returning _URC_FATAL_PHASE1_ERROR\n");
+        return _URC_FATAL_PHASE1_ERROR;
+    }
+
+    if (unlikely(unwind_exception->exception_class != our_exception_class)) {
+        TRACE_CXXEXCEPT("...caught foreign exception\n");
+        return _URC_FOREIGN_EXCEPTION_CAUGHT;
+    }
+
+    __cxa_exception *cxx_ex = (__cxa_exception*)(unwind_exception + 1) - 1;
+
+    int ip_before_insn = 0;
+    uintptr_t throw_ip = _Unwind_GetIPInfo(context, &ip_before_insn);
+
+    throw_ip -= (ip_before_insn == 0);
 
     uintptr_t func_start = _Unwind_GetRegionStart(context);
 
@@ -440,15 +469,14 @@ _Unwind_Reason_Code __gxx_personality_v0(
 
         uintptr_t start = landingpad_start + start_ofs;
         uintptr_t end = start + len;
-        uintptr_t code = lp ? landingpad_start + lp : 0;
+        uintptr_t landingpad = lp ? landingpad_start + lp : 0;
 
         bool is_match = (throw_ip >= start && throw_ip <= end);
         char const *match = is_match ? " (**match**)" : "";
 
-        TRACE_CXXEXCEPT("...region: %#zx - %#zx lp: %#zx"
-                        " code: %#zx action: %#zx %s\n",
-                        start, end, lp,
-                        code, action, match);
+        TRACE_CXXEXCEPT("...region: %#zx - %#zx landingpad: %#zx"
+                        " action: %#zx %s\n",
+                        start, end, landingpad, action, match);
 
         int type_index = -1;
 
@@ -459,7 +487,7 @@ _Unwind_Reason_Code __gxx_personality_v0(
 
         char const *type_name = nullptr;
 
-        if (type_index > 0) {
+        if (is_match && type_index > 0) {
             uintptr_t tiaddr = 0;
 
             switch (type_enc & ~DW_EH_PE_indirect) {
@@ -491,8 +519,10 @@ _Unwind_Reason_Code __gxx_personality_v0(
                             " exception with type %s\n", catch_type->name());
         }
 
-        if (is_match)
-            match_ent = {start, end, code, action, is_match, type_name};
+        if (is_match) {
+            match_ent = {start, end, landingpad, action, is_match, type_name};
+            //break;
+        }
     }
 
     if ((actions & _UA_HANDLER_FRAME) && cxx_ex->catchTemp) {
@@ -514,12 +544,6 @@ _Unwind_Reason_Code __gxx_personality_v0(
         _Unwind_SetGR(context, r1, 0);
         _Unwind_SetIP(context, match_ent.code);
         return _URC_INSTALL_CONTEXT;
-    }
-
-    if ((actions & _UA_CLEANUP_PHASE) && !match_ent.code) {
-        TRACE_CXXEXCEPT("...cleanup phase continuing unwind"
-                        " because match has 0 code address\n");
-        return _URC_CONTINUE_UNWIND;
     }
 
     if ((actions & _UA_SEARCH_PHASE) && match_ent.action) {
@@ -545,6 +569,12 @@ _Unwind_Reason_Code __gxx_personality_v0(
         cxx_ex->catchTemp = (void*)match_ent.code;
 
         return _URC_HANDLER_FOUND;
+    }
+
+    if ((actions & _UA_CLEANUP_PHASE) && !match_ent.code) {
+        TRACE_CXXEXCEPT("...cleanup phase continuing unwind"
+                        " because match has 0 code address\n");
+        return _URC_CONTINUE_UNWIND;
     }
 
     TRACE_CXXEXCEPT("...continuing unwind\n\n");

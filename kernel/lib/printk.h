@@ -43,6 +43,8 @@ int hex_dump(void const volatile *mem, size_t size, uintptr_t base = 0);
 
 int putsdbg(char const *s);
 
+int writedbg(char const *s, size_t len);
+
 struct format_flag_info_t {
     char const * const name;
     uintptr_t mask;
@@ -66,50 +68,94 @@ __END_DECLS
 
 __BEGIN_NAMESPACE_STD
 
-class hex {};
-
 class setw { public: setw(int w) : w(w) {} int const w; };
 
 class setfill {};
 
 __END_NAMESPACE_STD
 
+enum debug_out_modifier_t { dec, hex, plus, noplus };
+
 class debug_out_t {
 public:
+    // unsigned
     template<typename T>
-    typename std::enable_if<
-        std::is_integral<T>::value && std::is_unsigned<T>::value,
+    _always_inline typename std::enable_if<
+        std::is_integral<T>::value && std::is_unsigned<T>::value &&
+        !std::is_same<T, bool>::value && !std::is_same<T, char>::value,
         debug_out_t&
     >::type
     operator<<(T const& rhs)
     {
-        return write_unsigned((uint64_t)rhs, sizeof(T));
+        return write_unsigned(uint64_t(rhs), sizeof(T));
     }
 
+    // signed
     template<typename T>
-    typename std::enable_if<
-        std::is_integral<T>::value && std::is_signed<T>::value,
+    _always_inline typename std::enable_if<
+        std::is_integral<T>::value && std::is_signed<T>::value &&
+        !std::is_same<T, bool>::value && !std::is_same<T, char>::value,
         debug_out_t&
     >::type
     operator<<(T const& rhs)
     {
-        return write_signed((int64_t)rhs, sizeof(T));
+        return write_signed(int64_t(rhs), sizeof(T));
     }
 
-    debug_out_t& operator<<(char const *rhs);
-    debug_out_t& operator<<(bool const& value);
+    // string literal
+    template<size_t _N>
+    _always_inline debug_out_t& operator<<(char const (&str)[_N])
+    {
+        writedbg(str, _N - 1);
+        return *this;
+    }
 
-    debug_out_t& operator<<(std::hex);
+    // char const *
+    template<typename T>
+    _always_inline typename std::enable_if<std::is_same<T,
+    char const *>::value, debug_out_t&>::type
+    operator<<(T str)
+    {
+        return write_str(str);
+    }
+
+    // pointer other than const char *
+    template<typename T>
+    _always_inline typename std::enable_if<std::is_pointer<T>::value &&
+    !std::is_same<T, char const *>::value, debug_out_t&>::type
+    operator<<(T ptr)
+    {
+        return write_ptr(ptr);
+    }
+
+    // nullptr
+    _always_inline debug_out_t& operator<<(nullptr_t n)
+    {
+        return write_str("<nullptr>");
+    }
+
+    _always_inline debug_out_t& operator<<(bool b)
+    {
+        return write_bool(b);
+    }
+
+    _always_inline debug_out_t&operator<<(char c)
+    {
+        return write_char(c);
+    }
+
+    debug_out_t& operator<<(debug_out_modifier_t);
 
 private:
-    bool hex = false;
+    bool use_hex = false;
+    bool use_plus = false;
 
     debug_out_t& write_unsigned(uint64_t value, size_t sz);
-
     debug_out_t& write_signed(int64_t value, size_t sz);
-
+    debug_out_t& write_bool(bool value);
+    debug_out_t& write_char(char value);
     debug_out_t& write_str(char const *rhs);
+    debug_out_t& write_ptr(void const *rhs);
 };
-
 
 extern debug_out_t dbgout;

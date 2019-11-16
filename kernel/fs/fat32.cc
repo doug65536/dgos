@@ -716,7 +716,7 @@ off_t fat32_fs_t::walk_cluster_chain(
 
             cluster_t fat_block = c_clus >> fat_block_shift;
             if (sync_pending.empty() || sync_pending.back() != fat_block) {
-                if (!sync_pending.push_back(fat_block))
+                if (unlikely(!sync_pending.push_back(fat_block)))
                     panic_oom();
             }
 
@@ -739,7 +739,7 @@ off_t fat32_fs_t::walk_cluster_chain(
 
         cluster_t fat_block = c_clus >> fat_block_shift;
         if (sync_pending.empty() || sync_pending.back() != fat_block)
-            if (!sync_pending.push_back(fat_block))
+            if (unlikely(!sync_pending.push_back(fat_block)))
                 panic_oom();
     }
 
@@ -1350,7 +1350,7 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 
     std::unique_ptr<fat32_fs_t> self(new (std::nothrow) fat32_fs_t);
     if (self->mount(conn)) {
-        if (!fat32_mounts.push_back(self))
+        if (unlikely(!fat32_mounts.push_back(self)))
             panic_oom();
         return self.release();
     }

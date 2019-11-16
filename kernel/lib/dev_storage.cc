@@ -55,7 +55,7 @@ EXPORT void storage_if_register_factory(storage_if_factory_t *factory)
 {
     scoped_lock lock(storage_lock);
 
-    if (!storage_if_factories.push_back(factory))
+    if (unlikely(!storage_if_factories.push_back(factory)))
         panic_oom();
     STORAGE_TRACE("Registered storage driver %s\n", name);
     probe_storage_factory(factory);
@@ -75,7 +75,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
         storage_if_base_t *if_ = list[i];
 
         // Store interface instance
-        if (!storage_ifs.push_back(if_))
+        if (unlikely(!storage_ifs.push_back(if_)))
             panic_oom();
 
         STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
@@ -91,7 +91,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
             storage_dev_base_t *dev = dev_list[k];
             // Store device instance
             scoped_lock lock(storage_lock);
-            if (!storage_devs.push_back(dev))
+            if (unlikely(!storage_devs.push_back(dev)))
                 panic_oom();
         }
     }
@@ -101,7 +101,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
 EXPORT void fs_register_factory(char const *name, fs_factory_t *fs)
 {
     scoped_lock lock(storage_lock);
-    if (!fs_regs.push_back(new (std::nothrow) fs_reg_t{ name, fs }))
+    if (unlikely(!fs_regs.push_back(new (std::nothrow) fs_reg_t{ name, fs })))
         panic_oom();
     printdbg("%s filesystem registered\n", name);
 }
@@ -125,7 +125,7 @@ EXPORT void fs_add(fs_reg_t *fs_reg, fs_base_t *fs)
         fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, fs });
     } else if (fs) {
         scoped_lock lock(storage_lock);
-        if (!fs_mounts.push_back(fs_mount_t{ fs_reg, fs }))
+        if (unlikely(!fs_mounts.push_back(fs_mount_t{ fs_reg, fs })))
             panic_oom();
     }
 }
@@ -152,7 +152,7 @@ EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     } else if (mfs) {
         scoped_lock lock(storage_lock);
-        if (!fs_mounts.push_back(fs_mount_t{ fs_reg, mfs }))
+        if (unlikely(!fs_mounts.push_back(fs_mount_t{ fs_reg, mfs })))
             panic_oom();
     }
 }
@@ -201,7 +201,7 @@ static void probe_part_factory(part_factory_t *factory)
 void part_register_factory(char const *name, part_factory_t *factory)
 {
     scoped_lock lock(storage_lock);
-    if (!part_factories.push_back(factory))
+    if (unlikely(!part_factories.push_back(factory)))
         panic_oom();
     printk("%s partition type registered\n", name);
     probe_part_factory(factory);

@@ -339,9 +339,36 @@ struct acpi_hpet_t {
 
 static _always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
 {
+    // These are likely uncacheable loads, try to do it decently
+    // Checksum of 76 bytes is so slow, you can see a delay when debugging
+    // on KVM, when doing it as byte loads
+    size_t i = 0;
+
+    size_t wide_count = len >> 3;
     uint8_t sum = 0;
-    for (size_t i = 0; i < len; ++i)
+    while (i < wide_count) {
+        uint64_t value = ((uint64_t*)bytes)[i++];
+        sum += value & 0xFF;
+        value >>= 8;
+        sum += value & 0xFF;
+        value >>= 8;
+        sum += value & 0xFF;
+        value >>= 8;
+        sum += value & 0xFF;
+        value >>= 8;
+        sum += value & 0xFF;
+        value >>= 8;
+        sum += value & 0xFF;
+        value >>= 8;
+        sum += value & 0xFF;
+        value >>= 8;
+        sum += value & 0xFF;
+    }
+    i <<= 3;
+
+    for ( ; i < len; ++i)
         sum += (uint8_t)bytes[i];
+
     return sum;
 }
 

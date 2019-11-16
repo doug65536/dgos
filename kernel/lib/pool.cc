@@ -87,7 +87,8 @@ EXPORT void *pool_base_t::alloc()
 EXPORT void *pool_base_t::calloc()
 {
     void *item = alloc();
-    memset(item, 0, item_size);
+    if (likely(item))
+        memset(item, 0, item_size);
     return item;
 }
 

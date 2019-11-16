@@ -1,16 +1,15 @@
 #pragma once
 #include "types.h"
 #include "asm_constants.h"
+#include "segrw.h"
 
 __BEGIN_DECLS
 
 // Call external code with guarantee of no registers affected
 // As an added bonus, it also creates a compiler barrier
-// Registers are not clobbered (but flags are)
+// Only rax and rflags clobbered
 static _always_inline void cs_enter() {
-    __asm__ __volatile__ (
-        "call cs_enter_asm\n\t" : : : "memory", "cc", "rax"
-    );
+    cpu_gs_inc<CPU_INFO_LOCKS_HELD_OFS>();
 }
 
 extern "C" void cs_leave_asm();

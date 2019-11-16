@@ -1,3 +1,4 @@
+#pragma once
 #include "types.h"
 
 __BEGIN_NAMESPACE_STD

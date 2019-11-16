@@ -57,9 +57,15 @@ class cpu_exception : public std::exception {};
 
 class gpf_exception : public cpu_exception {
 public:
-    gpf_exception() = default;
+    gpf_exception(int err_code)
+        : cpu_exception()
+        , err_code(err_code)
+    {
+    }
+
     ~gpf_exception() = default;
     char const *what() const noexcept override;
+    int const err_code;
 };
 
 __END_NAMESPACE_EXT

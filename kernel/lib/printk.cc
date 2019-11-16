@@ -994,6 +994,11 @@ EXPORT int putsdbg(char const *s)
     return len + 1;
 }
 
+EXPORT int writedbg(char const * restrict s, size_t len)
+{
+    return write_debug_str(s, intptr_t(len));
+}
+
 static int printdbg_emit_chars(char const * restrict s,
                                intptr_t ch, void * restrict context)
 {
@@ -1138,36 +1143,64 @@ EXPORT size_t format_flags_register(
     return total_written;
 }
 
-EXPORT debug_out_t &debug_out_t::operator<<(const char *rhs)
+EXPORT debug_out_t &debug_out_t::operator<<(debug_out_modifier_t modifier)
 {
-    return write_str(rhs);
-}
+    switch (modifier) {
+    case dec:
+        use_hex = false;
+        break;
 
-EXPORT debug_out_t &debug_out_t::operator<<(std::hex)
-{
-    hex = true;
+    case hex:
+        use_hex = true;
+        break;
+
+    case plus:
+        use_plus = true;
+        break;
+
+    case noplus:
+        use_plus = false;
+        break;
+
+    }
     return *this;
 }
 
 EXPORT debug_out_t &debug_out_t::write_unsigned(uint64_t value, size_t sz)
 {
-    printdbg(hex ? "%#" PRIx64 : "%" PRIu64, value);
+    printdbg(use_hex ? "%#" PRIx64
+            : use_plus ? "+%" PRIu64
+            : "%" PRIu64, value);
     return *this;
 }
 
 EXPORT debug_out_t &debug_out_t::write_signed(int64_t value, size_t sz)
 {
-    printdbg(hex ? "%#" PRIx64 : "%" PRId64, value);
+    printdbg(use_hex ? "%#" PRIx64
+            : use_plus ? "%+" PRId64
+            : "%" PRId64, value);
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::write_str(const char *rhs)
+EXPORT debug_out_t &debug_out_t::write_str(char const *rhs)
 {
     printdbg("%s", rhs);
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::operator<<(const bool &value)
+EXPORT debug_out_t &debug_out_t::write_ptr(void const *rhs)
+{
+    printdbg("%#zx", uintptr_t(rhs));
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_char(char rhs)
+{
+    printdbg("%c", rhs);
+    return *this;
+}
+
+EXPORT debug_out_t &debug_out_t::write_bool(bool value)
 {
     return write_str(value ? "true" : "false");
 }

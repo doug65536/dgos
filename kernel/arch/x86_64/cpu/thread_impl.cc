@@ -334,7 +334,7 @@ public:
 
     thread_info_t *choose_next();
 
-private:    
+private:
     thread_info_t *current;
 
     // 32 vectors, one per priority level
@@ -522,7 +522,7 @@ static thread_t thread_create_with_state(
     thread->ref_count = 1;
 
     char *stack = thread_allocate_stack(
-                i, stack_size, "create_with_state", 0xFE);
+                i, stack_size, "create_with_state", 0xF0);
 
     thread->stack = stack;
     thread->stack_size = stack_size;
@@ -1098,7 +1098,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
         pause();
     }
-    
+
     fpu_state_t& fpu_state = cpu->fpu_state;
 
     if (thread != outgoing) {
@@ -1128,11 +1128,11 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
             // Only save control words when fpu is discarded
             if (fpu_state == discarded)
                 save = ctrlwords;
-            
+
             // Don't save FPU again on nested context save
             else if (fpu_state == saved)
                 save = ignore;
-                
+
             // Possibly save FPU registers from kernel mode
             else if (!from_kern || from_kern_fpu)
                 save = dataregs;
@@ -1170,7 +1170,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
                 outgoing->syscall_fcw87 = cpu_fcw_get();
                 ISR_CTX_FPU(ctx) = nullptr;
             }
-            
+
             fpu_state = saved;
             break;
 
@@ -1183,7 +1183,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
         case zeros:
         case ignore:
-            ISR_CTX_FPU(ctx) = nullptr;
+            assert(ISR_CTX_FPU(ctx) == nullptr);
             break;
         }
 

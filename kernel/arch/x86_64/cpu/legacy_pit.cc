@@ -149,9 +149,9 @@ static void pit8254_irq_handler()
     if (last_time + 1000000000 <= timer_ns) {
         last_time += 1000000000;
 
-        workq::enqueue([=] {
-            printdbg("PIT Time: %8" PRId64 "\n", timer_ns);
-        });
+//        workq::enqueue([=] {
+//            printdbg("PIT Time: %8" PRId64 "\n", timer_ns);
+//        });
     }
 }
 
@@ -166,7 +166,7 @@ static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
 }
 
 static uint64_t pit8254_time_ns()
-{    
+{
     cpu_scoped_irq_disable irq_dis;
     pit8254_scoped_lock lock(pit8254_lock);
 
@@ -253,7 +253,7 @@ static uint64_t pit8254_nsleep(uint64_t nanosec)
     outb(PIT_DATA(2), (count >> 8) & 0xFF);
 
     uint32_t readback;
-    do {        
+    do {
         outb(PIT_CMD, PIT_READBACK_CH2);
         outb(PIT_CMD, PIT_CHANNEL(2) | PIT_ACCESS_LATCH);
         readback = inb(PIT_DATA(2));
@@ -282,9 +282,9 @@ void pit8254_enable()
     irq_hook(PIT_IRQ, pit8254_irq_handler, "pit8254");
     irq_setmask(PIT_IRQ, true);
 
-    uint64_t now, end = time_ns() + 500000000;
+//    uint64_t now, end = time_ns() + 500000000;
 
-    while ((now = time_ns()) < end) {
-        printdbg("time: %" PRIx64 "\n", now);
-    }
+//    while ((now = time_ns()) < end) {
+//        printdbg("time: %" PRIx64 "\n", now);
+//    }
 }

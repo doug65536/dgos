@@ -48,7 +48,7 @@ using sym_tab = std::multimap<uint64_t, std::string>;
 
 using trace_item_vector = std::vector<trace_item>;
 
-char symbol_file[] = "kernel-tracing.sym";
+char symbol_file[] = "sym/kernel-tracing.sym";
 
 class trace_error : public std::runtime_error {
 public:

@@ -3,7 +3,7 @@
 #include "mm.h"
 #include "likely.h"
 
-UNITTEST(test_mmap_oom)
+DISABLED_UNITTEST(test_mmap_oom)
 {
     struct item {
         size_t *addr;

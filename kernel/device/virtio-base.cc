@@ -575,7 +575,7 @@ void virtio_virtqueue_t::recycle_used()
         virtio_iocp_t* const completion = completions[id];
         completions[id] = nullptr;
         completion->set_result(used_len);
-        if (!pending_completions.push_back(completion))
+        if (unlikely(!pending_completions.push_back(completion)))
             panic_oom();
     } while ((++tail & 0xFFFF) != done_idx);
 
