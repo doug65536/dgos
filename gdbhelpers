@@ -1,17 +1,22 @@
 define startupbreakpoints
+	set remotetimeout 86400
 	set architecture i386:x86-64
 	set osabi none
 	set scheduler-locking step
 	set range-stepping off
 	thbreak entry
 	commands
-		b isr_entry_13
+		#b isr_entry_13
 		b cpu_debug_break
 		b unhandled_exception_handler
 		b apic_spurious_handler
+		#GP
 		b isr_entry_8
+		#UD
+		b isr_entry_6
 		b vpanic
-		b unittest::unit::fail()
+		b unittest::unit::fail
+		b unittest::unit::failed
 		b validate_failed
 	end
 
@@ -122,4 +127,81 @@ end
 
 define dumpn
 	dump binary memory $arg0 $arg1 $arg1+$arg2
+end
+
+define walkunwind_ctx
+	set $ctx = $arg0
+
+	# Save context
+	set $save_rip = $rip
+	set $save_rsp = $rsp
+	set $save_rax = $rax
+	set $save_rbx = $rbx
+	set $save_rcx = $rcx
+	set $save_rdx = $rdx
+	set $save_rsi = $rsi
+	set $save_rdi = $rdi
+	set $save_rbp = $rbp
+	set $save_r8  = $r8
+	set $save_r9  = $r9
+	set $save_r10 = $r10
+	set $save_r11 = $r11
+	set $save_r12 = $r12
+	set $save_r13 = $r13
+	set $save_r14 = $r14
+	set $save_r15 = $r15
+
+	# Set context
+	set $rip = $ctx.iret.rip
+	set $rsp = $ctx.iret.rsp
+	set $rax = $ctx.r.n.rax
+	set $rbx = $ctx.r.n.rbx
+	set $rcx = $ctx.r.n.rcx
+	set $rdx = $ctx.r.n.rdx
+	set $rsi = $ctx.r.n.rsi
+	set $rdi = $ctx.r.n.rdi
+	set $rbp = $ctx.r.n.rbp
+	set $r8  = $ctx.r.n.r8
+	set $r9  = $ctx.r.n.r9
+	set $r10 = $ctx.r.n.r10
+	set $r11 = $ctx.r.n.r11
+	set $r12 = $ctx.r.n.r12
+	set $r13 = $ctx.r.n.r13
+	set $r14 = $ctx.r.n.r14
+	set $r15 = $ctx.r.n.r15
+
+	# Unwind
+	bt
+
+	# Restore context
+	set $rip = $save_rip
+	set $rsp = $save_rsp
+	set $rax = $save_rax
+	set $rbx = $save_rbx
+	set $rcx = $save_rcx
+	set $rdx = $save_rdx
+	set $rsi = $save_rsi
+	set $rdi = $save_rdi
+	set $rbp = $save_rbp
+	set $r8  = $save_r8
+	set $r9  = $save_r9
+	set $r10 = $save_r10
+	set $r11 = $save_r11
+	set $r12 = $save_r12
+	set $r13 = $save_r13
+	set $r14 = $save_r14
+	set $r15 = $save_r15
+end
+
+define walkunwind
+	set $tid_loop = 0
+	while $tid_loop < thread_count
+		set $tid = $tid_loop++
+		set $ctx = threads[$tid].ctx
+		if $ctx
+			printf "\n"
+			printf "Unwinding thread %d\n", $tid
+			walkunwind_ctx $ctx.gpr
+		end
+	end
 end
