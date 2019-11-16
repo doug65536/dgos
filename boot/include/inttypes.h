@@ -3,7 +3,16 @@
 #error Required information missing
 #endif
 
+#if __SIZEOF_LONG__ != 4 && __SIZEOF_LONG__ != 8
+#error long is not 32 bit and not 64 bit!
+#endif
+
+#if __SIZEOF_LONG_LONG__ != 8
+#error long long is not 64 bit!
+#endif
+
 #if __SIZEOF_LONG__ == 4 && __SIZEOF_LONG_LONG__ == 8
+// 32 bit code
 #define __FMT8      "hh"
 #define __FMT16     "h"
 #ifdef __clang__
@@ -15,6 +24,7 @@
 #define __FMTMX     "j"
 #define __FMTPT     "t"
 #elif __SIZEOF_LONG__ == 8 && __SIZEOF_LONG_LONG__ == 8
+// 64 bit code
 #define __FMT8      "hh"
 #define __FMT16     "h"
 #define __FMT32     ""
