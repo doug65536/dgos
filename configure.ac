@@ -183,19 +183,20 @@ for flag in \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Warray-bounds Wformat-overflow \
 		Wno-address-of-packed-member \
+		Wno-maybe-uninitialized \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
 		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack \
-		Wsuggest-attribute=const Wsuggest-attribute=pure \
 		Wno-unused-parameter fno-eliminate-unused-debug-types \
-		fno-eliminate-unused-debug-symbols
+		fno-eliminate-unused-debug-symbols fno-plt fvar-tracking
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
 		[], [])
 done
 AC_SUBST([COMPILER_FLAGS])
+#Wsuggest-attribute=const Wsuggest-attribute=pure
 #fvar-tracking
 #fvar-tracking-assignments
 #Wno-overlength-strings
@@ -328,7 +329,7 @@ for flag in \
 	mpreferred-stack-boundary=4 \
 	fPIE \
 	Wl,--no-eh-frame-hdr \
-	Wl,-T$srcdir/user/user64.ld \
+	Wl,-T$srcdir/user/user64_phdrs.ld \
 	fno-exceptions fno-rtti \
 	Wl,-z,max-page-size=4096 \
 	Wl,-z,separate-code \
@@ -518,6 +519,12 @@ AX_CHECK_COMPILE_FLAG([-fno-exceptions],
 	[AS_VAR_SET([NO_EXCEPTIONS_FLAGS], [" -fno-exceptions"])]
 	[], [])
 AC_SUBST([NO_EXCEPTIONS_FLAGS])
+
+AS_VAR_SET([YES_EXCEPTIONS_FLAGS], [])
+AX_CHECK_COMPILE_FLAG([-fexceptions],
+	[AS_VAR_SET([YES_EXCEPTIONS_FLAGS], [" -fexceptions"])]
+	[], [])
+AC_SUBST([YES_EXCEPTIONS_FLAGS])
 
 AS_VAR_SET([NO_COMMON_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-common],
