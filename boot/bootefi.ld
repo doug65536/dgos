@@ -1,4 +1,4 @@
-ENTRY(efi_main)
+ENTRY(entry)
 
 SECTIONS {
 	. = SIZEOF_HEADERS;
@@ -10,6 +10,7 @@ SECTIONS {
 		__text_st = .;
 		___initialized_data_st = .;
 
+		*(.entry)
 		*(.text)
 		*(.text.*)
 		*(.text.unlikely)
@@ -108,6 +109,7 @@ SECTIONS {
 
 	.got : ALIGN(64) {
 		PROVIDE_HIDDEN(___got = .);
+		PROVIDE_HIDDEN(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got)
 		*(.got.plt)
 	}

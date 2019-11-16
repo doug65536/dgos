@@ -1,3 +1,4 @@
+bootentry_efi.S
 gpt.h
 retpoline.S
 vesa_efi.cc

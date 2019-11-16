@@ -108,6 +108,10 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
 
         UINTN buf_sz = sizeof(EFI_FILE_INFO) + sizeof(CHAR16) * 256;
         auto info_buffer = (EFI_FILE_INFO*)malloc(buf_sz);
+
+        if (unlikely(!info_buffer))
+            return false;
+
         status = file->GetInfo(file, &efi_file_info_guid,
                                &buf_sz, info_buffer);
 
@@ -134,6 +138,7 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
         return !EFI_ERROR(status);
     }
 
+    _use_result
     bool pread_impl(void *buf, size_t bytes, off_t ofs) override final
     {
         EFI_STATUS status;
@@ -188,11 +193,11 @@ private:
                 dhcp_packet = &efi_pxe->Mode->ProxyOffer;
             }
         } else {
-            halt(TSTR "Don't know how to handle IPv6 PXE");
+            PANIC(TSTR "Don't know how to handle IPv6 PXE");
         }
 
         if (unlikely(!dhcp_packet))
-            halt(TSTR "Unable to process DHCP packet");
+            PANIC(TSTR "Unable to process DHCP packet");
 
         memcpy(&server_addr.ipv4, &dhcp_packet->Dhcpv4.BootpSiAddr,
                sizeof(server_addr.ipv4));
@@ -253,7 +258,7 @@ private:
 
         char *utf8_filename = (char*)malloc(strlen(filename) * 4 + 1);
 
-        if (!utf8_filename)
+        if (unlikely(!utf8_filename))
             return false;
 
         char *out = utf8_filename;
@@ -343,7 +348,7 @@ _constructor(ctor_fs) void register_efi_fs()
                 (VOID**)&efi_loaded_image);
 
     if (unlikely(EFI_ERROR(status)))
-        halt(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
+        PANIC(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
     // Get the vtbl for the simple_filesystem_protocol of this executable
     status = efi_systab->BootServices->HandleProtocol(
@@ -359,7 +364,7 @@ _constructor(ctor_fs) void register_efi_fs()
                     efi_simple_filesystem, &efi_root_dir);
 
         if (unlikely(EFI_ERROR(status)))
-            halt(TSTR "OpenVolume for boot partition failed");
+            PANIC(TSTR "OpenVolume for boot partition failed");
 
         status = efi_systab->BootServices->HandleProtocol(
                 efi_loaded_image->DeviceHandle,
@@ -367,7 +372,7 @@ _constructor(ctor_fs) void register_efi_fs()
                 (VOID**)&efi_blk_io);
 
         if (unlikely(EFI_ERROR(status)))
-            halt(TSTR "HandleProtocol for block_io_protocol failed");
+            PANIC(TSTR "HandleProtocol for block_io_protocol failed");
     } else {
         status = efi_systab->BootServices->HandleProtocol(
                     efi_loaded_image->DeviceHandle,
@@ -375,7 +380,7 @@ _constructor(ctor_fs) void register_efi_fs()
                     (VOID**)&efi_pxe);
 
         if (unlikely(EFI_ERROR(status)))
-            halt(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
+            PANIC(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
         efi_pxe_file_handle_t::initialize();
         PRINT("EFI PXE API initialized");
@@ -447,7 +452,7 @@ ssize_t file_handle_base_t::pread(int fd, void *buf, size_t bytes, off_t ofs)
         return -1;
 
     if (!file_handles[fd]->pread_impl(buf, bytes, ofs))
-        return false;
+        return -1;
 
     return bytes;
 }
@@ -462,7 +467,7 @@ uint64_t file_handle_base_t::boot_drv_serial()
     {
         size_t constexpr const sz = 512;
         void *mem = calloc(1, sz);
-        if (mem == nullptr)
+        if (unlikely(mem == nullptr))
             PANIC_OOM();
         EFI_FILE_SYSTEM_INFO *info = new (mem) EFI_FILE_SYSTEM_INFO;
 
@@ -476,6 +481,9 @@ uint64_t file_handle_base_t::boot_drv_serial()
     }
 
     char *buffer = (char*)malloc(efi_blk_io->Media->BlockSize);
+
+    if (unlikely(!buffer))
+        return -1;
 
     status = efi_blk_io->ReadBlocks(efi_blk_io, efi_blk_io->Media->MediaId,
                                     0, efi_blk_io->Media->BlockSize, buffer);
@@ -500,29 +508,11 @@ file_handle_base_t::~file_handle_base_t()
 extern char __text_st[];
 
 extern "C" _noreturn
-EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
+EFI_STATUS efi_main()
 {
-    ::efi_image_handle = image_handle;
-    ::efi_systab = systab;
-
-    PRINT("efi bootloader .text @ 0x%" PRIx64 "\n", uint64_t(__text_st));
-
-    PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
-
-    PRINT("invoking constructors");
-    ctors_invoke();
-
-//    PRINT("showing boot menu");
-//    kernel_params_t params;
-//    boot_menu_show(params);
+    PRINT("choosing kernel");
+    tchar const *kernel_name = cpu_choose_kernel();
 
     PRINT("running kernel");
-    elf64_run(cpu_choose_kernel());
-
-    PRINT("it returned?");
-
-    //dtors_invoke();
-    //
-    //systab->BootServices->Exit(image_handle, 0, 0, nullptr);
-    //return EFI_SUCCESS;
+    elf64_run(kernel_name);
 }

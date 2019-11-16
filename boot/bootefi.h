@@ -4597,5 +4597,5 @@ struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
 
 extern EFI_GUID gEfiSimplePointerProtocolGuid;
 
-extern EFI_HANDLE efi_image_handle;
-extern EFI_SYSTEM_TABLE *efi_systab;
+extern "C" EFI_HANDLE efi_image_handle;
+extern "C" EFI_SYSTEM_TABLE *efi_systab;
