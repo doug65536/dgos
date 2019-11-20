@@ -84,4 +84,5 @@
 - Extensive debugging support for QEMU and Bochs
 - QtCreator project files for easy editing and kernel debugging
 - Instrumented call trace generation with ncurses viewer
-- KASAN address space sanitizer
+- KASAN address sanitizer
+- UBSAN (undefined behavior sanitizer)
