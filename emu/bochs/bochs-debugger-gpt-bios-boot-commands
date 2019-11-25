@@ -1,0 +1,4 @@
+u switch-mode
+ldsym global "sym/bootfat.sym"
+lb "cpu_debug_break"
+

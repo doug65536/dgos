@@ -1,4 +1,0 @@
-u switch-mode
-ldsym global "bootfat.sym"
-lb "cpu_debug_break"
-#lb "elf64_run"
