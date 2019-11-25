@@ -18,7 +18,7 @@
 .global entry
 entry:
     mov %dl,boot_drive
-    
+
     mov $ .Linit_ret,%bx
     jmp early_init
 .Linit_ret:

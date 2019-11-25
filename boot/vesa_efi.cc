@@ -126,7 +126,7 @@ vbe_mode_list_t const& vbe_enumerate_modes()
 
     mode_list.count = efi_graphics_output->Mode->MaxMode;
     mode_list.modes = new (std::nothrow)
-            vbe_selected_mode_t[mode_list.count] {};
+            vbe_selected_mode_t[mode_list.count]();
 
     for (uint32_t i = 0; i < mode_list.count; ++i) {
         UINTN info_sz = sizeof(*info);

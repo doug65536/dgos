@@ -38,7 +38,7 @@ elf64_context_t *load_kernel_begin()
 {
     ELF64_TRACE("constructing new context\n");
 
-    elf64_context_t *ctx = new (std::nothrow) elf64_context_t{};
+    elf64_context_t *ctx = new (std::nothrow) elf64_context_t();
     return ctx;
 }
 
@@ -69,18 +69,7 @@ bool load_kernel_chunk(Elf64_Phdr *blk, int file, elf64_context_t *ctx)
                                    blk->p_filesz, 1 << 30);
 
     uint64_t offset = 0;
-    for (size_t i = 0; i < iovec_count; ++i) {
-        PRINT("iovec[%zu] base=%" PRIx64 " sz=%" PRIx64 "\n",
-              i, iovec[i].base, iovec[i].size);
 
-        offset += iovec[i].size;
-    }
-    PRINT("Total offset=%" PRIx64 "\n", offset);
-
-    assert(offset == blk->p_filesz);
-    __asm__ __volatile__ ("" : : : "memory");
-
-    offset = 0;
     for (size_t i = 0; i < iovec_count; ++i) {
         assert(iovec[i].base < 0x100000000);
 
@@ -100,8 +89,6 @@ bool load_kernel_chunk(Elf64_Phdr *blk, int file, elf64_context_t *ctx)
         offset += iovec[i].size;
     }
 
-    PRINT("offset=%" PRIx64 "\n", offset);
-    PRINT("blk->p_filesz=%" PRIx64 "\n", blk->p_filesz);
     assert(offset == blk->p_filesz);
 
     if (blk->p_filesz < blk->p_memsz) {
@@ -119,13 +106,6 @@ bool load_kernel_chunk(Elf64_Phdr *blk, int file, elf64_context_t *ctx)
 
     free(iovec);
     iovec = nullptr;
-
-    // Clear modified bits if uninitialized data
-//    if (blk->p_memsz > blk->p_filesz) {
-//        paging_modify_flags(blk->p_vaddr + blk->p_filesz,
-//                            blk->p_memsz - blk->p_filesz,
-//                            PTE_DIRTY | PTE_ACCESSED, 0);
-//    }
 
     return true;
 }
@@ -153,7 +133,7 @@ tchar const *cpu_choose_kernel()
 static kernel_params_t *prompt_kernel_param(
         void *phys_mem_table, void *ap_entry_ptr, int phys_mem_table_size)
 {
-    kernel_params_t *params = new (std::nothrow) kernel_params_t{};
+    kernel_params_t *params = new (std::nothrow) kernel_params_t();
 
     params->size = sizeof(*params);
 
@@ -218,7 +198,10 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     size_t phys_mem_table_size = 0;
     void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
-    uint64_t top_addr = physmap_top_addr();
+    uint64_t top_addr =
+            physmap_top_addr();
+
+    assert(top_addr != 0);
 
     // Round up to a 1GB boundary
     top_addr = (top_addr + (UINT64_C(1) << 30) - 1) & -(UINT64_C(1) << 30);
@@ -253,6 +236,9 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 
     params->initrd_st = initrd_base;
     params->initrd_sz = initrd_size;
+
+    params->phys_mapping = physmap_addr;
+    params->phys_mapping_sz = top_addr;
 
     // This check is done late to make debugging easier
     // It is impossible to debug 32 bit code on qemu-x86_64 target

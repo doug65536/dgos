@@ -404,9 +404,9 @@ int file_handle_base_t::open(tchar const *filename)
         return fd;
 
     if (!efi_pxe) {
-        file_handles[fd] = new (std::nothrow) efi_fs_file_handle_t;
+        file_handles[fd] = new (std::nothrow) efi_fs_file_handle_t();
     } else {
-        file_handles[fd] = new (std::nothrow) efi_pxe_file_handle_t;
+        file_handles[fd] = new (std::nothrow) efi_pxe_file_handle_t();
     }
 
     if (!file_handles[fd]->open_impl(filename)) {
@@ -469,7 +469,7 @@ uint64_t file_handle_base_t::boot_drv_serial()
         void *mem = calloc(1, sz);
         if (unlikely(mem == nullptr))
             PANIC_OOM();
-        EFI_FILE_SYSTEM_INFO *info = new (mem) EFI_FILE_SYSTEM_INFO;
+        EFI_FILE_SYSTEM_INFO *info = new (mem) EFI_FILE_SYSTEM_INFO();
 
         UINTN info_buffer_size = sz;
         status = efi_root_dir->GetInfo(
@@ -510,9 +510,9 @@ extern char __text_st[];
 extern "C" _noreturn
 EFI_STATUS efi_main()
 {
-    PRINT("choosing kernel");
+    //PRINT("choosing kernel");
     tchar const *kernel_name = cpu_choose_kernel();
 
-    PRINT("running kernel");
+    PRINT("running kernel: %s", kernel_name);
     elf64_run(kernel_name);
 }

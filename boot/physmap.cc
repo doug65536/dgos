@@ -45,11 +45,16 @@ static bool physmap_init()
         size_t count = 0;
         physmem_range_t *ranges = physmap_get(&count);
 
-        for (size_t i = 1; i < count && !did_something; ++i) {
+        uint64_t top = 0;
+
+        if (count && ranges[0].valid)
+            top = ranges[0].base + ranges[0].size;
+
+        for (size_t i = 1; i < count; ++i) {
             if (!ranges[i].valid)
                 continue;
 
-            uint64_t top = ranges[i].base + ranges[i].size;
+            top = ranges[i].base + ranges[i].size;
             if (physmap_top < top)
                 physmap_top = top;
         }

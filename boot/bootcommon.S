@@ -18,7 +18,7 @@ early_init:
     // 32 bit instructions are okay if detect_ancient_cpu returned...
 
     movzwl %sp,%esp
-    jmp *%bx
+    jmpw *%bx
 
 initial_stack_ptr:
     .word ___initial_stack
