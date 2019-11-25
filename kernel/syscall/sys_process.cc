@@ -5,6 +5,7 @@
 #include "threadsync.h"
 #include "chrono.h"
 #include "user_mem.h"
+#include "syscall/sys_limits.h"
 
 struct futex_tab_ent_t {
     uintptr_t addr;
@@ -109,4 +110,62 @@ long sys_futex(int *uaddr, int futex_op, int val,
     default:
         return -int(errno_t::EINVAL);
     }
+}
+
+long sys_posix_spawn(pid_t *restrict pid,
+                     char const *restrict path,
+                     posix_spawn_file_actions_t const *file_actions,
+                     posix_spawnattr_t const *restrict attr,
+                     char const * * restrict argv,
+                     char const * * restrict envp)
+{
+    mm_copy_string_result_t path_string = mm_copy_user_string(path, PATH_MAX);
+    if (!path_string.second)
+        return -int(errno_t::EFAULT);
+
+    std::vector<std::string> argv_items;
+    std::vector<std::string> envp_items;
+    std::vector<std::string> *curr_items = &argv_items;
+    char const ** restrict cur_src = argv;
+
+    for (size_t pass = 0; pass < 2; ++pass) {
+        char const *str_entry = nullptr;
+        do {
+            if (unlikely(curr_items->size() >= ARG_MAX))
+                return -int(errno_t::EINVAL);
+
+            str_entry = nullptr;
+            if (unlikely(!mm_copy_user(&str_entry, cur_src +
+                                       curr_items->size(),
+                                       sizeof(str_entry)))) {
+                return -int(errno_t::EFAULT);
+            }
+
+            if (str_entry == nullptr)
+                break;
+
+            mm_copy_string_result_t str = mm_copy_user_string(
+                        str_entry, PATH_MAX);
+
+            if (unlikely(!str.second))
+                return -int(errno_t::EINVAL);
+
+            if (unlikely(!curr_items->emplace_back(std::move(str.first))))
+                return -int(errno_t::ENOMEM);
+        } while (str_entry);
+
+        curr_items = &envp_items;
+        cur_src = envp;
+    }
+
+    pid_t pid_result = 0;
+    long result = process_t::spawn(&pid_result,
+                                   std::move(path_string.first),
+                                   std::move(argv_items),
+                                   std::move(envp_items));
+
+    if (!mm_copy_user(pid, &pid_result, sizeof(*pid)))
+        return -int(errno_t::EFAULT);
+
+    return result;
 }

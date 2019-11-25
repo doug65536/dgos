@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/likely.h>
+#include <spawn.h>
 
 __thread int testtls = 42;
 
@@ -57,6 +58,15 @@ void load_module(char const *path, char const *parameters = nullptr)
 
 int main(int argc, char **argv, char **envp)
 {
+//    static char const * user_test_argv[] = {
+//        "usertest",
+//        nullptr
+//    };
+
+//    pid_t user_test_pid = 0;
+//    int status = posix_spawn(&user_test_pid, user_test_argv[0],
+//            nullptr, nullptr, user_test_argv, nullptr);
+
     load_module("unittest.km");
 
     // fixme: check ACPI
@@ -95,4 +105,5 @@ int main(int argc, char **argv, char **envp)
                       PCI_DEV_CLASS_NETWORK,
                       PCI_SUBCLASS_NETWORK_ETHERNET, -1))
         load_module("rtl8139.km");
+
 }

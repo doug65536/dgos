@@ -18,6 +18,8 @@
 #include "memory.h"
 #include "type_traits.h"
 
+#include "printk.h"
+
 __BEGIN_NAMESPACE_STD
 
 template<typename _T>
@@ -75,6 +77,15 @@ struct allocator<void>
     {
         using other = allocator<_U>;
     };
+
+    allocator()
+    {
+    }
+
+    template<typename _U>
+    allocator(allocator<_U> const& rhs)
+    {
+    }
 };
 __END_NAMESPACE_STD
 
@@ -96,28 +107,46 @@ struct page_allocator : public page_allocator_base
     template<typename _U>
     struct rebind
     {
-        using other = typename std::allocator<_U>;
+        using other = page_allocator<_U>;
     };
 
     value_type *allocate(size_t __n) const
     {
-        return allocate_impl(__n * sizeof(value_type));
+        return (value_type*)allocate_impl(__n * sizeof(value_type));
     }
 
     void deallocate(value_type * p, size_t n) const
     {
-        deallocate_impl(p, n);
+        deallocate_impl(p, n * sizeof(value_type));
     }
 };
 
-template<typename T, typename Alloc = std::allocator<void>,
+template<>
+struct page_allocator<void>
+{
+    template<typename _U>
+    struct rebind
+    {
+        using other = page_allocator<_U>;
+    };
+};
+
+template<typename T, typename Alloc = std::allocator<char>,
          size_t chunk_size = PAGESIZE << 4>
 class bump_allocator_impl
-    : public refcounted<T>
+    : public refcounted<bump_allocator_impl<T>>
 {
 private:
+    using Allocator = typename Alloc::template rebind<char>::other;
     struct freetag_t {};
     struct emplace_tag_t {};
+
+    /// +-----------+
+    /// | items...  |
+    /// | items...  |
+    /// +-----------+
+    /// | next page |
+    /// +-----------+
 
     union item_t
     {
@@ -128,10 +157,13 @@ private:
         item_t *next_free;
     };
 
+    // Calculate how many items fit, leaving room for page chain pointer
     static constexpr size_t page_capacity =
             (chunk_size - sizeof(void*)) / sizeof(T);
 
 public:
+    using value_type = T;
+
     bump_allocator_impl()
     {
         current_page = nullptr;
@@ -140,24 +172,25 @@ public:
         last_free = nullptr;
     }
 
+    void destroy() override final
+    {
+        reinterpret_cast<T*>(this)->~T();
+        Allocator().deallocate((char*)this, sizeof(bump_allocator_impl));
+    }
+
     T *allocate(size_t __n)
     {
         assert(__n < page_capacity);
+        assert(__n == 1);
 
         size_t remain = page_capacity - bump_index;
 
-        // Fastpath allocation when it would fit within capacity
-        if (remain >= __n) {
-            T *result = reinterpret_cast<T*>(
-                        current_page[bump_index].storage.data);
-            bump_index += __n;
-            return result;
-        }
-
         // Reuse block if possible
-        if (first_free)
+        if (likely(first_free))
         {
             T *result = reinterpret_cast<T*>(first_free->storage.data);
+            printdbg("bump allocator reusing freed block at %#zx\n",
+                     uintptr_t(result));
 
             // Advance first_free to next item
             first_free = first_free->next_free;
@@ -168,17 +201,28 @@ public:
             return result;
         }
 
-        if (likely(bump_index < page_capacity))
-            return reinterpret_cast<T*>(
+        // Fastpath allocation when it would fit within capacity
+        if (likely(remain >= __n)) {
+            printdbg("bump allocator allocated"
+                     " and bumped from [%#zx] at %#zx\n", bump_index,
+                     uintptr_t(current_page[bump_index].storage.data));
+
+            // Most likely case, we have room in current page
+            T *result = reinterpret_cast<T*>(
                         current_page[bump_index++].storage.data);
+
+            return result;
+        }
 
         // Page full or first allocation ever
 
+        printdbg("bump allocator adding a new page\n");
+
         // Link new page back to this page
-        char *prev_page = current_page;
+        item_t *prev_page = current_page;
 
         // Allocate a new page
-        current_page = alloc.allocate(chunk_size);
+        current_page = (item_t*)alloc.allocate(chunk_size);
 
         // Pointer sized bytes at the end of the page
         // are reserved for previous page chain
@@ -187,21 +231,29 @@ public:
         // Reset index to start of freshly allocated page
         bump_index = 0;
 
+        printdbg("bump allocator allocated"
+                 " and bumped from [%#zx] at %#zx\n", bump_index,
+                 uintptr_t(current_page[bump_index].storage.data));
+
         return reinterpret_cast<T*>(
                     current_page[bump_index++].storage.data);
     }
 
     void deallocate(T *__p, size_t __n)
     {
+        assert(__n == 1);
+        printdbg("bump allocator item freed at %#zx\n",
+                 uintptr_t(__p));
+
         // Either write next pointer into last block, or,
         // write that into first_free instead
-        void **adj = last_free ? (void**)last_free : &first_free;
-        *adj = __p;
+        item_t **adj = last_free ? &last_free->next_free : &first_free;
+        *adj = (item_t*)__p;
 
         // Newly deallocated block is reused last
         // after all previously freed blocks
         // This should reduce temporal locality but increase spacial locality
-        last_free = __p;
+        last_free = (item_t*)__p;
 
         // Null out next pointer in free block chain
         *(void**)__p = nullptr;
@@ -212,7 +264,7 @@ private:
     size_t bump_index;
 
     // Rebind incoming allocator to allocate item_t objects
-    typename Alloc::template rebind<char>::other alloc;
+    Allocator alloc;
 
     item_t *first_free;
     item_t *last_free;
@@ -223,8 +275,9 @@ private:
 template<typename _T, typename _Alloc>
 class bump_allocator
 {
+    using _Allocator = typename _Alloc::template rebind<char>::other;
 public:
-    typedef _T value_type;
+    using value_type = _T;
 
     static_assert(sizeof(_T) >= sizeof(void*),
                   "Type is too small to bump allocate");
@@ -237,19 +290,24 @@ public:
 
     bump_allocator()
     {
-        impl = new (std::nothrow) bump_allocator_impl<_T, _Alloc>;
     }
 
     bump_allocator(bump_allocator const&) = default;
     bump_allocator(bump_allocator&&) = default;
     bump_allocator& operator=(bump_allocator const&) = default;
 
-    value_type * allocate(size_t __n) const
+    value_type *allocate(size_t __n)
     {
+        if (unlikely(!impl)) {
+            void *mem = _Allocator().allocate(
+                        sizeof(bump_allocator_impl<_T, _Alloc>));
+            impl = new (mem) bump_allocator_impl<_T, _Alloc>();
+        }
+
         return impl->allocate(__n);
     }
 
-    void deallocate(value_type * __p, size_t __n) const
+    void deallocate(value_type * __p, size_t __n)
     {
         return impl->deallocate(__p, __n);
     }
@@ -257,7 +315,34 @@ public:
 private:
     refptr<bump_allocator_impl<_T, _Alloc>> impl;
 };
+
+template<typename _Alloc>
+class bump_allocator<void, _Alloc>
+{
+public:
+    template<typename _U>
+    struct rebind
+    {
+        using other = bump_allocator<_U, _Alloc>;
+    };
+
+    using _Allocator = typename _Alloc::template rebind<char>::other;
+
+    bump_allocator(bump_allocator const& rhs) = default;
+
+    ~bump_allocator() = default;
+
+    template<typename _U, typename _A>
+    bump_allocator(bump_allocator<_U, _A> const& rhs)
+        : impl(rhs.impl)
+    {
+    }
+
+private:
+    refptr<bump_allocator_impl<void, _Alloc>> impl;
+};
 __END_NAMESPACE_EXT
+
 #endif
 
 __BEGIN_NAMESPACE_STD

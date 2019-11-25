@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include "types.h"
 #include <inttypes.h>
+#include "utility.h"
+
 //#include "cxxexcept.h"
 
 __BEGIN_DECLS
@@ -126,6 +128,12 @@ public:
     operator<<(T ptr)
     {
         return write_ptr(ptr);
+    }
+
+    template<typename _K, typename _V>
+    debug_out_t& operator<<(std::pair<_K, _V> const& __rhs)
+    {
+        return *this << '{' << __rhs.first << ',' << __rhs.second << '}';
     }
 
     // nullptr

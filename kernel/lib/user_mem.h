@@ -4,6 +4,7 @@
 
 __BEGIN_DECLS
 
+_use_result
 bool mm_copy_user(void *dst, void const *src, size_t size);
 
 /// If src == nullptr, clears destination, otherwise copies from src
@@ -15,11 +16,13 @@ ptrdiff_t mm_copy_user_str(char *dst, char const *src, size_t size);
 
 intptr_t mm_lenof_user_str(char const *src, size_t max_size);
 
+_use_result
 _const
 bool mm_is_user_range(void const *buf, size_t size);
 
+_use_result
 _const
-bool mm_max_user_len(void const *buf);
+size_t mm_max_user_len(void const *buf);
 
 
 __END_DECLS

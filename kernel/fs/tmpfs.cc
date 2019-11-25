@@ -222,7 +222,7 @@ int tmpfs_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 
 int tmpfs_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 {
-    *fi = new (std::nothrow) tmpfs_file_t;
+    *fi = new (std::nothrow) tmpfs_file_t();
 
     return 0;
 }
@@ -396,11 +396,14 @@ ssize_t tmpfs_fs_t::read(fs_file_info_t *fi, char *buf,
     if (unlikely(offset < 0))
         return -int(errno_t::EINVAL);
 
+    void const *src = st + file_info.file_ofs + offset;
     if (mm_is_user_range(buf, size)) {
-        if (!mm_copy_user(buf, st + file_info.file_ofs + offset, size))
+        if (unlikely(madvise(buf, size, MADV_WILLNEED) < 0))
+            return -int(errno_t::ENOMEM);
+        if (unlikely(!mm_copy_user(buf, src, size)))
             return -int(errno_t::EFAULT);
     } else {
-        memcpy(buf, st + file_info.file_ofs + offset, size);
+        memcpy(buf, src, size);
     }
 
     return size;

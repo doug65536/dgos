@@ -332,7 +332,11 @@ void modload_load_symbols(char const *path, uintptr_t addr)
     // So that memory clobber is really needed, I need the caller to write
     // the actual path string into memory there (flow analysis could discard
     // it without the memory clobber)
-    __asm__ __volatile__ ("" : : "D" (path), "S" (addr) : "memory");
+    __asm__ __volatile__ (
+                ""
+                :
+                :
+                : "memory");
 }
 
 static errno_t load_failed(errno_t err)
@@ -543,6 +547,8 @@ errno_t module_t::load_sections(module_reader_t const& pread)
             continue;
 
         void *addr = (void*)(phdr.p_vaddr + base_adj);
+
+        madvise(addr, phdr.p_memsz, MADV_WILLNEED);
 
         size_t io_size = phdr.p_filesz;
         ssize_t io_result = pread(addr, phdr.p_filesz, phdr.p_offset);

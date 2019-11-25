@@ -189,7 +189,7 @@ for flag in \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
 		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack \
 		Wno-unused-parameter fno-eliminate-unused-debug-types \
-		fno-eliminate-unused-debug-symbols fno-plt fvar-tracking
+		fno-eliminate-unused-debug-symbols fno-plt
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
@@ -321,7 +321,6 @@ AC_SUBST([NO_FLOAT_FLAGS])
 
 USER64_FLAGS=
 for flag in \
-	mindirect-branch=thunk-extern D_USE_RETPOLINE=1 \
 	malign-stringops \
 	fbuiltin \
 	mred-zone \
@@ -344,6 +343,55 @@ do
 done
 AC_SUBST([USER64_FLAGS])
 
+USERLIB64_FLAGS=
+for flag in \
+	malign-stringops \
+	fbuiltin \
+	mred-zone \
+	m64 \
+	mpreferred-stack-boundary=4 \
+	fPIC \
+	fno-exceptions fno-rtti
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USERLIB64_FLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USERLIB64_FLAGS])
+
+USER64_LDFLAGS=
+for flag in \
+	Wl,--no-eh-frame-hdr \
+	Wl,-T$srcdir/user/user64_phdrs.ld \
+	Wl,-z,max-page-size=4096 \
+	Wl,-z,separate-code \
+	Wl,-z,relro \
+	Wl,-z,now \
+	Wl,--relax \
+	Wl,-g
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USERLIB64_LDFLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USERLIB64_LDFLAGS])
+
+USERLIB64_LDFLAGS=
+for flag in \
+	Wl,--no-eh-frame-hdr \
+	Wl,-T$srcdir/user/lib64.ld \
+	Wl,-z,max-page-size=4096 \
+	Wl,-z,separate-code \
+	Wl,-z,relro \
+	Wl,-z,now \
+	Wl,--relax \
+	Wl,-g
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USERLIB64_LDFLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USERLIB64_LDFLAGS])
 
 ELF32_FLAGS=
 for flag in \

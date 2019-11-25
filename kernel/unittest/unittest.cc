@@ -94,8 +94,10 @@ void unittest::unit_ctx::skip(unittest::unit *test)
     ++skipped;
 }
 
-unittest::unit::unit(const char *name, const char *test_file, int test_line)
-    : name(name)
+unittest::unit::unit(const char *name, const char *test_file,
+                     int test_line, bool init_enabled)
+    : is_enabled(init_enabled)
+    , name(name)
     , test_file(test_file)
     , test_line(test_line)
 {
@@ -161,11 +163,28 @@ void unittest::unit::run_all(unit_ctx *ctx)
         printk("%s: testing...\n", it->get_name());
         size_t prev_failures = ctx->failure_count();
         it->set_ctx(ctx);
-        it->invoke();
+
+        if (likely(!it->float_thread())) {
+            it->invoke();
+        } else {
+            thread_t tid = thread_create(&unit::thread_fn, it, 0, true, true);
+            int cpu_nr = thread_current_cpu(tid);
+            printdbg("Test thread cpu nr %d\n", cpu_nr);
+            thread_wait(tid);
+            thread_close(tid);
+        }
+
         if (likely(prev_failures == ctx->failure_count())) {
             printk("%s: OK\n", it->get_name());
         } else {
             printk("*** FAILED! %s\n", it->get_name());
         }
     }
+}
+
+int unittest::unit::thread_fn(void *arg)
+{
+    unittest::unit *test = (unittest::unit *)arg;
+    test->invoke();
+    return 0;
 }

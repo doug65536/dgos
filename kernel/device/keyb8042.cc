@@ -137,7 +137,7 @@ static void keyb8042_keyboard_handler(void)
 
     scancode = inb(KEYB_DATA);
 
-    printdbg("scancode: %x\n", scancode);
+    printdbg("scancode: %#x\n", scancode);
 
     int32_t vk = 0;
     int sign = !!(scancode & 0x80) * -2 + 1;
@@ -446,7 +446,7 @@ void keyb8042_init(void)
         return;
     }
 
-    KEYB8042_TRACE("Keyboard original config = %02x\n", config);
+    KEYB8042_TRACE("Keyboard original config = %#02x\n", config);
 
     // Disable IRQs and translation
     config &= ~(KEYB_CONFIG_IRQEN_PORT1 |
@@ -454,7 +454,7 @@ void keyb8042_init(void)
                 KEYB_CONFIG_XLAT_PORT1);
 
     // Write config
-    KEYB8042_TRACE("Writing keyboard controller config = %02x\n", config);
+    KEYB8042_TRACE("Writing keyboard controller config = %#02x\n", config);
     if (unlikely(keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)) {
         KEYB8042_MSG("Failed to send write config command\n");
         return;
@@ -500,7 +500,7 @@ void keyb8042_init(void)
     }
 
     if (unlikely(port1_test_result != KEYB_CMD_TEST_PORTn_OK)) {
-        KEYB8042_MSG("Keyboard port 1 self test failed! result=%02x\n",
+        KEYB8042_MSG("Keyboard port 1 self test failed! result=%#02x\n",
                      ctl_test_result);
         return;
     }
@@ -514,7 +514,7 @@ void keyb8042_init(void)
         }
 
         if (port2_test_result != KEYB_CMD_TEST_PORTn_OK) {
-            KEYB8042_MSG("Keyboard port 2 self test failed! result=%02x\n",
+            KEYB8042_MSG("Keyboard port 2 self test failed! result=%#02x\n",
                          port2_test_result);
             port2_exists = 0;
         }
@@ -530,7 +530,7 @@ void keyb8042_init(void)
     // Read reset result
     port1_test_result = keyb8042_read_data();
     if (port1_test_result != KEYB_REPLY_RESETOK) {
-        KEYB8042_TRACE("Keyboard reset failed, data=%x\n", port1_test_result);
+        KEYB8042_TRACE("Keyboard reset failed, data=%#x\n", port1_test_result);
         return;
     }
 
@@ -553,7 +553,7 @@ void keyb8042_init(void)
         config |= KEYB_CONFIG_IRQEN_PORT2;
     }
 
-    KEYB8042_TRACE("Writing keyboard controller config = %02x\n", config);
+    KEYB8042_TRACE("Writing keyboard controller config = %#02x\n", config);
     if (keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)
         return;
     if (keyb8042_write_data(config) < 0)

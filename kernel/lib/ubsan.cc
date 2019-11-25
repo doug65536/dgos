@@ -118,6 +118,12 @@ EXPORT void __ubsan_handle_type_mismatch_v1(
     if (ptr == nullptr) {
         __ubsan_report("Null pointer access at %s:%d,%d\n",
                  data->loc.filename, data->loc.line, data->loc.column);
+    } else if (uintptr_t(ptr) & ~-(1U << data->log_alignment)) {
+        __ubsan_report("Misaligned pointer %s type \"%s\" at %s:%d,%d\n",
+                       data->type_check_kind < countof(__ubsan_type_check_kinds)
+                       ? __ubsan_type_check_kinds[data->type_check_kind]
+                       : "<unknown kind>", data->type.TypeName,
+                       data->loc.filename, data->loc.line, data->loc.column);
     } else {
         __ubsan_report("Type mismatch in %s type \"%s\" at %s:%d,%d\n",
                  data->type_check_kind < countof(__ubsan_type_check_kinds)

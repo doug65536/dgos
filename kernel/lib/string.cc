@@ -470,12 +470,14 @@ EXPORT size_t strspn(char const *src, char const *chars)
     return i;
 }
 
+// Return the offset of a character in the chars string
+// otherwise, the length of the string
 EXPORT size_t strcspn(char const *src, char const *chars)
 {
     size_t i = 0;
 
     if (chars[0] && !chars[1]) {
-        // One character special case
+        // One character special case, fastpath
         while (src[i] && src[i] != chars[0])
             ++i;
     } else {
@@ -484,7 +486,7 @@ EXPORT size_t strcspn(char const *src, char const *chars)
 
         for (makeByteBitmap(map, chars); src[i]; ++i) {
             size_t ch = (uint8_t)src[i];
-            if (map[ch >> 5] & (1U << (ch & 31)))
+            if (map[ch >> 5] & (size_t(1) << (ch & 31)))
                 break;
         }
     }

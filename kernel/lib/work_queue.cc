@@ -10,7 +10,7 @@ EXPORT workq_impl* workq::percpu;
 
 void workq::init(int cpu_count)
 {
-    percpu = new (std::nothrow) workq_impl[cpu_count];
+    percpu = new (std::nothrow) workq_impl[cpu_count]();
 
     for (int i = 0; i < cpu_count; ++i)
         percpu[i].set_affinity(i);
@@ -96,7 +96,8 @@ EXPORT workq_work *workq::allocate(workq_impl *queue, size_t size)
 void workq::slih_startup(void*)
 {
     printk("Initializing kernel threadpool\n");
-    init(thread_cpu_count());
+    int cpu_count = thread_cpu_count();
+    init(cpu_count);
 }
 
 REGISTER_CALLOUT(workq::slih_startup, nullptr,
@@ -142,28 +143,28 @@ int workq_alloc::alloc_slot()
 
     // Find the first 0 bit in that qword
     uint8_t bit = bit_lsb_set(~map[word]);
-    uint64_t upd = map[word] | (UINT64_C(1) << bit);
+    uint32_t upd = map[word] | (UINT32_C(1) << bit);
     map[word] = upd;
 
     // Build a mask that will set the top bit to 1
     // if all underlying bits are now 1
-    uint64_t top_mask = (UINT64_C(1) << word) & -(~upd == 0);
+    uint32_t top_mask = (UINT32_C(1) << word) & -(~upd == 0);
 
     top |= top_mask;
 
-    return int(word << 6) + bit;
+    return int(word << 5) + bit;
 }
 
 void workq_alloc::free_slot(size_t i)
 {
     assert(i < capacity);
 
-    size_t word = unsigned(i) >> 6;
+    size_t word = i >> 5;
 
-    uint8_t bit = word & 63;
+    uint8_t bit = word & 31;
 
     // Clear that bit
-    map[word] &= ~(UINT64_C(1) << bit);
+    map[word] &= ~(UINT32_C(1) << bit);
 
     // Since we freed one, we know that the bit of level 0 must become 0
     top &= ~(UINT64_C(1) << word);
@@ -171,7 +172,7 @@ void workq_alloc::free_slot(size_t i)
 
 workq_impl::workq_impl()
 {
-    tid = thread_create(worker, this, 0, false);
+    tid = thread_create(worker, this, 0, false, false);
 }
 
 workq_impl::~workq_impl()

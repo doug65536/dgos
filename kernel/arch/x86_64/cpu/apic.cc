@@ -739,6 +739,8 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                         PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL | MAP_NOCACHE |
                         MAP_WRITETHRU, -1, 0);
+            if (unlikely(ioapic->ptr == MAP_FAILED))
+                panic_oom();
 
             ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
             uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
@@ -788,7 +790,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
             int ioapic_index = intr_to_ioapic[intr];
 
             ACPI_TRACE("Applied redirection, irq=%u, gsi=%u"
-                       ", flags=%x vector=%u, ioapic_index=%d\n",
+                       ", flags=%#x vector=%u, ioapic_index=%d\n",
                        irq, gsi, ent->irq_src.flags, intr, ioapic_index);
 
             mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
@@ -848,9 +850,12 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
     }
 }
 
-static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
+static void acpi_process_hpet(void *acpi_hdr)
 {
-    acpi_hpet_list.push_back(acpi_hdr->addr);
+    acpi_gas_t aligned_gas;
+    memcpy(&aligned_gas, (char*)acpi_hdr + offsetof(acpi_hpet_t, addr),
+           sizeof(aligned_gas));
+    acpi_hpet_list.push_back(aligned_gas);
 }
 
 
@@ -869,6 +874,8 @@ static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
         munmap(ptr, guess);
         ptr = (T*)mmap((void*)physaddr, actual_len,
                        PROT_READ, MAP_PHYSICAL, -1, 0);
+        if (unlikely(ptr == MAP_FAILED))
+            panic_oom();
         acpi_mappings.push_back({uint64_t(ptr), uint64_t(actual_len)});
     }
 
@@ -884,82 +891,99 @@ static void acpi_parse_rsdt()
     acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
                 (void*)acpi_rsdt_addr, len,
                 PROT_READ, MAP_PHYSICAL, -1, 0);
+    if (unlikely(rsdt_hdr == MAP_FAILED))
+        panic_oom();
     acpi_mappings.push_back({uint64_t(rsdt_hdr), len});
+
+    acpi_sdt_hdr_t aligned_rsdt_hdr{};
+    memcpy(&aligned_rsdt_hdr, rsdt_hdr, sizeof(aligned_rsdt_hdr));
 
     // For ACPI 1.0, get length from header and remap
     if (!acpi_rsdt_len) {
-        acpi_rsdt_len = rsdt_hdr->len;
+        acpi_rsdt_len = aligned_rsdt_hdr.len;
         rsdt_hdr = acpi_remap_len(rsdt_hdr, acpi_rsdt_addr,
                                   sizeof(*rsdt_hdr), acpi_rsdt_len);
     }
 
-    ACPI_TRACE("RSDT version %#x\n", rsdt_hdr->rev);
+    ACPI_TRACE("RSDT version %#x\n", aligned_rsdt_hdr.rev);
 
     if (acpi_chk_hdr(rsdt_hdr) != 0) {
         ACPI_ERROR("ACPI RSDT checksum mismatch!\n");
         return;
     }
 
-    uint32_t *rsdp_ptrs = (uint32_t *)(rsdt_hdr + 1);
-    uint32_t *rsdp_end = (uint32_t *)((char*)rsdt_hdr + rsdt_hdr->len);
+    void *rsdp_ptrs = (void *)(rsdt_hdr + 1);
+    void *rsdp_end = (void *)((char*)rsdt_hdr + aligned_rsdt_hdr.len);
 
     ACPI_TRACE("Processing RSDP pointers from %p to %p\n",
-           (void*)rsdp_ptrs, (void*)rsdp_end);
+           rsdp_ptrs, rsdp_end);
 
-    for (uint32_t *rsdp_ptr = rsdp_ptrs;
-         rsdp_ptr < rsdp_end; rsdp_ptr += (acpi_rsdt_ptrsz >> 2)) {
-        uint64_t hdr_addr;
+    for (void *rsdp_ptr = rsdp_ptrs; rsdp_ptr < rsdp_end;
+         rsdp_ptr = (char*)rsdp_ptr + acpi_rsdt_ptrsz) {
+        uint64_t hdr_addr = 0;
 
-        if (acpi_rsdt_ptrsz == sizeof(uint32_t)){
-            hdr_addr = *rsdp_ptr;
-        } else {
-            memcpy(&hdr_addr, rsdp_ptr, sizeof(uint64_t));
-        }
+        memcpy(&hdr_addr, rsdp_ptr, acpi_rsdt_ptrsz);
 
         acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
                 mmap((void*)hdr_addr,
                       64 << 10, PROT_READ, MAP_PHYSICAL, -1, 0);
+        if (unlikely(hdr == MAP_FAILED))
+            panic_oom();
+        acpi_sdt_hdr_t aligned_sdt_hdr{};
+        memcpy(&aligned_sdt_hdr, hdr, sizeof(aligned_sdt_hdr));
         acpi_mappings.push_back({uint64_t(hdr), uint64_t{64 << 10}});
 
-        hdr = acpi_remap_len(hdr, hdr_addr, 64 << 10, hdr->len);
+        hdr = acpi_remap_len(hdr, hdr_addr, 64 << 10, aligned_sdt_hdr.len);
 
-        ACPI_TRACE("Encountered sig=%4.4s\n", hdr->sig);
+        ACPI_TRACE("Encountered sig=%4.4s\n", aligned_sdt_hdr.sig);
 
-        if (!memcmp(hdr->sig, "FACP", 4)) {
+        if (!memcmp(aligned_sdt_hdr.sig, "FACP", 4)) {
             acpi_fadt_t *fadt_hdr = (acpi_fadt_t *)hdr;
 
-            if (acpi_chk_hdr(&fadt_hdr->hdr) == 0) {
+            acpi_fadt_t aligned_fadt_hdr{};
+            memcpy(&aligned_fadt_hdr, fadt_hdr, sizeof(aligned_fadt_hdr));
+
+            if (acpi_chk_hdr(fadt_hdr) == 0) {
                 ACPI_TRACE("ACPI FADT found\n");
                 acpi_process_fadt(fadt_hdr);
             } else {
                 ACPI_ERROR("ACPI FADT checksum mismatch!\n");
             }
-        } else if (!memcmp(hdr->sig, "APIC", 4)) {
+        } else if (!memcmp(aligned_sdt_hdr.sig, "APIC", 4)) {
             acpi_madt_t *madt_hdr = (acpi_madt_t *)hdr;
 
-            if (acpi_chk_hdr(&madt_hdr->hdr) == 0) {
+            acpi_madt_t aligned_madt_hdr{};
+            memcpy(&aligned_madt_hdr, hdr, sizeof(aligned_madt_hdr));
+
+            if (acpi_chk_hdr(hdr) == 0) {
                 ACPI_TRACE("ACPI MADT found\n");
                 acpi_process_madt(madt_hdr);
             } else {
                 ACPI_ERROR("ACPI MADT checksum mismatch!\n");
             }
-        } else if (!memcmp(hdr->sig, "HPET", 4)) {
+        } else if (!memcmp(aligned_sdt_hdr.sig, "HPET", 4)) {
             acpi_hpet_t *hpet_hdr = (acpi_hpet_t *)hdr;
 
-            if (acpi_chk_hdr(&hpet_hdr->hdr) == 0) {
+            acpi_hpet_t aligned_hpet_hdr{};
+            memcpy(&aligned_hpet_hdr, hpet_hdr, sizeof(aligned_hpet_hdr));
+
+            if (acpi_chk_hdr(hdr) == 0) {
                 ACPI_TRACE("ACPI HPET found\n");
                 acpi_process_hpet(hpet_hdr);
             } else {
                 ACPI_ERROR("ACPI MADT checksum mismatch!\n");
             }
-        } else if (!memcmp(hdr->sig, "MCFG", 4) /* && false killed */) {
-            acpi_mcfg_hdr_t *mcfg_hdr = (acpi_mcfg_hdr_t*)hdr;
+        } else if (!memcmp(aligned_sdt_hdr.sig, "MCFG", 4) /* && false killed */) {
+            //acpi_mcfg_hdr_t *mcfg_hdr = (acpi_mcfg_hdr_t*)hdr;
 
-            if (acpi_chk_hdr(&mcfg_hdr->hdr) == 0) {
+            acpi_mcfg_hdr_t aligned_mcfg_hdr{};
+            memcpy(&aligned_mcfg_hdr, hdr, sizeof(aligned_mcfg_hdr));
+
+            if (acpi_chk_hdr(hdr) == 0) {
                 acpi_ecam_rec_t *ecam_ptr = (acpi_ecam_rec_t*)
-                        (mcfg_hdr+1);
+                        ((char*)hdr + sizeof(acpi_mcfg_hdr_t));
                 acpi_ecam_rec_t *ecam_end = (acpi_ecam_rec_t*)
-                        ((char*)&mcfg_hdr->hdr + mcfg_hdr->hdr.len);
+                        ((char*)hdr + aligned_mcfg_hdr.hdr.len);
                 size_t ecam_count = ecam_end - ecam_ptr;
                 pci_init_ecam(ecam_count);
                 for (size_t i = 0; i < ecam_count; ++i) {
@@ -1087,6 +1111,8 @@ static void mp_parse_fps()
     mp_cfg_tbl_hdr_t *cth = (mp_cfg_tbl_hdr_t *)
             mmap((void*)mp_tables, 0x10000,
                  PROT_READ, MAP_PHYSICAL, -1, 0);
+    if (unlikely(cth == MAP_FAILED))
+        panic_oom();
     acpi_mappings.push_back({uint64_t(cth), 0x10000});
 
     cth = acpi_remap_len(cth, uintptr_t(mp_tables),
@@ -1184,6 +1210,8 @@ static void mp_parse_fps()
                             (void*)(uintptr_t)entry_ioapic->addr,
                             12, PROT_READ | PROT_WRITE,
                             MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                if (unlikely(ioapic_ptr == MAP_FAILED))
+                    panic_oom();
 
                 ioapic->ptr = ioapic_ptr;
 
@@ -1281,7 +1309,7 @@ static void mp_parse_fps()
             uint8_t parent_bus = entry_busheir->parent_bus;
             uint8_t info = entry_busheir->info;
 
-            MPS_TRACE("Bus hierarchy, bus=%d, parent=%d, info=%x\n",
+            MPS_TRACE("Bus hierarchy, bus=%d, parent=%d, info=%#x\n",
                       bus, parent_bus, info);
 
             entry += entry_busheir->len;
@@ -1296,7 +1324,7 @@ static void mp_parse_fps()
             uint32_t bus_predef = entry_buscompat->predef_range_list;
 
             MPS_TRACE("Bus compat, bus=%d, mod=%d,"
-                      " predefined_range_list=%x\n",
+                      " predefined_range_list=%#x\n",
                       bus, bus_mod, bus_predef);
 
             entry += entry_buscompat->len;
@@ -1493,13 +1521,13 @@ void apic_dump_regs(int ap)
         printdbg("ap=%d APIC: ", ap);
         for (int x = 0; x < 4; ++x) {
             if (apic->reg_readable(i + x)) {
-                printdbg("%s[%3x]=%#.8x%s",
+                printdbg("%s[%#3x]=%#.8x%s",
                          x == 0 ? "apic: " : "",
                          (i + x),
                          apic->read32(i + x),
                          x == 3 ? "\n" : " ");
             } else {
-                printdbg("%s[%3x]=--------%s",
+                printdbg("%s[%#3x]=--------%s",
                          x == 0 ? "apic: " : "",
                          i + x,
                          x == 3 ? "\n" : " ");
@@ -1629,6 +1657,8 @@ int apic_init(int ap)
                         (void*)(apic_base),
                         4096, PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+            if (unlikely(apic_ptr == MAP_FAILED))
+                panic_oom();
 
             apic = &apic_x;
         }
@@ -1836,69 +1866,68 @@ void apic_start_smp(void)
         thread_init_cpu(i, apic_id_list[i]);
 
     // See if there are any other CPUs to start
-    if (topo_thread_count * topo_core_count == 1 &&
-            apic_id_count == 1)
-        return;
 
-    // Read address of MP entry trampoline from boot sector
-    uint32_t mp_trampoline_addr = (uint32_t)
-            bootinfo_parameter(bootparam_t::ap_entry_point);
-    uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
+    if (apic_id_count > 1) {
+        // Read address of MP entry trampoline from boot sector
+        uint32_t mp_trampoline_addr = (uint32_t)
+                bootinfo_parameter(bootparam_t::ap_entry_point);
+        uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
 
-    cmos_prepare_ap();
+        cmos_prepare_ap();
 
-    // Send INIT to all other CPUs
-    apic_send_command(0, APIC_CMD_DELIVERY_INIT |
-                      APIC_CMD_DEST_MODE_LOGICAL |
-                      APIC_CMD_DEST_TYPE_OTHER);
-    APIC_TRACE("Done sending INIT IPIs\n");
+        // Send INIT to all other CPUs
+        apic_send_command(0, APIC_CMD_DELIVERY_INIT |
+                          APIC_CMD_DEST_MODE_LOGICAL |
+                          APIC_CMD_DEST_TYPE_OTHER);
+        APIC_TRACE("Done sending INIT IPIs\n");
 
-    // 10ms delay
-    nsleep(10000000);
+        // 10ms delay
+        nsleep(10000000);
 
-    APIC_TRACE("%d hyperthread bits\n", topo_thread_bits);
-    APIC_TRACE("%d core bits\n", topo_core_bits);
+        APIC_TRACE("%d hyperthread bits\n", topo_thread_bits);
+        APIC_TRACE("%d core bits\n", topo_core_bits);
 
-    APIC_TRACE("%d hyperthread count\n", topo_thread_count);
-    APIC_TRACE("%d core count\n", topo_core_count);
+        APIC_TRACE("%d hyperthread count\n", topo_thread_count);
+        APIC_TRACE("%d core count\n", topo_core_count);
 
-    uint32_t smp_expect = 0;
-    for (unsigned pkg = 0; pkg < apic_id_count; ++pkg) {
-        APIC_TRACE("Package base APIC ID = %u\n", apic_id_list[pkg]);
+        uint32_t smp_expect = 0;
+        for (unsigned pkg = 0; pkg < apic_id_count; ++pkg) {
+            APIC_TRACE("Package base APIC ID = %u\n", apic_id_list[pkg]);
 
-        uint8_t total_cpus = topo_core_count *
-                topo_thread_count *
-                apic_id_count;
-        uint32_t stagger = 16666666 / total_cpus;
+            uint8_t total_cpus = topo_core_count *
+                    topo_thread_count *
+                    apic_id_count;
+            uint32_t stagger = 16666666 / total_cpus;
 
-        for (unsigned thread = 0;
-             thread < topo_thread_count; ++thread) {
-            for (unsigned core = 0; core < topo_core_count; ++core) {
-                uint8_t target = apic_id_list[pkg] +
-                        (thread | (core << topo_thread_bits));
+            for (unsigned thread = 0;
+                 thread < topo_thread_count; ++thread) {
+                for (unsigned core = 0; core < topo_core_count; ++core) {
+                    uint8_t target = apic_id_list[pkg] +
+                            (thread | (core << topo_thread_bits));
 
-                // Don't try to start BSP
-                if (target == apic_id_list[0])
-                    continue;
+                    // Don't try to start BSP
+                    if (target == apic_id_list[0])
+                        continue;
 
-                APIC_TRACE("Sending SIPI to APIC ID %u, "
-                           "trampoline page=%#x\n",
-                           target, mp_trampoline_page);
+                    APIC_TRACE("Sending SIPI to APIC ID %u, "
+                               "trampoline page=%#x\n",
+                               target, mp_trampoline_page);
 
-                // Send SIPI to CPU
-                apic_send_command(target,
-                                  APIC_CMD_SIPI_PAGE_n(mp_trampoline_page) |
-                                  APIC_CMD_DELIVERY_SIPI |
-                                  APIC_CMD_DEST_TYPE_BYID |
-                                  APIC_CMD_DEST_MODE_PHYSICAL);
+                    // Send SIPI to CPU
+                    apic_send_command(target,
+                                      APIC_CMD_SIPI_PAGE_n(mp_trampoline_page) |
+                                      APIC_CMD_DELIVERY_SIPI |
+                                      APIC_CMD_DEST_TYPE_BYID |
+                                      APIC_CMD_DEST_MODE_PHYSICAL);
 
-                nsleep(stagger);
+                    nsleep(stagger);
 
-                ++smp_expect;
+                    ++smp_expect;
 
-                APIC_TRACE("BSP waiting for AP\n");
-                cpu_wait_value(&thread_smp_running, smp_expect);
-                APIC_TRACE("BSP finished waiting for AP\n");
+                    APIC_TRACE("BSP waiting for AP\n");
+                    cpu_wait_value(&thread_smp_running, smp_expect);
+                    APIC_TRACE("BSP finished waiting for AP\n");
+                }
             }
         }
     }
@@ -2142,7 +2171,8 @@ static void apic_calibrate()
     if (cpuid_is_hypervisor() || cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
         if (!cpuid_has_inrdtsc())
-            APIC_TRACE("Using RDTSC overriding cpuid because hyperivisor\n");
+            APIC_TRACE("Using RDTSC overriding cpuid because "
+                       "hypervisor\n");
         time_ns_set_handler(apic_rdtsc_time_ns_handler, nullptr, true);
         nsleep_set_handler(apic_rdtsc_nsleep_handler, nullptr, true);
     }

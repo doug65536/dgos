@@ -50,7 +50,8 @@ struct pair
     {
     }
 
-    constexpr pair(first_type __first_value, second_type __second_value)
+    constexpr pair(first_type __first_value,
+                   second_type __second_value)
         : first(__first_value)
         , second(__second_value)
     {
@@ -59,6 +60,52 @@ struct pair
     first_type first;
     second_type second;
 };
+
+template<typename T1, typename T2>
+constexpr bool operator==(pair<T1,T2> const& lhs,
+                          pair<T1,T2> const& rhs)
+{
+    return lhs.first == rhs.first && lhs.second == rhs.second;
+}
+
+template<typename T1, typename T2>
+constexpr bool operator!=( pair<T1,T2> const& lhs,
+                                  pair<T1,T2> const& rhs )
+{
+    return !(lhs.first == rhs.first) || !(lhs.second == rhs.second);
+}
+
+template<typename T1, typename T2>
+constexpr bool operator<( pair<T1,T2> const& lhs,
+                                 pair<T1,T2> const& rhs )
+{
+    return lhs.first < rhs.first
+            ? true
+            : rhs.first < lhs.first
+              ? false
+              : rhs.second < rhs.second;
+}
+
+template<typename T1, typename T2>
+constexpr bool operator<=( pair<T1,T2> const& lhs,
+                                  pair<T1,T2> const& rhs )
+{
+    return !(rhs < lhs);
+}
+
+template<typename T1, typename T2>
+constexpr bool operator>( pair<T1,T2> const& lhs,
+                                 pair<T1,T2> const& rhs )
+{
+    return rhs < lhs;
+}
+
+template<typename T1, typename T2>
+constexpr bool operator>=( pair<T1,T2> const& lhs,
+                                  pair<T1,T2> const& rhs )
+{
+    return !(lhs < rhs);
+}
 
 template<typename _T>
 constexpr _T min(_T const& __lhs, _T const& __rhs)

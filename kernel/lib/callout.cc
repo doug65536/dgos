@@ -42,7 +42,7 @@ size_t callout_call(callout_type_t type, bool as_thread)
                     0
                 };
                 work.tid = thread_create(thread_callout_worker,
-                                         &work, 0, false);
+                                         &work, 0, false, false);
 
                 if (worker_count == countof(workers))
                     wait_pending();

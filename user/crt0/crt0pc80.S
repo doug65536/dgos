@@ -2,7 +2,7 @@
 
 #include <sys/cpu_bug.h>
 
-.section .init_array, "a", @progbits
+.section .init_array, "a"
 .quad __crt0_fpu80
 
 .section .text, "ax", @progbits

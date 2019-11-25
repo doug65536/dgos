@@ -2,7 +2,8 @@
 #include "types.h"
 
 enum constructor_order_t {
-    ctor_ctors_ran = 1000,
+    ctor_asan_init = 1000,
+    ctor_ctors_ran,
     ctor_cpu_init_cpus,
     ctor_cpu_init_bsp,
     ctor_text_dev,

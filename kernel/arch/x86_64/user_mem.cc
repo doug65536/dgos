@@ -44,11 +44,11 @@ EXPORT bool mm_is_user_range(void const *buf, size_t size)
             (uintptr_t(buf) + size) <= 0x7FFFFFFFFFFF;
 }
 
-EXPORT bool mm_max_user_len(void const *buf)
+EXPORT size_t mm_max_user_len(void const *buf)
 {
     return (uintptr_t(buf) >= 0x400000 &&
-            uintptr_t(buf) < 0x7FFFFFFFFFFF)
-            ? (char*)0x800000000000 - (char*)buf
+            uintptr_t(buf) < 0x7FFFFFC00000)
+            ? (char*)0x7FFFFFC00000 - (char*)buf
             : 0;
 }
 
@@ -65,8 +65,9 @@ EXPORT mm_copy_string_result_t mm_copy_user_string(
 
     intptr_t len1 = mm_lenof_user_str(user_src, max_size);
 
-    if (len1 >= 0 && result.first.resize(len1 + 1) &&
-        mm_copy_user(result.first.data(), user_src, len1 + 1))
+    if (len1 >= 0 && result.first.reserve(len1 + 1) &&
+            result.first.resize(len1) &&
+            mm_copy_user(result.first.data(), user_src, len1 + 1))
     {
         // Did not fault
         intptr_t len2 = strlen(result.first.data());

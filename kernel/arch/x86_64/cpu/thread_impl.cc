@@ -93,7 +93,7 @@ struct link_t {
 };
 
 struct alignas(256) thread_info_t {
-    // Dirty line, frequently modified items
+    // Exclusive line, frequently modified items, rarely shared
 
     isr_context_t * volatile ctx;
 
@@ -103,12 +103,16 @@ struct alignas(256) thread_info_t {
     void * volatile gsbase;
     uint32_t syscall_mxcsr, syscall_fcw87;
     char * volatile xsave_ptr;
-    link_t link;
 
     // Modified every context switch
     uint64_t used_time;
 
-    // --- cache line ---
+    uint64_t reserved[2];
+
+    // --- cache line --- shared line
+
+    // 2 64-bit pointers
+    link_t link;
 
     // Owning process
     process_t *process;
@@ -131,30 +135,37 @@ struct alignas(256) thread_info_t {
 
     uint64_t volatile wake_time;
 
-    uint32_t thread_flags;
+    // --- cache line ---
 
-    // Doesn't include guard pages
-    uint32_t stack_size;
+    // 4 64-bit values
+    mutex_t lock;   // 32 bytes
+
+    // 3 64-bit values
+    condition_var_t done_cond;
 
     // Current CPU exception longjmp container
     void *exception_chain;
 
-    // Process exit code
-    int exit_code;
+    // --- cache line ---
 
     // Thread current kernel errno
     errno_t errno;
-
     // 3 bytes...
 
-    // --- cache line ---
+    // Doesn't include guard pages
+    uint32_t stack_size;
 
-    __cxa_eh_globals cxx_exception_info;
-
-    mutex_t lock;   // 32 bytes
-    condition_var_t done_cond;
+    uint32_t thread_flags;
 
     int wake_count;
+
+    // Process exit code
+    int exit_code;
+
+    int reserved2;
+
+    // 2 64-bit values
+    __cxa_eh_globals cxx_exception_info;
 
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
@@ -170,6 +181,8 @@ struct alignas(256) thread_info_t {
     // is set to now. Preemption is set up so the timer will fire when this
     // time elapses.
     uint64_t timeslice_remaining;
+
+    // --- cache line ---
 
     char *stack;
 
@@ -316,7 +329,7 @@ static void cpus_init_t()
     cpus[0].tss_ptr = tss_list;
 }
 
-// Ticks up as each AP startups up
+// Ticks up as each AP starts up
 uint32_t cpu_count;
 
 // Holds full count
@@ -412,11 +425,14 @@ static constexpr size_t stack_guard_size = (64<<10);
 static char *thread_allocate_stack(
         thread_t tid, size_t stack_size, char const *noun, int fill)
 {
+    // Whole thing is guard pages at first
     char *stack;
     stack = (char*)mmap(nullptr, stack_guard_size +
-                        stack_size + stack_guard_size,
-                        PROT_READ | PROT_WRITE,
-                        MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+                        stack_size + stack_guard_size, PROT_NONE,
+                        MAP_UNINITIALIZED, -1, 0);
+
+    if (unlikely(stack == MAP_FAILED))
+        return nullptr;
 
     THREAD_STK_TRACE("Allocated %s stack"
                      ", size=%#zx"
@@ -431,14 +447,8 @@ static char *thread_allocate_stack(
     char *guard0_st = stack;
     char *guard0_en = guard0_st + stack_guard_size;
     char *guard1_st = guard0_en + stack_size;
-
-    madvise(guard0_st, stack_guard_size, MADV_DONTNEED);
-    mprotect(guard0_st, stack_guard_size, PROT_NONE);
-
-    //madvise(guard0_en, stack_size, MADV_WILLNEED);
-
-    madvise(guard1_st, stack_guard_size, MADV_DONTNEED);
-    mprotect(guard1_st, stack_guard_size, PROT_NONE);
+    mprotect(guard0_en, stack_size, PROT_READ | PROT_WRITE);
+    madvise(guard0_en, stack_size, MADV_WILLNEED);
 
     THREAD_TRACE("Thread %d %s stack range=%p-%p,"
                  " stack=%p-%p\n", tid, noun,
@@ -473,7 +483,7 @@ static void thread_gc()
 static thread_t thread_create_with_state(
         thread_fn_t fn, void *userdata, size_t stack_size,
         thread_state_t state, thread_cpu_mask_t const &affinity,
-        thread_priority_t priority, bool user)
+        thread_priority_t priority, bool user, bool is_float)
 {
     thread_gc();
 
@@ -524,14 +534,17 @@ static thread_t thread_create_with_state(
     char *stack = thread_allocate_stack(
                 i, stack_size, "create_with_state", 0xF0);
 
+    if (unlikely(stack == nullptr))
+        panic_oom();
+
     thread->stack = stack;
     thread->stack_size = stack_size;
 
     char *xsave_stack = nullptr;
-    if (user) {
+    if (user || is_float) {
         // XSave stack
 
-        //thread->thread_flags |= THREAD_FLAGS_USER_FPU;
+        thread->thread_flags |= THREAD_FLAGS_KERNEL_FPU;
 
         xsave_stack = thread_allocate_stack(
                     i, xsave_stack_size, "xsave", 0);
@@ -614,13 +627,14 @@ static thread_t thread_create_with_state(
 
 
 EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
-                              size_t stack_size, bool user)
+                              size_t stack_size, bool user, bool is_float)
 {
     thread_create_info_t info{};
     info.fn = fn;
     info.userdata = userdata;
     info.stack_size = stack_size;
     info.user = user;
+    info.is_float = is_float;
 
     return thread_create_with_info(&info);
 }
@@ -630,7 +644,7 @@ EXPORT thread_t thread_create_with_info(thread_create_info_t const* info)
     return thread_create_with_state(
                 info->fn, info->userdata, info->stack_size,
                 info->suspended ? THREAD_IS_SLEEPING: THREAD_IS_READY,
-                thread_cpu_mask_t(-1), 0, info->user);
+                thread_cpu_mask_t(-1), 0, info->user, info->is_float);
 }
 
 #if 0
@@ -767,7 +781,7 @@ void thread_init(int ap)
                     smp_idle_thread, nullptr, 0,
                     THREAD_IS_INITIALIZING,
                     thread_cpu_mask_t(cpu_nr),
-                    -256, false);
+                    -256, false, false);
 
         thread->process = threads[0].process;
 
@@ -803,7 +817,7 @@ static thread_info_t *thread_choose_next(
         thread_info_t * const outgoing)
 {
     size_t cpu_nr = cpu->cpu_nr;
-    size_t i = outgoing - threads;
+    size_t i = outgoing->thread_id;
     thread_info_t *incoming = nullptr;
     thread_info_t *candidate;
     uint64_t now = 0;
@@ -845,8 +859,13 @@ static thread_info_t *thread_choose_next(
 
         // Garbage collect destructing threads
         if (unlikely(candidate->state == THREAD_IS_DESTRUCTING)) {
-            atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
-                           THREAD_IS_EXITING);
+            if (atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
+                               THREAD_IS_EXITING) == THREAD_IS_DESTRUCTING) {
+                if (candidate->process->del_thread(candidate->thread_id)) {
+                    candidate->state = THREAD_IS_FINISHED;
+                    condvar_wake_all(&candidate->done_cond);
+                }
+            }
             continue;
         }
 
@@ -920,8 +939,10 @@ static void thread_clear_busy(void *outgoing)
     // delete the thread from the owning process
     if (unlikely(atomic_and(&thread->state,
                             (thread_state_t)~THREAD_BUSY) ==
-                 THREAD_IS_EXITING))
-        thread->process->del_thread(thread->thread_id);
+                 THREAD_IS_EXITING)) {
+        thread_info_t * volatile other = thread=thread;
+        //thread->process->del_thread(thread->thread_id);
+    }
 }
 
 static void thread_free_stacks(thread_info_t *thread)
@@ -997,7 +1018,7 @@ void thread_destruct(thread_info_t *thread)
     }
 }
 
-int thread_close(thread_t tid)
+EXPORT int thread_close(thread_t tid)
 {
     auto& thread = threads[tid];
     if (thread.state == THREAD_IS_FINISHED) {
@@ -1080,6 +1101,9 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     for ( ; ; ++retries) {
         thread = thread_choose_next(cpu, outgoing);
 
+        if (thread != outgoing)
+            printdbg("Switching to thread %#x\n", thread->thread_id);
+
         assert((thread >= threads + cpu_count &&
                 thread < threads + countof(threads)) ||
                thread == threads + cpu->cpu_nr);
@@ -1155,7 +1179,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
             //
             // The outgoing FPU context needs to be saved
 
-            THREAD_TRACE("Saving fpu context of thread %x\n",
+            THREAD_TRACE("Saving fpu context of thread %#x\n",
                          outgoing->thread_id);
 
             // Save it correctly
@@ -1199,8 +1223,8 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
                 cpu_cr0_clts();
             }
 
-            THREAD_TRACE("Restoring context of thread %zx\n",
-                         thread - threads);
+            THREAD_TRACE("Restoring context of thread %d\n",
+                         thread->thread_id);
 
             if (ISR_CTX_FPU(thread->ctx)) {
                 // Use the correct one
@@ -1222,6 +1246,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
         case zeros:
             if (!(cpu->cr0_shadow & CPU_CR0_TS))
                 cpu_clear_fpu();
+            fpu_state = saved;
             break;
 
         case ignore:
@@ -1229,11 +1254,16 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
         }
 
         if (to_fpu) {
-            // Allow use of FPU but don't restore anything
-            cpu_cr0_clts();
+            if (cpu->cr0_shadow & CPU_CR0_TS) {
+                // Allow use of FPU
+                printdbg("FPU allowed\n");
+                cpu->cr0_shadow &= ~CPU_CR0_TS;
+                cpu_cr0_clts();
+            }
         } else if ((cpu->cr0_shadow & CPU_CR0_TS) == 0) {
             // Lock out the FPU
             // Set TS flag to block access to FPU
+            printdbg("FPU locked out\n");
             cpu->cr0_shadow |= CPU_CR0_TS;
             cpu_cr0_set(cpu->cr0_shadow);
         }
@@ -1417,10 +1447,13 @@ EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
 EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
 {
     cpu_info_t *cpu = this_cpu();
+    int cur_tid = cpu->cur_thread->thread_id;
     if (tid < 0)
         tid = cpu->cur_thread->thread_id;
     if (uintptr_t(tid) < countof(threads))
         threads[tid].fsbase = (void*)fsbase;
+    if (cur_tid == tid)
+        cpu_fsbase_set((void*)fsbase);
 }
 
 EXPORT thread_cpu_mask_t const* thread_get_affinity(int id)
@@ -1579,6 +1612,11 @@ EXPORT process_t *thread_current_process()
     return thread->process;
 }
 
+EXPORT unsigned thread_current_cpu(thread_t tid)
+{
+    cpu_info_t *cpu = tid < 0 ? this_cpu() : &cpus[run_cpu[tid]];
+    return cpu->cpu_nr;
+}
 
 uint32_t thread_get_cpu_apic_id(int cpu)
 {

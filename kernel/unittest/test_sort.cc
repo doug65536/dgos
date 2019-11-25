@@ -4,39 +4,17 @@
 #include "printk.h"
 #include "inttypes.h"
 #include "chrono.h"
+#include "utility.h"
 
 UNITTEST(test_sort)
 {
-    int cases[][4] = {
-        { 1, 2, 3, 4 },
-        { 1, 2, 4, 3 },
-        { 1, 3, 2, 4 },
-        { 1, 3, 4, 2 },
-        { 1, 4, 2, 3 },
-        { 1, 4, 3, 2 },
-        { 2, 1, 3, 4 },
-        { 2, 1, 4, 3 },
-        { 2, 3, 1, 4 },
-        { 2, 3, 4, 1 },
-        { 2, 4, 1, 3 },
-        { 2, 4, 3, 1 },
-        { 3, 1, 2, 4 },
-        { 3, 1, 4, 2 },
-        { 3, 2, 1, 4 },
-        { 3, 2, 4, 1 },
-        { 3, 4, 1, 2 },
-        { 3, 4, 2, 1 },
-        { 4, 1, 2, 3 },
-        { 4, 1, 3, 2 },
-        { 4, 2, 1, 3 },
-        { 4, 2, 3, 1 },
-        { 4, 3, 1, 2 },
-        { 4, 3, 2, 1 }
+    int cases[4] = {
+        1, 2, 3, 4
     };
 
-    for (size_t i = 0; i < 24; ++i) {
+    do {
         int tcase[4];
-        std::copy(&cases[i][0], &cases[i][4], tcase);
+        std::copy(&cases[0], &cases[4], tcase);
 
         std::sort(tcase, tcase + 4);
 
@@ -44,7 +22,7 @@ UNITTEST(test_sort)
         eq(2, tcase[1]);
         eq(3, tcase[2]);
         eq(4, tcase[3]);
-    }
+    } while (std::next_permutation(cases, cases + countof(cases)));
 }
 
 UNITTEST(test_stress_sort)

@@ -321,7 +321,7 @@ bool virtio_blk_if_t::init(pci_dev_iterator_t const &pci_iter)
     blk_config = (blk_config_t*)device_cfg;
     log2_sectorsize = bit_log2(blk_config->blk_size);
 
-    per_queue = new (std::nothrow) per_queue_t[queue_count];
+    per_queue = new (std::nothrow) per_queue_t[queue_count]();
 
     for (size_t i = 0; i < queue_count; ++i) {
         if (!per_queue[i].init(this, &queues[i]))

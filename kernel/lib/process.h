@@ -7,6 +7,7 @@
 #include "desc_alloc.h"
 #include "thread.h"
 #include "cpu/except_asm.h"
+#include "cxxstring.h"
 
 struct fd_table_t
 {
@@ -147,6 +148,9 @@ struct file_mapping_t {
 
 struct process_t
 {
+    static constexpr uintptr_t min_addr = 0x400000;
+    static constexpr uintptr_t max_addr = 0x7fc000000000;
+
     process_t() = default;
 
     bool valid_fd(int fd)
@@ -168,11 +172,9 @@ struct process_t
         exited
     };
 
-    char *path = nullptr;
-    char **argv = nullptr;
-    char **env = nullptr;
-    size_t argc = 0;
-    size_t envc = 0;
+    std::string path;
+    std::vector<std::string> argv;
+    std::vector<std::string> env;
     uintptr_t mmu_context = 0;
     void *linear_allocator = nullptr;
     uintptr_t tls_addr = 0;
@@ -193,9 +195,9 @@ struct process_t
     state_t state = state_t::unused;
 
     static int spawn(pid_t * pid_result,
-                     char const * path,
-                     char const * const * argv,
-                     char const * const * envp);
+                     std::string path,
+                     std::vector<std::string> argv,
+                     std::vector<std::string> env);
     static process_t *init(uintptr_t mmu_context);
 
     void *get_allocator();

@@ -44,7 +44,7 @@ static void malloc_statup_smp(void*)
     // Lock free transition to N per-cpu heaps
     size_t new_heap_count = thread_get_cpu_count();
 
-    heap_t **new_default_heaps = new (std::nothrow) heap_t *[new_heap_count];
+    heap_t **new_default_heaps = new (std::nothrow) heap_t *[new_heap_count]();
     if (unlikely(!default_heaps))
         panic_oom();
 

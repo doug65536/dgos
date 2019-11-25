@@ -149,7 +149,12 @@ public:
     void releaseref()
     {
         if (atomic_dec(&refcount) == 0)
-            delete static_cast<T*>(this);
+            destroy();
+    }
+
+    virtual void destroy()
+    {
+        delete static_cast<T*>(this);
     }
 
 protected:
@@ -160,7 +165,7 @@ protected:
     }
 
     _always_inline
-    ~refcounted()
+    virtual ~refcounted()
     {
         assert(refcount == 0);
     }

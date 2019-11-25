@@ -90,7 +90,7 @@ bool usb_hub_t::init(usb_config_helper const* cfg_hlp)
 
     for (int port = 1; port <= hub_desc.num_ports; ++port) {
         uint32_t status = get_port_status(port);
-        USBHUB_TRACE("Port %d status == %x\n", port, status);
+        USBHUB_TRACE("Port %d status == %#x\n", port, status);
 
         if (status & 1) {
             if (control.add_hub_port(port)) {

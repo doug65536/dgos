@@ -295,8 +295,8 @@ void cmos_init(void)
     time_ofday_set_handler(cmos_gettimeofday);
 
     // Keep rereading the time until we get the same values twice
-    time_of_day_t tod1;
-    time_of_day_t tod2;
+    time_of_day_t tod1{};
+    time_of_day_t tod2{};
     tod1 = cmos_read_gettimeofday(lock);
     for (;;) {
         tod2 = cmos_read_gettimeofday(lock);

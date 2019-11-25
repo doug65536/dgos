@@ -1481,17 +1481,30 @@ libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS) \
-	$(USER64_FLAGS)
+	$(COMPILER_FLAGS)
 
-#bin_PROGRAMS += libc.so
-#
-#libc_so_SOURCES = $(libc_a_SOURCES)
-#libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) -fPIC -shared -nostdlib
-#libc_so_CFLAGS = $(libc_a_CFLAGS) -fPIC -shared -nostdlib
-#libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) -fPIC -shared -nostdlib
-#libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fPIC -shared -nostdlib
-#EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
+bin_PROGRAMS += libc.so
+
+libc_so_SOURCES = $(libc_a_SOURCES)
+
+libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) \
+	$(USERLIB64_FLAGS) \
+	-fPIC -shared -nostdlib
+
+libc_so_CFLAGS = $(libc_a_CFLAGS) \
+	-fPIC -shared -nostdlib
+
+libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) -fPIC \
+	-shared -nostdlib
+
+libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fPIC -shared -nostdlib \
+	-isystem $(top_srcdir)/libc/include \
+	$(FREESTANDING_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS) \
+	$(USERLIB64_LDFLAGS)
+
+EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
 
 noinst_LIBRARIES += libm.a
 
@@ -2139,7 +2152,7 @@ QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
-QEMU_RAM = 1G
+QEMU_RAM = 160M
 
 QEMU_MEMFILL =
 #QEMU_MEMFILL = \
@@ -2224,10 +2237,6 @@ QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_CO
 QEMU_DISPLAY_SPICE = -spice ipv4,port=14446,disable-ticketing=on
 QEMU_DISPLAY =
 QEMU_MACHINE = -machine q35 $(QEMU_DISPLAY)
-#QEMU_MACHINE_nvme = -machine q35
-#QEMU_MACHINE_ahci = -machine q35
-#QEMU_MACHINE_usb = -machine q35
-#QEMU_MACHINE_ide = -machine pc
 
 QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 
@@ -2376,10 +2385,14 @@ BOCHS_MEDIA = gpt mbr iso
 BOCHS_FW = bios efi
 BOCHS_PART = kernel boot
 
+bochs_symdep_boot = sym/bootfat.sym
+bochs_symdep_kernel = sym/kernel-generic.sym
+
 # 1=media, 2=fw, 3=part
 define bochs_launcher =
 $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
-		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
+		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands \
+		$$(bochs_symdep_$(3))
 	cp "$$<" "$$@"
 
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
@@ -2388,10 +2401,11 @@ debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
 		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
 	$$(BOCHS) \
 		-f $$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
-		-rc $$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands \
 		$$(BOCHS_FLAGS)
 .PHONY: debug-$(1)-$(2)-bochs-$(3)
 endef
+
+#-rc $$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
 
 $(foreach media,$(BOCHS_MEDIA), \
 	$(foreach fw,$(BOCHS_FW), \
@@ -2401,3 +2415,14 @@ $(foreach media,$(BOCHS_MEDIA), \
 	) \
 )
 
+debug: debug-up-efi-hd-gpt-nvme-vga-kvm
+
+.PHONY: debug
+
+debug-bochs: debug-gpt-bios-bochs-kernel
+
+.PHONY: debug-bochs
+
+debug-bochs-boot: debug-gpt-bios-bochs-boot
+
+.PHONY: debug-bochs-boot

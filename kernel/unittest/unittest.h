@@ -35,15 +35,31 @@ private:
 
 class unit {
 public:
-    unit(char const *name, char const *test_file, int test_line);
+    unit(char const *name, char const *test_file, int test_line,
+         bool init_enabled);
 
     _noinline
     void fail(const char *file, int line);
 
     void set_ctx(unit_ctx *ctx);
 
+    bool enabled() const {
+        return is_enabled;
+    }
+
+    void enabled(bool en) {
+        is_enabled = en;
+    }
+
+    bool float_thread() const {
+        return is_float_thread;
+    }
+
+    void float_thread(bool en) {
+        is_float_thread = en;
+    }
+
     virtual void invoke() = 0;
-    virtual bool enabled() const { return true; }
 
     void eq(char const *expect, char *value,
             char const *file = __builtin_FILE(),
@@ -99,10 +115,15 @@ protected:
     unit_ctx *ctx = nullptr;
     unit *next = nullptr;
 
+    bool is_enabled;
+    bool is_float_thread = false;
+
     static unit *list_st;
     static unit *list_en;
 
 private:
+    static int thread_fn(void *arg);
+
     char const * const name = nullptr;
     char const * const test_file = nullptr;
     int const test_line = 0;
@@ -206,19 +227,49 @@ extern template void unit::eq(size_t const&, size_t const&,
 #define UNITTEST_CONCAT2(a,b) a##b
 #define UNITTEST_CONCAT(a,b) UNITTEST_CONCAT2(a, b)
 
-#define UNITTESTIMPL(name, symbol, is_enabled) \
-class symbol \
+#define UNITTEST_CLASS_NAME(name) \
+    UNITTEST_CONCAT(unit_, name)
+
+#define UNITTEST_INSTANCE_NAME(name) \
+    UNITTEST_CONCAT(UNITTEST_CLASS_NAME(name), _instance)
+
+#define UNITTESTIMPL(name, init_enabled, fn_attr) \
+class UNITTEST_CLASS_NAME(name) \
     : public unittest::unit { \
 public: \
-    symbol() : unit(#name, __FILE__, __LINE__) {} \
+    UNITTEST_CLASS_NAME(name)() \
+        : unit(#name, __FILE__, __LINE__, (init_enabled)) {} \
     void invoke() override final; \
-    bool enabled() const override final { return (is_enabled); } \
-}; symbol UNITTEST_CONCAT(symbol, instance); void symbol ::invoke()
+}; UNITTEST_CLASS_NAME(name) UNITTEST_INSTANCE_NAME(name); \
+fn_attr void UNITTEST_CLASS_NAME(name) ::invoke()
 
-#define UNITTEST(name) \
-    UNITTESTIMPL(name, UNITTEST_CONCAT(unit_, name), true)
-#define DISABLED_UNITTEST(name) \
-    UNITTESTIMPL(name, UNITTEST_CONCAT(unit_, name), false)
+template<typename T, void (unit::*member)(T value)>
+struct unittest_set_member {
+    unittest_set_member(unit* unit_ptr, T enabled)
+    {
+        (unit_ptr->*member)(enabled);
+    }
+};
+
+using unittest_set_enable =
+unittest_set_member<bool, &unit::enabled>;
+
+using unittest_set_float =
+unittest_set_member<bool, &unit::float_thread>;
+
+#define UNITTEST(name) UNITTESTIMPL(name, true, )
+#define OPTIMIZED_UNITTEST(name) UNITTESTIMPL(name, true, _always_optimize)
+#define DISABLED_UNITTEST(name) UNITTESTIMPL(name, false,)
+
+#define UNITTEST_SET_ENABLE(name, enabled) \
+    unittest::unittest_set_enable \
+        UNITTEST_CONCAT(set_unit_set_enable_, name)( \
+            (& UNITTEST_INSTANCE_NAME(name)), (enabled))
+
+#define UNITTEST_SET_FLOAT(name, enabled) \
+    unittest::unittest_set_float \
+        UNITTEST_CONCAT(set_unit_set_float_, name)( \
+            (& UNITTEST_INSTANCE_NAME(name)), (enabled))
+
 
 } // namespace unittest
-

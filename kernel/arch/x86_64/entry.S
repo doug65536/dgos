@@ -156,10 +156,10 @@ bsp_init:
     call __asan_storeN_noabort
 
     // Mark .rodata initialized
-//    leaq __bspstk_st(%rip),%rdi
-//    leaq __bspstk_en(%rip),%rsi
-//    subq %rdi,%rsi
-//    call __asan_storeN_noabort
+    leaq __bspstk_st(%rip),%rdi
+    leaq __bspstk_en(%rip),%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
 
     // Mark .data initialized
     leaq ___data_st(%rip),%rdi
@@ -173,15 +173,9 @@ bsp_init:
     subq %rdi,%rsi
     call __asan_storeN_noabort
 
-    // XX: hardcoded
-    movabs $(-(518 << 30)),%rdi
-    movabs $(4 << 30),%rsi
-    call __asan_storeN_noabort
-
     // Mark VGA initialized
     movl $ 0xb8000,%edi
     movl $ 0x08000,%esi
-    subl %edi,%esi
     call __asan_storeN_noabort
 
     movb $1,asan_ready(%rip)
@@ -218,8 +212,8 @@ early_tss:
     //
     //  uint64_t ist[8]; 2 emergency stacks in last 8KB of main stack
     .quad 0
-    .quad kernel_stack+8192
-    .quad kernel_stack+4096
+    .quad kernel_stack+65536-4096*1
+    .quad kernel_stack+65536-4096*2
     .space 5*8
     //
     //  uint32_t reserved3;

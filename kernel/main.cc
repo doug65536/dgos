@@ -61,7 +61,6 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 #define ENABLE_FILESYSTEM_RD_TEST   1
 #define ENABLE_SPAWN_STRESS         0
 #define ENABLE_SHELL                0
-#define ENABLE_CONDVAR_STRESS       0
 #define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     0
@@ -118,7 +117,8 @@ public:
         this->devid = devid;
         this->indicator = indicator;
         this->index = index;
-        tid = thread_create(&read_stress_thread_t::worker, this, 0, 0);
+        tid = thread_create(&read_stress_thread_t::worker, this, 0,
+                            false, false);
         return tid;
     }
 
@@ -213,7 +213,7 @@ private:
                 int ofs = 0;
                 if (delta_time >= 1000000000) {
                     for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
-                        ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
+                        ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%#2x ",
                                         counts[s << 6]);
                     }
 
@@ -521,7 +521,7 @@ int clks_unhalted(void *cpu)
     while (1) {
         thread_sleep_for(1000);
         uint64_t curr = thread_get_usage(-1);
-        printk("CPU %zx: %" PRIu64 " clocks\n", cpu_nr, curr - last);
+        printk("CPU %#zx: %" PRIu64 " clocks\n", cpu_nr, curr - last);
         last = curr;
     }
 }
@@ -546,7 +546,7 @@ static int find_vbe(void *p)
                 bios[i+2] == 'M' &&
                 bios[i+3] == 'P' &&
                 sum_bytes(bios + i, 20) == 0) {
-            printk("Found VBE PM Interface at %x!\n",
+            printk("Found VBE PM Interface at %#x!\n",
                      (uint32_t)(uintptr_t)p + i);
             break;
         }
@@ -721,7 +721,8 @@ int test_filesystem_read_thread(void*)
 
 bool test_filesystem_read()
 {
-    int tid = thread_create(test_filesystem_read_thread, nullptr, 0, false);
+    int tid = thread_create(test_filesystem_read_thread, nullptr, 0,
+                            false, false);
     if (tid > 0) {
         thread_close(tid);
         return true;
@@ -775,26 +776,9 @@ static int init_thread(void *)
 
     //printk("Running set<int> self test\n");
     //std::set<int>::test();
-//    rbtree_t<>::test();
-
-//    {
-//        using tree = rbtree_t<uintptr_t,uintptr_t>;
-//        tree rotation_stress;
-//        rotation_stress.init();
-//        for (int i = 0; i < 4000000; ++i) {
-//            rotation_stress.insert(i, 0);
-//            if (i >= 1000000) {
-//                tree::kvp_t kvp{i - 1000000, 0};
-//                tree::iter_t it;
-//                tree::kvp_t *item = rotation_stress.find(&kvp, &it);
-//                assert(it);
-//                rotation_stress.delete_at(it);
-//            }
-//        }
-//    }
 
     pid_t init_pid = -1;
-    if (unlikely(process_t::spawn(&init_pid, "init", nullptr, nullptr) != 0))
+    if (unlikely(process_t::spawn(&init_pid, "init", {}, {}) != 0))
         panic("spawn init failed!");
 
     if (unlikely(process_t::wait_for_exit(init_pid) < 0))
@@ -850,17 +834,6 @@ static int init_thread(void *)
     modload_load("ide.km");
 #endif
 
-    //test_spawn();
-
-//    printk("Initializing framebuffer\n");
-//    fb_init();
-
-    //priqueue_test.test();
-
-#if ENABLE_CONDVAR_STRESS
-    condvar_test();
-#endif
-
 #if 0
     //    for (int i = 0; i < 10000; ++i) {
     //        printk("%d=%f\n", i, i / 1000.0);
@@ -903,7 +876,7 @@ static int init_thread(void *)
     //printk("Running mprotect self test\n");
     //mprotect_test(nullptr);
 
-    printk("Running red-black tree self test\n");
+    //printk("Running red-black tree self test\n");
     //rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
@@ -938,7 +911,7 @@ static int init_thread(void *)
 
 #if ENABLE_SHELL_THREAD > 0
     printk("Running shell thread\n");
-    thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, false);
+    thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, false, false);
 #endif
 
 #if ENABLE_SLEEP_THREAD
@@ -992,7 +965,7 @@ int debugger_thread(void *)
 {
     printk("Starting GDB stub\n");
     gdb_init();
-    thread_create(init_thread, nullptr, 0, false);
+    thread_create(init_thread, nullptr, 0, false, true);
 
     return 0;
 }
@@ -1096,6 +1069,11 @@ void test_cxx_except()
 
 extern "C" _noreturn int main(void)
 {
+#ifdef _ASAN_ENABLED
+    __builtin___asan_storeN_noabort((void*)kernel_params->phys_mapping,
+                                    kernel_params->phys_mapping_sz);
+#endif
+
     //test_cxx_except();
 
 //    bool caught = false;
@@ -1118,9 +1096,9 @@ extern "C" _noreturn int main(void)
 //    assert(caught);
 
     if (!kernel_params->wait_gdb)
-        thread_create(init_thread, nullptr, 0, false);
+        thread_create(init_thread, nullptr, 0, false, false);
     else
-        thread_create(debugger_thread, nullptr, 0, false);
+        thread_create(debugger_thread, nullptr, 0, false, false);
 
     thread_idle_set_ready();
 

@@ -3,7 +3,7 @@
 #include "keyboard.h"
 #include "mouse.h"
 
-#define USBHID_DEBUG 0
+#define USBHID_DEBUG 1
 #if USBHID_DEBUG
 #define USBHID_TRACE(...) printdbg("usbhid: " __VA_ARGS__)
 #else
@@ -711,7 +711,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
         if (!pressed) {
             // Generate keyup event
-            USBHID_TRACE("keydown, scancode=%x\n", scancode);
+            USBHID_TRACE("keydown, scancode=%#x\n", scancode);
 
             int vk = (scancode < countof(usb_hid_keybd_lookup))
                     ? usb_hid_keybd_lookup[scancode] : 0;
@@ -731,7 +731,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
         if (memchr(last_keybd_state + 2, scancode, 6))
             continue;
 
-        USBHID_TRACE("keydown, scancode=%x\n", scancode);
+        USBHID_TRACE("keydown, scancode=%#x\n", scancode);
 
         // Generate keydown event
         int vk = (scancode < countof(usb_hid_keybd_lookup))

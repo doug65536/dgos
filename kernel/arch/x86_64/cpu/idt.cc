@@ -516,7 +516,7 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
 
 //static void dump_frame(uintptr_t rbp, uintptr_t rip)
 //{
-//    printk("at cfa=%16zx ip=%16zx\n", rbp, rip);
+//    printk("at cfa=%#16zx ip=%#16zx\n", rbp, rip);
 //}
 
 void dump_context(isr_context_t *ctx, int to_screen)
@@ -595,8 +595,8 @@ void dump_context(isr_context_t *ctx, int to_screen)
                  ctx->gpr.s.r[i]);
     }
 
-    printdbg("ss:rsp=%4lx:%16lx\n", ISR_CTX_REG_SS(ctx), ISR_CTX_REG_RSP(ctx));
-    printdbg("cs:rip=%4lx:%16zx\n", ISR_CTX_REG_CS(ctx),
+    printdbg("ss:rsp=%#4lx:%#016lx\n", ISR_CTX_REG_SS(ctx), ISR_CTX_REG_RSP(ctx));
+    printdbg("cs:rip=%#4lx:%#016zx\n", ISR_CTX_REG_CS(ctx),
              uintptr_t(ISR_CTX_REG_RIP(ctx)));
 
     // Exception
@@ -691,7 +691,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // cs:rip
     con_draw_xy(0, 16, "cs:rip", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%16zx",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%#04lx:%#16zx",
              ISR_CTX_REG_CS(ctx), (uintptr_t)ISR_CTX_REG_RIP(ctx));
     con_draw_xy(6, 16, fmt_buf, color);
 
@@ -819,6 +819,8 @@ void idt_clone_debug_exception_dispatcher(void)
     char *clone = (char*)mmap(nullptr, isr_size,
                               PROT_READ | PROT_WRITE | PROT_EXEC,
                               MAP_POPULATE, -1, 0);
+    if (unlikely(clone == MAP_FAILED))
+        panic_oom();
 
     memcpy(clone, ___isr_st, isr_size);
 

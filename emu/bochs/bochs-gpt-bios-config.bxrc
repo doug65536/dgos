@@ -12,7 +12,7 @@ ata3: enabled=0
 usb_xhci: enabled=1
 debugger_log: bochs-debuglog
 plugin_ctrl: unmapped=1, biosdev=1, speaker=1, extfpuirq=0
-plugin_ctrl: parallel=1, serial=1, gameport=1, iodebug=1
+plugin_ctrl: parallel=1, serial=1, gameport=1
 config_interface: textconfig
 display_library: x
 memory: host=1024, guest=1024
@@ -33,12 +33,12 @@ floppy_bootsig_check: disabled=0
 # no floppyb
 pci: enabled=1, chipset=i440fx
 vga: extension=vbe, update_freq=5, realtime=1
-cpu: count=1:1:1, ips=24000000, quantum=1, model=bx_generic
+cpu: ips=24000000, model=bx_generic
 cpu: reset_on_triple_fault=0, cpuid_limit_winnt=0, ignore_bad_msrs=0
 cpu: mwait_is_nop=0
 cpuid: level=6, stepping=3, model=3, family=6, vendor_string="GenuineIntel",
 cpuid: brand_string="              Intel(R) Pentium(R) 4 CPU AVX-512"
-cpuid: mmx=1, apic=x2apic, simd=avx512, sse4a=1, misaligned_sse=0, sep=1
+cpuid: mmx=1, apic=x2apic, simd=avx2, sse4a=1, misaligned_sse=0, sep=1
 cpuid: movbe=0, adx=0, aes=1, sha=1, xsave=1, xsaveopt=1, avx_f16c=0
 cpuid: avx_fma=1, bmi=0, xop=0, fma4=1, tbm=0, x86_64=1, 1g_pages=1, pcid=0
 cpuid: fsgsbase=1, smep=1, smap=1, mwait=1
@@ -72,3 +72,4 @@ com1: enabled=1, mode=file, dev=/dev/ttyS0, turbo=1
 com2: enabled=0
 com3: enabled=0
 com4: enabled=0
+gdbstub: enabled=1

@@ -19,6 +19,9 @@ PHDRS {
 
 	/* rw- */
 	stacks PT_LOAD FLAGS(6);
+
+	/* rw- */
+	asan PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
@@ -276,6 +279,11 @@ SECTIONS {
 		*(.bspstk)
 		PROVIDE_HIDDEN(__bspstk_en = .);
 	} :stacks
+
+	/* Separate so it won't cause excessive asan pool pages to be allocated */
+	.asanbss (NOLOAD) : {
+		*(.asanbss)
+	} :asan
 
 	. = ALIGN(4K);
 	PROVIDE_HIDDEN(___init_brk = .);

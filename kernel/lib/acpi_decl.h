@@ -65,7 +65,7 @@ struct acpi_sdt_hdr_t {
     uint32_t oem_rev;
     uint32_t creator_id;
     uint32_t creator_rev;
-} _packed;
+};
 
 C_ASSERT(sizeof(acpi_sdt_hdr_t) == 36);
 
@@ -347,7 +347,8 @@ static _always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
     size_t wide_count = len >> 3;
     uint8_t sum = 0;
     while (i < wide_count) {
-        uint64_t value = ((uint64_t*)bytes)[i++];
+        uint64_t value;
+        __builtin_memcpy(&value, &((uint64_t*)bytes)[i++], sizeof(value));
         sum += value & 0xFF;
         value >>= 8;
         sum += value & 0xFF;
@@ -372,7 +373,10 @@ static _always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
     return sum;
 }
 
-static _always_inline uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
+static _always_inline uint8_t acpi_chk_hdr(void *hdr)
 {
-    return checksum_bytes((char const *)hdr, hdr->len);
+    size_t ofs = offsetof(acpi_sdt_hdr_t, len);
+    uint32_t len = 0;
+    __builtin_memcpy(&len, (char*)hdr + ofs, sizeof(len));
+    return checksum_bytes((char const *)hdr, len);
 }

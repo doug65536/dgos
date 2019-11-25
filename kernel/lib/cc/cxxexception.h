@@ -49,6 +49,18 @@ public:
     char const *what() const noexcept override;
 };
 
+class logic_error {
+    // fixme
+};
+
+class out_of_range : public logic_error {
+public:
+    out_of_range(/*fixme: string const& __message*/);
+
+    out_of_range(char const *__message);
+};
+
+
 __END_NAMESPACE_STD
 
 __BEGIN_NAMESPACE_EXT
@@ -124,13 +136,6 @@ class length_error  : public logic_error {
     length_error(string const& __message);
 
     length_error(char const *__message);
-};
-
-class out_of_range : public logic_error {
-public:
-    out_of_range(string const& __message);
-
-    out_of_range(char const *__message);
 };
 
 class future_error : public logic_error {

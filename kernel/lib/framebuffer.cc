@@ -788,7 +788,7 @@ static void test_framebuffer_thread()
     int x = 0;
     int xdir = 1;
     int ydir = 1;
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < 1; ++i) {
         for (size_t i = 0; i < countof(tests); ++i) {
             draw_str(x + 24 + 40, y + 40 + 33 + 14 + i*20,
                      tests[i], 0x777777U, 0x563412);

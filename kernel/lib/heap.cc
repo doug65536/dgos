@@ -158,7 +158,7 @@ uint32_t heap_get_block_heap_id(void *block)
 
 heap_t *heap_t::create(void)
 {
-    heap_t *heap = new heap_t;
+    heap_t *heap = new heap_t();
     return heap;
 }
 
@@ -249,6 +249,8 @@ heap_hdr_t *heap_t::create_arena(uint8_t log2size, scoped_lock const& lock)
     char *arena = (char*)mmap(nullptr, HEAP_BUCKET_SIZE,
                               PROT_READ | PROT_WRITE,
                               MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+    if (unlikely(arena == MAP_FAILED))
+        panic_oom();
     char *arena_end = arena + HEAP_BUCKET_SIZE;
 
     size_t slot = (*arena_count_ptr)++;
@@ -285,7 +287,7 @@ void *heap_t::large_alloc(size_t size, uint32_t heap_id)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)mmap(nullptr, size,
                            PROT_READ | PROT_WRITE,
-                           MAP_UNINITIALIZED, -1, 0);
+                           MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
 
     assert(hdr != MAP_FAILED);
 

@@ -17,6 +17,7 @@
 #include "contig_alloc.h"
 #include "user_mem.h"
 #include "cpu/except_asm.h"
+#include "utility.h"
 
 union process_ptr_t {
     process_t *p;
@@ -41,7 +42,7 @@ process_t *process_t::add_locked(processes_scoped_lock const&)
     pid_t pid;
     size_t realloc_count = 0;
 
-    process_t *process = new (std::nothrow) process_t;
+    process_t *process = new (std::nothrow) process_t();
     if (unlikely(!process))
         return nullptr;
 
@@ -95,60 +96,23 @@ process_t *process_t::add()
 }
 
 int process_t::spawn(pid_t * pid_result,
-                  char const * path,
-                  char const * const * argv,
-                  char const * const * envp)
+                  std::string path,
+                  std::vector<std::string> argv,
+                  std::vector<std::string> env)
 {
     *pid_result = -1;
 
     process_t *process = process_t::add();
 
-    process->path = strdup(path);
-
-    if (unlikely(!process->path))
-        return int(errno_t::ENOMEM);
-
-    // Count the arguments
-    size_t arg_count = 0;
-    while (argv && argv[arg_count++]);
-
-    // Count the environment variables
-    size_t env_count = 0;
-    while (envp && envp[env_count++]);
-
-    // Make a copy of the arguments and environment variables
-    process->argv = (char**)calloc(arg_count + 1, sizeof(*argv));
-
-    if (unlikely(!process->argv))
-        return int(errno_t::ENOMEM);
-
-    process->env = (char**)calloc(env_count + 1, sizeof(*envp));
-
-    if (unlikely(!process->env))
-        return int(errno_t::ENOMEM);
-
-    for (size_t i = 0; i < arg_count; ++i) {
-        process->argv[i] = strdup(argv[i]);
-
-        if (unlikely(!process->argv[i]))
-            return int(errno_t::ENOMEM);
-    }
-    process->argv[arg_count] = nullptr;
-    process->argc = arg_count;
-
-    for (size_t i = 0; i < env_count; ++i) {
-        process->env[i] = strdup(envp[i]);
-
-        if (unlikely(!process->env[i]))
-            return int(errno_t::ENOMEM);
-    }
-    process->env[env_count] = nullptr;
-    process->envc = env_count;
+    process->path = std::move(path);
+    process->argv = std::move(argv);
+    process->env = std::move(env);
 
     // Return the assigned PID
     *pid_result = process->pid;
 
-    thread_t tid = thread_create(&process_t::run, process, 0, true);
+    thread_t tid = thread_create(&process_t::run, process, 0,
+                                 true, true);
 
     if (unlikely(tid < 0))
         return int(errno_t::ENOMEM);
@@ -156,6 +120,7 @@ int process_t::spawn(pid_t * pid_result,
     if (unlikely(!process->add_thread(tid)))
         return int(errno_t::ENOMEM);
 
+    // Wait for it to finish starting
     processes_scoped_lock lock(process->process_lock);
     while (process->state == process_t::state_t::starting)
         process->cond.wait(lock);
@@ -191,10 +156,10 @@ int process_t::run()
     /*int fd_o = */file_open("/dev/conout", 0, 0);
     /*int fd_e = */file_open("/dev/conerr", 0, 0);
 
-    file_t fd{file_open(path, O_RDONLY)};
+    file_t fd{file_open(path.c_str(), O_RDONLY)};
 
     if (unlikely(!fd)) {
-        printdbg("Failed to open executable %s\n", path);
+        printdbg("Failed to open executable %s\n", path.c_str());
         return -1;
     }
 
@@ -346,16 +311,34 @@ int process_t::run()
         }
     }
 
-    modload_load_symbols(path, first_exec);
+    modload_load_symbols(path.c_str(), first_exec);
 
     // Initialize the stack
 
     size_t stack_size = 65536;
-    void *stack = mmap(nullptr, stack_size, PROT_READ | PROT_WRITE,
-                       MAP_STACK | MAP_USER, -1, 0);
+    char *stack_memory = (char*)mmap(
+                nullptr, stack_size, PROT_NONE,
+                MAP_STACK | MAP_NOCOMMIT | MAP_USER, -1, 0);
 
-    if (unlikely(stack == MAP_FAILED)) {
+    if (unlikely(stack_memory == MAP_FAILED)) {
         printdbg("Failed to allocate user stack\n");
+        return -1;
+    }
+
+    // Guard page
+    char *stack = stack_memory + PAGE_SIZE;
+    stack_size -= PAGE_SIZE;
+
+    // Permit access to area excluding guard area
+    if (unlikely(mprotect(stack, stack_size, PROT_READ | PROT_WRITE) < 0)) {
+        printdbg("Failed set page protetions on user stack\n");
+        return -1;
+    }
+
+    // Commit first stack page
+    if (unlikely(madvise(stack + stack_size - PAGE_SIZE,
+                         PAGE_SIZE, MADV_WILLNEED) < 0)) {
+        printdbg("Failed to commit initial page in user stack\n");
         return -1;
     }
 
@@ -365,26 +348,32 @@ int process_t::run()
     // Initialize main thread TLS
     static_assert(sizeof(uintptr_t) == sizeof(void*), "Unexpected size");
     // The space for the uintptr_t is for the pointer to itself at TLS offset 0
-    size_t tls_vsize = PAGE_SIZE + tls_msize + sizeof(uintptr_t) + PAGE_SIZE;
-    void *tls = mmap(nullptr, tls_vsize,
-                     PROT_READ | PROT_WRITE,
-                     MAP_USER | MAP_NOCOMMIT, -1, 0);
+    size_t tls_vsize = PAGE_SIZE + sizeof(uintptr_t) + tls_msize + PAGE_SIZE;
+    void *tls = mmap(nullptr, tls_vsize, PROT_NONE, MAP_USER, -1, 0);
     if (tls == MAP_FAILED)
         return -1;
 
-    // 4KB guard region around TLS
-    mprotect(tls, PAGE_SIZE, PROT_NONE);
-    mprotect((void*)(((uintptr_t(tls) + PAGESIZE + tls_msize +
-                       PAGESIZE - 1)) & -PAGESIZE), PAGE_SIZE, PROT_NONE);
-
     uintptr_t tls_area = uintptr_t(tls) + PAGESIZE;
+
+    // 4KB guard region around TLS
+    if (unlikely(mprotect((void*)tls_area, tls_msize,
+                          PROT_READ | PROT_WRITE) < 0))
+        return -1;
 
     if (unlikely(!mm_is_user_range((void*)tls_area, tls_msize)))
         return -1;
 
+    // Explicitly commit faster than taking demand faults
+    if (unlikely(madvise((void*)tls_area, tls_msize, MADV_WILLNEED) < 0))
+        return -1;
+
     // Copy template into TLS area
-    mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize);
-    mm_copy_user((char*)tls_area + tls_fsize, nullptr, tls_msize - tls_fsize);
+    if (unlikely(!mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize)))
+        return -1;
+
+    if (unlikely(!mm_copy_user((char*)tls_area + tls_fsize, nullptr,
+                               tls_msize - tls_fsize)))
+        return -1;
 
     /// TLS uses negative offsets from the end of the TLS data, and a
     /// pointer to the TLS is located at the TLS base address.
@@ -402,7 +391,8 @@ int process_t::run()
     // the pointer to itself is located
     uintptr_t tls_ptr = uintptr_t(tls) + PAGE_SIZE + tls_msize;
     // Patch the pointer to itself into the TLS area
-    mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr));
+    if (unlikely(!mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr))))
+        return -1;
 
     // Point fs at it
     thread_set_fsbase(thread_get_id(), tls_ptr);
@@ -426,12 +416,12 @@ int process_t::run()
     size_t info_sz;
 
     // Populate the stack
-    void *stack_ptr = (char*)stack + stack_size;
+    void *stack_ptr = stack + stack_size;
 
     // Calculate the total size of environment string text
     info_sz = 0;
-    for (size_t i = 0; i < envc; ++i) {
-        size_t len = strlen(env[i]) + 1;
+    for (size_t i = 0; i < env.size(); ++i) {
+        size_t len = env[i].length() + 1;
         info_sz += len;
     }
 
@@ -441,8 +431,8 @@ int process_t::run()
 
     // Calculate the total size of argument string text
     info_sz = 0;
-    for (size_t i = 0; i < argc; ++i) {
-        size_t len = strlen(argv[i]) + 1;
+    for (size_t i = 0; i < argv.size(); ++i) {
+        size_t len = argv[i].length() + 1;
         info_sz += len;
     }
 
@@ -454,14 +444,14 @@ int process_t::run()
     stack_ptr = (void*)(uintptr_t(stack_ptr) & -sizeof(void*));
 
     // Calculate where the pointers to the environment strings start
-    stack_ptr = (char**)env_ptr - (envc + 1);
+    stack_ptr = (char**)env_ptr - (env.size() + 1);
     char **envp_ptr = (char**)stack_ptr;
 
     // Copy the environment strings and populate environment string pointers
-    for (size_t i = 0; i < envc; ++i) {
-        size_t len = strlen(env[i]) + 1;
+    for (size_t i = 0; i < env.size(); ++i) {
+        size_t len = env[i].length() + 1;
         // Copy the string
-        memcpy(env_ptr, env[i], len);
+        memcpy(env_ptr, env[i].c_str(), len);
         // Write the pointer to the string
         envp_ptr[i] = env_ptr;
         // Advance string output pointer
@@ -469,14 +459,14 @@ int process_t::run()
     }
 
     // Calculate where the pointers to the argument strings start
-    stack_ptr = envp_ptr - (argc + 1);
+    stack_ptr = envp_ptr - (argv.size() + 1);
     char **argp_ptr = (char**)stack_ptr;
 
     // Copy the argument strings and populate argument string pointers
-    for (size_t i = 0; i < envc; ++i) {
-        size_t len = strlen(argv[i]) + 1;
+    for (size_t i = 0; i < env.size(); ++i) {
+        size_t len = argv[i].length() + 1;
         // Copy the string
-        memcpy(arg_ptr, argv[i], len);
+        memcpy(arg_ptr, argv[i].c_str(), len);
         // Write the pointer to the string
         argp_ptr[i] = arg_ptr;
         // Advance string output pointer
@@ -485,11 +475,14 @@ int process_t::run()
 
     // Push argv to the stack
     stack_ptr = (char**)stack_ptr - 1;
-    mm_copy_user(stack_ptr, &argp_ptr, sizeof(argp_ptr));
+    if (unlikely(!mm_copy_user(stack_ptr, &argp_ptr, sizeof(argp_ptr))))
+        return -1;
 
     // Push argc to the stack
     stack_ptr = (uintptr_t*)stack_ptr - 1;
-    mm_copy_user(stack_ptr, &argc, sizeof(argc));
+    int argc = argv.size();
+    if (!mm_copy_user(stack_ptr, &argc, sizeof(argc)))
+        return -1;
 
     std::vector<auxv_t> auxent;
 
@@ -545,18 +538,14 @@ void process_t::set_allocator(void *allocator)
 
 void process_t::destroy()
 {
-    free(path);
-    path = nullptr;
+    std::string empty_path;
+    empty_path.swap(path);
 
-    for (size_t i = 0; i < argc; ++i)
-        free(argv[i]);
-    free(argv);
-    argv = nullptr;
+    std::vector<std::string> empty_argv;
+    empty_argv.swap(argv);
 
-    for (size_t i = 0; i < envc; ++i)
-        free(env[i]);
-    free(env);
-    env = nullptr;
+    std::vector<std::string> empty_env;
+    empty_env.swap(env);
 
     delete (contiguous_allocator_t*)linear_allocator;
     linear_allocator = nullptr;

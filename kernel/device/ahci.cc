@@ -1089,7 +1089,7 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
                 error = (port->taskfile_data >> AHCI_HP_TFD_ERR_BIT) &
                         AHCI_HP_TFD_ERR_MASK;
 
-                AHCI_TRACE("Error: port=%u, err=%x\n", port_num, error);
+                AHCI_TRACE("Error: port=%u, err=%#x\n", port_num, error);
             }
 
             if (error != 0) {
@@ -1768,7 +1768,7 @@ std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
         if (pci_iter.config.get_bar(5) == 0)
             continue;
 
-        AHCI_TRACE("Found AHCI Device BAR ht=%x %u/%u/%u d=%x s=%x:"
+        AHCI_TRACE("Found AHCI Device BAR ht=%#x %u/%u/%u d=%#x s=%#x:"
                    " %#" PRIx64 " %#" PRIx64 " %#" PRIx64
                    " %#" PRIx64 " %#" PRIx64 " %#" PRIx64 "\n",
                    pci_iter.config.header_type,

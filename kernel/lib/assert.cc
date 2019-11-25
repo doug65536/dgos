@@ -16,7 +16,7 @@ EXPORT int assert_failed(char const *expr,
     //cpu_irq_disable();
     // volatile because I might change it in the debugger and I want control
     // flow to appear to be able to return and continue
-    bool volatile keep_waiting = true;
+    bool volatile keep_waiting = false;
     while(keep_waiting)
         halt();
     return 0;

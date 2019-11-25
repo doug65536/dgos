@@ -356,8 +356,8 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_finit_module,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_fexecve
     (syscall_handler_t*)(void*)sys_probe_pci_for,
-    (syscall_handler_t*)(void*)sys_render_batch
-    //(syscall_handler_t*)(void*)sys_,
+    (syscall_handler_t*)(void*)sys_render_batch,
+    (syscall_handler_t*)(void*)sys_posix_spawn,
     //(syscall_handler_t*)(void*)sys_,
     //(syscall_handler_t*)(void*)sys_,
 };

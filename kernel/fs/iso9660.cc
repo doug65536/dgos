@@ -862,9 +862,10 @@ ssize_t iso9660_fs_t::read(fs_file_info_t *fi,
     if (offset + size > file_size)
         size = file_size - offset;
 
-    if (mm_is_user_range(buf, size))
-        mm_copy_user(buf, file->content + offset, size);
-    else
+    if (mm_is_user_range(buf, size)) {
+        if (unlikely(!mm_copy_user(buf, file->content + offset, size)))
+            return -int(errno_t::EFAULT);
+    } else
         memcpy(buf, file->content + offset, size);
 
     return size;

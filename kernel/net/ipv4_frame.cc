@@ -30,7 +30,7 @@ void ipv4_frame_received(ethq_pkt_t *pkt)
         break;
 
     default:
-        IPV4_FRAME_TRACE("Dropped unrecognized protocol=%x\n",
+        IPV4_FRAME_TRACE("Dropped unrecognized protocol=%#x\n",
                          ntohs(ipv4_pkt->protocol));
         break;
     }

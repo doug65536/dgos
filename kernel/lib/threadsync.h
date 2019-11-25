@@ -31,7 +31,11 @@ struct condition_var_t {
     // This lock must be held while adding a
     // thread_wait_t to the wait list
     spinlock_t lock;
+
+    uint32_t reserved;
 };
+
+C_ASSERT(sizeof(condition_var_t) == 8 * 3);
 
 struct mutex_t {
     // Linked list of threads waiting for the mutex
@@ -42,7 +46,10 @@ struct mutex_t {
 
     // This lock must be held while updating the list
     spinlock_t lock;
+    uint32_t reserved;
 };
+
+C_ASSERT(sizeof(mutex_t) == 4 * 8);
 
 struct rwlock_t {
     // Chain of writer waiters

@@ -1,8 +1,9 @@
 define startupbreakpoints
 	set remotetimeout 86400
 	set architecture i386:x86-64
+	#set architecture i386
 	set osabi none
-	set scheduler-locking step
+	set scheduler-locking off
 	set range-stepping off
 	thbreak entry
 	commands
@@ -24,7 +25,6 @@ define startupbreakpoints
 	commands
 		printf "Loading %s at 0x%lx",$rdi,$rsi
 		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
-
 	end
 end
 
@@ -133,8 +133,15 @@ define walkunwind_ctx
 	set $ctx = $arg0
 
 	# Save context
+	set $save_cr3 = $cr3
 	set $save_rip = $rip
 	set $save_rsp = $rsp
+	set $save_eflags = $eflags
+	set $save_ss = $ss
+	set $save_ds = $ds
+	set $save_es = $es
+	set $save_fs = $fs
+	set $save_gs = $gs
 	set $save_rax = $rax
 	set $save_rbx = $rbx
 	set $save_rcx = $rcx
@@ -152,8 +159,15 @@ define walkunwind_ctx
 	set $save_r15 = $r15
 
 	# Set context
+	set $cr3 = $ctx.cr3
 	set $rip = $ctx.iret.rip
 	set $rsp = $ctx.iret.rsp
+	set $eflags = (uint32_t)$ctx.iret.rflags
+	set $ss = $ctx.iret.ss
+	set $ds = $ctx.s.n.ds
+	set $es = $ctx.s.n.es
+	set $fs = $ctx.s.n.fs
+	set $gs = $ctx.s.n.gs
 	set $rax = $ctx.r.n.rax
 	set $rbx = $ctx.r.n.rbx
 	set $rcx = $ctx.r.n.rcx
@@ -171,11 +185,23 @@ define walkunwind_ctx
 	set $r15 = $ctx.r.n.r15
 
 	# Unwind
-	bt
+	python
+try:
+	gdb.execute("bt")
+except:
+	pass
+	end
 
 	# Restore context
+	set $cr3 = $save_cr3
 	set $rip = $save_rip
 	set $rsp = $save_rsp
+	set $eflags = $save_eflags
+	set $ss = $save_ss
+	set $ds = $save_ds
+	set $es = $save_es
+	set $fs = $save_fs
+	set $gs = $save_gs
 	set $rax = $save_rax
 	set $rbx = $save_rbx
 	set $rcx = $save_rcx
@@ -201,7 +227,24 @@ define walkunwind
 		if $ctx
 			printf "\n"
 			printf "Unwinding thread %d\n", $tid
-			walkunwind_ctx $ctx.gpr
+			python
+try:
+	gdb.execute("walkunwind_ctx $ctx.gpr")
+except:
+	pass
+			end
 		end
+	end
+end
+
+define modulesyms
+	set $midx = 0
+	set $mcount = loaded_modules.__sz
+	while $midx < $mcount
+		set $mname = loaded_modules.__m[$midx].__ptr->module_name.__str.__m
+		set $maddr = loaded_modules.__m[$midx].__ptr->first_exec
+		printf "Loading %s at 0x%lx",$mname,$maddr
+		eval "add-symbol-file %s 0x%lx",$mname,$maddr
+		set $midx = $midx + 1
 	end
 end

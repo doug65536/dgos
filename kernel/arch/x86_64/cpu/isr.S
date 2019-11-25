@@ -1329,7 +1329,7 @@ protection_barrier_ibpb:
 
     .cfi_endproc
 
-// on entry, ebx=intr, r12=ctx
+// on entry, rbp=frame, ebx=intr, r12=ctx
 .balign 16
 exception_isr_handler:
     .cfi_startproc
@@ -1886,6 +1886,7 @@ nofault_define_region nofault_offsetof
 // Returns the length if the string fits in a max_size buffer with null
 // Returns -2 if string too long
 // Returns -1 if faulted
+// Returns 0 without touching buffer if max_size is zero
 // ptrdiff_t nofault_strnlen(char const *s, size_t max_size)
 .global nofault_strnlen
 .hidden nofault_strnlen
@@ -1894,6 +1895,13 @@ nofault_strnlen:
     .cfi_startproc
 
     xor %eax,%eax
+
+    insn_fixup
+    stac
+
+    // Do not touch buffer if max_size is zero
+    test %rsi,%rsi
+    jz .Lnofault_strnlen_done
 
 .Lnofault_strnlen_loop:
     movb (%rdi,%rax),%cl
@@ -1906,7 +1914,7 @@ nofault_strnlen:
     inc %rax
 
     // Continue looping if the offset has not reached the maximum yet
-    cmp %rax,%rsi
+    cmp %rsi,%rax
     jb .Lnofault_strnlen_loop
 
     // Max length! Return -2 (to differentiate it from -1 from fault)
@@ -1915,6 +1923,10 @@ nofault_strnlen:
 
 .Lnofault_strnlen_done:
 .Lnofault_strnlen_faulted:// crash will resume here with -1 in rax
+
+    insn_fixup
+    clac
+
     ret
 
 .Lnofault_strnlen_end:
@@ -2040,6 +2052,7 @@ nofault_memcpy:
 
     ret
 
+.balign 16
 .Lmisaligned_dest:
     movzbl (%rsi),%eax
     add $1,%rsi
@@ -2049,6 +2062,7 @@ nofault_memcpy:
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_misaligned_mainloop
 
+.balign 16
 .Lnofault_memcpy_little_remaining:
     // See if any number of 64 bit chunks are remaining
     test $-8,%rdx
@@ -2063,6 +2077,7 @@ nofault_memcpy:
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_little_remaining
 
+.balign 16
 .Lnofault_memcpy_little_remaining_not64:
     // See if any number of 32 bit chunks are remaining
     test $-4,%rdx
@@ -2077,6 +2092,7 @@ nofault_memcpy:
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_little_remaining_not64
 
+.balign 16
 .Lnofault_memcpy_little_remaining_not32:
     movzbl (%rsi),%eax
     add $1,%rsi
@@ -2092,8 +2108,6 @@ nofault_memcpy:
     .cfi_endproc
 
 nofault_define_region nofault_memcpy
-
-
 
 .global __module_unwind_resume
 .balign 16

@@ -1,7 +1,18 @@
 #include "bootinfo.h"
 #include "bios_data.h"
 #include "main.h"
+#include "callout.h"
 #include "export.h"
+
+_constructor(ctor_asan_init)
+static void bootinfo_init()
+{
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(kernel_params), sizeof(*kernel_params));
+    __asan_storeN_noabort(uintptr_t(kernel_params->vbe_selected_mode),
+                          sizeof(*kernel_params->vbe_selected_mode));
+#endif
+}
 
 EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
 {

@@ -8,6 +8,7 @@
 #include "cpu/apic.h"
 #include "thread.h"
 #include "printk.h"
+#include "string.h"
 
 // Using hacky hardcoded stubs to avoid _no_instrument proliferation
 
@@ -262,7 +263,7 @@ static isr_context_t *eainst_intr_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-_hot _no_instrument
+_hot _no_instrument _no_ubsan
 static void eainst_write_record(trace_item const& item)
 {
     if (unlikely(!trace_queue_counts))
@@ -274,7 +275,19 @@ static void eainst_write_record(trace_item const& item)
     size_t slot = cpu_queue_count++;
 
     // Append record
-    trace_queue[item.cid * trace_queue_stride + slot] = item;
+    //trace_queue[item.cid * trace_queue_stride + slot], &item, sizeof(item));
+    C_ASSERT(sizeof(item) == 17);
+    uint64_t tmp;
+    __asm__ __volatile__ (
+        "mov (%[src]),%[tmp]\n\t"
+        "mov %[tmp],(%[src])\n\t"
+        "mov 8(%[src]),%[tmp]\n\t"
+        "mov %[tmp],8(%[src])\n\t"
+        "mov 16(%[src]),%b[tmp]\n\t"
+        "mov %b[tmp],16(%[src])\n\t"
+        : [tmp] "=&r" (tmp)
+        : [src] "r" (&trace_queue[item.cid * trace_queue_stride + slot])
+    );
 
     size_t effective_stride =
             trace_queue_counts
@@ -380,7 +393,7 @@ void eainst_set_cpu_count(int count)
     atomic_st_rel(&eainst_flush_ready, 1);
 }
 
-_hot _no_instrument
+_hot _no_instrument _no_ubsan
 void __cyg_profile_func_enter(void *this_fn, void * /*call_site*/)
 {
     trace_item item;

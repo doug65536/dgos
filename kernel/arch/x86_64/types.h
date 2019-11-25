@@ -48,6 +48,7 @@
 #define _artificial             __attribute__((__artificial__))
 #define _no_instrument          __attribute__((__no_instrument_function__))
 #define _no_asan                __attribute__((__no_address_safety_analysis__))
+#define _no_ubsan               __attribute__((no_sanitize("undefined")))
 #define _no_plt                 __attribute__((__noplt__))
 #define _constructor(prio)      __attribute__((__constructor__(prio)))
 #define _destructor(prio)       __attribute__((__destructor__(prio)))

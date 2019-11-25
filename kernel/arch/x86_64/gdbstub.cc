@@ -1781,7 +1781,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
         kind = from_hex<int>(&input);
 
-        GDBSTUB_TRACE("%s breakpoint at %zx with size %d\n",
+        GDBSTUB_TRACE("%s breakpoint at %#zx with size %d\n",
                       add ? "add" : "remove", addr, kind);
 
         ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
@@ -2125,19 +2125,19 @@ bool gdb_cpu_ctrl_t::breakpoint_write_target(
         return false;
 
     uintptr_t orig_pagedir = cpu_page_directory_get();
-    GDBSTUB_TRACE("Switching from stub pagedir (%zx)"
-                  " to target pagedir (%zx)\n", orig_pagedir, page_dir);
+    GDBSTUB_TRACE("Switching from stub pagedir (%#zx)"
+                  " to target pagedir (%#zx)\n", orig_pagedir, page_dir);
 
     cpu_page_directory_set(page_dir);
     cpu_tlb_flush();
     cpu_cr0_change_bits(CPU_CR0_WP, 0);
     *old_value = atomic_xchg((uint8_t*)addr, value);
-    GDBSTUB_TRACE("Wrote %#lx to %zx, replaced %#" PRIx64 "\n",
+    GDBSTUB_TRACE("Wrote %#lx to %#zx, replaced %#" PRIx64 "\n",
                   uintptr_t(value), addr, uintptr_t(*old_value));
     cpu_cr0_change_bits(0, CPU_CR0_WP);
     cpu_page_directory_set(orig_pagedir);
     cpu_tlb_flush();
-    GDBSTUB_TRACE("Switched back to stub pagedir (%zx)\n", orig_pagedir);
+    GDBSTUB_TRACE("Switched back to stub pagedir (%#zx)\n", orig_pagedir);
 
     return true;
 }
@@ -2499,7 +2499,7 @@ void gdb_cpu_ctrl_t::start()
             panic_oom();
     }
 
-    stub_tid = thread_create(gdb_thread, nullptr, 0, false);
+    stub_tid = thread_create(gdb_thread, nullptr, 0, false, false);
 
     cpu_wait_value(&stub_running, true);
 

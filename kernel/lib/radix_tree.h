@@ -7,24 +7,24 @@
 // Compactly represent up to 128TB sparse array
 class radix_tree_t {
 public:
-    _no_asan _asan_optimize
+    _no_asan _asan_optimize _use_result _const
     void *lookup(uint64_t addr, bool commit_pages);
 
-    _no_asan _asan_optimize
-    void fill(uint64_t start, uint8_t value, uint64_t len);
+    _no_asan _asan_optimize _use_result
+    bool fill(uint64_t start, uint8_t value, uint64_t len);
 
-    _no_asan _asan_optimize
+    _no_asan _asan_optimize _use_result
     bool is_filled_with(uint64_t start, uint8_t value, uint64_t len);
 
 private:
-    _no_asan _asan_optimize
+    _no_asan _asan_optimize _use_result
     static void *alloc_page();
 
-    static uint8_t asan_pool[4096*1024];
+    static uint8_t asan_pool[];
     static size_t asan_alloc_ptr;
 
     template<typename T>
-    _no_asan _asan_optimize
+    _no_asan _asan_optimize _use_result
     void *commit(T &p) {
         p = (T)alloc_page();
         return p;

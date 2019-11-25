@@ -68,7 +68,7 @@ void *radix_tree_t::lookup(uint64_t addr, bool commit_pages)
     return (char*)level3 + misalignment;
 }
 
-void radix_tree_t::fill(uint64_t start, uint8_t value, uint64_t len)
+bool radix_tree_t::fill(uint64_t start, uint8_t value, uint64_t len)
 {
     while (len) {
         uint64_t page_end = (start + PAGE_SIZE) & -PAGE_SIZE;
@@ -78,6 +78,9 @@ void radix_tree_t::fill(uint64_t start, uint8_t value, uint64_t len)
 
         uint8_t *p = (uint8_t*)lookup(start, true);
 
+        if (unlikely(!p))
+            return false;
+
         // Note, can't use memset here because that would cause
         // recursive ASAN store calls, so just fill manually in a loop
         for (size_t i = 0; i < fill; ++i)
@@ -86,6 +89,8 @@ void radix_tree_t::fill(uint64_t start, uint8_t value, uint64_t len)
         start += fill;
         len -= fill;
     }
+
+    return true;
 }
 
 bool radix_tree_t::is_filled_with(uint64_t start, uint8_t value, uint64_t len)
@@ -112,15 +117,21 @@ bool radix_tree_t::is_filled_with(uint64_t start, uint8_t value, uint64_t len)
     return true;
 }
 
-uint8_t radix_tree_t::asan_pool[4096*1024];
+// One page can track 32KB
+#define ASAN_POOL_BYTE_LIMIT    (UINT64_C(1)<<28)
+#define ASAN_POOL_PAGE_COUNT    (ASAN_POOL_BYTE_LIMIT >> 14)
+
+_section(".asanbss")
+uint8_t radix_tree_t::asan_pool[PAGE_SIZE*ASAN_POOL_PAGE_COUNT];
+_section(".asanbss")
 size_t radix_tree_t::asan_alloc_ptr;
 
 void *radix_tree_t::alloc_page()
 {
     if (likely(asan_alloc_ptr < countof(asan_pool))) {
-        void *result = asan_pool + asan_alloc_ptr;
-        asan_alloc_ptr += 4096;
-        return result;
+        size_t offset = atomic_xadd(&asan_alloc_ptr, PAGE_SIZE);
+        if (likely(offset < countof(asan_pool)))
+            return asan_pool + offset;
     }
     return nullptr;
 }

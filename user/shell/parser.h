@@ -15,7 +15,11 @@ typedef enum parser_op_t {
     Op_Add,
     Op_Sub,
     Op_Mul,
-    Op_Div
+    Op_Div,
+    Op_Function,
+    Op_Comma,
+    Op_CallWithArgs,
+    Op_Call
 } parser_op_t;
 
 typedef struct parser_token_t {

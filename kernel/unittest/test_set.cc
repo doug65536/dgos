@@ -3,7 +3,12 @@
 #include "stdlib.h"
 #include "permute.h"
 
-template class std::basic_set<int>;
+// Instantiate everything
+template class std::__basic_tree<int, void>;
+template class std::__basic_tree<int, void>::__basic_iterator<false, 1>;
+template class std::__basic_tree<int, void>::__basic_iterator<true, 1>;
+template class std::__basic_tree<int, void>::__basic_iterator<false, -1>;
+template class std::__basic_tree<int, void>::__basic_iterator<true, -1>;
 
 UNITTEST(test_set_int_default_construct)
 {
@@ -165,8 +170,6 @@ UNITTEST(test_set_int_construct_insert_churn)
             ne(nullptr, &*ins_pair.first);
             eq(true, ins_pair.second);
             eq(k, *ins_pair.first);
-
-            eq(true, c.validate());
         }
     }
 
@@ -189,8 +192,9 @@ UNITTEST(test_set_int_insert_1k)
 
         eq(size_t(i) + 1, c.size());
 
-        eq(true, c.validate());
     }
+
+    eq(true, c.validate());
 
     eq(size_t(e), c.size());
     eq(true, c.begin() + e == c.end());
@@ -241,8 +245,9 @@ UNITTEST(test_set_int_insert_reverse)
         eq(true, ins_pair.second);
         eq(e - i, *ins_pair.first);
 
-        eq(true, c.validate());
     }
+
+    eq(true, c.validate());
 
     eq(size_t(e), c.size());
     eq(true, c.begin() + e == c.end());
@@ -305,9 +310,10 @@ UNITTEST(test_set_int_simple_erase)
         eq(true, c.end() != it);
         eq(true, c.validate());
         auto next = c.erase(it);
-        eq(true, c.validate());
         eq(true, (n + 1 < 8 ? c.find(n + 1) : c.end()) == next);
     }
+
+    eq(true, c.validate());
 
     int i = 0;
     for (int const& _ _unused: c)
@@ -325,7 +331,6 @@ UNITTEST(test_set_int_complex_erase)
     int inserted_st = 0;
     int inserted_en = 0;
 
-    //asm("cli");
     for (int i = 0; i < 64 + 1024 + 64; ++i) {
         if (i < 64 + 1024) {
             std::pair<std::set<int>::iterator, bool> ins_pair =
@@ -334,15 +339,12 @@ UNITTEST(test_set_int_complex_erase)
             ne(nullptr, &*ins_pair.first);
             eq(true, ins_pair.second);
             eq(inserted_en - 1, *ins_pair.first);
-
-            eq(true, c.validate());
         }
 
         if (i >= 64) {
             auto it = c.find(inserted_st++);
             eq(true, c.end() != it);
             c.erase(it);
-            eq(true, c.validate());
         }
 
         for (int i = inserted_st; i < inserted_en; ++i) {
@@ -351,12 +353,14 @@ UNITTEST(test_set_int_complex_erase)
             eq(i, *it);
         }
 
+
         eq(size_t(inserted_en) - inserted_st, c.size());
     }
-    //asm("sti");
+
+    eq(true, c.validate());
 }
 
-UNITTEST(test_set_int_every_insert_permutation)
+DISABLED_UNITTEST(test_set_int_every_insert_permutation)
 {
     std::set<int> c;
 
@@ -425,7 +429,6 @@ UNITTEST(test_set_int_every_erase_order)
 
             //c.dump("after erase");
 
-            eq(true, c.validate());
 
             // Make sure all the ones we did not erase remain
             for (int k = i + 1; k < 8; ++k) {
@@ -438,5 +441,13 @@ UNITTEST(test_set_int_every_erase_order)
             for (int k = 0; k <= i; ++k)
                 eq(true, c.end() == c.find(seed ^ k));
         }
+
+        eq(true, c.validate());
     }
+}
+
+UNITTEST(test_map_insert)
+{
+    std::map<int, short> c;
+    c.insert({42, 6500});
 }

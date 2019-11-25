@@ -99,34 +99,16 @@ static void gdt_set_tss_base(tss_t *base)
         uintptr_t tss_addr = uintptr_t(&base->reserved0);
 
         // Get low and high halves of address
-        uint32_t tss_addr_lo = tss_addr & 0xFFFFFFFF;
-        uint32_t tss_addr_hi = tss_addr >> 32;
+        uint32_t tss_addr_lo = tss_addr & 0xFFFFFFFFU;
+        uint32_t tss_addr_hi = (tss_addr >> 32) & 0xFFFFFFFFU;
 
         tss_lo.set_base(tss_addr_lo);
         tss_hi.set_base_hi(tss_addr_hi);
         tss_lo.set_limit(sizeof(*base) - 1);
+        tss_lo.set_present(true);
 
-        //new (&gdt[(GDT_SEL_TSS >> 3)]) gdt_entry_t(tss_lo);
-        //new (&gdt[(GDT_SEL_TSS >> 3) + 1]) gdt_entry_tss_ldt_t(tss_hi);
-
-        gdt_entry_combined_t gdt_ent_lo =
-                GDT_MAKE_TSS_DESCRIPTOR(
-                    tss_addr_lo,
-                    sizeof(*base)-1, 1, 0, 0);
-
-        gdt_entry_combined_t gdt_ent_hi =
-                GDT_MAKE_TSS_HIGH_DESCRIPTOR(tss_addr_hi);
-
-        printdbg("no ub\n");
-        hex_dump(&tss_lo, sizeof(tss_lo));
-        hex_dump(&tss_hi, sizeof(tss_hi));
-
-        printdbg("ub\n");
-        hex_dump(&gdt_ent_lo, sizeof(tss_lo));
-        hex_dump(&gdt_ent_hi, sizeof(tss_hi));
-
-        gdt[GDT_SEL_TSS >> 3] = gdt_ent_lo;
-        gdt[(GDT_SEL_TSS >> 3) + 1] = gdt_ent_hi;
+        gdt[GDT_SEL_TSS >> 3] = tss_lo;
+        gdt[(GDT_SEL_TSS >> 3) + 1] = tss_hi;
     } else {
         gdt[GDT_SEL_TSS >> 3].raw = 0;
         gdt[(GDT_SEL_TSS >> 3) + 1].raw = 0;
@@ -146,20 +128,27 @@ void gdt_init_tss(size_t cpu_count)
 
     // Map space for all the stacks
     char *stacks_base = (char*)mmap(
-                nullptr, stacks_sz, PROT_READ | PROT_WRITE,
-                MAP_POPULATE, -1, 0);
+                nullptr, stacks_sz, PROT_NONE,
+                MAP_NOCOMMIT, -1, 0);
+    if (unlikely(stacks_base == MAP_FAILED))
+        panic_oom();
     char *stacks_alloc = stacks_base;
 
     for (size_t i = 0; i < cpu_count; ++i) {
         tss_t *tss = tss_list + i;
 
+        tss->iomap_base = uint16_t(uintptr_t(tss + 1) - uintptr_t(tss));
+
         for (size_t st = 0; st < stack_count_per_cpu; ++st) {
-            void *stack = stacks_alloc;
+            char *stack = stacks_alloc;
 
             stacks_alloc += TSS_STACK_SIZE;
 
-            madvise(stack, PAGESIZE, MADV_DONTNEED);
-            mprotect(stack, PAGESIZE, PROT_NONE);
+            char *stack_st = stack + PAGE_SIZE;
+            char *stack_en = stacks_alloc;
+
+            mprotect(stack_st, stack_en - stack_st, PROT_READ | PROT_WRITE);
+            madvise(stack_st, stack_en - stack_st, MADV_WILLNEED);
 
             printdbg("Allocated IST cpu=%zu slot=%zu at %#zx\n",
                      i, st, (uintptr_t)stack);
@@ -170,8 +159,6 @@ void gdt_init_tss(size_t cpu_count)
                 tss->ist[st] = uintptr_t(stack) + TSS_STACK_SIZE;
             else
                 tss->rsp[0] = uintptr_t(stack) + TSS_STACK_SIZE;
-
-            tss->iomap_base = uint16_t(uintptr_t(tss + 1) - uintptr_t(tss));
 
             assert(tss->reserved0 == 0);
             assert(tss->reserved3 == 0);

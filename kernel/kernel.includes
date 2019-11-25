@@ -19,3 +19,4 @@ device
 ../emu/bochs
 ../toolchain
 unittest
+../user

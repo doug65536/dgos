@@ -6,6 +6,7 @@
 #include "numeric_limits.h"
 #include "debug.h"
 #include "printk.h"
+#include "cxxexception.h"
 
 #define _BASIC_SET_TRACE_ON    0
 #if _BASIC_SET_TRACE_ON
@@ -20,11 +21,8 @@ __BEGIN_NAMESPACE_STD
 namespace detail {
 
 template<typename _T>
-class rbtree_policy_t
-{
+class base_tree_policy_t {
 public:
-    static constexpr int _RED = 1;
-    static constexpr int _BLACK = 0;
 
     static _T *__sibling(_T *__n)
     {
@@ -53,6 +51,89 @@ public:
 
         return nullptr;
     }
+
+
+    static void __replace_node(_T *&__root, _T *__oldn, _T *__newn)
+    {
+        assert(__oldn != nullptr);
+
+        _T *__oldp = __oldn->__parent;
+
+        if (__oldp == nullptr) {
+            __root = __newn;
+        } else {
+            if (__oldn == __oldp->__left)
+                __oldp->__left = __newn;
+            else
+                __oldp->__right = __newn;
+        }
+
+        if (__newn)
+            __newn->__parent = __oldp;
+    }
+
+    static void __swap_nodes(_T *&root, _T *__a, _T *__b)
+    {
+        assert(__a != __b);
+
+        assert(__a->__parent || root == __a);
+        assert(__b->__parent || root == __b);
+
+        // Get the appropriate pointer to the parent's left/right pointer
+        // or the tree root pointer
+
+        if (__a->__parent == nullptr) {
+            __a->__parent = __b->__parent;
+            __b->__parent = nullptr;
+        } else if (__b->__parent == nullptr) {
+            __b->__parent = __a->__parent;
+            __a->__parent = nullptr;
+        }
+
+        _T **__a_parent_ptr = __a->__parent
+                ? (__a == __a->__parent->__left
+                   ? &__a->__parent->__left
+                   : &__a->__parent->__right)
+                : &root;
+
+        _T **__b_parent_ptr = __b->__parent
+                ? (__b == __b->__parent->__left
+                   ? &__b->__parent->__left
+                   : &__b->__parent->__right)
+                : &root;
+
+        assert(*__a_parent_ptr == __a);
+        assert(*__b_parent_ptr == __b);
+
+        if (__a->__parent && __b->__parent) {
+            std::swap(*__a_parent_ptr, *__b_parent_ptr);
+            std::swap(__a->__parent, __b->__parent);
+        }
+        std::swap(__a->__left, __b->__left);
+        std::swap(__a->__right, __b->__right);
+    }
+
+    static constexpr _T *__tree_max(_T *n)
+    {
+        while (n->__right)
+            n = n->__right;
+        return n;
+    }
+
+    static constexpr _T *tree_min(_T *n)
+    {
+        while (n->__left)
+            n = n->__left;
+        return n;
+    }
+};
+
+template<typename _T>
+class rbtree_policy_t : public base_tree_policy_t<_T>
+{
+public:
+    static constexpr int _RED = 1;
+    static constexpr int _BLACK = 0;
 
     // Root can become black at any time, root must always be black
     static void __insert_case1(_T *__n)
@@ -224,62 +305,6 @@ public:
         }
     }
 
-    static void __swap_nodes(_T *&root, _T *__a, _T *__b)
-    {
-        assert(__a != __b);
-
-        assert(__a->__parent || root == __a);
-        assert(__b->__parent || root == __b);
-
-        // Get the appropriate pointer to the parent's left/right pointer
-        // or the tree root pointer
-
-        if (__a->__parent == nullptr) {
-            __a->__parent = __b->__parent;
-            __b->__parent = nullptr;
-        } else if (__b->__parent == nullptr) {
-            __b->__parent = __a->__parent;
-            __a->__parent = nullptr;
-        }
-
-        _T **__a_parent_ptr = __a->__parent
-                ? (__a == __a->__parent->__left
-                   ? &__a->__parent->__left
-                   : &__a->__parent->__right)
-                : &root;
-
-        _T **__b_parent_ptr = __b->__parent
-                ? (__b == __b->__parent->__left
-                   ? &__b->__parent->__left
-                   : &__b->__parent->__right)
-                : &root;
-
-        assert(*__a_parent_ptr == __a);
-        assert(*__b_parent_ptr == __b);
-
-        if (__a->__parent && __b->__parent) {
-            std::swap(*__a_parent_ptr, *__b_parent_ptr);
-            std::swap(__a->__parent, __b->__parent);
-        }
-        std::swap(__a->__left, __b->__left);
-        std::swap(__a->__right, __b->__right);
-        //std::swap(__a->__balance, __b->__balance);
-    }
-
-    static constexpr _T *__tree_max(_T *n)
-    {
-        while (n->__right)
-            n = n->__right;
-        return n;
-    }
-
-    static constexpr _T *tree_min(_T *n)
-    {
-        while (n->__left)
-            n = n->__left;
-        return n;
-    }
-
     static int __delete_at(_T *&__root, _T *__n)
     {
         _T *__child;
@@ -322,32 +347,13 @@ public:
 
         return 1;
     }
-
-    static void __replace_node(_T *&__root, _T *__oldn, _T *__newn)
-    {
-        assert(__oldn != nullptr);
-
-        _T *__oldp = __oldn->__parent;
-
-        if (__oldp == nullptr) {
-            __root = __newn;
-        } else {
-            if (__oldn == __oldp->__left)
-                __oldp->__left = __newn;
-            else
-                __oldp->__right = __newn;
-        }
-
-        if (__newn)
-            __newn->__parent = __oldp;
-    }
 };
 
 template<typename _T>
 class avltree_policy_t
 {
 public:
-    static void retrace_insert(_T *&root_ptr, _T *_Z)
+    static void __retrace_insert(_T *&root_ptr, _T *_Z)
     {
         _T *_X, *_N, *_G;
 
@@ -680,46 +686,117 @@ public:
     using rebind = avltree_policy_t<U>;
 };
 
-template<typename T>
 class panic_policy_t
 {
 public:
-    static T *oom()
+    static void *oom()
     {
         panic_oom();
-        __builtin_unreachable();
     }
 };
 
 }   // namespace detail
 
+template<typename _T, typename _U>
+struct __tree_value
+{
+    using type = std::pair<_T const, _U>;
+    using key_type = _T const;
+    using value_type = _U;
+
+    _always_inline
+    static constexpr _T const& key(type const& __rhs)
+    {
+        return __rhs.first;
+    }
+
+    _always_inline
+    static constexpr _U& value(type& __rhs)
+    {
+        return __rhs.second;
+    }
+
+    _always_inline
+    static constexpr _U const& value(type const& __rhs)
+    {
+        return __rhs.second;
+    }
+};
+
+template<typename _T>
+struct __tree_value<_T, void>
+{
+    using type = _T;
+    using key_type = _T;
+    using value_type = type;
+
+//    _always_inline
+//    static constexpr _T& key(type& __rhs)
+//    {
+//        return __rhs;
+//    }
+
+    _always_inline
+    static constexpr _T const& key(type const& __rhs)
+    {
+        return __rhs;
+    }
+
+    _always_inline
+    static constexpr _T const& value(type const& __rhs)
+    {
+        return __rhs;
+    }
+};
+
+using _TreePolicy = detail::avltree_policy_t<void>;
+using _OOMPolicy = detail::panic_policy_t;
+
 template<
     typename _T,
+    typename _V,
     typename _Compare = less<_T>,
-    typename _Alloc = allocator<void>,
-    typename _TreePolicy = detail::avltree_policy_t<void>,
-    typename _OOMPolicy = detail::panic_policy_t<_T>>
-class basic_set
+    typename _Alloc = allocator<void>>
+class __basic_tree_index
+{
+};
+
+template<
+    typename _T,
+    typename _V,
+    typename _Compare = less<_T>,
+    typename _Alloc = allocator<void>>
+class __basic_tree
 {
 private:
     struct __node_t;
+
+    // Handle void _V
+    using __tree_value_t = __tree_value<_T, _V>;
+    // Either the pair<<_T,_V>, or just _T if _V is void
+    using __item_type = typename __tree_value_t::type;
+public:
     using __node_allocator_t =
         typename _Alloc::template rebind<__node_t>::other;
-public:
-    using value_type = _T;
+
+    using key_type = typename __tree_value_t::key_type;
+    using mapped_type = typename __tree_value_t::value_type;
+    using value_type = typename __tree_value_t::type;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
-    using pointer = _T*;
-    using const_pointer = _T const*;
-    using reference = _T&;
-    using const_reference = _T const&;
+    using pointer = __item_type*;
+    using const_pointer = __item_type const*;
+    using reference = __item_type&;
+    using const_reference = __item_type const&;
+    using node_type = __node_t;
+    using node_allocator = __node_allocator_t;
 
     template<bool _is_const, int dir>
-    class basic_iterator : public bidirectional_iterator_tag
+    class __basic_iterator : public bidirectional_iterator_tag
     {
     private:
         static_assert(dir == 1 || -dir == 1, "Unexpected direction");
-        using owner_ptr_t = basic_set const *;
+        using owner_ptr_t = __basic_tree const *;
         using node_ptr_t = __node_t const *;
 
         template<bool _is_const_inst>
@@ -729,14 +806,14 @@ public:
         }
 
     public:
-        basic_iterator() = default;
-        basic_iterator(basic_iterator const& rhs) = default;
-        basic_iterator &operator=(basic_iterator const& rhs) = default;
+        __basic_iterator() = default;
+        __basic_iterator(__basic_iterator const& __rhs) = default;
+        __basic_iterator &operator=(__basic_iterator const& __rhs) = default;
 
         template<bool _rhs_is_const, int _dir>
-        basic_iterator(basic_iterator<_rhs_is_const, _dir> const& rhs)
-            : __curr(rhs.__curr)
-            , __owner(rhs.__owner)
+        __basic_iterator(__basic_iterator<_rhs_is_const, _dir> const& __rhs)
+            : __curr(__rhs.__curr)
+            , __owner(__rhs.__owner)
         {
             // --------+---------+---------
             // LHS     | RHS     | Allowed
@@ -753,7 +830,7 @@ public:
 
         // Step to the element that compares greater
         _always_inline
-        basic_iterator& step(integral_constant<int, 1>::type const&)
+        __basic_iterator& step(integral_constant<int, 1>::type const&)
         {
             __curr = __tree_next(__curr);
 
@@ -762,44 +839,44 @@ public:
 
         // Step to the element that compares lesser
         _always_inline
-        basic_iterator& step(integral_constant<int, -1>::type const&)
+        __basic_iterator& step(integral_constant<int, -1>::type const&)
         {
             __curr = __tree_prev(__curr);
 
             return *this;
         }
 
-        _always_inline basic_iterator& inc()
+        _always_inline __basic_iterator& inc()
         {
             return step(typename integral_constant<int, dir>::type());
         }
 
-        _always_inline basic_iterator& dec()
+        _always_inline __basic_iterator& dec()
         {
             // Steps to lesser if forward, greater if reverse
             return step(typename integral_constant<int, -dir>::type());
         }
 
-        _always_inline basic_iterator& operator++()
+        _always_inline __basic_iterator& operator++()
         {
             return inc();
         }
 
-        _always_inline basic_iterator& operator--()
+        _always_inline __basic_iterator& operator--()
         {
             return dec();
         }
 
-        basic_iterator operator++(int)
+        __basic_iterator operator++(int)
         {
-            basic_iterator orig(*this);
+            __basic_iterator orig(*this);
             inc();
             return orig;
         }
 
-        basic_iterator operator--(int)
+        __basic_iterator operator--(int)
         {
-            basic_iterator orig(*this);
+            __basic_iterator orig(*this);
             dec();
             return orig;
         }
@@ -814,49 +891,49 @@ public:
             return __curr->__item_ptr();
         }
 
-        bool operator==(basic_iterator const& rhs) const
+        bool operator==(__basic_iterator const& __rhs) const
         {
-            return __curr == rhs.__curr;
+            return __curr == __rhs.__curr;
         }
 
-        bool operator!=(basic_iterator const& rhs) const
+        bool operator!=(__basic_iterator const& __rhs) const
         {
-            return __curr != rhs.__curr;
+            return __curr != __rhs.__curr;
         }
 
-        basic_iterator operator-(size_t n) const
+        __basic_iterator operator-(size_type __n) const
         {
-            basic_iterator result(*this);
+            __basic_iterator __result(*this);
 
-            if (__curr == nullptr && n) {
-                --n;
+            if (__curr == nullptr && __n) {
+                --__n;
                 if (dir > 0)
-                    result.__curr = __owner->__tree_max();
+                    __result.__curr = __owner->__tree_max();
                 else
-                    result.__curr = __owner->__tree_min();
+                    __result.__curr = __owner->__tree_min();
             }
 
-            while (n-- && result.__curr)
-                --result;
+            while (__n-- && __result.__curr)
+                --__result;
 
-            return result;
+            return __result;
         }
 
-        basic_iterator operator+(size_t n) const
+        __basic_iterator operator+(size_type __n) const
         {
-            basic_iterator result(*this);
-            while (n-- && result.__curr)
-                ++result;
-            return result;
+            __basic_iterator __result(*this);
+            while (__n-- && __result.__curr)
+                ++__result;
+            return __result;
         }
 
     private:
-        friend class basic_set;
+        friend class __basic_tree;
 
-        basic_iterator(node_ptr_t node,
-                       owner_ptr_t owner)
-            : __curr(node)
-            , __owner(owner)
+        __basic_iterator(node_ptr_t __node,
+                       owner_ptr_t __owner)
+            : __curr(__node)
+            , __owner(__owner)
         {
         }
 
@@ -865,61 +942,68 @@ public:
     };
 
     // Set interestingly only has const iterators
-    using const_iterator = basic_iterator<true, 1>;
-    using reverse_iterator = basic_iterator<true, -1>;
-    using iterator = const_iterator;
-    using const_reverse_iterator = reverse_iterator;
+    using const_iterator = __basic_iterator<true, 1>;
+    using reverse_iterator = __basic_iterator<true, -1>;
+    using iterator = __basic_iterator<false, 1>;
+    using const_reverse_iterator = __basic_iterator<false, -1>;
 
-    basic_set()
+    __basic_tree()
         : __root(nullptr)
         , __current_size(0)
     {
     }
 
-    explicit basic_set(_Compare const& __cmp,
-                       _Alloc const& __alloc = _Alloc())
-        : __cmp(__cmp)
-        , __alloc(__node_allocator_t(__alloc))
+    explicit __basic_tree(_Alloc const& __alloc)
+        : __root(nullptr)
+        , __current_size(0)
+        , __alloc(__alloc)
     {
     }
 
-    ~basic_set()
+    explicit __basic_tree(_Compare const& __cmp,
+                          _Alloc const& __alloc = _Alloc())
+        : __cmp(__cmp)
+        , __alloc(__alloc)
+    {
+    }
+
+    ~__basic_tree()
     {
         clear();
     }
 
-    basic_set(basic_set const& rhs)
+    __basic_tree(__basic_tree const& __rhs)
         : __root(nullptr)
         , __current_size(0)
-        , __cmp(rhs.__cmp)
+        , __cmp(__rhs.__cmp)
     {
-        for (value_type const& item : rhs)
-            insert(item);
+        for (__item_type const& __item : __rhs)
+            insert(__item);
     }
 
-    basic_set(basic_set&& rhs)
-        : __root(rhs.__root)
-        , __current_size(rhs.__current_size)
-        , __cmp(std::move(rhs.__cmp))
+    __basic_tree(__basic_tree&& __rhs)
+        : __root(__rhs.__root)
+        , __current_size(__rhs.__current_size)
+        , __cmp(std::move(__rhs.__cmp))
     {
-        rhs.__root = nullptr;
-        rhs.__current_size = 0;
+        __rhs.__root = nullptr;
+        __rhs.__current_size = 0;
     }
 
-    basic_set& operator=(basic_set const& __rhs)
+    __basic_tree& operator=(__basic_tree const& __rhs)
     {
         if (unlikely(&__rhs == this))
             return *this;
 
         clear();
 
-        for (value_type const& __item : __rhs)
+        for (__item_type const& __item : __rhs)
             insert(__item);
 
         return *this;
     }
 
-    basic_set& operator=(basic_set&& __rhs)
+    __basic_tree& operator=(__basic_tree&& __rhs)
     {
         __root = __rhs.__root;
         __rhs.__root = nullptr;
@@ -933,6 +1017,44 @@ public:
         return *this;
     }
 
+    template<typename _K>
+    value_type const& operator[](_K const& __key) const
+    {
+        static_assert(!is_same<_V, void>::value, "Not a map");
+        pair<iterator,bool> ins = insert(__key);
+        if (likely(ins.first != end()))
+            return __tree_value_t::value(*ins.first);
+        throw std::bad_alloc();
+    }
+
+    template<typename _K>
+    value_type& operator[](_K const& __key)
+    {
+        static_assert(!is_same<_V, void>::value, "Not a map");
+        pair<iterator,bool> ins = insert(__key);
+        if (likely(ins.first != end()))
+            return __tree_value_t::value(*ins.first);
+        throw std::bad_alloc();
+    }
+
+    template<typename _K>
+    value_type& at(_K const& key)
+    {
+        iterator __it = find(key);
+        if (likely(__it != end()))
+            return __tree_value_t::value(*__it);
+        throw std::out_of_range();
+    }
+
+    template<typename _K>
+    value_type const& at(_K const& key) const
+    {
+        const_iterator __it = find(key);
+        if (likely(__it != end()))
+            return __tree_value_t::value(*__it);
+        throw std::out_of_range();
+    }
+
     size_type size() const
     {
         return __current_size;
@@ -941,6 +1063,11 @@ public:
     bool empty() const
     {
         return __current_size == 0;
+    }
+
+    _Alloc get_allocator() const
+    {
+        return __alloc;
     }
 
     ///     (nullptr)     (max)
@@ -955,38 +1082,38 @@ public:
 
     iterator begin()
     {
-        __node_t *n = __tree_min();
-        return iterator(n, this);
+        __node_t *__n = __tree_min();
+        return iterator(__n, this);
     }
 
     const_iterator begin() const
     {
-        __node_t *n = __tree_min();
-        return const_iterator(n, this);
+        __node_t *__n = __tree_min();
+        return const_iterator(__n, this);
     }
 
     const_iterator cbegin() const
     {
-        __node_t *n = __tree_min();
-        return const_iterator(n, this);
+        __node_t *__n = __tree_min();
+        return const_iterator(__n, this);
     }
 
     reverse_iterator rbegin()
     {
-        __node_t *n = __tree_max();
-        return reverse_iterator(n, this);
+        __node_t *__n = __tree_max();
+        return reverse_iterator(__n, this);
     }
 
     const_reverse_iterator rbegin() const
     {
-        __node_t *n = __tree_max();
-        return const_reverse_iterator(n, this);
+        __node_t *__n = __tree_max();
+        return const_reverse_iterator(__n, this);
     }
 
     const_reverse_iterator crbegin() const
     {
-        __node_t *n = __tree_max();
-        return const_reverse_iterator(n, this);
+        __node_t *__n = __tree_max();
+        return const_reverse_iterator(__n, this);
     }
 
     iterator end()
@@ -1021,11 +1148,11 @@ public:
 
     size_type max_size()
     {
-        return std::numeric_limits<size_t>::max() /
+        return std::numeric_limits<size_type>::max() /
                 (sizeof(__node_t) + 32);
     }
 
-    void swap(basic_set& __rhs)
+    void swap(__basic_tree& __rhs)
     {
         std::swap(__root, __rhs.__root);
         std::swap(__current_size, __rhs.__current_size);
@@ -1052,37 +1179,37 @@ public:
         __current_size = 0;
     }
 
-    iterator find(_T const& k)
+    iterator find(_T const& __k)
     {
-        return iterator(__tree_find(k), this);
+        return iterator(__tree_find(__k), this);
     }
 
-    const_iterator find(_T const& k) const
+    const_iterator find(_T const& __k) const
     {
-        return const_iterator(__tree_find(k), this);
+        return const_iterator(__tree_find(__k), this);
     }
 
     template<typename U>
-    iterator find(U const& k)
+    iterator find(U const& __k)
     {
         static_assert(sizeof(typename _Compare::is_transparent) != -1,
                       "C++14 find requires comparator type to have"
                       " is_transparent member type");
 
-        return iterator(const_cast<__node_t*>(__tree_find(k)), this);
+        return iterator(const_cast<__node_t*>(__tree_find(__k)), this);
     }
 
     template<typename U>
-    const_iterator find(U const& k) const
+    const_iterator find(U const& __k) const
     {
         static_assert(sizeof(typename _Compare::is_transparent) != -1,
                       "C++14 find requires comparator type to have"
                       " is_transparent member type");
 
-        return const_iterator(__tree_find(k));
+        return const_iterator(__tree_find(__k));
     }
 
-    pair<iterator, bool> insert(_T&& __value)
+    pair<iterator, bool> insert(__item_type&& __value)
     {
         pair<iterator, bool> __result;
 
@@ -1092,16 +1219,17 @@ public:
         if (unlikely(__found_dup)) {
             __result = { iterator(__i, this), false };
         } else if (likely(__i != nullptr)) {
-            new (__i->__storage.data) value_type(forward<_T>(__value));
+            new (__i->__storage.__mem.data)
+                    __item_type(move(__value));
             __result = { iterator(__i, this), true };
 
-            _NodePolicy::retrace_insert(__root, __i);
+            _NodePolicy::__retrace_insert(__root, __i);
         }
 
         return __result;
     }
 
-    pair<iterator, bool> insert(_T const& __value)
+    pair<iterator, bool> insert(__item_type const& __value)
     {
         return emplace(__value);
     }
@@ -1114,21 +1242,22 @@ public:
 
         // Placement new into memory
         // Can't avoid allocating node...
-        __node_t *__n = new (__n_mem) __node_t;
+        __node_t *__n = new (__n_mem) __node_t();
 
         // ...and can't avoid running constructor,
         // because we need a value to pass to the comparator
-        value_type const *__ins =
-                new (reinterpret_cast<pointer>(__n->__storage.data))
-                value_type(std::forward<Args>(__args)...);
+        __item_type const *__ins =
+                new (reinterpret_cast<pointer>(__n->__storage.__mem.data))
+                __item_type(std::forward<Args>(__args)...);
 
         bool __found_dup;
         __node_t *__i = __tree_ins(__n, __found_dup, *__ins);
 
         if (likely(!__found_dup)) {
-            _NodePolicy::retrace_insert(__root, __n);
+            _NodePolicy::__retrace_insert(__root, __n);
         } else {
-            reinterpret_cast<pointer>(__n->__storage.data)->~_T();
+            reinterpret_cast<pointer>(__n->__storage.__mem.data)->
+                    ~__item_type();
             __n->~__node_t();
             __alloc.deallocate(__n, 1);
         }
@@ -1136,9 +1265,35 @@ public:
         return pair<iterator, bool>(iterator(__i, this), !__found_dup);
     }
 
-    iterator lower_bound(_T const& key) const
+    iterator lower_bound(_T const& __k) const
     {
-        return end();
+        __node_t const *__node;
+        int __prev_diff = -10;
+        int __diff = -10;
+        for (__node = __root; __node; ) {
+            auto& __item = __node->__item();
+
+            // diff = k <=> item
+            __prev_diff = __diff;
+            __diff = !__cmp(__k, __tree_value_t::key(__item)) -
+                    !__cmp(__tree_value_t::key(__item), __k);
+
+            // Break when equal
+            if (unlikely(__diff == 0))
+                break;
+
+            __node_t const *__next = __node->__select_lr(__diff < 0);
+
+            if (!__next)
+                break;
+
+            __node = __next;
+        }
+
+        if (__node && __diff == -1 && __prev_diff == 1)
+            __node = __tree_next(__node);
+
+        return iterator(__node, this);
     }
 
     //
@@ -1155,11 +1310,11 @@ public:
         // Process right child first
         int __right_space = __dump_node(__node->__right, __spacing, __space);
 
-        for (int pass = 0; pass < 6; ++pass) {
+        for (int __pass = 0; __pass < 6; ++__pass) {
             for (int i = __spacing; i < __space; i++)
                 dbgout << ' ';
 
-            switch (pass) {
+            switch (__pass) {
             case 0:
                 dbgout << '*' << __node;
                 break;
@@ -1201,9 +1356,9 @@ public:
         dbgout << "\n\n";
     }
 
-    void dump(int spacing = 10, int space = 0)
+    void dump(int __spacing = 10, int __space = 0)
     {
-        dump("", spacing, space);
+        dump("", __spacing, __space);
     }
 
     _noinline
@@ -1215,14 +1370,14 @@ public:
 
     bool validate() const
     {
-        iterator __en = end();
-        iterator __curr = begin();
-        iterator __next = __curr;
+        const_iterator __en = end();
+        const_iterator __curr = begin();
+        const_iterator __next = __curr;
 
         if (__next != __en)
             ++__next;
 
-        size_t __expect_size = 0;
+        size_type __expect_size = 0;
 
         while (__curr != __en) {
             // Analyze the node
@@ -1245,15 +1400,19 @@ public:
                 }
 
                 if (unlikely(__parent->__left == __node &&
-                             !(__cmp(__node->__item(),
-                                     __parent->__item())))) {
+                             !(__cmp(__tree_value_t::key(
+                                         __node->__item()),
+                                     __tree_value_t::key(
+                                         __parent->__item()))))) {
                     dbgout << "Left child is not less than its parent\n";
                     return validate_failed();
                 }
 
                 if (unlikely(__parent->__right == __node &&
-                             !(__cmp(__parent->__item(),
-                                     __node->__item())))) {
+                             !(__cmp(__tree_value_t::key(
+                                         __parent->__item()),
+                                     __tree_value_t::key(
+                                         __node->__item()))))) {
                     dbgout << "Parent is not less than its right child\n";
                     return validate_failed();
                 }
@@ -1309,8 +1468,6 @@ public:
 private:
     void __swap_nodes(__node_t *__a, __node_t *__b)
     {
-        //dump("before swap");
-
         // Handle both cases with one implementation (__a is always parent)
         if (unlikely(__b == __a->__parent)) {
             assert(!"Unlikely eh?");
@@ -1387,15 +1544,9 @@ private:
                 __b->__left->__parent = __b;
             if (__b->__right)
                 __b->__right->__parent = __b;
-
-            // Trade places
-//            if (__a_ptr != &__root && __b_ptr != &__root)
-//                std::swap(*__a_ptr, *__b_ptr);
         }
 
         std::swap(__a->__balance, __b->__balance);
-
-        //dump("after swap");
     }
 
     void __delete_node(__node_t *__node)
@@ -1500,24 +1651,24 @@ private:
     }
 
 public:
-    iterator erase(const_iterator place)
+    iterator erase(const_iterator __place)
     {
-        __node_t *node = place.template ptr<false>();
+        __node_t *__node = __place.template ptr<false>();
 
-        iterator result(node, this);
-        ++result;
+        iterator __result(__node, this);
+        ++__result;
 
-        __delete_node(node);
+        __delete_node(__node);
 
-        return result;
+        return __result;
     }
 
-    size_type erase(value_type const& key)
+    size_type erase(_T const& __key)
     {
-        const_iterator it = find(key);
+        const_iterator __it = find(__key);
 
-        if (it != end()) {
-            erase(it);
+        if (__it != end()) {
+            erase(__it);
             return 1;
         }
 
@@ -1527,30 +1678,31 @@ public:
     template<typename _K>
     iterator lower_bound(_K const& k)
     {
-        __node_t *node = __root;
+        __node_t *__node = __root;
 
-        while (node) {
-            auto& item = node->__item();
+        while (__node) {
+            auto& item = __node->__item();
 
             // diff = k <=> item
-            int diff = !__cmp(k, item) - !__cmp(item, k);
+            int __diff = !__cmp(k, __tree_value_t::key(item)) -
+                    !__cmp(__tree_value_t::key(item), k);
 
-            if (unlikely(diff == 0))
+            if (unlikely(__diff == 0))
                 break;
 
-            __node_t *next_node = node->__select_lr(diff < 0);
+            __node_t *__next_node = __node->__select_lr(__diff < 0);
 
-            if (unlikely(!next_node))
+            if (unlikely(!__next_node))
                 break;
 
-            node = next_node;
+            __node = __next_node;
         }
 
-        return iterator(node);
+        return iterator(__node);
     }
 
     template<typename _K>
-    iterator upper_bound(_K const& key)
+    iterator upper_bound(_K const& __key)
     {
 
     }
@@ -1562,32 +1714,42 @@ private:
         __node_t *__right = nullptr;
         __node_t *__parent = nullptr;
         int __balance = 0;
-        typename std::aligned_storage<sizeof(_T), alignof(_T)>::type __storage;
 
-        void __delete_node(__node_allocator_t const& __alloc)
+        // For debugger
+        union __storage_t {
+            typename std::aligned_storage<
+                sizeof(__item_type), alignof(__item_type)>::type __mem;
+            __item_type __instance;
+
+            __storage_t()
+            {
+            }
+        } __storage;
+
+        void __delete_node(__node_allocator_t& __alloc)
         {
-            __item_ptr()->~value_type();
+            __item_ptr()->~__item_type();
             __alloc.deallocate(this, 1);
         }
 
         inline reference __item() noexcept
         {
-            return *reinterpret_cast<pointer>(__storage.data);
+            return *reinterpret_cast<pointer>(__storage.__mem.data);
         }
 
         inline const_reference __item() const noexcept
         {
-            return *reinterpret_cast<const_pointer>(__storage.data);
+            return *reinterpret_cast<const_pointer>(__storage.__mem.data);
         }
 
         inline pointer __item_ptr() noexcept
         {
-            return reinterpret_cast<pointer>(__storage.data);
+            return reinterpret_cast<pointer>(__storage.__mem.data);
         }
 
         inline const_pointer __item_ptr() const noexcept
         {
-            return reinterpret_cast<const_pointer>(__storage.data);
+            return reinterpret_cast<const_pointer>(__storage.__mem.data);
         }
 
         inline __node_t * const& __select_lr(bool __is_left) const
@@ -1612,8 +1774,8 @@ private:
     };
 
     // Find an existing key, null if no exact match
-    template<typename K>
-    __node_t const *__tree_find(K const& k) const
+    template<typename _K>
+    __node_t const *__tree_find(_K const& __k) const
     {
         __node_t const *__node = __root;
 
@@ -1621,7 +1783,8 @@ private:
             auto& item = __node->__item();
 
             // diff = k <=> item
-            int __diff = !__cmp(k, item) - !__cmp(item, k);
+            int __diff = !__cmp(__k, __tree_value_t::key(item)) -
+                    !__cmp(__tree_value_t::key(item), __k);
 
             // Break when equal
             if (unlikely(__diff == 0))
@@ -1639,7 +1802,7 @@ private:
     // insert: __n is nullptr when the node hasn't been created yet,
     // emplace: __n is the node with the value constructed into it already
     __node_t *__tree_ins(__node_t *__n, bool &__found_dup,
-                         value_type const &__val)
+                         __item_type const &__val)
     {
         __found_dup = false;
         int __diff = -1;
@@ -1655,7 +1818,10 @@ private:
                 auto const& __rhs = __s->__item();
 
                 // diff = lhs <=> rhs
-                __diff = !__cmp(__val, __rhs) - !__cmp(__rhs, __val);
+                __diff = !__cmp(__tree_value_t::key(__val),
+                                __tree_value_t::key(__rhs)) -
+                        !__cmp(__tree_value_t::key(__rhs),
+                               __tree_value_t::key(__val));
 
                 if (unlikely(__diff == 0))
                 {
@@ -1671,15 +1837,15 @@ private:
             // Allocate memory for node using allocator
             void* __n_mem = __alloc.allocate(1);
 
-            if (!__n_mem)
+            if (unlikely(!__n_mem))
                 _OOMPolicy::oom();
 
             // Placement new into memory
-            __n = new (__n_mem) __node_t;
+            __n = new (__n_mem) __node_t();
 
             // Forwarding placement construct item
-            new (reinterpret_cast<pointer>(__n->__storage.data))
-                    value_type(__val);
+            new (reinterpret_cast<pointer>(__n->__storage.__mem.data))
+                    __item_type(__val);
         }
 
         // New node is initially a leaf
@@ -1773,13 +1939,45 @@ private:
 
 private:
     __node_t *__root;
-    size_t __current_size;
+    size_type __current_size;
     _Compare __cmp;
     __node_allocator_t __alloc;
 };
 
-template<typename T, typename C = less<T>, typename A = allocator<T>>
-using set = basic_set<T, C, A>;
+template<typename _K, typename _V, typename _C>
+class __basic_map_comp {
+public:
+    bool operator()(pair<_K const, _V> const& __lhs,
+                    pair<_K const, _V> const& __rhs) const
+    {
+        return _C()(__lhs.first, __rhs.first);
+    }
+
+    template<typename _U,
+             typename = typename _U::is_transparent>
+    bool operator()(pair<_K const, _V> const& __lhs,
+                    _U const& __rhs) const
+    {
+        return _C()(__lhs.first, __rhs);
+    }
+
+    template<typename _U,
+             typename = typename _U::is_transparent>
+    bool operator()(_U const& __lhs,
+                    pair<_K const, _V> const& __rhs)
+    {
+        return _C()(__lhs, __rhs.first);
+    }
+};
+
+template<typename _K, typename _C = less<_K>, typename _A = allocator<_K>>
+using set = __basic_tree<_K, void, _C, _A>;
+
+template<typename _K, typename _V,
+         typename _C = less<_K>, typename _A = allocator<pair<_K const, _V>>>
+using map = __basic_tree<_K, _V, _C, _A>;
+
+//template<typename
 
 __END_NAMESPACE_STD
 

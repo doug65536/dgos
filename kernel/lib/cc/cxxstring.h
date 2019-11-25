@@ -168,8 +168,11 @@ public:
     }
 
     basic_string(basic_string const& __rhs)
-        : __str(__rhs.__str)
     {
+        if (!__str.reserve(__rhs.size() + 1))
+            throw std::bad_alloc();
+        __str = __rhs.__str;
+        __str[__rhs.size()] = 0;
     }
 
     basic_string(basic_string&& __rhs) noexcept
@@ -337,7 +340,10 @@ public:
 
     bool reserve(size_type __sz)
     {
-        return __str.reserve(__sz);
+        if (unlikely(!__str.reserve(__sz + 1)))
+            return false;
+        __str[__sz] = 0;
+        return true;
     }
 
     size_type capacity() const

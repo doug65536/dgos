@@ -210,6 +210,8 @@ int mprotect(void *__addr, size_t __len, int __prot);
 // Extension: Advise that this region cannot use weak ordering
 #define MADV_STRONGORDER    (-9)
 
+#define MADV_UNINITIALIZED  0x80
+
 /// Set hints about a range of address space
 /// __addr, address, start of range
 /// __len, size, of range

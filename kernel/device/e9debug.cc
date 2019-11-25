@@ -18,6 +18,9 @@ static char vt102_reset[] = "\x1B" "c";
 _constructor(ctor_ctors_ran)
 static void e9debug_serial_ready(void*)
 {
+    // HACK! Enable bochs debugger hardware
+    outw(0x8A00, 0x8A00);
+
     if (bootinfo_parameter(bootparam_t::boot_serial_log)) {
         printk("Enabling serial debug output\n");
         uart = uart_dev_t::open(0, true, 8, 'N', 1);

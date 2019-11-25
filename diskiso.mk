@@ -22,6 +22,7 @@ $(top_builddir)/isodisk.img: \
 		$(top_srcdir)/populate_iso.sh \
 		\
 		$(top_builddir)/fatpart.img \
+		$(shell $(FIND) -L "$(top_builddir)/iso_stage") \
 		\
 		$(top_builddir)/bootiso-bin
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)

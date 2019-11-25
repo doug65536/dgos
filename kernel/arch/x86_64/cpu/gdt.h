@@ -66,6 +66,13 @@ struct gdt_entry_t {
         return *this;
     }
 
+    constexpr gdt_entry_t& set_present(bool present)
+    {
+        access = (access & ~GDT_ACCESS_PRESENT) |
+                (present ? GDT_ACCESS_PRESENT : 0);
+        return *this;
+    }
+
     constexpr gdt_entry_t& set_flags(uint8_t flags)
     {
         flags_limit_high &= 0x0F;

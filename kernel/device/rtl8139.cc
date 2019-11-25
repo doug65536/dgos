@@ -409,7 +409,7 @@ void rtl8139_dev_t::rx_irq_handler(uint16_t isr)
     while (!(RTL8139_MM_RD_8(RTL8139_CR) & RTL8139_CR_RXEMPTY)) {
         memcpy(&hdr, hdr_ptr, sizeof(hdr));
 
-        RTL8139_TRACE("Header flags: %x len=%d\n",
+        RTL8139_TRACE("Header flags: %#x len=%d\n",
                  hdr.status, hdr.len);
 
         ethq_pkt_t *pkt = ethq_pkt_acquire();
@@ -434,7 +434,7 @@ void rtl8139_dev_t::rx_irq_handler(uint16_t isr)
 
             RTL8139_TRACE("Received packet from"
                           " %02x:%02x:%02x:%02x:%02x:%02x"
-                          " %s=%04x\n",
+                          " %s=%#04x\n",
                           pkt->pkt.hdr.s_mac[0],
                     pkt->pkt.hdr.s_mac[1],
                     pkt->pkt.hdr.s_mac[2],
@@ -478,7 +478,7 @@ void rtl8139_dev_t::tx_irq_handler()
     // Transmit status of all descriptors
     uint16_t tsad = RTL8139_MM_RD_16(RTL8139_TSAD);
 
-    RTL8139_TRACE("RX IRQ TSAD=%x\n", tsad);
+    RTL8139_TRACE("RX IRQ TSAD=%#x\n", tsad);
 
     for (int i = 0; i < 4; ++i,
          (tx_tail = ((tx_tail + 1) & 3))) {
@@ -585,7 +585,7 @@ void rtl8139_dev_t::irq_handler()
     ethq_pkt_t *rx_first = nullptr;
 
     if (isr != 0) {
-        RTL8139_TRACE("IRQ status = %x\n", isr);
+        RTL8139_TRACE("IRQ status = %#x\n", isr);
 
         if (isr & RTL8139_IxR_SERR) {
             RTL8139_TRACE("*** IRQ: System Error\n");
@@ -696,7 +696,7 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
                  pci_iter.config.irq_line);
 
         void *mem = calloc(1, sizeof(rtl8139_dev_t));
-        rtl8139_dev_t *self = new (mem) rtl8139_dev_t;
+        rtl8139_dev_t *self = new (mem) rtl8139_dev_t();
 
         rtl8139_devices = (rtl8139_dev_t**)realloc(rtl8139_devices,
                                   sizeof(*rtl8139_devices) *

@@ -250,7 +250,7 @@ static uint32_t png_process_idata(
 png_image_t *png_load(char const *path)
 {
     // Allocate read buffer
-    std::unique_ptr<uint8_t> buf = new uint8_t[PNG_BUFSIZE];
+    std::unique_ptr<uint8_t> buf = new uint8_t[PNG_BUFSIZE]();
     if (!buf)
         return 0;
 

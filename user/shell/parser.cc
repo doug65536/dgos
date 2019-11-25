@@ -9,7 +9,7 @@ parser_node_ptr_t parser_node(size_t count, parser_op_t op, ...)
 {
     va_list ap;
     va_start(ap, op);
-    parser_node_ptr_t node = new parser_node_t;
+    parser_node_ptr_t node = new parser_node_t();
     node->ops = count;
     for (size_t i = 0; i < count; ++i)
         node->op[i] = va_arg(ap, void*);

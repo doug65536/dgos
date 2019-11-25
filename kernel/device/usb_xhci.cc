@@ -1244,7 +1244,7 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
 
     usb_config_helper cfg_hlp(slotid, dev_desc, bos, cfg_buf, 128);
 
-    USBXHCI_TRACE("Searching for driver for %04x:%04x\n",
+    USBXHCI_TRACE("Searching for driver for %#04x:%#04x\n",
                   cfg_hlp.device().vendor_id, cfg_hlp.device().product_id);
 
     dump_config_desc(cfg_hlp);
@@ -1317,7 +1317,7 @@ void usbxhci::walk_caps(char const volatile *caps)
             break;
 
         case USBXHCI_EXTCAPID_PROTO:
-            USBXHCI_TRACE("USB %2x.%02x \"%4.4s\"\n",
+            USBXHCI_TRACE("USB %#2x.%#02x \"%4.4s\"\n",
                           (*cap >> 24) & 0xFF,
                           (*cap >> 16) & 0xFF,
                           (char const*)(cap+1));
@@ -1605,6 +1605,9 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     mmio_op->usbcmd |= USBXHCI_USBCMD_RUNSTOP;
 
+    while (mmio_op->usbsts & USBXHCI_USBSTS_HCH)
+        pause();
+
     for (int port = 0; port < maxports; ++port) {
         if (mmio_op->ports[port].portsc & USBXHCI_PORTSC_CCS) {
             USBXHCI_TRACE("Device is connected to port %d\n", port);
@@ -1627,6 +1630,8 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
         if (USBXHCI_PORTSC_CCS_GET(mmio_op->ports[port].portsc)) {
             USBXHCI_TRACE("Adding device on port %d\n", port);
             add_device(0, port, 0);
+        } else {
+            USBXHCI_TRACE("No device on port %d\n", port);
         }
     }
 
@@ -1638,7 +1643,7 @@ int usbxhci::enable_slot(int port)
     usbxhci_cmd_trb_noop_t cmd{};
     cmd.trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_ENABLESLOTCMD);
 
-    USBXHCI_TRACE("Enabling slot for port %x\n", port);
+    USBXHCI_TRACE("Enabling slot for port %#x\n", port);
 
     usb_blocking_iocp_t block;
 
@@ -1647,8 +1652,8 @@ int usbxhci::enable_slot(int port)
 
     block.wait();
 
-    USBXHCI_TRACE("enableslot completed: completion code=%x, "
-                  "parameter=%x, slotid=%d\n",
+    USBXHCI_TRACE("enableslot completed: completion code=%#x, "
+                  "parameter=%#x, slotid=%d\n",
                   unsigned(block.get_result().cc),
                   block.get_result().ccp,
                   block.get_result().slotid);
@@ -1739,8 +1744,8 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
 
     block.wait();
 
-    USBXHCI_TRACE("setaddr completed: completion code=%x, "
-                  "parameter=%x, slotid=%d\n",
+    USBXHCI_TRACE("setaddr completed: completion code=%#x, "
+                  "parameter=%#x, slotid=%d\n",
                   (unsigned)block.get_result().cc,
                   block.get_result().ccp, slotid);
 

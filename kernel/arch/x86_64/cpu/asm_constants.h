@@ -18,14 +18,14 @@
 #define THREAD_GSBASE_OFS           16
 //#define THREAD_SYSCALL_STACK_OFS    24
 #define THREAD_XSAVE_PTR_OFS        32
-#define THREAD_PROCESS_PTR_OFS      64
-#define THREAD_PRIV_CHG_STACK_OFS   80
-#define THREAD_THREAD_ID_OFS        88
+#define THREAD_PROCESS_PTR_OFS      80
+#define THREAD_PRIV_CHG_STACK_OFS   96
+#define THREAD_THREAD_ID_OFS        104
 #define THREAD_CXX_EXCEPT_OFS       128
 
 #define THREAD_SC_MXCSR_OFS         24
 #define THREAD_SC_FCW87_OFS         28
 
-#define SYSCALL_COUNT   317
+#define SYSCALL_COUNT   318
 #define SYSCALL_ENOSYS  -81
 #define SYSCALL_RFLAGS  0x202

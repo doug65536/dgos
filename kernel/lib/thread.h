@@ -29,6 +29,7 @@ struct thread_create_info_t
     size_t stack_size;
     thread_priority_t priority;
     bool user;
+    bool is_float;
     bool suspended;
 
     uintptr_t tls_base;
@@ -162,7 +163,7 @@ extern int spincount_mask;
 
 // Implemented in arch
 thread_t thread_create(thread_fn_t fn, void *userdata,
-                       size_t stack_size, bool user);
+                       size_t stack_size, bool user, bool is_float);
 
 thread_t thread_create_with_info(thread_create_info_t const* info);
 
@@ -213,6 +214,9 @@ _noreturn
 void thread_idle();
 
 int thread_close(thread_t tid);
+
+_use_result
+unsigned thread_current_cpu(thread_t tid);
 
 _use_result
 thread_t thread_proc_0(void (*fn)());

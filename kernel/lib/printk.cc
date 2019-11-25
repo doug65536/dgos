@@ -1091,8 +1091,7 @@ EXPORT size_t format_flags_register(
     int chars_needed;
     bool measure = !buf_size;
 
-    for (format_flag_info_t const *fi = info;
-         fi->name; ++fi) {
+    for (format_flag_info_t const *fi = info; fi->name; ++fi) {
         uintptr_t value = (flags >> fi->bit) & fi->mask;
 
         if (value != 0 ||

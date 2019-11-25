@@ -412,6 +412,18 @@ DISABLED_UNITTEST(test_vector_lifecycle)
 #include "rand.h"
 #include "hash.h"
 
+
+_const
+static size_t mem_fill_value(size_t input)
+{
+    // Expect them at 8-byte boundaries, make all bits useful
+    size_t n = ((input & UINT64_C(0xFFFFFFFFFFFF) >> 3)) *
+            UINT64_C(6364136223846793005) +
+            UINT64_C(1442695040888963407);
+    n = (n << 32) | (n >> 32);
+    return n;
+}
+
 _const
 static uint8_t byte_from_sz(size_t sz)
 {
@@ -424,12 +436,12 @@ UNITTEST(test_vector_random_malloc)
     uint64_t seed = 42;
 
     size_t i = 0;
-    for (size_t pass = 0; pass < 2003; ++pass) {
+    for (size_t pass = 0; pass < 16; ++pass) {
         auto& stored_ptr = ptrs[i].first;
         size_t& stored_sz = ptrs[i].second;
 
         int sz = rand_r(&seed) % 65536;
-        uint8_t *p = new (std::nothrow) uint8_t[sz];
+        uint8_t *p = new (std::nothrow) uint8_t[sz]();
         ne(nullptr, p);
 
         uint8_t expect = byte_from_sz(stored_sz);

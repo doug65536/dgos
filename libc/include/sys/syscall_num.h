@@ -325,3 +325,4 @@
 #define SYS_fexecve                 314
 #define SYS_probe_pci_for           315
 #define SYS_render_batch            316
+#define SYS_posix_spawn             317

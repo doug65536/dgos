@@ -675,8 +675,8 @@ uart_async_t::uart_async_t()
     , sending_break(false)
     , sending_data(false)
 {
-    rx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size];
-    tx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size];
+    rx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size]();
+    tx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size]();
 }
 
 uart_async_t::~uart_async_t()

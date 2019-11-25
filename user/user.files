@@ -1,6 +1,7 @@
 crt0/crt0pc32.S
 crt0/crt0pc64.S
 crt0/crt0pc80.S
+lib64.ld
 user64_phdrs.ld
 init/init.cc
 user64.ld
