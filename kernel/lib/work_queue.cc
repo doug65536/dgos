@@ -6,6 +6,13 @@
 #include "callout.h"
 #include "cpu/thread_impl.h"
 
+#define DEBUG_WORKQ 0
+#if DEBUG_WORKQ
+#define WORKQ_TRACE(...) printdbg("workq: " __VA_ARGS__)
+#else
+#define WORKQ_TRACE(...) ((void)0)
+#endif
+
 EXPORT workq_impl* workq::percpu;
 
 void workq::init(int cpu_count)
@@ -35,6 +42,7 @@ EXPORT void workq_impl::enqueue_and_unlock(workq_work *work, scoped_lock& lock)
     workq_work **prev_ptr = tail ? &tail->next : &head;
     *prev_ptr = work;
     tail = work;
+    work->next = nullptr;
     lock.unlock();
     not_empty.notify_one();
 }
@@ -122,13 +130,14 @@ void *workq_alloc::alloc()
 {
     int slot;
     if (likely((slot = alloc_slot()) >= 0))
-        return items + alloc_slot();
+        return items + slot;
     panic("Ran out of workq memory");
 }
 
 void workq_alloc::free(void *p)
 {
     size_t i = (value_type*)p - items;
+    WORKQ_TRACE("Freeing slot %zu\n", i);
     free_slot(i);
 }
 
@@ -148,11 +157,15 @@ int workq_alloc::alloc_slot()
 
     // Build a mask that will set the top bit to 1
     // if all underlying bits are now 1
-    uint32_t top_mask = (UINT32_C(1) << word) & -(~upd == 0);
+    uint32_t top_mask = (UINT32_C(1) << word) & -(++upd == 0);
 
     top |= top_mask;
 
-    return int(word << 5) + bit;
+    size_t slot = (word << 5) + bit;
+
+    WORKQ_TRACE("Allocated slot %zu of 1024\n", slot);
+
+    return slot;
 }
 
 void workq_alloc::free_slot(size_t i)
@@ -161,12 +174,18 @@ void workq_alloc::free_slot(size_t i)
 
     size_t word = i >> 5;
 
-    uint8_t bit = word & 31;
+    uint8_t bit = i & 31;
+
+    uint32_t mask = UINT32_C(1) << bit;
+
+    // Make sure we are freeing an allocated block, otherwise chaos
+    assert(map[word] & mask);
 
     // Clear that bit
-    map[word] &= ~(UINT32_C(1) << bit);
+    map[word] &= ~mask;
 
-    // Since we freed one, we know that the bit of level 0 must become 0
+    // Since we freed one, we know unconditionally that the
+    // bit of level 0 must become 0
     top &= ~(UINT64_C(1) << word);
 }
 

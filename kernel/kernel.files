@@ -157,7 +157,7 @@ syscall/sys_time.cc
 ../emu/bochs/bochs-debugger-efi-commands
 ../emu/bochs/bochs-fat-efi-config.bxrc
 ../emu/bochs/bochs-iso-efi-config.bxrc
-../doconfigure
+../bootstrap
 ../gdbhelpers
 ../genregs.py
 ../gensymtab.sh
@@ -238,6 +238,7 @@ device/e9debug.cc
 device/usb_xhci.cc
 device/rtl8139.cc
 device/vga.cc
+device/vga.h
 device/nvme.h
 device/serial-uart.cc
 device/keyb8042.cc
@@ -433,6 +434,7 @@ arch/x86_64/cpu/segrw.cc
 unittest/test_allocator.cc
 unittest/test_bit.cc
 unittest/test_chrono.cc
+unittest/test_filesystem.cc
 unittest/test_malloc.cc
 unittest/test_nofault.cc
 unittest/test_printk.cc

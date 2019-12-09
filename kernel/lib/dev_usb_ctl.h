@@ -46,12 +46,7 @@ using usb_blocking_iocp_t = dgos::basic_blocking_iocp_t<usb_iocp_result_t>;
 
 class usb_pipe_t {
 public:
-    usb_pipe_t()
-        : bus(nullptr)
-        , slotid(-1)
-        , epid(-1)
-    {
-    }
+    usb_pipe_t();
 
     usb_pipe_t(usb_bus_t *bus, int slotid, int epid)
         : bus(bus)

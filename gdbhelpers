@@ -221,12 +221,13 @@ end
 
 define walkunwind
 	set $tid_loop = 0
+	printf "Unwinding %d threads\n", thread_count
 	while $tid_loop < thread_count
 		set $tid = $tid_loop++
 		set $ctx = threads[$tid].ctx
 		if $ctx
 			printf "\n"
-			printf "Unwinding thread %d\n", $tid
+			printf "Unwinding thread %d state=0x%x\n", $tid, threads[$tid].state
 			python
 try:
 	gdb.execute("walkunwind_ctx $ctx.gpr")

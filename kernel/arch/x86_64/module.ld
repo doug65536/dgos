@@ -8,6 +8,7 @@ PHDRS {
 
 	ehfr PT_GNU_EH_FRAME FLAGS(4);
 	dyna PT_DYNAMIC FLAGS(4);
+	driv 0x61000000 FLAGS(4);
 	/*relr 0x6474e552 / *PT_GNU_RELRO* / FLAGS(6);*/
 }
 
@@ -35,6 +36,10 @@ SECTIONS {
 
 		PROVIDE_HIDDEN(___rodata_en = .);
 	} :read
+
+	.driver : {
+		*(.driver)
+	} :read :driv
 
 	.gnu.version : {
 		*(.gnu.version)
@@ -102,6 +107,10 @@ SECTIONS {
 		*(.rela.ifunc)
 		*(.rela.*)
 		PROVIDE_HIDDEN (__rela_dyn_en = .);
+	} :read
+
+	.gcc_except_table : {
+		*(.gcc_except_table .gcc_except_table.*)
 	} :read
 
 	.plt.got : {

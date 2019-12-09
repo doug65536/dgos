@@ -233,7 +233,9 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_ISR_CFG:
-            // This is ignored, because only MSI-X is used?
+            // I wish I could ignore this old crap and just use MSI-X, but
+            // no, qemu broke virtio almost entirely, broken all the way
+            // to always using pin interrupts
             isr_status = (uint32_t*)mmap((void*)bar, sizeof(uint32_t),
                                          PROT_READ, MAP_PHYSICAL, -1, 0);
             break;
@@ -353,7 +355,7 @@ bool virtio_virtqueue_t::init(
         used_ftr = (ring_ftr_t*)(used_ring + queue_count);
     }
 
-    completions.reset(new (std::nothrow) virtio_iocp_t*[queue_count]);
+    completions.reset(new (std::nothrow) virtio_iocp_t*[queue_count]());
     if (!completions)
         return false;
 
@@ -407,7 +409,8 @@ bool virtio_virtqueue_t::init(
     return true;
 }
 
-virtio_virtqueue_t::desc_t *virtio_virtqueue_t::alloc_desc(bool dev_writable)
+virtio_virtqueue_t::desc_t *
+virtio_virtqueue_t::alloc_desc(bool dev_writable)
 {
     scoped_lock lock(queue_lock);
 
@@ -462,7 +465,7 @@ void virtio_virtqueue_t::alloc_multiple(
 void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
                                        virtio_iocp_t *iocp)
 {
-    size_t mask = ~-(1U << log2_queue_size);
+    size_t mask = ~-(size_t(1) << log2_queue_size);
 
     scoped_lock lock(queue_lock);
 
@@ -548,10 +551,11 @@ void virtio_virtqueue_t::recycle_used()
     size_t const mask = ~-(1 << log2_queue_size);
     size_t const done_idx = atomic_ld_acq(&used_hdr->idx);
     VIRTIO_TRACE("done_idx = %zu\n", done_idx);
-    while (unlikely(done_idx == tail)) {
+    if (unlikely(done_idx == tail)) {
         VIRTIO_TRACE("dropped spurious virtio IRQ\n");
         return;
     }
+
     do {
         used_t const& used = used_ring[tail & mask];
         avail_t const id = used.id;

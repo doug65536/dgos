@@ -4,6 +4,7 @@
 
 int closedir(DIR *__dirp)
 {
-    errno = ENOSYS;
-    return -1;
+    __dirp->dirfd = -1;
+    delete __dirp;
+    return 0;
 }

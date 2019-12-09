@@ -10,7 +10,7 @@ public:
     virtual ssize_t write(char const *buf, size_t size, off_t offset) = 0;
 
     // fs_file_info_t interface
-    ino_t get_inode() const override;
+    ino_t get_inode() const override = 0;
 };
 
 // A registration object which creates a dev_fs_file_t object
@@ -106,9 +106,9 @@ struct dev_fs_t final
         }
     };
 
-    void register_file(dev_fs_file_reg_t *reg)
+    bool register_file(dev_fs_file_reg_t *reg)
     {
-
+        return files.emplace_back(reg);
     }
 
     std::vector<dev_fs_file_reg_t*> files;

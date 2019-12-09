@@ -121,9 +121,11 @@ struct storage_if_base_t;
 
 struct EXPORT storage_if_factory_t {
     storage_if_factory_t(char const *factory_name);
+    virtual ~storage_if_factory_t();
+
+    void register_factory();
 
     virtual std::vector<storage_if_base_t *> detect(void) = 0;
-    static void register_factory(void *p);
     char const * const name;
 };
 
@@ -143,14 +145,31 @@ struct EXPORT storage_if_base_t {
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
         & name##_factory, callout_type_t::late_dev, "000")
 
-void storage_if_register_factory(
-        char const *name, storage_if_factory_t *factory);
+bool storage_if_unregister_factory(storage_if_factory_t *factory);
+void storage_if_register_factory(storage_if_factory_t *factory);
 
 typedef int dev_t;
 
 size_t storage_dev_count();
 storage_dev_base_t *storage_dev_open(dev_t dev);
 void storage_dev_close(storage_dev_base_t *dev);
+
+template<typename T>
+bool unregister_factory(std::vector<T*> &factories,
+                        T *factory)
+{
+    typename std::vector<T*>::iterator pos =
+            std::find(factories.begin(),
+                      factories.end(), factory);
+
+    if (unlikely(pos == factories.end()))
+        return false;
+
+    factories.erase(pos);
+
+    return true;
+}
+
 
 //
 // Filesystem (FAT32, etc)
@@ -238,10 +257,8 @@ struct fs_statvfs_t {
 struct fs_base_t;
 
 struct fs_factory_t {
-    explicit constexpr fs_factory_t(char const *factory_name)
-        : name(factory_name)
-    {
-    }
+    explicit fs_factory_t(char const *factory_name);
+    virtual ~fs_factory_t();
 
     virtual fs_base_t *mount(fs_init_info_t *conn) = 0;
     static void register_factory(void *p);
@@ -250,7 +267,7 @@ struct fs_factory_t {
 };
 
 struct fs_base_t {
-    virtual ~fs_base_t() {}
+    virtual ~fs_base_t() = 0;
 
     //
     // Startup and shutdown
@@ -462,7 +479,7 @@ class EXPORT fs_base_ro_t : public fs_base_t {
 
 #define FS_DEV_PTR(type, p) type *self = (type*)(p)
 
-void fs_register_factory(char const *name, fs_factory_t *fs);
+void fs_register_factory(fs_factory_t *fs);
 
 //
 // Partitioning scheme (MBR, GPT, and special types like CPIO, etc)
@@ -480,22 +497,19 @@ struct part_factory_t {
     {
     }
 
+    virtual ~part_factory_t();
+
     virtual std::vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
     static void register_factory(void *p);
     char const * const name;
 };
 
-struct fs_reg_t {
-    char const *name;
-    fs_factory_t *factory;
-};
-
 __BEGIN_DECLS
 
-void part_register_factory(char const *name, part_factory_t *factory);
+void part_register_factory(part_factory_t *factory);
 
 void fs_mount(char const *fs_name, fs_init_info_t *info);
-void fs_add(fs_reg_t *reg, fs_base_t *fs);
+void fs_add(fs_factory_t *reg, fs_base_t *fs);
 fs_base_t *fs_from_id(size_t id);
 
 void probe_storage_factory(storage_if_factory_t *factory);

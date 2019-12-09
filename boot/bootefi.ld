@@ -8,7 +8,6 @@ SECTIONS {
 			? .
 			: __section_alignment__ ) : {
 		__text_st = .;
-		___initialized_data_st = .;
 
 		*(.entry)
 		*(.text)

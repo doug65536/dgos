@@ -17,14 +17,13 @@
 #include "export.h"
 #include "printk.h"
 #include "apic.h"
-#include "rbtree.h"
 #include "callout.h"
 #include "vector.h"
 #include "mutex.h"
 #include "except.h"
-#include "rbtree.h"
 #include "work_queue.h"
 #include "cxxexcept.h"
+#include "basic_set.h"
 
 // Implements platform independent thread.h
 
@@ -92,6 +91,9 @@ struct link_t {
     }
 };
 
+using timestamp_t = uint64_t;
+using ready_map_t = std::map<timestamp_t, thread_info_t*>;
+
 struct alignas(256) thread_info_t {
     // Exclusive line, frequently modified items, rarely shared
 
@@ -138,10 +140,10 @@ struct alignas(256) thread_info_t {
     // --- cache line ---
 
     // 4 64-bit values
-    mutex_t lock;   // 32 bytes
+    std::mutex lock;   // 32 bytes
 
     // 3 64-bit values
-    condition_var_t done_cond;
+    std::condition_variable done_cond;
 
     // Current CPU exception longjmp container
     void *exception_chain;
@@ -189,6 +191,14 @@ struct alignas(256) thread_info_t {
     thread_cpu_mask_t cpu_affinity;
 
     std::vector<__exception_jmp_buf_t> exit_jmpbuf;
+
+    char *name;
+
+    bool closed;
+
+    // Iterator points to the node we inserted into the
+    // ready list, otherwise default constructed
+    ready_map_t::iterator schedule_node;
 };
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
@@ -249,7 +259,7 @@ struct alignas(128) cpu_info_t {
     fpu_state_t fpu_state = discarded;
     uint8_t reserved2[2] = {};
 
-    // Which cpu's context is in the FPU, or -1 if discarded
+    // Which thread's context is in the FPU, or -1 if discarded
     thread_t fpu_owner = -1;
 
     thread_info_t *goto_thread = nullptr;
@@ -259,7 +269,7 @@ struct alignas(128) cpu_info_t {
     // Context switch is prevented when this is nonzero
     uint32_t locks_held = 0;
     // When locks_held transitions to zero, a context switch is forced
-    // when this is true. Deferrng a context switch because locks_held
+    // when this is true. Deferring a context switch because locks_held
     // is nonzero sets this to true
     uint32_t csw_deferred = 0;
 
@@ -285,7 +295,6 @@ struct alignas(128) cpu_info_t {
 
     lock_type queue_lock;
 
-
     //unsigned reserved3 = 0;
 
     // Cleanup to be run after switching stacks on a context switch
@@ -294,14 +303,12 @@ struct alignas(128) cpu_info_t {
 
     void *storage[7] = {};
 
-    using timestamp = uint64_t;
-
     // Tree sorted in order of when timestamp was issued.
     // Only threads that are ready to run appear in this tree.
     // Threads that block on I/O and keep a timeslice issued further in
     // the past get drastically more priority than threads that used up
     // their timeslice, and recently got a newer timeslice.
-    rbtree_t<timestamp, uintptr_t> ready_list;
+    ready_map_t ready_list;
 };
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
@@ -336,6 +343,7 @@ uint32_t cpu_count;
 uint32_t total_cpus;
 
 void thread_destruct(thread_info_t *thread);
+static void thread_signal_completion(thread_info_t *thread);
 
 ///
 
@@ -463,21 +471,6 @@ static char *thread_allocate_stack(
     return guard1_st;
 }
 
-static void thread_gc()
-{
-    for (size_t i = 0; i < thread_count; ++i) {
-        if (likely(threads[i].state != THREAD_IS_FINISHED))
-            continue;
-
-        if (unlikely(atomic_cmpxchg(&threads[i].state, THREAD_IS_FINISHED,
-                                    THREAD_IS_FINISHED_BUSY) !=
-                     THREAD_IS_FINISHED))
-            continue;
-
-        thread_destruct(threads + i);
-    }
-}
-
 // Returns threads array index or 0 on error
 // Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
@@ -485,8 +478,6 @@ static thread_t thread_create_with_state(
         thread_state_t state, thread_cpu_mask_t const &affinity,
         thread_priority_t priority, bool user, bool is_float)
 {
-    thread_gc();
-
     if (stack_size == 0)
         stack_size = 65536;
     else if (stack_size < 16384)
@@ -526,8 +517,8 @@ static thread_t thread_create_with_state(
     // 0 = never
     thread->wake_time = 0;
 
-    mutex_init(&thread->lock);
-    condvar_init(&thread->done_cond);
+    //mutex_init(&thread->lock);
+    //condvar_init(&thread->done_cond);
 
     thread->ref_count = 1;
 
@@ -846,7 +837,7 @@ static thread_info_t *thread_choose_next(
 
         candidate = threads + i;
 
-        // Quickly ignore running and suspended threads threads
+        // Quickly ignore running and suspended threads
         if (candidate->state == THREAD_IS_RUNNING ||
                 candidate->state == THREAD_IS_UNINITIALIZED ||
                 candidate->state == THREAD_IS_EXITING)
@@ -861,10 +852,8 @@ static thread_info_t *thread_choose_next(
         if (unlikely(candidate->state == THREAD_IS_DESTRUCTING)) {
             if (atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
                                THREAD_IS_EXITING) == THREAD_IS_DESTRUCTING) {
-                if (candidate->process->del_thread(candidate->thread_id)) {
-                    candidate->state = THREAD_IS_FINISHED;
-                    condvar_wake_all(&candidate->done_cond);
-                }
+                if (candidate->process->del_thread(candidate->thread_id))
+                    thread_signal_completion(candidate);
             }
             continue;
         }
@@ -940,8 +929,7 @@ static void thread_clear_busy(void *outgoing)
     if (unlikely(atomic_and(&thread->state,
                             (thread_state_t)~THREAD_BUSY) ==
                  THREAD_IS_EXITING)) {
-        thread_info_t * volatile other = thread=thread;
-        //thread->process->del_thread(thread->thread_id);
+        thread_destruct(thread);
     }
 }
 
@@ -953,7 +941,7 @@ static void thread_free_stacks(thread_info_t *thread)
     assert(thread->state == THREAD_IS_EXITING ||
            thread->state == THREAD_IS_FINISHED);
 
-    // The user stack
+    // The thread stack
     if (thread->stack != nullptr && thread->stack_size > 0) {
         stk = thread->stack - thread->stack_size - stack_guard_size;
         stk_sz = stack_guard_size + thread->stack_size + stack_guard_size;
@@ -995,10 +983,10 @@ static void thread_free_stacks(thread_info_t *thread)
 static void thread_signal_completion(thread_info_t *thread)
 {
     // Wake up any threads waiting for this thread to exit ASAP
-    mutex_lock(&thread->lock);
+    std::unique_lock<std::mutex> mutex_lock(thread->lock);
     thread->state = THREAD_IS_FINISHED;
-    mutex_unlock(&thread->lock);
-    condvar_wake_all(&thread->done_cond);
+    mutex_lock.unlock();
+    thread->done_cond.notify_all();
 }
 
 // Thread is not running anymore, destroy things only needed when it runs
@@ -1006,23 +994,25 @@ void thread_destruct(thread_info_t *thread)
 {\
     cpu_scoped_irq_disable irq_dis;
 
-    thread_signal_completion(thread);
-
     thread_free_stacks(thread);
 
     // If everybody has closed their handle to this thread,
     // then mark it for recycling immediately
     if (thread->ref_count == 0) {
-        mutex_destroy(&thread->lock);
+        // New mutex
+        //mutex_destroy(&thread->lock);
         atomic_st_rel(&thread->state, THREAD_IS_UNINITIALIZED);
     }
 }
 
 EXPORT int thread_close(thread_t tid)
 {
-    auto& thread = threads[tid];
+    thread_info_t& thread = threads[tid];
+    if (thread.closed)
+        return 0;
+
     if (thread.state == THREAD_IS_FINISHED) {
-        mutex_destroy(&thread.lock);
+        //mutex_destroy(&thread.lock);
         atomic_st_rel(&thread.state, THREAD_IS_UNINITIALIZED);
         return 1;
     }
@@ -1101,8 +1091,8 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     for ( ; ; ++retries) {
         thread = thread_choose_next(cpu, outgoing);
 
-        if (thread != outgoing)
-            printdbg("Switching to thread %#x\n", thread->thread_id);
+//        if (thread != outgoing)
+//            printdbg("Switching to thread %#x\n", thread->thread_id);
 
         assert((thread >= threads + cpu_count &&
                 thread < threads + countof(threads)) ||
@@ -1223,7 +1213,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
                 cpu_cr0_clts();
             }
 
-            THREAD_TRACE("Restoring context of thread %d\n",
+            THREAD_TRACE("Restoring fpu context of thread %#x\n",
                          thread->thread_id);
 
             if (ISR_CTX_FPU(thread->ctx)) {
@@ -1366,9 +1356,16 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
     thread_info_t *thread = threads + tid;
 
     for (;;) {
-        THREAD_TRACE("Resuming %d\n", tid);
+        //THREAD_TRACE("Resuming %d\n", tid);
 
-        cpu_wait_value(&thread->state, THREAD_IS_SLEEPING);
+        if (thread->state != THREAD_IS_SLEEPING) {
+            uint64_t wait_sleeping_st = time_ns();
+            cpu_wait_value(&thread->state, THREAD_IS_SLEEPING);
+            uint64_t wait_sleeping_en = time_ns();
+            uint64_t wait_sleeping = wait_sleeping_en - wait_sleeping_st;
+            printdbg("Waited %" PRIu64 "ns to wake thread from sleep\n",
+                     wait_sleeping);
+        }
 
         // Transition it to sleeping+busy so another cpu won't touch it
         if (thread->state == THREAD_IS_SLEEPING &&
@@ -1407,11 +1404,9 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
 EXPORT int thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
-    mutex_lock(&thread->lock);
-    while (thread->state != THREAD_IS_FINISHED &&
-           thread->state != THREAD_IS_EXITING)
-        condvar_wait(&thread->done_cond, &thread->lock);
-    mutex_unlock(&thread->lock);
+    std::unique_lock<std::mutex> mutex_lock(thread->lock);
+    while (thread->state != THREAD_IS_FINISHED)
+        thread->done_cond.wait(mutex_lock);
     return thread->exit_code;
 }
 

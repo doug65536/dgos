@@ -1,6 +1,13 @@
 // pci driver: C=STORAGE, S=NVM, I=NVME
 
 #include "kmodule.h"
+#include "pci.h"
+
+PCI_DRIVER_BY_CLASS(
+        nvme,
+        PCI_DEV_CLASS_STORAGE, PCI_SUBCLASS_STORAGE_NVM,
+        PCI_PROGIF_STORAGE_NVM_NVME);
+
 #include "dev_storage.h"
 #include "nvmedecl.h"
 #include "device/pci.h"
@@ -518,13 +525,10 @@ private:
 
 class nvme_if_factory_t final : public storage_if_factory_t {
 public:
-    nvme_if_factory_t() : storage_if_factory_t("nvme") {}
+    nvme_if_factory_t();
 private:
     virtual std::vector<storage_if_base_t*> detect(void) override final;
 };
-
-static nvme_if_factory_t nvme_if_factory;
-STORAGE_REGISTER_FACTORY(nvme_if);
 
 // NVMe interface instance
 class nvme_if_t final : public storage_if_base_t {
@@ -606,6 +610,12 @@ private:
 static std::vector<nvme_if_t*> nvme_devices;
 static std::vector<nvme_dev_t*> nvme_drives;
 
+nvme_if_factory_t::nvme_if_factory_t()
+    : storage_if_factory_t("nvme")
+{
+    storage_if_register_factory(this);
+}
+
 std::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 {
     std::vector<storage_if_base_t *> list;
@@ -636,7 +646,8 @@ std::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 
         nvme_devices.push_back(self);
         if (self->init(pci_iter)) {
-            list.push_back(self.release());
+            if (likely(list.push_back(self.get())))
+                self.release();
         } else {
             nvme_devices.pop_back();
         }
@@ -911,8 +922,11 @@ void nvme_if_t::identify_ns_handler(
 
     drive->init(this, namespaces[ctx->cur_ns], log2_sectorsize);
 
-    ctx->list.push_back(drive);
-    nvme_drives.push_back(drive.release());
+    if (unlikely(!ctx->list.push_back(drive)))
+        panic_oom();
+    if (unlikely(!nvme_drives.push_back(drive.get())))
+        panic_oom();
+    drive.release();
 
     // Enumerate next namespace if there are more
     if (++ctx->cur_ns < namespaces.size()) {
@@ -1326,3 +1340,5 @@ nvme_cmp_t *nvme_queue_state_t::cmp_queue_ptr()
 {
     return cmp_queue.data();
 }
+
+static nvme_if_factory_t nvme_if_factory;

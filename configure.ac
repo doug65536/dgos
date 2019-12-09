@@ -174,7 +174,7 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++17 fno-fat-lto-objects g \
+		std=c++17 fno-fat-lto-objects ggdb3 \
 		fno-integrated-as Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
 		Wstrict-overflow \
@@ -188,14 +188,16 @@ for flag in \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
 		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack \
-		Wno-unused-parameter fno-eliminate-unused-debug-types \
-		fno-eliminate-unused-debug-symbols fno-plt
+		Wno-unused-parameter \
+		fno-plt
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
 		[], [])
 done
 AC_SUBST([COMPILER_FLAGS])
+#fno-eliminate-unused-debug-types
+#fno-eliminate-unused-debug-symbols
 #Wsuggest-attribute=const Wsuggest-attribute=pure
 #fvar-tracking
 #fvar-tracking-assignments
@@ -378,6 +380,7 @@ AC_SUBST([USERLIB64_LDFLAGS])
 
 USERLIB64_LDFLAGS=
 for flag in \
+	Wl,-shared \
 	Wl,--no-eh-frame-hdr \
 	Wl,-T$srcdir/user/lib64.ld \
 	Wl,-z,max-page-size=4096 \
@@ -399,8 +402,7 @@ for flag in \
 	mpreferred-stack-boundary=2 \
 	Wl,-m,elf_i386 \
 	Wl,-N \
-	Wl,--no-dynamic-linker \
-	static
+	Wl,--no-dynamic-linker
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ELF32_FLAGS], [" -$flag"])]

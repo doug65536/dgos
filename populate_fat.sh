@@ -11,6 +11,10 @@ mkdir -p stage || exit
 
 truncate --size 128K stage/.big || exit
 
+for f in *.km; do
+    ln -fsTr "$f" "stage/$f"
+done
+
 ln -fsTr kernel-generic stage/dgos-kernel-generic || exit
 ln -fsTr kernel-tracing stage/dgos-kernel-tracing || exit
 ln -fsTr kernel-asan stage/dgos-kernel-asan || exit
@@ -19,6 +23,9 @@ for f in initrd; do
 done
 
 ln -fsTr "$TOPSRC/user/background.png" stage/background.png || exit
+
+mkdir -p stage/sym || exit
+cp -R sym/* stage/sym || exit
 
 # EFI boot files
 mkdir -p stage/EFI/boot || exit

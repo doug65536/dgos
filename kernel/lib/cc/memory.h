@@ -203,9 +203,9 @@ public:
 
         // Fastpath allocation when it would fit within capacity
         if (likely(remain >= __n)) {
-            printdbg("bump allocator allocated"
-                     " and bumped from [%#zx] at %#zx\n", bump_index,
-                     uintptr_t(current_page[bump_index].storage.data));
+//            printdbg("bump allocator allocated"
+//                     " and bumped from [%#zx] at %#zx\n", bump_index,
+//                     uintptr_t(current_page[bump_index].storage.data));
 
             // Most likely case, we have room in current page
             T *result = reinterpret_cast<T*>(
@@ -231,9 +231,9 @@ public:
         // Reset index to start of freshly allocated page
         bump_index = 0;
 
-        printdbg("bump allocator allocated"
-                 " and bumped from [%#zx] at %#zx\n", bump_index,
-                 uintptr_t(current_page[bump_index].storage.data));
+//        printdbg("bump allocator allocated"
+//                 " and bumped from [%#zx] at %#zx\n", bump_index,
+//                 uintptr_t(current_page[bump_index].storage.data));
 
         return reinterpret_cast<T*>(
                     current_page[bump_index++].storage.data);
@@ -296,6 +296,12 @@ public:
     bump_allocator(bump_allocator&&) = default;
     bump_allocator& operator=(bump_allocator const&) = default;
 
+    template<typename _U>
+    bump_allocator(bump_allocator<_U, _Alloc> const& rhs)
+        : impl(rhs.impl.detach())
+    {
+    }
+
     value_type *allocate(size_t __n)
     {
         if (unlikely(!impl)) {
@@ -332,10 +338,15 @@ public:
 
     ~bump_allocator() = default;
 
-    template<typename _U, typename _A>
-    bump_allocator(bump_allocator<_U, _A> const& rhs)
-        : impl(rhs.impl)
+    template<typename _U>
+    bump_allocator(bump_allocator<_U, _Alloc>&& rhs)
+        : impl(rhs.detach())
     {
+    }
+
+    bump_allocator *detach()
+    {
+        return impl.detach();
     }
 
 private:

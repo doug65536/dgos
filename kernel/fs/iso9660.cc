@@ -15,12 +15,9 @@
 
 struct iso9660_factory_t : public fs_factory_t {
 public:
-    constexpr iso9660_factory_t() : fs_factory_t("iso9660") {}
+    iso9660_factory_t();
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
-
-static iso9660_factory_t iso9660_factory;
-STORAGE_REGISTER_FACTORY(iso9660);
 
 struct iso9660_fs_t final : public fs_base_ro_t {
     FS_BASE_IMPL
@@ -548,6 +545,12 @@ int iso9660_fs_t::mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
 //
 // Startup and shutdown
 
+iso9660_factory_t::iso9660_factory_t()
+    : fs_factory_t("iso9660")
+{
+    fs_register_factory(this);
+}
+
 fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
 {
     if (iso9660_mounts.empty())
@@ -1013,3 +1016,5 @@ int iso9660_fs_t::poll(fs_file_info_t *fi,
     (void)reventsp;
     return 0;
 }
+
+static iso9660_factory_t iso9660_factory;

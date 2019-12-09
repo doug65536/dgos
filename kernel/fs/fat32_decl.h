@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "assert.h"
 
 // This is included by the bootloader
 
@@ -34,6 +35,44 @@ struct fat32_bpb_data_t {
 //  4:0  Seconds divided by 2 (0-29)
 // 10:5  Minutes (0-59)
 // 15:11 Hours (0-23)
+
+#define FAT_DATE_DAY_BIT        0
+#define FAT_DATE_DAY_BITS       5
+#define FAT_DATE_MONTH_BIT      5
+#define FAT_DATE_MONTH_BITS     4
+#define FAT_DATE_YEAR_BIT       9
+#define FAT_DATE_YEAR_BITS      7
+
+C_ASSERT(FAT_DATE_DAY_BITS + FAT_DATE_MONTH_BITS + FAT_DATE_YEAR_BITS == 16);
+C_ASSERT(FAT_DATE_DAY_BIT + FAT_DATE_DAY_BITS == FAT_DATE_MONTH_BIT);
+C_ASSERT(FAT_DATE_MONTH_BIT + FAT_DATE_MONTH_BITS == FAT_DATE_YEAR_BIT);
+C_ASSERT(FAT_DATE_YEAR_BIT + FAT_DATE_YEAR_BITS == 16);
+
+#define FAT_TIME_SEC_BIT        0
+#define FAT_TIME_SEC_BITS       5
+#define FAT_TIME_MIN_BIT        5
+#define FAT_TIME_MIN_BITS       6
+#define FAT_TIME_HOUR_BIT       11
+#define FAT_TIME_HOUR_BITS      5
+
+C_ASSERT(FAT_TIME_SEC_BITS + FAT_TIME_MIN_BITS + FAT_TIME_HOUR_BITS == 16);
+C_ASSERT(FAT_TIME_SEC_BIT + FAT_TIME_SEC_BITS == FAT_TIME_MIN_BIT);
+C_ASSERT(FAT_TIME_MIN_BIT + FAT_TIME_MIN_BITS == FAT_TIME_HOUR_BIT);
+C_ASSERT(FAT_TIME_HOUR_BIT + FAT_TIME_HOUR_BITS == 16);
+
+#define FAT_DATE_DAY(dos_date) \
+    (((dos_date) >> FAT_DATE_DAY_BIT) & ~-(1 << FAT_DATE_DAY_BITS))
+#define FAT_DATE_MONTH(dos_date) \
+    (((dos_date) >> FAT_DATE_MONTH_BIT) & ~-(1 << FAT_DATE_MONTH_BITS))
+#define FAT_DATE_YEAR(dos_date) \
+    ((((dos_date) >> FAT_DATE_YEAR_BIT) & ~-(1 << FAT_DATE_YEAR_BITS)) + 1980)
+
+#define FAT_TIME_SEC(dos_time) \
+    ((((dos_time) >> FAT_TIME_SEC_BIT) & ~-(1 << FAT_TIME_SEC_BITS)) * 2)
+#define FAT_TIME_MIN(dos_time) \
+    (((dos_time) >> FAT_TIME_MIN_BIT) & ~-(1 << FAT_TIME_MIN_BITS))
+#define FAT_TIME_HOUR(dos_time) \
+    (((dos_time) >> FAT_TIME_HOUR_BIT) & ~-(1 << FAT_TIME_HOUR_BITS))
 
 #define FAT_LAST_LFN_ORDINAL    char(0x40)
 #define FAT_ORDINAL_MASK        char(0x3F)
@@ -107,10 +146,10 @@ struct fat32_dir_entry_t {
     uint16_t start_hi;
 
     // offset = 0x16
-    uint16_t modified_date;
+    uint16_t modified_time;
 
     // offset = 0x18
-    uint16_t modified_time;
+    uint16_t modified_date;
 
     // offset = 0x1A
     uint16_t start_lo;

@@ -111,6 +111,7 @@ int process_t::spawn(pid_t * pid_result,
     // Return the assigned PID
     *pid_result = process->pid;
 
+
     thread_t tid = thread_create(&process_t::run, process, 0,
                                  true, true);
 
@@ -137,7 +138,8 @@ int process_t::run(void *process_arg)
 }
 
 // Hack to reuse module loader symbol auto-load hook for processes too
-extern void modload_load_symbols(char const *path, uintptr_t addr);
+extern void modload_load_symbols(char const *path, uintptr_t text_addr,
+                                 uintptr_t base_addr);
 
 // Returns when program exits
 int process_t::run()
@@ -152,9 +154,13 @@ int process_t::run()
     Elf64_Ehdr hdr;
 
     // Open a stdin, stdout, and stderr
-    /*int fd_i = */file_open("/dev/conin", 0, 0);
-    /*int fd_o = */file_open("/dev/conout", 0, 0);
-    /*int fd_e = */file_open("/dev/conerr", 0, 0);
+    int fd_i = file_open("/dev/conin", 0, 0);
+    //int fd_o = file_open("/dev/conout", 0, 0);
+    //int fd_e = file_open("/dev/conerr", 0, 0);
+
+    assert(fd_i == 0);
+    //assert(fd_o == 1);
+    //assert(fd_e == 2);
 
     file_t fd{file_open(path.c_str(), O_RDONLY)};
 
@@ -311,7 +317,7 @@ int process_t::run()
         }
     }
 
-    modload_load_symbols(path.c_str(), first_exec);
+    modload_load_symbols(path.c_str(), first_exec, 0);
 
     // Initialize the stack
 
@@ -353,24 +359,27 @@ int process_t::run()
     if (tls == MAP_FAILED)
         return -1;
 
+    // 4KB guard region around TLS
     uintptr_t tls_area = uintptr_t(tls) + PAGESIZE;
 
-    // 4KB guard region around TLS
-    if (unlikely(mprotect((void*)tls_area, tls_msize,
+    if (unlikely(!mm_is_user_range((void*)tls_area,
+                                   sizeof(uintptr_t) + tls_msize)))
+        return -1;
+
+    if (unlikely(mprotect((void*)tls_area, tls_msize + sizeof(uintptr_t),
                           PROT_READ | PROT_WRITE) < 0))
         return -1;
 
-    if (unlikely(!mm_is_user_range((void*)tls_area, tls_msize)))
-        return -1;
-
     // Explicitly commit faster than taking demand faults
-    if (unlikely(madvise((void*)tls_area, tls_msize, MADV_WILLNEED) < 0))
+    if (unlikely(madvise((void*)tls_area, tls_msize + sizeof(uintptr_t),
+                         MADV_WILLNEED) < 0))
         return -1;
 
     // Copy template into TLS area
     if (unlikely(!mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize)))
         return -1;
 
+    // Zero fill the region not specified in the file
     if (unlikely(!mm_copy_user((char*)tls_area + tls_fsize, nullptr,
                                tls_msize - tls_fsize)))
         return -1;
@@ -389,7 +398,7 @@ int process_t::run()
 
     // The TLS pointer here points to the end of the TLS, which is where
     // the pointer to itself is located
-    uintptr_t tls_ptr = uintptr_t(tls) + PAGE_SIZE + tls_msize;
+    uintptr_t tls_ptr = tls_area + tls_msize;
     // Patch the pointer to itself into the TLS area
     if (unlikely(!mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr))))
         return -1;
@@ -580,16 +589,21 @@ void process_t::exit(pid_t pid, int exitcode)
 
 bool process_t::add_thread(thread_t tid)
 {
+    scoped_lock lock(process_lock);
     return threads.push_back(tid);
 }
 
 // Returns true when the last thread exits
 bool process_t::del_thread(thread_t tid)
 {
+    scoped_lock lock(process_lock);
+
     thread_list::iterator it = std::find(threads.begin(), threads.end(), tid);
 
     if (unlikely(it == threads.end()))
         return false;
+
+    thread_close(tid);
 
     threads.erase(it);
 

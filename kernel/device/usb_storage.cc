@@ -34,7 +34,7 @@ enum struct usb_msc_op_t {
 // A factory that enumerates all of the available storage devices
 class usb_msc_if_factory_t final : public storage_if_factory_t {
 public:
-    usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
+    usb_msc_if_factory_t();
 protected:
     // storage_if_factory_t interface
     std::vector<storage_if_base_t *> detect() override;
@@ -288,6 +288,12 @@ static std::vector<usb_msc_dev_t*> usb_msc_drives;
 //
 // Storage interface factory
 
+usb_msc_if_factory_t::usb_msc_if_factory_t()
+    : storage_if_factory_t("usb_msc")
+{
+    storage_if_register_factory(this);
+}
+
 std::vector<storage_if_base_t *> usb_msc_if_factory_t::detect()
 {
     USB_MSC_TRACE("Reporting %d USB mass storage interfaces\n", usb_msc_count);
@@ -422,7 +428,9 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     if (status < 0)
         return false;
 
-    usb_msc_devices.push_back(if_.release());
+    if (likely(usb_msc_devices.push_back(if_.get())))
+        if_.release();
+
     return true;
 }
 
@@ -558,8 +566,10 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
 
         uint8_t log2_blk_sz = bit_msb_set(blk_sz);
 
-        if (drv->init(this, lun, max_lba, log2_blk_sz))
-            usb_msc_drives.push_back(drv.release());
+        if (drv->init(this, lun, max_lba, log2_blk_sz)) {
+            if (likely(usb_msc_drives.push_back(drv.get())))
+                drv.release();
+        }
 
         USB_MSC_TRACE("initializing lun %d complete\n", lun);
     }
@@ -729,4 +739,3 @@ int usb_msc_if_t::reset()
 }
 
 static usb_msc_if_factory_t usb_msc_if_factory;
-STORAGE_REGISTER_FACTORY(usb_msc_if);

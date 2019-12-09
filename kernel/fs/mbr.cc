@@ -31,14 +31,17 @@ struct partition_tbl_ent_t {
 } _packed;
 
 struct mbr_part_factory_t : public part_factory_t {
-    constexpr mbr_part_factory_t() : part_factory_t("mbr") {}
+    constexpr mbr_part_factory_t();
     std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
-static mbr_part_factory_t mbr_part_factory;
-STORAGE_REGISTER_FACTORY(mbr_part);
-
 static std::vector<part_dev_t*> partitions;
+
+constexpr mbr_part_factory_t::mbr_part_factory_t()
+    : part_factory_t("mbr")
+{
+    part_register_factory(this);
+}
 
 std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
 {
@@ -70,7 +73,8 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                         part->name = "fat32";
 
                         partitions.push_back(part);
-                        list.push_back(part.release());
+                        if (likely(list.push_back(part.get())))
+                            part.release();
                         break;
 
                     case 0x83:
@@ -91,8 +95,13 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                         part->lba_len = ptbl[i].total_sectors;
                         part->name = "ext4";
 
-                        partitions.push_back(part);
-                        list.push_back(part.release());
+                        if (unlikely(!partitions.push_back(part)))
+                            panic_oom();
+
+                        if (unlikely(!list.push_back(part.get())))
+                            panic_oom();
+
+                        part.release();
                     }
                 }
             }
@@ -102,3 +111,4 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
     return list;
 }
 
+static mbr_part_factory_t mbr_part_factory;

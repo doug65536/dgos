@@ -6,7 +6,7 @@ ENTRY(entry)
 
 SECTIONS {
 	.text 0x1000 : AT(0x1000) {
-		___initialized_data_st = .;
+		___text_st = .;
 		*(.head)
 		*(.early)
 

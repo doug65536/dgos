@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <sys/likely.h>
 #include <spawn.h>
+#include <dirent.h>
+#include <string.h>
 
 __thread int testtls = 42;
 
@@ -31,14 +33,14 @@ void load_module(char const *path, char const *parameters = nullptr)
         parameters = "";
 
     int fd = open(path, O_EXCL | O_RDONLY);
-    if (fd < 0)
+    if (unlikely(fd < 0))
         err("Cannot open %s\n", path);
 
     off_t sz = lseek(fd, 0, SEEK_END);
-    if (sz < 0)
+    if (unlikely(sz < 0))
         err("Cannot seek to end of module\n");
 
-    if (lseek(fd, 0, SEEK_SET) != 0)
+    if (unlikely(lseek(fd, 0, SEEK_SET) != 0))
         err("Cannot seek to start of module\n");
 
     void *mem = mmap(nullptr, sz, PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
@@ -48,7 +50,18 @@ void load_module(char const *path, char const *parameters = nullptr)
     if (unlikely(sz != read(fd, mem, sz)))
         err("Cannot read %zd bytes\n", sz);
 
-    int status = init_module(mem, sz, path, nullptr, parameters);
+    int status;
+    char *needed = (char*)malloc(NAME_MAX);
+    do {
+        strcpy(needed, "what the fuck");
+        needed[0] = 0;
+        status = init_module(mem, sz, path, nullptr, parameters, needed);
+
+        if (needed[0] != 0) {
+            load_module(needed);
+        }
+    } while (needed[0]);
+    free(needed);
 
     if (unlikely(status < 0))
         err("Module failed to initialize with %d %d\n", status, errno);
@@ -58,19 +71,24 @@ void load_module(char const *path, char const *parameters = nullptr)
 
 int main(int argc, char **argv, char **envp)
 {
-//    static char const * user_test_argv[] = {
-//        "usertest",
-//        nullptr
-//    };
+    DIR *dir = opendir("/");
 
-//    pid_t user_test_pid = 0;
-//    int status = posix_spawn(&user_test_pid, user_test_argv[0],
-//            nullptr, nullptr, user_test_argv, nullptr);
+    dirent *ent;
+    while ((ent = readdir(dir)) != nullptr) {
+        printf("%s\n", ent->d_name);
+    }
+
+    closedir(dir);
+
+//    dir = opendir("/dev/something");
 
     load_module("unittest.km");
 
     // fixme: check ACPI
     load_module("keyb8042.km");
+
+    load_module("fat32.km");
+    load_module("iso9660.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_SERIAL,
@@ -78,8 +96,7 @@ int main(int argc, char **argv, char **envp)
                       PCI_PROGIF_SERIAL_USB_XHCI) > 0)
         load_module("usbxhci.km");
 
-    load_module("fat32.km");
-    load_module("iso9660.km");
+    load_module("usbmsc.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_STORAGE,
@@ -92,6 +109,12 @@ int main(int argc, char **argv, char **envp)
                       PCI_SUBCLASS_STORAGE_SATA,
                       PCI_PROGIF_STORAGE_SATA_AHCI) > 0)
         load_module("ahci.km");
+
+    if (probe_pci_for(0x1AF4, -1,
+                      PCI_DEV_CLASS_STORAGE,
+                      -1,
+                      -1) > 0)
+        load_module("virtio-blk.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_STORAGE,

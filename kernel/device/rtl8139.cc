@@ -2,6 +2,11 @@
 
 #include "kmodule.h"
 #include "pci.h"
+
+PCI_DRIVER(rtl8139,
+           0x10EC, 0x8139,
+           PCI_DEV_CLASS_NETWORK, PCI_SUBCLASS_NETWORK_ETHERNET, -1);
+
 #include "callout.h"
 #include "printk.h"
 #include "stdlib.h"
@@ -68,8 +73,6 @@ int module_main(int argc, char const * const * argv)
     rtl8139_startup();
     return 0;
 }
-
-static rtl8139_factory_t rtl8139_factory;
 
 struct rtl8139_dev_t : public eth_dev_base_t {
     ETH_DEV_IMPL
@@ -886,3 +889,5 @@ static void rtl8139_startup()
 //REGISTER_CALLOUT(rtl8139_startup_hack, nullptr,
 //                 callout_type_t::nics_ready, "000");
 #endif
+
+static rtl8139_factory_t rtl8139_factory;

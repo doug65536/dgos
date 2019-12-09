@@ -18,6 +18,7 @@
 #include "thread_impl.h"
 #include "stacktrace.h"
 #include "apic.h"
+#include "elf64.h"
 
 // Enforce that we use the correct value in syscall.S
 C_ASSERT(SYSCALL_RFLAGS == (CPU_EFLAGS_IF | 2));
@@ -640,6 +641,16 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // gsbase
     printdbg("gsbase=%#.16lx\n", uintptr_t(gsbase));
+
+    ptrdiff_t rip = (ptrdiff_t)ISR_CTX_REG_RIP(ctx);
+
+    module_t *closest_module = modload_closest(rip);
+
+    if (closest_module) {
+        printdbg("Closest module is %s, at +%#zx\n",
+                 modload_get_name(closest_module).c_str(),
+                 rip - modload_get_base(closest_module));
+    }
 
     printdbg("-------------------------------------------\n");
 

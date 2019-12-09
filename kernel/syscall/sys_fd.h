@@ -14,6 +14,9 @@ ssize_t sys_pread64(int fd, void *bufaddr,
                     size_t count, off_t ofs);
 ssize_t sys_pwrite64(int fd, void const *bufaddr,
                      size_t count, off_t ofs);
+int sys_readdir_r(int fd, dirent_t *buf);
+int sys_opendir(char const *pathname);
+int sys_closedir(int fd);
 int sys_fsync(int fd);
 int sys_fdatasync(int fd);
 int sys_dup(int oldfd);

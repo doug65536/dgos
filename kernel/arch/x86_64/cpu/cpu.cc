@@ -776,6 +776,14 @@ void cpu_patch_nop(void *addr, size_t size)
         0+7+6+5+4+3+2+1
     };
 
+//    size_t line_remain = 64 - (uintptr_t(addr) & ~-64);
+
+//    // If the range crosses a cache line boundary, split it into two nops
+//    if (line_remain < size) {
+//        cpu_patch_nop(addr, line_remain);
+//        return cpu_patch_nop((char*)addr + line_remain, size - line_remain);
+//    }
+
     uint8_t *out = (uint8_t*)addr;
 
     cpu_scoped_irq_disable irq_dis;

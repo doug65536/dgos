@@ -1,6 +1,13 @@
 // pci driver: C=STORAGE,S=SATA,I=AHCI
 
 #include "kmodule.h"
+#include "pci.h"
+
+PCI_DRIVER_BY_CLASS(
+        ahci,
+        PCI_DEV_CLASS_STORAGE, PCI_SUBCLASS_STORAGE_SATA,
+        PCI_PROGIF_STORAGE_SATA_AHCI);
+
 #include "dev_storage.h"
 #include "ata.h"
 #include "ahci.bits.h"
@@ -25,11 +32,6 @@
 #else
 #define AHCI_TRACE(...) ((void)0)
 #endif
-
-int module_main(int argc, char const * const * argv)
-{
-    return 0;
-}
 
 enum ahci_fis_type_t {
     // Register FIS - host to device
@@ -848,15 +850,19 @@ struct hba_port_info_t {
 #define AHCI_PE_DBC_BIT     1
 #define AHCI_PE_DBC_n(n)    ((n)-1)
 
-class ahci_if_factory_t final : public storage_if_factory_t {
+class ahci_if_factory_t final
+    : public storage_if_factory_t
+{
 public:
-    ahci_if_factory_t() : storage_if_factory_t("ahci") {}
+    ahci_if_factory_t();
 private:
     virtual std::vector<storage_if_base_t *> detect(void) override final;
 };
 
-static ahci_if_factory_t ahci_if_factory;
-STORAGE_REGISTER_FACTORY(ahci_if);
+int module_main(int argc, char const * const * argv)
+{
+    return 0;
+}
 
 // AHCI interface instance
 class ahci_if_t final : public storage_if_base_t, public zero_init_t {
@@ -1742,6 +1748,12 @@ void ahci_if_t::bios_handoff()
         thread_yield();
 }
 
+ahci_if_factory_t::ahci_if_factory_t()
+    : storage_if_factory_t("ahci")
+{
+    storage_if_register_factory(this);
+}
+
 std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 {
     std::vector<storage_if_base_t *> list;
@@ -1832,8 +1844,11 @@ std::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 
             if (drive->init(this, port_num,
                             port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
-                ahci_drives.push_back(drive);
-                list.push_back(drive.release());
+                if (unlikely(!ahci_drives.push_back(drive)))
+                    panic_oom();
+                if (unlikely(!list.push_back(drive.get())))
+                    panic_oom();
+                drive.release();
             }
         }
     }
@@ -1955,3 +1970,5 @@ long ahci_dev_t::info(storage_dev_info_t key)
         return 0;
     }
 }
+
+static ahci_if_factory_t ahci_if_factory;

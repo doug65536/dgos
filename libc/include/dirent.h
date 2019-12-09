@@ -31,6 +31,8 @@ struct dirent {
     char d_name[NAME_MAX+1];
 };
 
+typedef struct dirent dirent_t;
+
 DIR *opendir(char const *__pathname);
 DIR *fdopendir(int __dirfd);
 int closedir(DIR *__dirp);

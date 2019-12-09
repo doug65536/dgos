@@ -139,8 +139,6 @@ syscall_entry:
     .cfi_val_encoded_addr cs, 0, GDT_SEL_USER_CODE64+3
     .cfi_val_encoded_addr ss, 0, GDT_SEL_USER_DATA+3
 
-    swapgs_boundary // in kernel cs with user gs begins
-
     // syscall rax
     // params rdi, rsi, rdx, r10, r8, r9
     // return rax
@@ -149,6 +147,11 @@ syscall_entry:
     // on return, rflags is initialized to CPU_EFLAGS_IF | 2
     // CPU is configured to clear EFLAGS IF, DF, TF, AC on entry
     // still on the caller's stack though!
+
+    // Switch to kernel gs
+    swapgs_boundary // in kernel cs with user gs begins
+    swapgs
+    swapgs_boundary // in kernel cs with user gs ends
 
     // Range check syscall number
     cmpq $ SYSCALL_COUNT,%rax
@@ -160,18 +163,13 @@ syscall_entry:
 
     xor %r11d,%r11d
 
-    // Switch to kernel gs
-    swapgs
-
-    swapgs_boundary // in kernel cs with user gs ends
-
     // Get pointer to current CPU's TSS from CPU-local data
     movq %gs:CPU_INFO_TSS_PTR_OFS(%r11),%r11
 
     // Get privilege change stack from TSS data (just like an interrupt would)
     movq TSS_RSP0_OFS(%r11),%r11
 
-    // Switch to this thread's syscall stack
+    // Switch to this thread's kernel stack
     xchgq %rsp,%r11
 
     .cfi_def_cfa r11,0
@@ -230,9 +228,12 @@ syscall_entry:
     swapgs
     swapgs_boundary // in kernel cs with user gs begins
     sysretq
+    swapgs_boundary // in kernel cs with user gs ends
 
     // syscall number out of range
 0:  movq $ SYSCALL_ENOSYS,%rax
+    swapgs
+    swapgs_boundary // in kernel cs with user gs begins
     sysretq
     swapgs_boundary // in kernel cs with user gs ends
 

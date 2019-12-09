@@ -29,12 +29,12 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
 {
     this->name = name;
 
-    linaddr_t initial_addr = *linear_base_ptr;
+//    linaddr_t initial_addr = *linear_base_ptr;
 
-    // Account for space taken creating trees
+//    // Account for space taken creating trees
 
-    size_t size_adj = *linear_base_ptr - initial_addr;
-    size -= size_adj;
+//    size_t size_adj = *linear_base_ptr - initial_addr;
+//    size -= size_adj;
 
     uintptr_t aligned_base;
 
@@ -44,15 +44,18 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
         // and align to 1GB boundary to make pointers more readable
         aligned_base = prev_base;
 
+
         // Page align
         aligned_base = (aligned_base + PAGE_SIZE - 1) & -PAGE_SIZE;
 
         // 1GB align
-        aligned_base += (1 << 30) - 1;
-        aligned_base &= -(1 << 30);
+//        aligned_base += (1 << 30) - 1;
+//        aligned_base &= -(1 << 30);
 
         std::pair<tree_t::iterator, bool> ins_by_size =
                 free_addr_by_size.insert({size, aligned_base});
+
+        free_addr_by_addr.share_allocator(free_addr_by_size);
 
         std::pair<tree_t::iterator, bool> ins_by_addr =
             free_addr_by_addr.insert({aligned_base, size});
@@ -82,6 +85,7 @@ void contiguous_allocator_t::init(
 
     if (size) {
         free_addr_by_size.insert({size, addr});
+        free_addr_by_addr.share_allocator(free_addr_by_size);
         free_addr_by_addr.insert({addr, size});
     }
 

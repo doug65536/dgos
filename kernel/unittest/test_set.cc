@@ -10,9 +10,16 @@ template class std::__basic_tree<int, void>::__basic_iterator<true, 1>;
 template class std::__basic_tree<int, void>::__basic_iterator<false, -1>;
 template class std::__basic_tree<int, void>::__basic_iterator<true, -1>;
 
+#define HEAP_VALIDATE 0
+#if HEAP_VALIDATE
+#define heap_validate() eq(true, malloc_validate(false));
+#else
+#define heap_validate() ((void)0)
+#endif
+
 UNITTEST(test_set_int_default_construct)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     std::set<int> c;
     eq(true, c.validate());
@@ -31,12 +38,12 @@ UNITTEST(test_set_int_default_construct)
 
     eq(size_t(0), count);
 
-    eq(true, malloc_validate(false));
+    heap_validate();
 }
 
 UNITTEST(test_set_int_insert_1)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     std::set<int> c;
 
@@ -73,12 +80,12 @@ UNITTEST(test_set_int_insert_1)
 
     eq(1, count);
 
-    eq(true, malloc_validate(false));
+    heap_validate();
 }
 
 UNITTEST(test_set_int_insert_dup)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     std::set<int> c;
 
@@ -123,12 +130,12 @@ UNITTEST(test_set_int_insert_dup)
 
     eq(1, count);
 
-    eq(true, malloc_validate(false));
+    heap_validate();
 }
 
 UNITTEST(test_set_int_excess_iter_inc_at_end)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     std::set<int> c;
 
@@ -155,12 +162,12 @@ UNITTEST(test_set_int_excess_iter_inc_at_end)
     eq(true, c.rend() == rit);
     eq(true, c.crend() == crit);
 
-    eq(true, malloc_validate(false));
+    heap_validate();
 }
 
 UNITTEST(test_set_int_construct_insert_churn)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     for (int i = 0; i < 100; ++i) {
         std::set<int> c;
@@ -173,12 +180,12 @@ UNITTEST(test_set_int_construct_insert_churn)
         }
     }
 
-    eq(true, malloc_validate(false));
+    heap_validate();
 }
 
 UNITTEST(test_set_int_insert_1k)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     std::set<int> c;
     int e = 1000;
@@ -228,12 +235,30 @@ UNITTEST(test_set_int_insert_1k)
 
     eq(e, count);
 
-    eq(true, malloc_validate(false));
+    heap_validate();
+}
+
+UNITTEST(test_set_lower_bound)
+{
+    std::set<int> c;
+
+    for (int i = 2; i < 10; i += 2) {
+        std::pair<std::set<int>::iterator, bool> ins = c.insert(i);
+        eq(i, *ins.first);
+        eq(true, ins.second);
+    }
+
+    for (int i = 1; i < 10; ++i) {
+        int expect = (i & 1) ? (i + 1) : i;
+        std::set<int>::iterator it = c.lower_bound(i);
+        eq(i > 8, it == c.end());
+        eq(true, i > 8 || *it == expect);
+    }
 }
 
 UNITTEST(test_set_int_insert_reverse)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     std::set<int> c;
     int e = 1000;
@@ -281,12 +306,12 @@ UNITTEST(test_set_int_insert_reverse)
 
     eq(e, count);
 
-    eq(true, malloc_validate(false));
+    heap_validate();
 }
 
 UNITTEST(test_set_int_simple_erase)
 {
-    eq(true, malloc_validate(false));
+    heap_validate();
 
     std::set<int> c;
 
@@ -321,7 +346,7 @@ UNITTEST(test_set_int_simple_erase)
     eq(0, i);
     eq(size_t(0), c.size());
 
-    eq(true, malloc_validate(false));
+    heap_validate();
 }
 
 UNITTEST(test_set_int_complex_erase)
@@ -403,51 +428,145 @@ DISABLED_UNITTEST(test_set_int_every_insert_permutation)
 
 UNITTEST(test_set_int_every_erase_order)
 {
+    std::vector<int> order;
     std::set<int> c;
 
-    for (int seed = 0; seed < 8; ++seed) {
-        c.clear();
+    for (int i = 0; i < 8; ++i)
+        order.push_back(i);
 
+    do {
         for (int i = 0; i < 8; ++i) {
             std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(i);
 
             ne(nullptr, &*ins_pair.first);
             eq(true, ins_pair.second);
             eq(i, *ins_pair.first);
-
-            eq(true, c.validate());
         }
 
-        //c.dump("before erase");
-
         for (int i = 0; i < 8; ++i) {
-            int key = seed ^ i;
-
-            //dbgout << "Erasing " << key << '\n';
+            int key = order[i];
 
             eq(size_t(1), c.erase(key));
 
-            //c.dump("after erase");
-
+            eq(size_t(8 - i - 1), c.size());
 
             // Make sure all the ones we did not erase remain
             for (int k = i + 1; k < 8; ++k) {
-                auto it = c.find(seed ^ k);
+                auto it = c.find(order[k]);
                 eq(true, c.end() != it);
-                eq(seed ^ k, *it);
+                eq(order[k], *it);
             }
 
             // Make sure all the ones erased are gone
             for (int k = 0; k <= i; ++k)
-                eq(true, c.end() == c.find(seed ^ k));
+                eq(true, c.end() == c.find(order[k]));
         }
 
         eq(true, c.validate());
-    }
+    } while (std::next_permutation(order.begin(), order.end()));
 }
 
 UNITTEST(test_map_insert)
 {
     std::map<int, short> c;
-    c.insert({42, 6500});
+    std::pair<std::map<int, short>::iterator, bool> ins =
+            c.insert({42, 6500});
+    eq(true, c.end() != ins.first);
+    eq(42, ins.first->first);
+    eq(6500, ins.first->second);
+    eq(size_t(1), c.size());
+    eq(6500, c[42]);
+}
+
+UNITTEST(test_map_index)
+{
+    std::map<int, short> c;
+    c[42] = 6500;
+    c[43] = 8900;
+    eq(size_t(2), c.size());
+    eq(6500, c[42]);
+    eq(8900, c[43]);
+}
+
+class destruct_watcher_t {
+public:
+    destruct_watcher_t()
+        : value(0)
+        , destruct_counter(nullptr)
+    {
+    }
+
+    destruct_watcher_t(int value, int *destruct_counter)
+        : value(value)
+        , destruct_counter(destruct_counter)
+    {
+    }
+
+    destruct_watcher_t(destruct_watcher_t&& rhs)
+        : value(rhs.value)
+        , destruct_counter(rhs.destruct_counter)
+    {
+        rhs.destruct_counter = nullptr;
+    }
+
+    destruct_watcher_t(destruct_watcher_t const& rhs)
+        : value(rhs.value)
+        , destruct_counter(rhs.destruct_counter)
+    {
+        if (rhs.destruct_counter)
+            rhs.destruct_counter = nullptr;
+    }
+
+    destruct_watcher_t& operator=(destruct_watcher_t&& rhs)
+    {
+        value = rhs.value;
+        destruct_counter = rhs.destruct_counter;
+        rhs.destruct_counter = nullptr;
+        return *this;
+    }
+
+    destruct_watcher_t& operator=(destruct_watcher_t const& rhs)
+    {
+        value = rhs.value;
+        destruct_counter = rhs.destruct_counter;
+        return *this;
+    }
+
+    ~destruct_watcher_t()
+    {
+        if (destruct_counter != nullptr)
+            ++*destruct_counter;
+    }
+
+    bool operator<(destruct_watcher_t const& rhs) const
+    {
+        return value < rhs.value;
+    }
+
+    int value;
+private:
+    mutable int* destruct_counter;
+};
+
+UNITTEST(test_map_key_value_destruct)
+{
+    int key1_count = 0;
+    int key2_count = 0;
+    int val1_count = 0;
+    int val2_count = 0;
+
+    std::map<destruct_watcher_t, destruct_watcher_t> c;
+    c[destruct_watcher_t(42, &key1_count)] =
+            destruct_watcher_t(6500, &val1_count);
+    c[destruct_watcher_t(43, &key2_count)] =
+            destruct_watcher_t(8900, &val2_count);
+    eq(size_t(2), c.size());
+    eq(6500, c[destruct_watcher_t(42, nullptr)].value);
+    eq(8900, c[destruct_watcher_t(43, nullptr)].value);
+    c.clear();
+    eq(size_t(0), c.size());
+    eq(key1_count, 1);
+    eq(key2_count, 1);
+    eq(val1_count, 1);
+    eq(val2_count, 1);
 }

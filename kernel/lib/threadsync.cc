@@ -138,7 +138,6 @@ EXPORT bool mutex_lock(mutex_t *mutex, int64_t timeout_time)
         result = thread_sleep_release(&mutex->lock, &wait.thread, timeout_time);
 
         if (result) {
-            assert(mutex->lock != 0);
             assert(wait.link.next == nullptr);
             assert(wait.link.prev == nullptr);
             assert(mutex->owner == wait.thread);
@@ -472,7 +471,6 @@ EXPORT void condvar_init(condition_var_t *var)
     var->lock = 0;
     var->link.next = &var->link;
     var->link.prev = &var->link;
-    atomic_barrier();
 }
 
 EXPORT void condvar_destroy(condition_var_t *var)

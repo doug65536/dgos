@@ -1,6 +1,6 @@
 #include "dev_storage.h"
 #include "fileio.h"
-#include "rbtree.h"
+#include "basic_set.h"
 #include "callout.h"
 #include "mm.h"
 #include "stdlib.h"
@@ -349,7 +349,7 @@ int file_fdatasync(int id)
     return fh->fs->fsync(fh->fi, 1);
 }
 
-int file_opendir(char const *path)
+EXPORT int file_opendir(char const *path)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(path, consumed);
@@ -376,7 +376,7 @@ int file_opendir(char const *path)
     return fh - file_table.data();
 }
 
-ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
+EXPORT ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -393,7 +393,7 @@ ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
     return size;
 }
 
-off_t file_telldir(int id)
+EXPORT off_t file_telldir(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -402,7 +402,7 @@ off_t file_telldir(int id)
     return fh->pos;
 }
 
-off_t file_seekdir(int id, off_t ofs)
+EXPORT off_t file_seekdir(int id, off_t ofs)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -412,7 +412,7 @@ off_t file_seekdir(int id, off_t ofs)
     return 0;
 }
 
-int file_closedir(int id)
+EXPORT int file_closedir(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -427,7 +427,7 @@ int file_closedir(int id)
     return status;
 }
 
-int file_mkdir(char const *path, mode_t mode)
+EXPORT int file_mkdir(char const *path, mode_t mode)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(path, consumed);
@@ -438,7 +438,7 @@ int file_mkdir(char const *path, mode_t mode)
     return fs->mkdir(path + consumed, mode);
 }
 
-int file_rmdir(char const *path)
+EXPORT int file_rmdir(char const *path)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(path, consumed);
@@ -449,7 +449,7 @@ int file_rmdir(char const *path)
     return fs->rmdir(path + consumed);
 }
 
-int file_rename(char const *old_path, char const *path)
+EXPORT int file_rename(char const *old_path, char const *path)
 {
     size_t old_consumed = 0;
     fs_base_t *old_fs = file_fs_from_path(old_path, old_consumed);
@@ -466,7 +466,7 @@ int file_rename(char const *old_path, char const *path)
     return fs->rename(old_path + old_consumed, path + consumed);
 }
 
-int file_unlink(char const *path)
+EXPORT int file_unlink(char const *path)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(path, consumed);
@@ -477,7 +477,7 @@ int file_unlink(char const *path)
     return fs->unlink(path + consumed);
 }
 
-int file_fchmod(int id, mode_t mode)
+EXPORT int file_fchmod(int id, mode_t mode)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -489,7 +489,7 @@ int file_fchmod(int id, mode_t mode)
     return fh->fs->fchmod(fh->fi, mode);
 }
 
-int file_chown(int id, int uid, int gid)
+EXPORT int file_chown(int id, int uid, int gid)
 {
     filetab_t *fh = file_fh_from_id(id);
 

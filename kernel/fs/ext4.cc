@@ -255,7 +255,9 @@ class ext4_fs_t final : public fs_base_t {
     char *mm_dev;
 };
 
-class ext4_factory_t : public fs_factory_t {
+class ext4_factory_t
+        : public fs_factory_t {
+    ext4_factory_t();
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
@@ -297,6 +299,12 @@ int ext4_fs_t::mm_fault_handler(
 
 //
 // Startup and shutdown
+
+ext4_factory_t::ext4_factory_t()
+    : fs_factory_t("ext4")
+{
+    fs_register_factory(this);
+}
 
 fs_base_t *ext4_factory_t::mount(fs_init_info_t *conn)
 {
@@ -373,7 +381,7 @@ int ext4_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 }
 
 ssize_t ext4_fs_t::readdir(fs_file_info_t *fi,
-                                   dirent_t *buf, off_t offset)
+                           dirent_t *buf, off_t offset)
 {
     (void)buf;
     (void)offset;

@@ -2,6 +2,7 @@
 #include "mutex.h"
 #include "printk.h"
 #include "memory.h"
+#include "chrono.h"
 
 #include "fs/devfs.h"
 
@@ -212,20 +213,30 @@ int keybd_event(keyboard_event_t event)
     return 1;
 }
 
-keyboard_event_t keybd_waitevent(void)
+keyboard_event_t keybd_waitevent(
+        std::chrono::high_resolution_clock::time_point const& timeout_time)
 {
-    keyboard_event_t event;
+    keyboard_event_t event{};
 
     keyboard_buffer_t::scoped_lock buffer_lock(keybd_buffer.lock);
 
-    while (keybd_buffer.head == keybd_buffer.tail)
-        keybd_buffer.not_empty.wait(buffer_lock);
+    while (keybd_buffer.head == keybd_buffer.tail) {
+        if (keybd_buffer.not_empty.wait_until(buffer_lock, timeout_time) ==
+                std::cv_status::timeout)
+            return event;
+    }
 
     event = keybd_buffer.buffer[keybd_buffer.tail];
 
     keybd_buffer.tail = keybd_queue_next(keybd_buffer.tail);
 
     return event;
+}
+
+keyboard_event_t keybd_waitevent()
+{
+    return keybd_waitevent(std::chrono::high_resolution_clock::
+                           time_point::max());
 }
 
 char const *keybd_special_text(int codepoint)
@@ -372,9 +383,7 @@ class keybd_file_reg_t : public dev_fs_file_reg_t {
 public:
     static keybd_file_reg_t *get_registration()
     {
-        if (unlikely(!instance))
-            instance.reset(new (std::nothrow) keybd_file_reg_t("conin"));
-        return instance;
+        return new (std::nothrow) keybd_file_reg_t("conin");
     }
 
     keybd_file_reg_t(char const *name)
@@ -384,39 +393,43 @@ public:
 
     struct keybd_file_t : public dev_fs_file_t {
         // dev_fs_file_t interface
-        ssize_t read(char *buf, size_t size, off_t offset) override
+        ssize_t read(char *buf, size_t size, off_t offset) override final
         {
             if (size < sizeof(keyboard_event_t))
                 return -int(errno_t::EINVAL);
 
             keyboard_event_t ev = keybd_waitevent();
-            memcpy(buf, &ev, sizeof(ev));
-            return sizeof(ev);
+            if (likely(ev.vk != 0)) {
+                memcpy(buf, &ev, sizeof(ev));
+                return sizeof(ev);
+            }
+
+            return 0;
         }
 
         // dev_fs_file_t interface
-        ssize_t write(char const *buf, size_t size, off_t offset) override
+        ssize_t write(char const *buf, size_t size, off_t offset) override final
         {
             return -int(errno_t::EROFS);
+        }
+
+        ino_t get_inode() const override final
+        {
+            return -int(errno_t::ENOSYS);
         }
     };
 
     // dev_fs_file_reg_t interface
     dev_fs_file_t *open(int flags, mode_t mode) override
     {
-        return &file;
+        return new (std::nothrow) keybd_file_t();
     }
-
-    keybd_file_t file;
-
-    static std::unique_ptr<keybd_file_reg_t> instance;
 };
-
-std::unique_ptr<keybd_file_reg_t> keybd_file_reg_t::instance;
 
 EXPORT void keybd_register(void*)
 {
-    devfs_register(keybd_file_reg_t::instance);
+    devfs_register(keybd_file_reg_t::get_registration());
 }
 
-REGISTER_CALLOUT(keybd_register, nullptr, callout_type_t::devfs_ready, "000");
+REGISTER_CALLOUT(keybd_register, nullptr, callout_type_t::
+                 devfs_ready, "000");

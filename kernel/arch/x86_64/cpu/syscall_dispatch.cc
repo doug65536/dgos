@@ -4,6 +4,7 @@
 #include "errno.h"
 #include "assert.h"
 
+
 #include "syscall/sys_fd.h"
 #include "syscall/sys_mem.h"
 #include "syscall/sys_time.h"
@@ -358,7 +359,9 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_probe_pci_for,
     (syscall_handler_t*)(void*)sys_render_batch,
     (syscall_handler_t*)(void*)sys_posix_spawn,
-    //(syscall_handler_t*)(void*)sys_,
+    (syscall_handler_t*)(void*)sys_opendir,
+    (syscall_handler_t*)(void*)sys_readdir_r,
+    (syscall_handler_t*)(void*)sys_closedir,
     //(syscall_handler_t*)(void*)sys_,
 };
 

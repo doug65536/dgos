@@ -58,13 +58,22 @@ __longjmp:
     push_cfi 8*8(%rdi)
     popfq_cfi
 
+    mov (%rdi),%rdx
+
     // Restore stack pointer
     movq 1*8(%rdi),%rsp
+    .cfi_register rip,rdx
     .cfi_register rsp,rsp
+    .cfi_same_value rbx
+    .cfi_same_value rbp
+    .cfi_same_value r12
+    .cfi_same_value r13
+    .cfi_same_value r14
+    .cfi_same_value r15
 
     // Return value is second parameter and "return" from setjmp again
     movq %rsi,%rax
-    jmpq *(%rdi)
+    jmpq *%rdx
 
     .cfi_endproc
 

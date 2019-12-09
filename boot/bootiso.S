@@ -107,9 +107,9 @@ relocate:
     xorw %cx,%cx
     movw %cx,%es
     movw $4096,%cx
-    movw $ ___initialized_data_st,%di
+    movw $ ___text_st,%di
     shrw $2,%cx
-    movw $ UNRELOCATED(___initialized_data_st),%si
+    movw $ UNRELOCATED(___text_st),%si
     cld
     rep movsl
 
@@ -129,10 +129,10 @@ reloc_entry:
     movb $ dap_length,dap_sizeof_packet(%si)
     movb $ 0,dap_reserved(%si)
     movl $ ___initialized_data_en,%ecx
-    subl $ ___initialized_data_st + 4096,%ecx
+    subl $ ___text_st + 4096,%ecx
     shrl $ 11,%ecx
     movw %cx,dap_block_count(%si)
-    movl $ ___initialized_data_st + 4096,%edx
+    movl $ ___text_st + 4096,%edx
     movw %dx,%ax
     andw $0xF,%ax
     shrl $ 4,%edx

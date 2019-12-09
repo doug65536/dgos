@@ -10,7 +10,9 @@
 #include "user_mem.h"
 
 int sys_init_module(char const *module, ptrdiff_t module_sz,
-                    char const *module_name, char const *module_params)
+                    char const *module_name, struct module *mod_user,
+                    char const *module_params,
+                    char *ret_needed)
 {
     char kmname[256];
 
@@ -97,10 +99,13 @@ int sys_init_module(char const *module, ptrdiff_t module_sz,
         parameters.back().push_back(ch);
     }
 
-    bool worked = modload_load_image(module, module_sz, kmname,
-                                     std::move(parameters));
+    errno_t err = errno_t::OK;
 
-    return worked ? 0 : -int(errno_t::EINVAL);
+    bool worked = modload_load_image(module, module_sz, kmname,
+                                     std::move(parameters),
+                                     ret_needed, &err);
+
+    return worked ? 0 : -int(err);
 }
 
 int sys_delete_module(char const *name_user)

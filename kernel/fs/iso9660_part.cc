@@ -7,14 +7,17 @@
 //struct part_dev_t;
 
 struct iso9660_part_factory_t : public part_factory_t {
-    constexpr iso9660_part_factory_t() : part_factory_t("iso9660") {}
+    constexpr iso9660_part_factory_t();
     std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
-static iso9660_part_factory_t iso9660_part_factory;
-STORAGE_REGISTER_FACTORY(iso9660_part);
-
 static std::vector<part_dev_t*> partitions;
+
+constexpr iso9660_part_factory_t::iso9660_part_factory_t()
+    : part_factory_t("iso9660")
+{
+    part_register_factory(this);
+}
 
 std::vector<part_dev_t *>
 iso9660_part_factory_t::detect(storage_dev_base_t *drive)
@@ -47,8 +50,11 @@ iso9660_part_factory_t::detect(storage_dev_base_t *drive)
         part->name = "iso9660";
 
         partitions.push_back(part);
-        list.push_back(part.release());
+        if (likely(list.push_back(part.get())))
+            part.release();
     }
 
     return list;
 }
+
+static iso9660_part_factory_t iso9660_part_factory;

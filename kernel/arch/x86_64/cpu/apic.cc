@@ -2043,7 +2043,7 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
 static uint64_t apic_rdtsc_time_ns_handler()
 {
     uint64_t now = cpu_rdtsc();
-    return now * clk_to_ns_numer/ clk_to_ns_denom;
+    return now * clk_to_ns_numer / clk_to_ns_denom;
 }
 
 static uint64_t apic_rdtsc_nsleep_handler(uint64_t nanosec)

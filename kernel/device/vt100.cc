@@ -107,7 +107,6 @@ private:
 
         bool crossed_out:1;
         bool dbl_underline:1;
-
     };
 
     template<size_t N>
@@ -132,6 +131,9 @@ private:
 
         return n;
     }
+
+    int cursor_x;
+    int cursor_y;
 
     void parse_csi(char32_t final)
     {
@@ -234,6 +236,12 @@ private:
         case 'n':
             //  (N=6: DSR device status report
             // Sends ESC[n;mR  where n=cursor row, m=cursor column
+//            if (np == 1 && params[0] == 6) {
+//                char reply[32];
+//                snprintf(reply, sizeof(reply), "\x1b[%u;%uR",
+//                         cursor_row, cursor_col);
+//                inject_input(reply);
+//            }
             break;
 
         case 's':
@@ -355,13 +363,13 @@ private:
                 utf8_codepoint = c & 0x7;
             } else if (unlikely(c >= 0xF8 && c < 0xFC)) {
                 // 111110xx
-                // 5 byte invalid UTF-8
+                // 5 byte invalid UTF-8 (invalid 27 bit)
 
                 utf8_remain = 4;
                 utf8_codepoint = c & 0x3;
             } else if (unlikely(c >= 0xFC && c < 0xFE)) {
                 // 1111110x
-                // 6 byte invalid UTF-8
+                // 6 byte invalid UTF-8 (invalid 32 bit)
 
                 utf8_remain = 5;
                 utf8_codepoint = c & 0x1;

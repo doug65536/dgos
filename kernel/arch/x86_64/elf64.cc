@@ -19,8 +19,9 @@
 #include "user_mem.h"
 #include "kmodule.h"
 #include "mutex.h"
+#include "basic_set.h"
 
-#define ELF64_DEBUG     0
+#define ELF64_DEBUG     1
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) printdbg(__VA_ARGS__)
 #else
@@ -31,7 +32,8 @@ using lock_type = std::shared_mutex;
 using ex_lock = std::unique_lock<lock_type>;
 using sh_lock = std::shared_lock<lock_type>;
 static lock_type loaded_modules_lock;
-static std::vector<std::unique_ptr<module_t>> loaded_modules;
+using module_list_t = std::vector<std::unique_ptr<module_t>>;
+static module_list_t loaded_modules;
 
 // Keep this in sync with __module_dynlink_thunk
 struct plt_stub_data_t {
@@ -50,7 +52,7 @@ struct plt_stub_data_t {
     uintptr_t plt_index;
 };
 
-// Relocatable module loader
+// Shared module loader
 
 extern Elf64_Sym const ___dynsym_st[];
 extern Elf64_Sym const ___dynsym_en[];
@@ -64,33 +66,14 @@ struct kernel_ht_t {
     Elf64_Word hash_nchain = 0;
     Elf64_Word const * hash_buckets = nullptr;
     Elf64_Word const * hash_chains = nullptr;
+    Elf64_Sym const * symtab;
+    char const *strtab;
+
+    // Assigned zero after relocations applied
+    uintptr_t base_adj;
 };
 
 static kernel_ht_t export_ht;
-
-static Elf64_Sym const *
-modload_lookup_name(kernel_ht_t *ht, char const *name,
-                    bool expect_missing = false)
-{
-    Elf64_Word hash = elf64_hash((unsigned char const*)name);
-    Elf64_Word bucket = hash % ht->hash_nbucket;
-
-    for (Elf64_Word i = ht->hash_buckets[bucket]; i != 0;
-         i = ht->hash_chains[i]) {
-        Elf64_Sym const *chk_sym = ___dynsym_st + i;
-        Elf64_Word name_index = chk_sym->st_name;
-        char const *chk_name = ___dynstr_st + name_index;
-        if (likely(!strcmp(chk_name, name)))
-            return chk_sym;
-    }
-
-    ELF64_TRACE("Failed to find %s\n", name);
-
-    if (!expect_missing)
-        cpu_debug_break();
-
-    return nullptr;
-}
 
 void modload_init(void)
 {
@@ -106,6 +89,9 @@ void modload_init(void)
     export_ht.hash_buckets = ___hash_st + 2;
     export_ht.hash_chains = export_ht.hash_buckets +
             export_ht.hash_nbucket;
+    export_ht.symtab = ___dynsym_st;
+    export_ht.strtab = ___dynstr_st;
+    export_ht.base_adj = 0;
 }
 
 #if ELF64_DEBUG
@@ -143,8 +129,9 @@ class module_t
 public:
     bool load(char const *path);
     errno_t load_image(void const *module, size_t module_sz,
-                    char const *module_name,
-                    std::vector<std::string> parameters);
+                       char const *module_name,
+                       std::vector<std::string> parameters,
+                       char *ret_needed);
     int run();
 
     ~module_t();
@@ -244,6 +231,7 @@ module_t *modload_load(char const *path, bool run)
 module_t *modload_load_image(void const *image, size_t image_sz,
                              char const *module_name,
                              std::vector<std::string> parameters,
+                             char *ret_needed,
                              errno_t *ret_errno)
 {
     std::unique_ptr<module_t> module(new (std::nothrow) module_t{});
@@ -260,7 +248,7 @@ module_t *modload_load_image(void const *image, size_t image_sz,
 //        parameters.push_back(nullptr);
 
     errno_t err = module->load_image(image, image_sz, module_name,
-                                     std::move(parameters));
+                                     std::move(parameters), ret_needed);
 
     if (likely(err == errno_t::OK))
         return module.release();
@@ -325,18 +313,22 @@ static constexpr char const *get_relocation_type(size_t type) {
 // This function's purpose is to act as a place to put a breakpoint
 // with commands that magically load the symbols for a module when loaded
 
-void modload_load_symbols(char const *path, uintptr_t addr)
+void modload_load_symbols(char const *path,
+                          uintptr_t text_addr, uintptr_t base_addr)
 {
+    printdbg("gdb: add-symbol-file %s %#zx\n", path, text_addr);
+
     // Automated breakpoint is placed here to load symbols
     // The debugger is actually going to dereference path and get addr
-    // So that memory clobber is really needed, I need the caller to write
+    // So that memory clobber is really needed, the caller need write
     // the actual path string into memory there (flow analysis could discard
     // it without the memory clobber)
-    __asm__ __volatile__ (
-                ""
-                :
-                :
-                : "memory");
+    //__asm__ __volatile__ ("" : : : "memory");
+    __asm__ __volatile__ ("outl %%eax,%%dx"
+                          :
+                          : "d" (0x8A02), "D" (path)
+                          , "S" (text_addr), "c" (base_addr)
+                          : "memory");
 }
 
 static errno_t load_failed(errno_t err)
@@ -363,10 +355,12 @@ errno_t module_t::parse_dynamic()
 
         case DT_STRTAB:
             dt_strtab = dyn_ent.d_un.d_ptr;
+            ht.strtab = (char const *)(dt_strtab + base_adj);
             continue;
 
         case DT_SYMTAB:
             dt_symtab = dyn_ent.d_un.d_ptr;
+            ht.symtab = (Elf64_Sym*)(dt_symtab + base_adj);
             continue;
 
         case DT_STRSZ:
@@ -529,7 +523,7 @@ errno_t module_t::map_sections()
             return load_failed(errno_t::ENOMEM);
         }
 
-        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", module_name,
+        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", module_name.c_str(),
                     ((phdr.p_memsz) + 4095) & -4096,
                     uintptr_t(addr));
     }
@@ -642,10 +636,54 @@ void module_t::install_plt_handler()
     plt_slots[2] = Elf64_Addr((void*)__module_dynlink_plt_thunk);
 }
 
+
+static Elf64_Addr modload_lookup_name(
+        kernel_ht_t *ht, char const *name, Elf64_Word hash,
+        bool expect_missing, bool recurse)
+{
+    Elf64_Word bucket = hash % ht->hash_nbucket;
+
+    for (Elf64_Word i = ht->hash_buckets[bucket]; i != 0;
+         i = ht->hash_chains[i]) {
+        Elf64_Sym const *chk_sym = ht->symtab + i;
+        Elf64_Word name_index = chk_sym->st_name;
+        char const *chk_name = ht->strtab + name_index;
+        if (likely(!strcmp(chk_name, name)))
+            return chk_sym->st_value + ht->base_adj;
+    }
+
+    // Look in each module
+    if (recurse) {
+        for (module_t *other: loaded_modules) {
+            ELF64_TRACE("Looking for %s in %s\n",
+                        name, other->module_name.c_str());
+            kernel_ht_t *other_ht = &other->ht;
+            Elf64_Addr other_sym =
+                    modload_lookup_name(other_ht, name, hash, true, false);
+            if (unlikely(other_sym))
+                return other_sym;
+        }
+    }
+
+    if (!expect_missing) {
+        ELF64_TRACE("Failed to find %s %s\n", name,
+                    expect_missing ? " (expected)" : "");
+        cpu_debug_break();
+    }
+
+    return 0;
+}
+
+static Elf64_Addr modload_lookup_name(kernel_ht_t *ht, char const *name,
+                                      bool expect_missing = false,
+                                      bool recurse = true)
+{
+    Elf64_Word hash = elf64_hash((unsigned char const*)name);
+    return modload_lookup_name(ht, name, hash, expect_missing, recurse);
+}
+
 errno_t module_t::apply_relocs()
 {
-    syms = (Elf64_Sym const *)(dt_symtab + base_adj);
-
     Elf64_Rela const *rela_ptrs[] = {
         (Elf64_Rela*)(dt_rela + base_adj),
         (Elf64_Rela*)(dt_jmprel + base_adj)
@@ -658,8 +696,6 @@ errno_t module_t::apply_relocs()
 
     static_assert(countof(rela_cnts) == countof(rela_ptrs),
                   "Arrays must have corresponding values");
-
-    strs = (char const *)(dt_strtab + base_adj);
 
     for (size_t rel_idx = 0; rel_idx < countof(rela_ptrs); ++rel_idx) {
         Elf64_Rela const *rela_ptr = rela_ptrs[rel_idx];
@@ -699,8 +735,9 @@ errno_t module_t::apply_relocs()
 
             if (sym.st_name) {
                 // Lookup name in kernel
-                ELF64_TRACE("%s lookup %s\n", module_name, name);
-                Elf64_Sym const *addr = modload_lookup_name(&export_ht, name);
+                ELF64_TRACE("%s lookup %s\n", module_name.c_str(), name);
+                Elf64_Addr addr = modload_lookup_name(
+                            &export_ht, name, false, true);
 
                 if (unlikely(!addr)) {
                     printk("module link error in %s:"
@@ -709,7 +746,7 @@ errno_t module_t::apply_relocs()
                     return load_failed(errno_t::ENOEXEC);
                 }
 
-                S = intptr_t(addr->st_value);
+                S = intptr_t(addr);
             }
 
             uint64_t value;
@@ -904,12 +941,16 @@ truncated_common:
         }
     }
 
+    // Symbol lookups do not need adjustment anymore
+    //ht.base_adj = 0;
+
     return errno_t::OK;
 }
 
 errno_t module_t::load_image(void const *module, size_t module_sz,
                              char const *module_name,
-                             std::vector<std::string> parameters)
+                             std::vector<std::string> parameters,
+                             char *ret_needed)
 {
     this->module_name = module_name;
 
@@ -957,6 +998,9 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
     // Compute relocation distance
     base_adj = Elf64_Sxword(Elf64_Addr(image) - min_vaddr);
 
+    // Remember adjustment for early fixups (before relocations are applied)
+    ht.base_adj = base_adj;
+
     dyn_seg = nullptr;
 
     // Pass 2, map sections
@@ -982,26 +1026,66 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
     if (unlikely(err != errno_t::OK))
         return err;
 
+    syms = (Elf64_Sym const *)(dt_symtab + base_adj);
+    strs = (char const *)(dt_strtab + base_adj);
+
+    // Made it this far, we can put the module on the list
+    ex_lock lock(loaded_modules_lock);
+    if (unlikely(!loaded_modules.push_back(this)))
+        return load_failed(errno_t::ENOMEM);
+    lock.unlock();
+
+    //
+    // Load dependencies
+
+    for (Elf64_Xword name_ofs: dt_needed) {
+        char const *name = strs + name_ofs;
+        bool already_loaded = false;
+        for (module_t const* other: loaded_modules) {
+            if (other->module_name == name) {
+                already_loaded = true;
+                break;
+            }
+        }
+        if (!already_loaded) {
+            module_list_t::reverse_iterator it = std::find(
+                        loaded_modules.rbegin(), loaded_modules.rend(), this);
+            assert(it != loaded_modules.rend());
+            if (likely(it != loaded_modules.rend())) {
+                // Prevent unique_ptr delete
+                it->release();
+                loaded_modules.erase(it.base() - 1);
+            }
+            size_t name_len = strlen(name);
+            name_len = std::min(name_len + 1, size_t(NAME_MAX));
+            if (unlikely(!mm_copy_user(ret_needed, name, name_len)))
+                return errno_t::EFAULT;
+            return errno_t::ENOENT;
+        }
+    }
+
     err = apply_relocs();
 
     // Lookup __dso_handle
-    Elf64_Sym const *sym;
-    sym = modload_lookup_name(&ht, "__dso_handle_export", true);
+//    Elf64_Addr sym;
+//    sym = modload_lookup_name(&ht, "__dso_handle_export", true, false);
 
-    if (!sym) {
-        for (sym = syms; (void*)sym < (void*)strs; ++sym) {
-            size_t name_ofs = sym->st_name;
-            char const *name = strs + name_ofs;
-            if (!strcmp(name, "__dso_handle_export"))
-                break;
-        }
-        if (!sym->st_info)
-            sym = nullptr;
+//    if (!sym) {
+//        // WTF?
 
-        // Dereferemce the pointer to __dso_handle to get __dso_handle address
-        if (sym)
-            dso_handle = *(void**)(sym->st_value + base_adj);
-    }
+//        for (sym = syms; (void*)sym < (void*)strs; ++sym) {
+//            size_t name_ofs = sym->st_name;
+//            char const *name = strs + name_ofs;
+//            if (!strcmp(name, "__dso_handle_export"))
+//                break;
+//        }
+//        if (!sym->st_info)
+//            sym = nullptr;
+
+//        // Dereferemce the pointer to __dso_handle to get __dso_handle address
+//        if (sym)
+//            dso_handle = *(void**)(sym->st_value + base_adj);
+//    }
 
     // Install PLT handler
     install_plt_handler();
@@ -1014,9 +1098,9 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
     find_1st_exec();
 
     printk("Module %s loaded at %#" PRIx64 "\n", module_name, base_adj);
-    printk("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
+    //printk("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
 
-    modload_load_symbols(module_name, first_exec);
+    modload_load_symbols(module_name, first_exec, base_adj);
 
     // Run the init array
     run_ctors();
@@ -1030,12 +1114,6 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
         if (unlikely(!argv.push_back(parameter.c_str())))
             return load_failed(errno_t::ENOMEM);
     }
-
-    // Made it this far, we can put the module on the list
-    ex_lock lock(loaded_modules_lock);
-    if (unlikely(!loaded_modules.push_back(this)))
-        return load_failed(errno_t::ENOMEM);
-    lock.unlock();
 
     run();
 
@@ -1078,16 +1156,16 @@ void __module_dynamic_linker(plt_stub_data_t *data)
 
     char const *name = strtab + symtab[sym_idx].st_name;
 
-    Elf64_Sym const *sym = modload_lookup_name(&export_ht, name);
+    Elf64_Addr sym = modload_lookup_name(&export_ht, name);
 
     assert(sym);
 
     auto got = (uintptr_t *)(module->dt_pltgot + module->base_adj);
 
-    cpu_patch_code(&got[data->plt_index], &sym->st_value,
+    cpu_patch_code(&got[data->plt_index], &sym,
             sizeof(got[data->plt_index]));
 
-    data->result = sym->st_value;
+    data->result = sym;
 }
 
 EXPORT void __module_register_frame(void const * const *__module_dso_handle,
@@ -1096,11 +1174,78 @@ EXPORT void __module_register_frame(void const * const *__module_dso_handle,
 
 }
 
+struct early_atexit_t {
+    void *dso_handle;
+    void (*handler)(void*);
+    void *arg;
+};
+
+// Lookup by dso_handle
+using fn_list_item_t = std::pair<void (*)(void*),void*>;
+using fn_list_t = std::vector<fn_list_item_t>;
+using atexit_map_t = std::map<void *, fn_list_t>;
+atexit_map_t atexit_lookup;
+bool atexit_ready;
+
+extern char kernel_stack[];
+early_atexit_t *early_atexit = (early_atexit_t*)kernel_stack;
+size_t early_atexit_count;
+
+_constructor(ctor_mmu_init)
+void atexit_init()
+{
+    for (size_t i = 0; i < early_atexit_count; ++i) {
+        fn_list_t& list = atexit_lookup[early_atexit[i].dso_handle];
+        list.push_back({early_atexit[i].handler, early_atexit[i].arg});
+    }
+    early_atexit_count = 0;
+
+    atexit_ready = true;
+}
+
 EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
 {
 //    std::find_if(loaded_modules.begin(), loaded_modules.end(),
 //                 [dso_handle](std::unique_ptr<module_t> const& mp) {
 //        return mp->dso_handle == dso_handle;
 //    });
+
+    if (atexit_ready) {
+        fn_list_t& list = atexit_lookup[dso_handle];
+        list.push_back({func, arg});
+    } else {
+        early_atexit[early_atexit_count++] = {dso_handle, func, arg};
+    }
+
     return 0;
+}
+
+module_t *modload_closest(ptrdiff_t address)
+{
+    ptrdiff_t closest = PTRDIFF_MAX;
+    module_t *closest_module = nullptr;
+
+    sh_lock lock(loaded_modules_lock);
+
+    for (std::unique_ptr<module_t>& module: loaded_modules) {
+        if (address >= module->base_adj) {
+            ptrdiff_t distance = address - module->base_adj;
+            if (closest > distance) {
+                closest = distance;
+                closest_module = module.get();
+            }
+        }
+    }
+
+    return closest_module;
+}
+
+std::string const& modload_get_name(module_t *module)
+{
+    return module->module_name;
+}
+
+ptrdiff_t modload_get_base(module_t *module)
+{
+    return module->base_adj;
 }

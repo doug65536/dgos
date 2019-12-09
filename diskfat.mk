@@ -39,6 +39,8 @@ $(top_builddir)/fatpart.img: \
 		\
 		$(top_builddir)/bootfat-bin \
 		\
+		$(generate_symbols_outputs) \
+		\
 		$(MODULE_LIST)
 	set -x && \
 		rm -f $(top_builddir)/fatpart.img \

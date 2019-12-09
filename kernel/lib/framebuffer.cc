@@ -44,6 +44,9 @@ public:
     static size_t glyph_index(size_t codepoint);
     static bitmap_glyph_t const *glyph(size_t codepoint);
 
+    static const constexpr size_t font_width = 9;
+    static const constexpr size_t font_height = 16;
+
 private:
     // text_dev_base_t interface
     TEXT_DEV_IMPL
@@ -62,7 +65,8 @@ private:
     int ofs_x;
     int ofs_y;
 
-    int attrib;
+    int fg_color;
+    int bg_color;
 
     int mouse_x;
     int mouse_y;
@@ -81,6 +85,9 @@ private:
 
     static framebuffer_console_t instances[1];
     static unsigned instance_count;
+
+    void scroll_screen(int x, int y);
+    void clear_screen();
 };
 
 framebuffer_console_t framebuffer_console_t::instances[1];
@@ -670,12 +677,6 @@ void scroll_up(size_t dist, uint32_t bg)
                 (fb.mode.height - dist));
         fill_rect(0, fb.mode.height - dist,
                   fb.mode.width, fb.mode.height, bg);
-    } else {
-        // Scanline at a time to avoid touching offscreen
-//                        for (size_t y = dist, ey = fb.mode.height;
-//                             y < ey; ++y) {
-//                            memmove(fb.video_mem, fb.video_mem + fb.)
-//                        }
     }
 }
 
@@ -685,7 +686,7 @@ static void draw_str(int x, int y, char const* str,
     while (char32_t codepoint = utf8_to_ucs4_upd(str)) {
         auto glyph = framebuffer_console_t::glyph(codepoint);
         draw_char(x, y, glyph, fg, bg);
-        x += 9;
+        x += framebuffer_console_t::font_width;
 
         if (unlikely(x + 9 > fb.mode.width)) {
             // Went off the right side
@@ -805,6 +806,8 @@ static void test_framebuffer_thread()
             }
         }
     }
+
+    scroll_up(16, 0xFF0000);
 }
 
 bool framebuffer_console_t::init()
@@ -832,7 +835,6 @@ void framebuffer_console_t::cleanup()
 int framebuffer_console_t::set_dimensions(int width _unused,
                                           int height _unused)
 {
-    this->width = width;
     return -int(errno_t::ENOSYS);
 }
 
@@ -846,54 +848,201 @@ void framebuffer_console_t::get_dimensions(int *width, int *height)
 
 void framebuffer_console_t::goto_xy(int x _unused, int y _unused)
 {
-
+    cursor_x = std::min(std::max(x, 0), width - 1);
+    cursor_y = std::min(std::max(y, 0), height - 1);
 }
 
 int framebuffer_console_t::get_x()
 {
-    return 0;
+    return cursor_x;
 }
 
 int framebuffer_console_t::get_y()
 {
-    return 0;
+    return cursor_y;
 }
 
 void framebuffer_console_t::fg_set(int color _unused)
 {
+    fg_color = color;
 }
 
 int framebuffer_console_t::fg_get()
 {
-    return 0;
+    return fg_color;
 }
 
 void framebuffer_console_t::bg_set(int color _unused)
 {
+    bg_color = color;
 }
 
 int framebuffer_console_t::bg_get()
 {
-    return 0;
+    return bg_color;
 }
 
 int framebuffer_console_t::cursor_toggle(int show _unused)
 {
-    return 0;
+    bool was_shown = cursor_on;
+    cursor_on = true;
+    return was_shown;
 }
 
 int framebuffer_console_t::cursor_is_shown()
 {
-    return 0;
+    return cursor_on;
 }
+
+
+//// negative x move the screen content left
+//// negative y move the screen content up
+//void framebuffer_console_t::scroll_screen(int x, int y)
+//{
+//    int row_size = width;
+//    int row_count;
+//    int row_step;
+//    int clear_start_row;
+//    int clear_end_row;
+//    int clear_start_col;
+//    int clear_end_col;
+//    uint16_t *src;
+//    uint16_t *dst;
+
+//    // Extreme move distance clears screen
+//    if ((x < 0 && -x >= width) ||
+//            (x > 0 && x >= width) ||
+//            (y < 0 && -y >= height) ||
+//            (y > 0 && y >= height)) {
+//        clear_screen();
+
+//        // Cursor tries to move with content
+
+//        cursor_x += x;
+//        cursor_y += y;
+
+//        cap_position(&cursor_x, &cursor_y);
+//        move_cursor_if_on();
+//        return;
+//    }
+
+//    if (y <= 0) {
+//        // Up
+//        src = shadow - (y * width);
+//        dst = shadow;
+//        row_count = height + y;
+//        // Loop from top to bottom
+//        row_step = width;
+//        // Clear the bottom
+//        clear_end_row = height;
+//        clear_start_row = clear_end_row + y;
+//    } else {
+//        // Down
+//        dst = shadow + ((height - 1) * width);
+//        src = shadow + ((height - y - 1) * width);
+//        row_count = height - y;
+//        // Loop from bottom to top
+//        row_step = -width;
+//        // Clear the top
+//        clear_start_row = 0;
+//        clear_end_row = y;
+//    }
+
+//    if (x <= 0) {
+//        // Left
+//        row_size += x;
+//        src -= x;
+//        // Clear right side
+//        clear_start_col = width + x;
+//        clear_end_col = width;
+//    } else {
+//        // Right
+//        row_size -= x;
+//        src += x;
+//        // Clear left side
+//        clear_start_col = 0;
+//        clear_end_col = x;
+//    }
+
+//    while (row_count--) {
+//        memmove(dst, src, row_size * sizeof(*dst));
+//        dst += row_step;
+//        src += row_step;
+//    }
+
+//    // Clear top/bottom
+//    if (clear_start_row != clear_end_row) {
+//        fill_region(
+//                    0,
+//                    clear_start_row,
+//                    width,
+//                    clear_end_row,
+//                    ' ');
+//    }
+
+//    // Clear left/right
+//    if (clear_start_col != clear_end_col) {
+//        fill_region(
+//                    clear_start_col,
+//                    clear_start_row ? clear_start_row : clear_end_row,
+//                    clear_end_col,
+//                    clear_start_row ? height : clear_start_row,
+//                    ' ');
+//    }
+
+//    int mouse_was_shown = mouse_toggle(0);
+//    memcpy(video_mem, shadow,
+//           width * height * sizeof(*shadow));
+//    mouse_toggle(mouse_was_shown);
+//}
+
+//void framebuffer_console_t::advance_cursor(int distance)
+//{
+//    cursor_x += distance;
+//    if (cursor_x >= width) {
+//        cursor_x = 0;
+//        if (++cursor_y >= height) {
+//            cursor_y = height - 1;
+//            scroll_screen(0, -1);
+//        }
+//    }
+//}
 
 void framebuffer_console_t::putc(int character _unused)
 {
+//    int advance;
+//    switch (character) {
+//    case '\n':
+//        advance_cursor(width - cursor_x);
+//        break;
+
+//    case '\r':
+//        advance_cursor(-cursor_x);
+//        break;
+
+//    case '\t':
+//        advance = ((cursor_x + 8) & -8) - cursor_x;
+//        advance_cursor(advance);
+//        break;
+
+//    case '\b':
+//        if (cursor_x > 0)
+//            advance_cursor(-1);
+//        break;
+
+//    default:
+//        write_char_at(cursor_x, cursor_y, ch, attrib);
+//        advance_cursor(1);
+//        break;
+//    }
 }
 
 void framebuffer_console_t::putc_xy(int x _unused, int y _unused,
                                     int character _unused)
 {
+    auto glyph = framebuffer_console_t::glyph(character);
+    draw_char(x * 9, y * 16, glyph, fg_color, bg_color);
+
 }
 
 int framebuffer_console_t::print(char const *s _unused)
@@ -926,6 +1075,11 @@ void framebuffer_console_t::fill(int sx _unused, int sy _unused,
                                  int ex _unused, int ey _unused,
                                  int character _unused)
 {
+    for (int x = sx; x < ex; ++x) {
+        for (int y = sy; y < ey; ++y) {
+            putc_xy(x, y, character);
+        }
+    }
 }
 
 void framebuffer_console_t::clear()
@@ -979,8 +1133,8 @@ int framebuffer_console_factory_t::detect(text_dev_base_t ***ptrs)
 {
     static text_dev_base_t *devs[countof(framebuffer_console_t::instances)];
 
-    if (framebuffer_console_t::instance_count >=
-            countof(framebuffer_console_t::instances)) {
+    if (unlikely(framebuffer_console_t::instance_count >=
+                 countof(framebuffer_console_t::instances))) {
         printdbg("Too many VGA devices!\n");
         return 0;
     }

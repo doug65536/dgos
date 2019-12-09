@@ -1,7 +1,6 @@
 #pragma once
 
 #include "types.h"
-#include "rbtree.h"
 #include "mutex.h"
 #include "basic_set.h"
 
@@ -13,7 +12,6 @@ public:
     using linaddr_t = uintptr_t;
 
     contiguous_allocator_t()
-//        : free_addr_by_addr(free_addr_by_size.get_allocator())
     {
     }
 
@@ -35,8 +33,7 @@ public:
 
     using tree_item_t = std::pair<uintptr_t, uintptr_t>;
     using tree_cmp_t = std::less<tree_item_t>;
-    using tree_alloc_t = ext::bump_allocator<void, ext::page_allocator<char>>;
-    using tree_t = std::set<tree_item_t, tree_cmp_t, tree_alloc_t>;
+    using tree_t = ext::fast_set<tree_item_t, tree_cmp_t>;
 
     template<typename F>
     void each_fw(F callback);
@@ -48,8 +45,6 @@ private:
     using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type free_addr_lock;
-    //typedef rbtree_t<> tree_t;
-    //tree_alloc_t alloc;
     tree_t free_addr_by_size;
     tree_t free_addr_by_addr;
     linaddr_t *linear_base_ptr = nullptr;

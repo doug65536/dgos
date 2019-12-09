@@ -1,5 +1,12 @@
 // pci driver: C=STORAGE, V=VIRTIO (0x1AF4)
 
+#include "kmodule.h"
+#include "pci.h"
+
+PCI_DRIVER(
+        virtio_blk,
+        0x1AF4, -1, PCI_DEV_CLASS_STORAGE, -1, -1);
+
 #include "virtio-blk.h"
 #include "virtio-base.h"
 #include "dev_storage.h"
@@ -54,19 +61,14 @@ protected:
     void found_device(virtio_base_t *device) override final;
 };
 
-static virtio_blk_factory_t virtio_blk_factory;
-
 std::vector<virtio_blk_if_t *> virtio_blk_ifs;
 
 class virtio_blk_if_factory_t : public storage_if_factory_t {
 public:
-    virtio_blk_if_factory_t() : storage_if_factory_t("virtio-blk") {}
+    virtio_blk_if_factory_t();
 private:
     virtual std::vector<storage_if_base_t *> detect(void) override final;
 };
-
-static virtio_blk_if_factory_t virtio_blk_if_factory;
-STORAGE_REGISTER_FACTORY(virtio_blk_if);
 
 enum struct virtio_blk_op_t : uint8_t {
     read,
@@ -190,12 +192,10 @@ int virtio_blk_factory_t::detect()
                          "virtio-blk");
 }
 
-std::vector<storage_if_base_t *> virtio_blk_if_factory_t::detect()
+virtio_blk_if_factory_t::virtio_blk_if_factory_t()
+    : storage_if_factory_t("virtio-blk")
 {
-    virtio_blk_factory.detect();
-
-    return std::vector<storage_if_base_t *>(
-                virtio_blk_ifs.begin(), virtio_blk_ifs.end());
+    storage_if_register_factory(this);
 }
 
 std::vector<storage_dev_base_t *> virtio_blk_if_t::detect_devices()
@@ -454,3 +454,13 @@ long virtio_blk_if_t::info(storage_dev_info_t key)
     }
 }
 
+static virtio_blk_factory_t virtio_blk_factory;
+static virtio_blk_if_factory_t virtio_blk_if_factory;
+
+std::vector<storage_if_base_t *> virtio_blk_if_factory_t::detect()
+{
+    virtio_blk_factory.detect();
+
+    return std::vector<storage_if_base_t *>(
+                virtio_blk_ifs.begin(), virtio_blk_ifs.end());
+}

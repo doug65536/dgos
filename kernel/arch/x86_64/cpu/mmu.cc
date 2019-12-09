@@ -16,7 +16,6 @@
 #include "cpuid.h"
 #include "thread_impl.h"
 #include "threadsync.h"
-#include "rbtree.h"
 #include "idt.h"
 #include "bsearch.h"
 #include "process.h"
@@ -198,7 +197,8 @@ typedef uintptr_t pte_t;
 #define PT1_ENTRIES     (0x40000UL)
 #define PT0_ENTRIES     (0x200UL)
 
-#define PT_RECURSE      (256UL)
+#define PT_RECURSE      UINT64_C(256)
+#define PT_BEGIN        (PT_RECURSE << 39)
 
 // Indices of start of page tables for each level
 #define PT3_INDEX       (PT_ENTRY(PT_RECURSE,0,0,0))
@@ -223,18 +223,17 @@ extern char ___text_st[];
 extern char ___text_en[];
 
 // -512GB
-static uint64_t min_kern_addr = 0xFFFFFF8000000000;
+static uint64_t min_kern_addr = UINT64_C(0xFFFFFF8000000000);
 
 #define PT_KERNBASE     uintptr_t(___text_st)
-#define PT_BASEADDR     (PT0_ADDR)
-#define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
+#define PT_MAX_ADDR     CANONICALIZE((PT_BEGIN + (UINT64_C(512) << 30)))
 
 // Virtual address space map
 // Low half
 // +-----------------+---------------------------------+-------+
 // |                 |                                 |       |
 // +-----------------+---------------------------------+-------+
-// |    4M - +128T   | User space                      | <128T |
+// |  4M - +128T-4M  | User space                      | <128T |
 // +-----------------+---------------------------------+-------+----+
 // |    0  -   +4M   | NULL Guard page                 |    4M |    |
 // +-----------------+---------------------------------+-------+    |
@@ -246,10 +245,10 @@ static uint64_t min_kern_addr = 0xFFFFFF8000000000;
 // +-----------------+---------------------------------+-------+
 // | -513G - -512G   | Zeroing page                    |    1G |
 // +-----------------+---------------------------------+-------+
-// | -128T - -513G   | Kernel heap                     | <128T |
+// | -127.5T - -512G | Kernel heap                     | <128T |
 // +-----------------+---------------------------------+-------+
 // | -128T - -127.5T | Recursive map                   |  512G |
-// |                 | FFFF8000...-FFFF8080...            |
+// |                 | FFFF8000...-FFFF8080...         |       |
 // +-----------------+---------------------------------+-------+
 
 // Page tables for entire address, worst case, consists of
@@ -544,7 +543,8 @@ private:
 };
 
 extern char ___init_brk[];
-//static linaddr_t near_base = (linaddr_t)___init_brk;
+
+// Used as a simple bump allocator to get address space early on
 static linaddr_t linear_base = PT_MAX_ADDR;
 
 mmu_phys_allocator_t phys_allocator;
@@ -576,6 +576,7 @@ EXPORT uintptr_t mm_alloc_contiguous(size_t size)
 
 EXPORT void mm_free_contiguous(uintptr_t addr, size_t size)
 {
+    assert(!(addr & PAGE_MASK));
     contig_phys_allocator.release_linear(addr, round_up(size));
 }
 
@@ -1462,8 +1463,8 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 
             lock.lock();
             mapping->active_read = -1;
-            mapping->done_cond.notify_all();
             lock.unlock();
+            mapping->done_cond.notify_all();
 
             // Restart the instruction, or unhandled exception on I/O error
             return likely(io_result >= 0) ? ctx : nullptr;
@@ -1697,8 +1698,11 @@ void mmu_init()
 
     linear_allocator.set_early_base(&linear_base);
     //near_allocator.set_early_base(&near_base);
-    contig_phys_allocator.set_early_base(&contiguous_start);
+    //contig_phys_allocator.set_early_base(&contiguous_start);
     //hole_allocator;
+
+    contig_phys_allocator.init(contiguous_start, contig_pool_size,
+                               "contiguous_physical");
 
     printdbg("Highest usable address: %#zx\n", highest_usable << PAGE_SIZE_BIT);
     size_t physalloc_size = mmu_phys_allocator_t::size_from_highest_page(
@@ -1742,7 +1746,7 @@ void mmu_init()
 
     // Prepare 4MB contiguous physical memory
     // allocator with a capacity of 128
-    contig_phys_allocator.early_init(4 << 20, "contig_phys_allocator");
+    //contig_phys_allocator.early_init(4 << 20, "contig_phys_allocator");
 
     assert(malloc_validate(false));
 
@@ -2574,11 +2578,6 @@ EXPORT int mprotect(void *addr, size_t len, int prot)
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    //uintptr_t orig_addr = uintptr_t(addr);
-    //pte_t *orig_pt3 = pt[3];
-    //printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
-    //hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
-
     while (pt[3] < end)
     {
         assert((*pt[0] & PTE_PRESENT) &&
@@ -2614,10 +2613,6 @@ EXPORT int mprotect(void *addr, size_t len, int prot)
         ptes_step(pt);
     }
 
-//    printdbg("PTEs after mprotect(%#zx, %#zx)\n", orig_addr, len);
-//    hex_dump((void*)orig_pt3, (end - orig_pt3) * sizeof(pte_t),
-//             uintptr_t(orig_pt3));
-
     mmu_send_tlb_shootdown();
 
     return 0;
@@ -2647,11 +2642,55 @@ bool pte_list_present(pte_t **ptes)
     return true;
 }
 
+// Returns the return value of the callback
+// Ends the loop when the callback returns a negative number
+// Calls the callback with each present sub-range
+// Callback signature: int(linaddr_t base, size_t len)
+template<typename F>
+static int present_ranges(F callback, linaddr_t rounded_addr, size_t len,
+                          bool is_present = true)
+{
+    assert(rounded_addr != 0);
+    assert(((rounded_addr) & PAGE_MASK) == 0);
+    assert(((len) & PAGE_MASK) == 0);
+
+    pte_t *ptes[4];
+
+    linaddr_t end = rounded_addr + len;
+
+    ptes_from_addr(ptes, rounded_addr);
+    int present_mask = ptes_present(ptes);
+
+    int result = 0;
+    linaddr_t range_start = 0;
+
+    for (linaddr_t addr = rounded_addr;
+         result >= 0 && addr < end; addr += PAGE_SIZE) {
+        if ((present_mask == 0xF) == is_present) {
+            if (!range_start)
+                range_start = addr;
+        } else {
+            if (range_start)
+                result = callback(range_start, addr - range_start);
+
+            range_start = 0;
+        }
+
+        ptes_step(ptes);
+        present_mask = ptes_present(ptes);
+    }
+
+    if (range_start && result >= 0)
+        result = callback(range_start, end - range_start);
+
+    return result;
+}
+
 // Support discarding pages and reverting to demand
 // paged state with MADV_DONTNEED.
 // Support enabling/disabling write combining
 // with MADV_WEAKORDER/MADV_STRONGORDER
-int madvise(void *addr, size_t len, int advice)
+EXPORT int madvise(void *addr, size_t len, int advice)
 {
     if (unlikely(len == 0))
         return 0;
@@ -2723,6 +2762,40 @@ int madvise(void *addr, size_t len, int advice)
                 if (unlikely(i == e))
                     return 0;
 
+                intptr_t device_index = mmu_device_from_addr(linaddr_t(addr));
+                if (unlikely(device_index >= 0)) {
+                    // Page in device pages explicitly
+                    mmap_device_mapping_t *mapping =
+                            mm_dev_mappings[device_index];
+
+                    int io_result = present_ranges([&](linaddr_t base,
+                                                   size_t range_len) -> int  {
+                        uintptr_t mapping_offset = base -
+                            linaddr_t(mapping->range.get());
+
+                        int io_result = mapping->callback(
+                                    mapping->context, (void*)base,
+                                    mapping_offset, range_len,
+                                    true, false);
+
+                        if (likely(io_result >= 0)) {
+                            pte_t *ptes[4];
+                            ptes_from_addr(ptes, base);
+                            for (size_t i = range_len >> PAGE_SIZE_BIT;
+                                    i > 0; --i) {
+                                atomic_or(ptes[3] + (i - 1), PTE_PRESENT);
+                            }
+                        }
+
+                        return io_result;
+                    }, linaddr_t(addr), len, false);
+
+                    if (unlikely(io_result < 0))
+                        return io_result;
+
+                    return 0;
+                }
+
                 success = phys_allocator.alloc_multiple(
                             false, len,
                             [&](size_t idx, uint8_t, physaddr_t paddr) {
@@ -2736,6 +2809,7 @@ int madvise(void *addr, size_t len, int advice)
                         pte_t replacement = (pte & ~PTE_ADDR) |
                             paddr | PTE_PRESENT;
 
+                        // If updating PTE succeeded, we want the page
                         if (likely(atomic_cmpxchg_upd(&pt[3][idx],
                                    &pte, replacement)))
                             return true;
@@ -2744,6 +2818,7 @@ int madvise(void *addr, size_t len, int advice)
                         continue;
                     }
 
+                    // Do not want the page
                     return false;
                 });
                 pt[3] += len >> PAGE_SCALE;
@@ -2771,55 +2846,14 @@ int madvise(void *addr, size_t len, int advice)
     return 0;
 }
 
-// Returns the return value of the callback
-// Ends the loop when the callback returns a negative number
-// Calls the callback with each present sub-range
-// Callback signature: int(linaddr_t base, size_t len)
-template<typename F>
-static int present_ranges(F callback, linaddr_t rounded_addr, size_t len)
-{
-    assert(rounded_addr != 0);
-    assert(((rounded_addr) & PAGE_MASK) == 0);
-    assert(((len) & PAGE_MASK) == 0);
-
-    pte_t *ptes[4];
-
-    linaddr_t end = rounded_addr + len;
-
-    ptes_from_addr(ptes, rounded_addr);
-    int present_mask = ptes_present(ptes);
-
-    int result = 0;
-    linaddr_t range_start = 0;
-
-    for (linaddr_t addr = rounded_addr;
-         result >= 0 && addr < end; addr += PAGE_SIZE) {
-        if (present_mask == 0xF) {
-            if (!range_start)
-                range_start = addr;
-        } else {
-            if (range_start)
-                result = callback(range_start, addr - range_start);
-
-            range_start = 0;
-        }
-
-        ptes_step(ptes);
-        present_mask = ptes_present(ptes);
-    }
-
-    if (range_start && result >= 0)
-        result = callback(range_start, end - range_start);
-
-    return result;
-}
-
 EXPORT int msync(void const *addr, size_t len, int flags)
 {
     // Check for validity, particularly accidentally using O_SYNC
     assert((flags & (MS_SYNC | MS_INVALIDATE)) == flags);
 
-    linaddr_t rounded_addr = linaddr_t(addr) & -intptr_t(PAGE_SIZE);
+    size_t misalignment = linaddr_t(addr) & (PAGE_SIZE - 1);
+    linaddr_t rounded_addr = linaddr_t(addr) & -PAGE_SIZE;
+    len += misalignment;
     len = round_up(len);
 
     if (unlikely(len == 0))
@@ -3107,7 +3141,7 @@ void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
     scoped_lock lock_(lock);
     physaddr_t free_end = base + size;
     unsigned low = base < 0x100000000;
-    size_t pagesz = uint64_t(1) << log2_pagesz;
+    size_t pagesz = size_t(1) << log2_pagesz;
     entry_t index = index_from_addr(free_end) - 1;
     while (size != 0) {
         assert(index < highest_usable);
@@ -3177,18 +3211,16 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
     if (!next_free[0])
         low = true;
 
-    entry_t first, last;
+    entry_t first;
 
     for (;;) {
         first = next_free[low];
-        last = first;
         assert(!(first & used_mask));
         entry_t new_next = first;
         size_t i;
         for (i = 0; i < count && new_next; ++i) {
             assert(new_next < highest_usable);
             new_next = entries[new_next];
-            last = new_next;
             assert(!(new_next & used_mask));
         }
 
@@ -3248,11 +3280,8 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
         // Splice the remaining pages onto the free chain
         lock_.lock();
 
-        assert(first != last);
-
         free_page_count += count - used_count;
 
-        entries[last] = next_free[low];
         next_free[low] = first;
     }
 
@@ -3404,34 +3433,38 @@ EXPORT int alias_window(void *addr, size_t size,
 
 int mlock(void const *addr, size_t len)
 {
-    linaddr_t staddr = linaddr_t(addr);
-    linaddr_t enaddr = staddr + len;
-
-    bool st_kernel = intptr_t(staddr) < 0;
-    bool en_kernel = intptr_t(enaddr-1) < 0;
-
-    // Spans across privilege boundary
-    if (st_kernel != en_kernel)
-        return -int(errno_t::EINVAL);
-
-    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, 1);
-
     return 0;
+
+//    linaddr_t staddr = linaddr_t(addr);
+//    linaddr_t enaddr = staddr + len;
+
+//    bool st_kernel = intptr_t(staddr) < 0;
+//    bool en_kernel = intptr_t(enaddr-1) < 0;
+
+//    // Spans across privilege boundary
+//    if (st_kernel != en_kernel)
+//        return -int(errno_t::EINVAL);
+
+//    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, 1);
+
+//    return 0;
 }
 
 int munlock(void const *addr, size_t len)
 {
-    linaddr_t staddr = linaddr_t(addr);
-    linaddr_t enaddr = staddr + len;
-
-    bool kernel = staddr >= 0x800000000000;
-
-    if (unlikely(!kernel && enaddr >= 0x800000000000))
-        return -int(errno_t::EINVAL);
-
-    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, -1);
-
     return 0;
+
+//    linaddr_t staddr = linaddr_t(addr);
+//    linaddr_t enaddr = staddr + len;
+
+//    bool kernel = staddr >= 0x800000000000;
+
+//    if (unlikely(!kernel && enaddr >= 0x800000000000))
+//        return -int(errno_t::EINVAL);
+
+//    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, -1);
+
+//    return 0;
 }
 
 uintptr_t mm_new_process(process_t *process)

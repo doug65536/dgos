@@ -2499,6 +2499,8 @@ void gdb_cpu_ctrl_t::start()
             panic_oom();
     }
 
+    cpu_irq_enable();
+
     stub_tid = thread_create(gdb_thread, nullptr, 0, false, false);
 
     cpu_wait_value(&stub_running, true);

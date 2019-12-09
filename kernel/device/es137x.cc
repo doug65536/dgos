@@ -1,8 +1,16 @@
 /// pci driver:
-/// C=0x4 (MULTIMEDIA),
-/// S=1 (AUDIO),
 /// V=0x1274 (Ensoniq),
 /// D=0x5000 (ES1370)
+/// C=0x4 (MULTIMEDIA),
+/// S=1 (AUDIO),
+
+#include "kmodule.h"
+#include "pci.h"
+
+PCI_DRIVER(
+        es137x,
+        0x1274, 0x5000,
+        PCI_DEV_CLASS_MULTIMEDIA, PCI_SUBCLASS_MULTIMEDIA_AUDIO, -1);
 
 #include "types.h"
 

@@ -14,6 +14,7 @@
 #include "inttypes.h"
 #include "cxxstring.h"
 #include "user_mem.h"
+#include "time.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -113,7 +114,7 @@ struct fat32_fs_t final : public fs_base_t {
     // Callback signature: bool(fat32_dir_union_t* de,
     //                          cluster_t dir_cluster, bool new_cluster)
     template<typename F>
-    void iterate_dir(cluster_t cluster, F callback,
+    int iterate_dir(cluster_t cluster, F callback,
                      cluster_t *extend_cluster = nullptr);
 
     fat32_dir_union_t *search_dir(cluster_t cluster,
@@ -135,10 +136,14 @@ struct fat32_fs_t final : public fs_base_t {
     int sync_fat_entry(cluster_t cluster);
 
     cluster_t transact_cluster(cluster_t prev_cluster,
-                              fat32_dir_union_t *dde, cluster_t cluster);
+                               fat32_dir_union_t *dde, cluster_t cluster);
 
     static void date_encode(uint16_t *date_field, uint16_t *time_field,
                             uint8_t *centisec_field, time_of_day_t tod);
+
+    static void date_decode(time_of_day_t *tod,
+                            unsigned date_field, unsigned time_field,
+                            unsigned centiseconds);
 
     file_handle_t *create_handle(char const *path, int flags,
                                  mode_t mode, errno_t &err);
@@ -190,12 +195,9 @@ pool_t<fat32_fs_t::file_handle_t> fat32_fs_t::handles;
 
 class fat32_factory_t : public fs_factory_t {
 public:
-    constexpr fat32_factory_t() : fs_factory_t("fat32") {}
+    fat32_factory_t();
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
-
-static fat32_factory_t fat32_factory;
-STORAGE_REGISTER_FACTORY(fat32);
 
 static std::vector<fat32_fs_t*> fat32_mounts;
 
@@ -593,8 +595,11 @@ int fat32_fs_t::commit_fat_extend(cluster_t *clusters, int32_t count)
     return result;
 }
 
+// Returns -1 on I/O error
+// Returns 0 immediately the first time the callback returns false
+// Returns 1 if the callback never returned false
 template<typename F>
-void fat32_fs_t::iterate_dir(cluster_t cluster, F callback,
+int fat32_fs_t::iterate_dir(cluster_t cluster, F callback,
                              cluster_t *extend_cluster)
 {
     size_t de_per_cluster = block_size >> dirent_size_shift;
@@ -604,11 +609,13 @@ void fat32_fs_t::iterate_dir(cluster_t cluster, F callback,
 
     while (!is_eof(cluster)) {
         fat32_dir_union_t *de = (fat32_dir_union_t *)lookup_cluster(cluster);
+        if (unlikely(madvise(de, block_size, MADV_WILLNEED) < 0))
+            return -1;
 
         // Iterate through all of the directory entries in this cluster
         for (size_t i = 0; i < de_per_cluster; ++i, ++de) {
             if (!callback(de, cluster, i == 0))
-                return;
+                return 0;
         }
 
         if (extend_cluster && is_eof(fat[cluster])) {
@@ -618,6 +625,8 @@ void fat32_fs_t::iterate_dir(cluster_t cluster, F callback,
             cluster = fat[cluster];
         }
     }
+
+    return 1;
 }
 
 fat32_dir_union_t *fat32_fs_t::search_dir(
@@ -633,7 +642,8 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
 
     fat32_dir_union_t *result = nullptr;
 
-    iterate_dir(cluster, [&](fat32_dir_union_t *de, cluster_t, bool) -> bool {
+    auto iterate_callback = [&](fat32_dir_union_t *de,
+            cluster_t, bool) -> bool {
         // If this is a short filename entry
         if (de->long_entry.attr != FAT_LONGNAME) {
             uint8_t checksum = lfn_checksum(de->short_entry.name);
@@ -670,7 +680,7 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
             if (le->ordinal == de->long_entry.ordinal &&
                     !memcmp((void*)le->name,
                             (void*)de->long_entry.name,
-                               sizeof(le->name)) &&
+                            sizeof(le->name)) &&
                     !memcmp((void*)le->name2,
                             (void*)de->long_entry.name2,
                             sizeof(le->name2)) &&
@@ -687,7 +697,12 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
         }
 
         return true;
-    });
+    };
+
+    int iterate_result = iterate_dir(cluster, iterate_callback);
+
+    if (unlikely(iterate_result < 0))
+        return nullptr;
 
     return result;
 }
@@ -1010,6 +1025,31 @@ int fat32_fs_t::sync_fat_entry(cluster_t cluster)
     return result;
 }
 
+void fat32_fs_t::date_decode(time_of_day_t *tod,
+                             unsigned date_field, unsigned time_field,
+                             unsigned centiseconds)
+{
+    unsigned y = FAT_DATE_YEAR(date_field);
+    unsigned mon = FAT_DATE_MONTH(date_field);
+    unsigned d = FAT_DATE_DAY(date_field);
+    unsigned h = FAT_TIME_HOUR(time_field);
+    unsigned min = FAT_TIME_MIN(time_field);
+    unsigned s = FAT_TIME_SEC(time_field);
+    *tod = {};
+    tod->century = y / 100;
+    tod->year = y % 100;
+    tod->month = mon;
+    tod->day = d;
+    tod->hour = h;
+    tod->minute = min;
+    tod->second = s;
+    if (centiseconds > 100) {
+        centiseconds -= 100;
+        ++tod->second;
+    }
+    tod->centisec = centiseconds;
+}
+
 void fat32_fs_t::date_encode(uint16_t *date_field, uint16_t *time_field,
                              uint8_t *centisec_field, time_of_day_t tod)
 {
@@ -1022,12 +1062,12 @@ void fat32_fs_t::date_encode(uint16_t *date_field, uint16_t *time_field,
     int yr = tod.century * 100 + tod.year;
 
     // 7 bit year : 4 bit month : 5 bit day
-    *date_field = ((yr - 1980) << 9) |
-            (tod.month << 5) | tod.day;
+    *date_field = ((yr - 1980) << FAT_DATE_YEAR_BIT) |
+            (tod.month << FAT_DATE_MONTH_BIT) | tod.day;
 
     // 5 bit hour : 6 bit minute : 4 bit second
-    *time_field = (tod.hour << 11) |
-            (tod.minute << 5) | (tod.second >> 1);
+    *time_field = (tod.hour << FAT_TIME_HOUR_BIT) |
+            (tod.minute << FAT_TIME_MIN_BIT) | (tod.second >> 1);
 
     if (centisec_field)
         *centisec_field = tod.centisec + (100 * (tod.second & 1));
@@ -1303,7 +1343,7 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
 
     root_cluster = bpb.root_dir_start;
 
-    memset(&root_dirent, 0, sizeof(root_dirent));
+    root_dirent = {};
     root_dirent.short_entry.start_lo =
             (root_cluster) & 0xFFFF;
     root_dirent.short_entry.start_hi =
@@ -1341,6 +1381,12 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
     //}
 
     return true;
+}
+
+fat32_factory_t::fat32_factory_t()
+    : fs_factory_t("fat32")
+{
+    fs_register_factory(this);
 }
 
 fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
@@ -1705,13 +1751,34 @@ int fat32_fs_t::ftruncate(fs_file_info_t *fi,
 // Query open file
 
 int fat32_fs_t::fstat(fs_file_info_t *fi,
-                       fs_stat_t *st)
+                      fs_stat_t *st)
 {
+    file_handle_t *file = static_cast<file_handle_t*>(fi);
     read_lock lock(rwlock);
 
-    (void)fi;
-    (void)st;
-    return -int(errno_t::ENOSYS);
+    st->st_size = file->dirent->size;
+
+    time_of_day_t tod;
+
+    date_decode(&tod, file->dirent->access_date, 0, 0);
+    st->st_atime = time_unix(tod);
+
+    date_decode(&tod, file->dirent->creation_date,
+                file->dirent->creation_time,
+                file->dirent->creation_centisec);
+    st->st_ctime = time_unix(tod);
+
+    date_decode(&tod, file->dirent->modified_date,
+                file->dirent->modified_time, 0);
+    st->st_mtime = time_unix(tod);
+
+    st->st_blksize = blksize_t(1) << (sector_shift + fat_block_shift);
+
+    st->st_blocks = file->dirent->size + (block_size - 1) / block_size;
+
+    st->st_nlink = 1;
+
+    return 0;
 }
 
 //
@@ -1863,3 +1930,5 @@ int fat32_fs_t::poll(fs_file_info_t *fi,
     (void)reventsp;
     return -int(errno_t::ENOSYS);
 }
+
+static fat32_factory_t fat32_factory;

@@ -236,10 +236,13 @@ ssize_t tmpfs_fs_t::readdir(fs_file_info_t *fi, dirent_t *buf, off_t offset)
     auto const& file_info = files[index];
 
     buf->d_ino = index + 1;
+    buf->d_reclen = sizeof(*buf);
+    buf->d_off = offset;
+    buf->d_type = 0;
     char const *name = names.data() + file_info.name_ofs;
     strncpy(buf->d_name, name, sizeof(buf->d_name));
 
-    return index + 1;
+    return 1;
 }
 
 int tmpfs_fs_t::releasedir(fs_file_info_t *fi)

@@ -1,5 +1,12 @@
 // pci driver: C=DISPLAY, S=VGA
 
+#include "kmodule.h"
+#include "pci.h"
+
+PCI_DRIVER_BY_CLASS(
+        vga,
+        PCI_DEV_CLASS_DISPLAY, PCI_SUBCLASS_DISPLAY_VGA, -1);
+
 #include "dev_text.h"
 
 #include "bios_data.h"
@@ -8,8 +15,6 @@
 #include "cpu/ioport.h"
 #include "time.h"
 #include "callout.h"
-
-
 
 class vga_factory_t : public text_dev_factory_t, public zero_init_t {
 public:
@@ -68,7 +73,6 @@ private:
     void move_cursor_to(int x, int y);
     void move_cursor_if_on();
     void write_char_at(
-
             int x, int y,
             int character, int attrib);
     void clear_screen();

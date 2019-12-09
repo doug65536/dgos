@@ -270,6 +270,7 @@ int probe_pci_for(
 
 int init_module(void const *module,
                 ptrdiff_t module_sz, char const *module_name,
-                struct module *mod_user, char const *parameters);
+                struct module *mod_user, char const *parameters,
+                char *ret_needed);
 
 __END_DECLS

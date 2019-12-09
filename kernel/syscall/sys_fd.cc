@@ -203,6 +203,62 @@ off_t sys_lseek(int fd, off_t ofs, int whence)
     return err(pos);
 }
 
+int sys_opendir(char const* pathname)
+{
+    user_str_t path(pathname);
+
+    if (unlikely(!path))
+        return path.err_int();
+
+    process_t *p = fast_cur_process();
+
+    int fd = p->ids.desc_alloc.alloc();
+
+    if (unlikely(fd < 0))
+        return err(errno_t::EMFILE);
+
+    int id = file_opendir(path);
+
+    if (unlikely(id < 0)) {
+        p->ids.desc_alloc.free(fd);
+        return err(id);
+    }
+
+    p->ids.ids[fd] = id;
+    return fd;
+}
+
+int sys_readdir_r(int fd, dirent_t *buf)
+{
+    int id = id_from_fd(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+
+    dirent_t ent{};
+    dirent_t *result = nullptr;
+
+    ssize_t status = file_readdir_r(id, &ent, &result);
+
+    if (unlikely(status == 0))
+        return 0;
+
+    if (unlikely(status < 0))
+        return int(status);
+
+    if (unlikely(!mm_copy_user(buf, &ent, sizeof(*buf))))
+        return -int(errno_t::EFAULT);
+
+    return sizeof(*buf);
+}
+
+int sys_closedir(int fd)
+{
+    int id = id_from_fd(fd);
+
+    return -file_closedir(id);
+}
+
 int sys_fsync(int fd)
 {
     int id = id_from_fd(fd);
@@ -345,15 +401,18 @@ int sys_open(char const* pathname, int flags, mode_t mode)
 
     int fd = p->ids.desc_alloc.alloc();
 
+    if (unlikely(fd < 0))
+        return err(errno_t::EMFILE);
+
     int id = file_open(path, flags, mode);
 
-    if (likely(id >= 0)) {
-        p->ids.ids[fd] = id;
-        return fd;
+    if (unlikely(id < 0)) {
+        p->ids.desc_alloc.free(fd);
+        return err(-id);
     }
 
-    p->ids.desc_alloc.free(fd);
-    return err(-id);
+    p->ids.ids[fd] = id;
+    return fd;
 }
 
 int sys_creat(char const *pathname, mode_t mode)
@@ -388,14 +447,14 @@ int sys_truncate(char const *path, off_t size)
 
 int sys_rename(char const *old_pathname, char const *new_pathname)
 {
-    std::unique_ptr<user_str_t> old_path_storage(new (std::nothrow)
-                                                 user_str_t(old_pathname));
+    std::unique_ptr<user_str_t> old_path_storage(
+                new (std::nothrow) user_str_t(old_pathname));
 
     if (unlikely(!old_path_storage))
         return old_path_storage->err_int();
 
-    std::unique_ptr<user_str_t> new_path_storage(new (std::nothrow)
-                                                 user_str_t(new_pathname));
+    std::unique_ptr<user_str_t> new_path_storage(
+                new (std::nothrow) user_str_t(new_pathname));
 
     if (unlikely(!new_path_storage))
         return new_path_storage->err_int();

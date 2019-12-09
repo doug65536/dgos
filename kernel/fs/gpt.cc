@@ -63,14 +63,17 @@ struct gpt_part_tbl_ent_t {
 } _packed;
 
 struct gpt_part_factory_t : public part_factory_t {
-    constexpr gpt_part_factory_t() : part_factory_t("gpt") {}
+    constexpr gpt_part_factory_t();
     std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
-static gpt_part_factory_t gpt_part_factory;
-STORAGE_REGISTER_FACTORY(gpt_part);
-
 static std::vector<part_dev_t*> partitions;
+
+constexpr gpt_part_factory_t::gpt_part_factory_t()
+    : part_factory_t("gpt")
+{
+    part_register_factory(this);
+}
 
 std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 {
@@ -81,8 +84,9 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     if (unlikely(sector_size < 128))
         return list;
 
-    std::unique_ptr<uint8_t[]> sector(new (std::nothrow) uint8_t[sector_size]);
-    memset(sector, 0, sector_size);
+    std::unique_ptr<uint8_t[]> sector(new (std::nothrow)
+                                      uint8_t[sector_size]());
+
 
     gpt_hdr_t hdr;
 
@@ -112,10 +116,12 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
             part->name = "fat32";
 
             partitions.push_back(part);
-            list.push_back(part.release());
+            if (likely(list.push_back(part.get())))
+                part.release();
         }
     }
 
     return list;
 }
 
+static gpt_part_factory_t gpt_part_factory;

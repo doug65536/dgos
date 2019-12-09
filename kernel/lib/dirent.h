@@ -1,12 +1,17 @@
 #pragma once
 #include "types.h"
+#include "syscall/sys_limits.h"
 
 typedef uint64_t ino_t;
 typedef uint16_t mode_t;
 
 struct dirent_t {
     ino_t d_ino;
-    char d_name[256];
+    off_t d_off;
+
+    unsigned short d_reclen;
+    unsigned char d_type;
+    char d_name[NAME_MAX+1];
 };
 
 //

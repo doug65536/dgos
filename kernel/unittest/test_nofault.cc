@@ -2,7 +2,7 @@
 #include "mm.h"
 #include "user_mem.h"
 
-UNITTEST(test_mm_copy_user_from_null)
+DISABLED_UNITTEST(test_mm_copy_user_from_null)
 {
     uint8_t *m = (uint8_t*)mm_alloc_space(PAGE_SIZE * 3);
     mmap(m + PAGE_SIZE, PAGE_SIZE,

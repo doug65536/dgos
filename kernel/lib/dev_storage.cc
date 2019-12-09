@@ -7,7 +7,7 @@
 
 #include "hash_table.h"
 
-#define DEBUG_STORAGE   0
+#define DEBUG_STORAGE   1
 #if DEBUG_STORAGE
 #define STORAGE_TRACE(...) printk("storage: " __VA_ARGS__)
 #else
@@ -15,11 +15,11 @@
 #endif
 
 struct fs_mount_t {
-    fs_reg_t *reg;
+    fs_factory_t *reg;
     fs_base_t *fs;
 };
 
-using path_table_t = hashtbl_t<fs_mount_t, fs_reg_t*, &fs_mount_t::reg>;
+using path_table_t = hashtbl_t<fs_mount_t, fs_factory_t*, &fs_mount_t::reg>;
 static path_table_t path_table;
 
 using lock_type = ext::mcslock;
@@ -30,7 +30,7 @@ static std::vector<storage_if_factory_t*> storage_if_factories;
 static std::vector<storage_if_base_t*> storage_ifs;
 static std::vector<storage_dev_base_t*> storage_devs;
 static std::vector<part_factory_t*> part_factories;
-static std::vector<fs_reg_t*> fs_regs;
+static std::vector<fs_factory_t*> fs_regs;
 static std::vector<fs_mount_t> fs_mounts;
 
 size_t storage_dev_count()
@@ -51,13 +51,22 @@ void storage_dev_close(storage_dev_base_t *dev)
     (void)dev;
 }
 
+EXPORT bool storage_if_unregister_factory(storage_if_factory_t *factory)
+{
+    scoped_lock lock(storage_lock);
+    return unregister_factory(storage_if_factories, factory);
+}
+
 EXPORT void storage_if_register_factory(storage_if_factory_t *factory)
 {
     scoped_lock lock(storage_lock);
 
     if (unlikely(!storage_if_factories.push_back(factory)))
         panic_oom();
-    STORAGE_TRACE("Registered storage driver %s\n", name);
+
+    lock.unlock();
+
+    STORAGE_TRACE("Registered storage driver %s\n", factory->name);
     probe_storage_factory(factory);
 }
 
@@ -70,7 +79,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
 
     STORAGE_TRACE("Found %zu %s interfaces\n", list.size(), factory->name);
 
-    for (unsigned i = 0; i < list.size(); ++i) {
+    for (size_t i = 0; i < list.size(); ++i) {
         // Calculate pointer to storage interface instance
         storage_if_base_t *if_ = list[i];
 
@@ -78,12 +87,12 @@ void probe_storage_factory(storage_if_factory_t *factory)
         if (unlikely(!storage_ifs.push_back(if_)))
             panic_oom();
 
-        STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
+        STORAGE_TRACE("Probing %s[%zu] for drives...\n", factory->name, i);
 
         // Get a list of storage devices on this interface
         std::vector<storage_dev_base_t*> dev_list = if_->detect_devices();
 
-        STORAGE_TRACE("Found %zu %s[%u] drives\n", dev_list.size(),
+        STORAGE_TRACE("Found %zu %s[%zu] drives\n", dev_list.size(),
                       factory->name, i);
 
         for (unsigned k = 0; k < dev_list.size(); ++k) {
@@ -97,19 +106,24 @@ void probe_storage_factory(storage_if_factory_t *factory)
     }
 }
 
-
-EXPORT void fs_register_factory(char const *name, fs_factory_t *fs)
+EXPORT bool fs_unregister_factory(fs_factory_t *fs)
 {
     scoped_lock lock(storage_lock);
-    if (unlikely(!fs_regs.push_back(new (std::nothrow) fs_reg_t{ name, fs })))
-        panic_oom();
-    printdbg("%s filesystem registered\n", name);
+    return unregister_factory(fs_regs, fs);
 }
 
-static fs_reg_t *find_fs(char const *name)
+EXPORT void fs_register_factory(fs_factory_t *fs)
 {
     scoped_lock lock(storage_lock);
-    for (fs_reg_t *reg : fs_regs) {
+    if (unlikely(!fs_regs.push_back(fs)))
+        panic_oom();
+    printdbg("%s filesystem registered\n", fs->name);
+}
+
+static fs_factory_t *find_fs(char const *name)
+{
+    scoped_lock lock(storage_lock);
+    for (fs_factory_t *reg : fs_regs) {
         if (strcmp(reg->name, name))
             continue;
 
@@ -118,7 +132,7 @@ static fs_reg_t *find_fs(char const *name)
     return nullptr;
 }
 
-EXPORT void fs_add(fs_reg_t *fs_reg, fs_base_t *fs)
+EXPORT void fs_add(fs_factory_t *fs_reg, fs_base_t *fs)
 {
     if (fs && fs->is_boot()) {
         scoped_lock lock(storage_lock);
@@ -132,7 +146,7 @@ EXPORT void fs_add(fs_reg_t *fs_reg, fs_base_t *fs)
 
 EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
 {
-    fs_reg_t *fs_reg = find_fs(fs_name);
+    fs_factory_t *fs_reg = find_fs(fs_name);
 
     if (!fs_reg) {
         STORAGE_TRACE("Could not find %s filesystem implementation\n", fs_name);
@@ -140,11 +154,10 @@ EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
     }
 
     assert(fs_reg != nullptr);
-    assert(fs_reg->factory != nullptr);
 
     printdbg("Mounting %s filesystem\n", fs_name);
 
-    fs_base_t *mfs = fs_reg->factory->mount(info);
+    fs_base_t *mfs = fs_reg->mount(info);
 
     if (mfs && mfs->is_boot()) {
         scoped_lock lock(storage_lock);
@@ -198,31 +211,35 @@ static void probe_part_factory(part_factory_t *factory)
         probe_part_factory_on_drive(factory, drive);
 }
 
-void part_register_factory(char const *name, part_factory_t *factory)
+bool part_unregister_factory(part_factory_t *factory)
 {
     scoped_lock lock(storage_lock);
+    return unregister_factory(part_factories, factory);
+}
+
+EXPORT void part_register_factory(part_factory_t *factory)
+{
+    scoped_lock lock(storage_lock);
+
     if (unlikely(!part_factories.push_back(factory)))
         panic_oom();
-    printk("%s partition type registered\n", name);
+
+    lock.unlock();
+
+    printk("%s partition type registered\n", factory->name);
     probe_part_factory(factory);
 }
 
 EXPORT void fs_factory_t::register_factory(void *p)
 {
     fs_factory_t *instance = (fs_factory_t*)p;
-    fs_register_factory(instance->name, instance);
-}
-
-EXPORT void storage_if_factory_t::register_factory(void *p)
-{
-    storage_if_factory_t *instance = (storage_if_factory_t*)p;
-    storage_if_register_factory(instance);
+    fs_register_factory(instance);
 }
 
 EXPORT void part_factory_t::register_factory(void *p)
 {
     part_factory_t *instance = (part_factory_t*)p;
-    part_register_factory(instance->name, instance);
+    part_register_factory(instance);
 }
 
 EXPORT int storage_dev_base_t::read_blocks(
@@ -459,6 +476,11 @@ EXPORT storage_if_factory_t::storage_if_factory_t(char const *factory_name)
 {
 }
 
+void storage_if_factory_t::register_factory()
+{
+    storage_if_register_factory(this);
+}
+
 EXPORT disk_io_plan_t::disk_io_plan_t(void *dest, uint8_t log2_sector_size)
     : dest(dest)
     , vec(nullptr)
@@ -530,3 +552,27 @@ EXPORT storage_if_base_t::~storage_if_base_t()
 }
 
 //std::unique_ptr<storage_if_base_t> dummy;
+
+storage_if_factory_t::~storage_if_factory_t()
+{
+    storage_if_unregister_factory(this);
+}
+
+fs_factory_t::~fs_factory_t()
+{
+    fs_unregister_factory(this);
+}
+
+part_factory_t::~part_factory_t()
+{
+    part_unregister_factory(this);
+}
+
+fs_factory_t::fs_factory_t(const char *factory_name)
+    : name(factory_name)
+{
+}
+
+fs_base_t::~fs_base_t()
+{
+}

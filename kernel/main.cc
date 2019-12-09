@@ -8,7 +8,6 @@
 #include "device/keyb8042.h"
 #include "callout.h"
 #include "time.h"
-#include "rbtree.h"
 #include "keyboard.h"
 #include "threadsync.h"
 #include "assert.h"
@@ -58,7 +57,6 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 #define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_WR_TEST   0
-#define ENABLE_FILESYSTEM_RD_TEST   1
 #define ENABLE_SPAWN_STRESS         0
 #define ENABLE_SHELL                0
 #define ENABLE_STRESS_HEAP_SMALL    1
@@ -175,7 +173,7 @@ private:
 
         uint64_t seed = 42;
         while (1) {
-            ++*indicator;
+            //++*indicator;
 
             uint64_t lba = rand_r_range(&seed, 16, data_blocks);
             //int64_t count = rand_r_range(&seed, 1, data_blocks);
@@ -212,7 +210,7 @@ private:
                 uint64_t delta_time = now - last_time;
                 int ofs = 0;
                 if (delta_time >= 1000000000) {
-                    for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
+                    for (size_t s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
                         ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%#2x ",
                                         counts[s << 6]);
                     }
@@ -220,13 +218,13 @@ private:
                     uint64_t completion_delta = completions - last_completions;
                     last_completions = completions;
 
-                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%" PRIu64,
-                                    completion_delta);
+                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs,
+                                    "delta=%" PRIu64, completion_delta);
 
                     auto ms = (now - last_time) / 1000000;
 
                     ofs += snprintf(buf + ofs, sizeof(buf) - ofs,
-                                    " %" PRIu64 " ms, %" PRIu64 "/sec",
+                                    " %" PRId64 " ms, %" PRIu64 "/sec",
                                     ms, 1000 * completion_delta / ms);
 
                     last_time = now;
@@ -234,7 +232,7 @@ private:
 
                 if (ofs) {
                     buf[ofs++] = 0;
-                    printk("%s\n", buf);
+                    putsdbg(buf);
                 }
             }
         }
@@ -704,33 +702,6 @@ int test_filesystem_write()
 }
 #endif
 
-#if ENABLE_FILESYSTEM_RD_TEST > 0
-int test_filesystem_read_thread(void*)
-{
-    printk("Opening root directory\n");
-
-    int od = file_opendir("");
-    dirent_t de;
-    dirent_t *dep;
-    while (file_readdir_r(od, &de, &dep) > 0) {
-        printk("File: %s\n", de.d_name);
-    }
-    file_closedir(od);
-    return 1;
-}
-
-bool test_filesystem_read()
-{
-    int tid = thread_create(test_filesystem_read_thread, nullptr, 0,
-                            false, false);
-    if (tid > 0) {
-        thread_close(tid);
-        return true;
-    }
-    return false;
-}
-#endif
-
 void test_spawn()
 {
 #if ENABLE_SPAWN_STRESS
@@ -783,6 +754,9 @@ static int init_thread(void *)
 
     if (unlikely(process_t::wait_for_exit(init_pid) < 0))
         panic("failed to wait for init");
+
+    printk("Initializing late devices\n");
+    callout_call(callout_type_t::late_dev);
 
 #if 0
     printk("Initializing 8042 keyboard\n");
@@ -863,10 +837,6 @@ static int init_thread(void *)
     printk("Float formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
     printk("Float formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
     printk("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
-#endif
-
-#if ENABLE_FILESYSTEM_RD_TEST
-    test_filesystem_read();
 #endif
 
 #if ENABLE_FILESYSTEM_WR_TEST

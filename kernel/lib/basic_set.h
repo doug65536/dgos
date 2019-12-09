@@ -7,6 +7,7 @@
 #include "debug.h"
 #include "printk.h"
 #include "cxxexception.h"
+#include "memory.h"
 
 #define _BASIC_SET_TRACE_ON    0
 #if _BASIC_SET_TRACE_ON
@@ -128,226 +129,226 @@ public:
     }
 };
 
-template<typename _T>
-class rbtree_policy_t : public base_tree_policy_t<_T>
-{
-public:
-    static constexpr int _RED = 1;
-    static constexpr int _BLACK = 0;
+//template<typename _T>
+//class rbtree_policy_t : public base_tree_policy_t<_T>
+//{
+//public:
+//    static constexpr int _RED = 1;
+//    static constexpr int _BLACK = 0;
 
-    // Root can become black at any time, root must always be black
-    static void __insert_case1(_T *__n)
-    {
-        _BASIC_SET_TRACE("Insert case 1\n");
+//    // Root can become black at any time, root must always be black
+//    static void __insert_case1(_T *__n)
+//    {
+//        _BASIC_SET_TRACE("Insert case 1\n");
 
-        if (!__n->__parent)
-            __n->__balance = _BLACK;
-        else
-            __insert_case2(__n);
-    }
+//        if (!__n->__parent)
+//            __n->__balance = _BLACK;
+//        else
+//            __insert_case2(__n);
+//    }
 
-    // n is not the root,
-    static void __insert_case2(_T *__n)
-    {
-        _BASIC_SET_TRACE("Insert case 2\n");
+//    // n is not the root,
+//    static void __insert_case2(_T *__n)
+//    {
+//        _BASIC_SET_TRACE("Insert case 2\n");
 
-        if (__n->__parent->__balance != _BLACK)
-            __insert_case3(__n);
-    }
+//        if (__n->__parent->__balance != _BLACK)
+//            __insert_case3(__n);
+//    }
 
-    static void __insert_case3(_T *__n)
-    {
-        _BASIC_SET_TRACE("Insert case 3\n");
+//    static void __insert_case3(_T *__n)
+//    {
+//        _BASIC_SET_TRACE("Insert case 3\n");
 
-        _T *__u = __uncle(__n);
-        _T *__g;
+//        _T *__u = __uncle(__n);
+//        _T *__g;
 
-        if (__u && __u->__balance == _RED) {
-            __n->__parent->__balance = _BLACK;
-            __u->__balance = _BLACK;
-            __g = grandparent(__n);
-            __g->__balance = _RED;
-            __insert_case1(__g);
-        } else {
-            __insert_case4(__n);
-        }
-    }
+//        if (__u && __u->__balance == _RED) {
+//            __n->__parent->__balance = _BLACK;
+//            __u->__balance = _BLACK;
+//            __g = grandparent(__n);
+//            __g->__balance = _RED;
+//            __insert_case1(__g);
+//        } else {
+//            __insert_case4(__n);
+//        }
+//    }
 
-    static void __insert_case4(_T *__n)
-    {
-        _BASIC_SET_TRACE("Insert case 4\n");
+//    static void __insert_case4(_T *__n)
+//    {
+//        _BASIC_SET_TRACE("Insert case 4\n");
 
-        _T *__g = grandparent(__n);
+//        _T *__g = grandparent(__n);
 
-        if ((__n == __n->__parent->__right &&
-             (__n->__parent == __g->__left))) {
-            __rotate_left(__n->__parent);
-            __n = __n->__left;
-        } else if ((__n == __n->__parent->__left) &&
-                   (__n->__parent == __g->__right)) {
-            rotate_right(__n->__parent);
-            __n = __n->__right;
-        }
-        __insert_case5(__n);
-    }
+//        if ((__n == __n->__parent->__right &&
+//             (__n->__parent == __g->__left))) {
+//            __rotate_left(__n->__parent);
+//            __n = __n->__left;
+//        } else if ((__n == __n->__parent->__left) &&
+//                   (__n->__parent == __g->__right)) {
+//            rotate_right(__n->__parent);
+//            __n = __n->__right;
+//        }
+//        __insert_case5(__n);
+//    }
 
-    static void __insert_case5(_T *__n)
-    {
-        _BASIC_SET_TRACE("Insert case 5\n");
+//    static void __insert_case5(_T *__n)
+//    {
+//        _BASIC_SET_TRACE("Insert case 5\n");
 
-        _T *__g = grandparent(__n);
+//        _T *__g = grandparent(__n);
 
-        __n->__parent->__balance = _BLACK;
-        __g->__balance = _RED;
-        if (__n == __n->__parent->__left)
-            rotate_right(__g);
-        else
-            __rotate_left(__g);
-    }
+//        __n->__parent->__balance = _BLACK;
+//        __g->__balance = _RED;
+//        if (__n == __n->__parent->__left)
+//            rotate_right(__g);
+//        else
+//            __rotate_left(__g);
+//    }
 
-    //
-    // Delete
+//    //
+//    // Delete
 
-    static void __delete_case6(_T *__n)
-    {
-        _T *__nparent = __n->__parent;
-        _T *__nsib = __sibling(__n);
+//    static void __delete_case6(_T *__n)
+//    {
+//        _T *__nparent = __n->__parent;
+//        _T *__nsib = __sibling(__n);
 
-        __nsib->__balance = __nparent->__balance;
-        __nparent->__balance = _BLACK;
-        if (__n == __nparent->__left) {
-            assert(__nsib->__right->__balance == _RED);
-            __nsib->__right->__balance = _BLACK;
-            __rotate_left(__nparent);
-        } else {
-            assert(__nsib->__left->__balance == _RED);
-            __nsib->__left->__balance = _BLACK;
-            rotate_right(__nparent);
-        }
-    }
+//        __nsib->__balance = __nparent->__balance;
+//        __nparent->__balance = _BLACK;
+//        if (__n == __nparent->__left) {
+//            assert(__nsib->__right->__balance == _RED);
+//            __nsib->__right->__balance = _BLACK;
+//            __rotate_left(__nparent);
+//        } else {
+//            assert(__nsib->__left->__balance == _RED);
+//            __nsib->__left->__balance = _BLACK;
+//            rotate_right(__nparent);
+//        }
+//    }
 
-    static void __delete_case5(_T *__n)
-    {
-        _T *__nparent = __n->__parent;
-        _T *__nsib = __sibling(__n);
+//    static void __delete_case5(_T *__n)
+//    {
+//        _T *__nparent = __n->__parent;
+//        _T *__nsib = __sibling(__n);
 
-        if (__n == __nparent->__left &&
-                __nsib->__balance == _BLACK &&
-                __nsib->__left->__balance == _RED &&
-                __nsib->__right->__balance == _BLACK) {
-            __nsib->__balance = _RED;
-            __nsib->__left->__balance = _BLACK;
-            rotate_right(__nsib);
-        } else if (__n == __nparent->__right &&
-                   __nsib->__balance == _BLACK &&
-                   __nsib->__right->__balance == _RED &&
-                   __nsib->__left->__balance == _BLACK) {
-            __nsib->__balance = _RED;
-            __nsib->__right->__balance = _BLACK;
-            __rotate_left(__nsib);
-        }
-        __delete_case6(__n);
-    }
+//        if (__n == __nparent->__left &&
+//                __nsib->__balance == _BLACK &&
+//                __nsib->__left->__balance == _RED &&
+//                __nsib->__right->__balance == _BLACK) {
+//            __nsib->__balance = _RED;
+//            __nsib->__left->__balance = _BLACK;
+//            rotate_right(__nsib);
+//        } else if (__n == __nparent->__right &&
+//                   __nsib->__balance == _BLACK &&
+//                   __nsib->__right->__balance == _RED &&
+//                   __nsib->__left->__balance == _BLACK) {
+//            __nsib->__balance = _RED;
+//            __nsib->__right->__balance = _BLACK;
+//            __rotate_left(__nsib);
+//        }
+//        __delete_case6(__n);
+//    }
 
-    static void __delete_case4(_T *__n)
-    {
-        _T *__nparent = __n->__parent;
-        _T *__nsib = __sibling(__n);
+//    static void __delete_case4(_T *__n)
+//    {
+//        _T *__nparent = __n->__parent;
+//        _T *__nsib = __sibling(__n);
 
-        if (__nparent->__balance == _RED &&
-                __nsib->__balance == _BLACK &&
-                __nsib->__left->__balance == _BLACK &&
-                __nsib->__right->__balance == _BLACK) {
-            __nsib->__balance = _RED;
-            __nparent->__balance = _BLACK;
-        } else {
-            __delete_case5(__n);
-        }
-    }
+//        if (__nparent->__balance == _RED &&
+//                __nsib->__balance == _BLACK &&
+//                __nsib->__left->__balance == _BLACK &&
+//                __nsib->__right->__balance == _BLACK) {
+//            __nsib->__balance = _RED;
+//            __nparent->__balance = _BLACK;
+//        } else {
+//            __delete_case5(__n);
+//        }
+//    }
 
-    static void __delete_case3(_T *__n)
-    {
-        _T *__nparent = __n->__parent;
-        _T *__nsib = __sibling(__n);
+//    static void __delete_case3(_T *__n)
+//    {
+//        _T *__nparent = __n->__parent;
+//        _T *__nsib = __sibling(__n);
 
-        if (__nparent->__balance == _BLACK &&
-                __nsib->__balance == _BLACK &&
-                __nsib->__left->__balance == _BLACK &&
-                __nsib->__right->__balance == _BLACK) {
-            __nsib->__balance = _RED;
-            __delete_case1(__nparent);
-        } else {
-            __delete_case4(__n);
-        }
-    }
+//        if (__nparent->__balance == _BLACK &&
+//                __nsib->__balance == _BLACK &&
+//                __nsib->__left->__balance == _BLACK &&
+//                __nsib->__right->__balance == _BLACK) {
+//            __nsib->__balance = _RED;
+//            __delete_case1(__nparent);
+//        } else {
+//            __delete_case4(__n);
+//        }
+//    }
 
-    static void __delete_case2(_T *__n)
-    {
-        _T *__nsib = __sibling(__n);
+//    static void __delete_case2(_T *__n)
+//    {
+//        _T *__nsib = __sibling(__n);
 
-        if (__nsib->__balance == _RED) {
-            _T *__nparent = __n->__parent;
-            __nparent->__balance = _RED;
-            __nsib->__balance = _BLACK;
-            if (__n == __nparent->__left) {
-                __rotate_left(__nparent);
-            } else {
-                rotate_right(__nparent);
-            }
-        }
-        __delete_case3(__n);
-    }
+//        if (__nsib->__balance == _RED) {
+//            _T *__nparent = __n->__parent;
+//            __nparent->__balance = _RED;
+//            __nsib->__balance = _BLACK;
+//            if (__n == __nparent->__left) {
+//                __rotate_left(__nparent);
+//            } else {
+//                rotate_right(__nparent);
+//            }
+//        }
+//        __delete_case3(__n);
+//    }
 
-    static void __delete_case1(_T *__n)
-    {
-        if (__n->__parent) {
-            __delete_case2(__n);
-        }
-    }
+//    static void __delete_case1(_T *__n)
+//    {
+//        if (__n->__parent) {
+//            __delete_case2(__n);
+//        }
+//    }
 
-    static int __delete_at(_T *&__root, _T *__n)
-    {
-        _T *__child;
-        _T *__left;
-        _T *__right;
+//    static int __delete_at(_T *&__root, _T *__n)
+//    {
+//        _T *__child;
+//        _T *__left;
+//        _T *__right;
 
-        __left = __n->__left;
-        __right = __n->__right;
+//        __left = __n->__left;
+//        __right = __n->__right;
 
-        if (__left && __right) {
-            // Find highest value in left subtree
-            _T *pred = __tree_max(__left);
+//        if (__left && __right) {
+//            // Find highest value in left subtree
+//            _T *pred = __tree_max(__left);
 
-            // Swap tree links without physically moving any data ever
-            __swap_nodes(__root, pred, __n);
+//            // Swap tree links without physically moving any data ever
+//            __swap_nodes(__root, pred, __n);
 
-            // Move the highest node in the left child
-            // to this node and delete that node
-            //__n->__kvp.key = pred->__kvp.key;
-            //__n->__kvp.val = pred->__kvp.val;
+//            // Move the highest node in the left child
+//            // to this node and delete that node
+//            //__n->__kvp.key = pred->__kvp.key;
+//            //__n->__kvp.val = pred->__kvp.val;
 
-            //__n = pred;
-            __left = __n->__left;
-            __right = __n->__right;
-        }
+//            //__n = pred;
+//            __left = __n->__left;
+//            __right = __n->__right;
+//        }
 
-        assert(!__left || !__right);
-        __child = !__right ? __left : __right;
-        if (__n->__balance == _BLACK) {
-            __n->__balance = __child->__balance;
-            __delete_case1(__n);
-        }
+//        assert(!__left || !__right);
+//        __child = !__right ? __left : __right;
+//        if (__n->__balance == _BLACK) {
+//            __n->__balance = __child->__balance;
+//            __delete_case1(__n);
+//        }
 
-        __replace_node(__root, __n, __child);
+//        __replace_node(__root, __n, __child);
 
-        if (!__n->__parent && __child)
-            __child->__balance = _BLACK;
+//        if (!__n->__parent && __child)
+//            __child->__balance = _BLACK;
 
-        free_node(__n);
+//        free_node(__n);
 
-        return 1;
-    }
-};
+//        return 1;
+//    }
+//};
 
 template<typename _T>
 class avltree_policy_t
@@ -702,7 +703,7 @@ struct __tree_value
 {
     using type = std::pair<_T const, _U>;
     using key_type = _T const;
-    using value_type = _U;
+    using mapped_type = _U;
 
     _always_inline
     static constexpr _T const& key(type const& __rhs)
@@ -721,14 +722,22 @@ struct __tree_value
     {
         return __rhs.second;
     }
+
+    _always_inline
+    static constexpr type with_default_value(key_type const& __rhs)
+    {
+        return type{__rhs, _U()};
+    }
 };
 
+// Specialization for void value type
 template<typename _T>
 struct __tree_value<_T, void>
 {
     using type = _T;
     using key_type = _T;
-    using value_type = type;
+    // Maps to itself
+    using mapped_type = type;
 
 //    _always_inline
 //    static constexpr _T& key(type& __rhs)
@@ -747,19 +756,16 @@ struct __tree_value<_T, void>
     {
         return __rhs;
     }
+
+    _always_inline
+    static constexpr _T const& with_default_value(type const& __rhs)
+    {
+        return __rhs;
+    }
 };
 
 using _TreePolicy = detail::avltree_policy_t<void>;
 using _OOMPolicy = detail::panic_policy_t;
-
-template<
-    typename _T,
-    typename _V,
-    typename _Compare = less<_T>,
-    typename _Alloc = allocator<void>>
-class __basic_tree_index
-{
-};
 
 template<
     typename _T,
@@ -780,7 +786,7 @@ public:
         typename _Alloc::template rebind<__node_t>::other;
 
     using key_type = typename __tree_value_t::key_type;
-    using mapped_type = typename __tree_value_t::value_type;
+    using mapped_type = typename __tree_value_t::mapped_type;
     using value_type = typename __tree_value_t::type;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
@@ -797,7 +803,8 @@ public:
     private:
         static_assert(dir == 1 || -dir == 1, "Unexpected direction");
         using owner_ptr_t = __basic_tree const *;
-        using node_ptr_t = __node_t const *;
+        using node_ptr_t = typename std::conditional<_is_const,
+            __node_t const *, __node_t *>::type;
 
         template<bool _is_const_inst>
         typename enable_if<!_is_const_inst, __node_t *>::type ptr()
@@ -886,6 +893,12 @@ public:
             return __curr->__item();
         }
 
+        typename std::conditional<_is_const, const_reference, reference>::type
+        operator*()
+        {
+            return __curr->__item();
+        }
+
         const_pointer operator->() const
         {
             return __curr->__item_ptr();
@@ -960,11 +973,30 @@ public:
     {
     }
 
+    explicit __basic_tree(__node_allocator_t&& __alloc)
+        : __root(nullptr)
+        , __current_size(0)
+        , __alloc(move(__alloc))
+    {
+    }
+
     explicit __basic_tree(_Compare const& __cmp,
                           _Alloc const& __alloc = _Alloc())
         : __cmp(__cmp)
         , __alloc(__alloc)
     {
+    }
+
+    explicit __basic_tree(_Compare const& __cmp,
+                          __node_allocator_t&& __other_alloc)
+        : __cmp(__cmp)
+        , __alloc(move(__other_alloc))
+    {
+    }
+
+    void share_allocator(__basic_tree const& __other)
+    {
+        __alloc = __other.__alloc;
     }
 
     ~__basic_tree()
@@ -1018,7 +1050,7 @@ public:
     }
 
     template<typename _K>
-    value_type const& operator[](_K const& __key) const
+    mapped_type const& operator[](_K const& __key) const
     {
         static_assert(!is_same<_V, void>::value, "Not a map");
         pair<iterator,bool> ins = insert(__key);
@@ -1028,17 +1060,17 @@ public:
     }
 
     template<typename _K>
-    value_type& operator[](_K const& __key)
+    mapped_type& operator[](_K const& __key)
     {
         static_assert(!is_same<_V, void>::value, "Not a map");
-        pair<iterator,bool> ins = insert(__key);
+        pair<iterator,bool> ins = __insert_key(__key);
         if (likely(ins.first != end()))
             return __tree_value_t::value(*ins.first);
         throw std::bad_alloc();
     }
 
     template<typename _K>
-    value_type& at(_K const& key)
+    mapped_type& at(_K const& key)
     {
         iterator __it = find(key);
         if (likely(__it != end()))
@@ -1047,7 +1079,7 @@ public:
     }
 
     template<typename _K>
-    value_type const& at(_K const& key) const
+    mapped_type const& at(_K const& key) const
     {
         const_iterator __it = find(key);
         if (likely(__it != end()))
@@ -1065,7 +1097,7 @@ public:
         return __current_size == 0;
     }
 
-    _Alloc get_allocator() const
+    __node_allocator_t get_allocator()
     {
         return __alloc;
     }
@@ -1209,12 +1241,23 @@ public:
         return const_iterator(__tree_find(__k));
     }
 
+    template<typename _InputIt>
+    void insert(_InputIt __st, _InputIt __en)
+    {
+        while (__st != __en) {
+            auto item = *__st;
+            insert(item);
+            ++__st;
+        }
+    }
+
     pair<iterator, bool> insert(__item_type&& __value)
     {
         pair<iterator, bool> __result;
 
         bool __found_dup;
-        __node_t *__i = __tree_ins(nullptr, __found_dup, __value);
+        __node_t *__i = __tree_ins(nullptr, __found_dup,
+                                   __tree_value_t::key(__value));
 
         if (unlikely(__found_dup)) {
             __result = { iterator(__i, this), false };
@@ -1229,9 +1272,45 @@ public:
         return __result;
     }
 
+    pair<iterator, bool> __insert_key(key_type const& __key)
+    {
+        pair<iterator, bool> __result;
+
+        bool __found_dup;
+        __node_t *__i = __tree_ins(nullptr, __found_dup, __key);
+
+        if (unlikely(__found_dup)) {
+            __result = { iterator(__i, this), false };
+        } else if (likely(__i != nullptr)) {
+            new (__i->__storage.__mem.data)
+                    __item_type(__tree_value_t::with_default_value(__key));
+            __result = { iterator(__i, this), true };
+
+            _NodePolicy::__retrace_insert(__root, __i);
+        }
+
+        return __result;
+    }
+
     pair<iterator, bool> insert(__item_type const& __value)
     {
-        return emplace(__value);
+        pair<iterator, bool> __result;
+
+        bool __found_dup;
+        __node_t *__i = __tree_ins(nullptr, __found_dup,
+                                   __tree_value_t::key(__value));
+
+        if (unlikely(__found_dup)) {
+            __result = { iterator(__i, this), false };
+        } else if (likely(__i != nullptr)) {
+            new (__i->__storage.__mem.data)
+                    __item_type(__value);
+            __result = { iterator(__i, this), true };
+
+            _NodePolicy::__retrace_insert(__root, __i);
+        }
+
+        return __result;
     }
 
     template<typename... Args>
@@ -1267,7 +1346,37 @@ public:
 
     iterator lower_bound(_T const& __k) const
     {
-        __node_t const *__node;
+        __node_t *__node;
+        int __diff = 0;
+        for (__node = __root; __node; ) {
+            auto& __item = __node->__item();
+
+            // diff = k <=> item
+            __diff = !__cmp(__k, __tree_value_t::key(__item)) -
+                    !__cmp(__tree_value_t::key(__item), __k);
+
+            // Break when equal
+            if (unlikely(__diff == 0))
+                break;
+
+            __node_t *__next = __node->__select_lr(__diff < 0);
+
+            if (!__next)
+                break;
+
+            __node = __next;
+        }
+
+        if (__node && __diff > 0)
+            __node = __tree_next(__node);
+
+        return iterator(__node, this);
+    }
+
+    template<typename _K>
+    iterator lower_bound(_K const& __k) const
+    {
+        __node_t *__node;
         int __prev_diff = -10;
         int __diff = -10;
         for (__node = __root; __node; ) {
@@ -1278,11 +1387,12 @@ public:
             __diff = !__cmp(__k, __tree_value_t::key(__item)) -
                     !__cmp(__tree_value_t::key(__item), __k);
 
+
             // Break when equal
             if (unlikely(__diff == 0))
                 break;
 
-            __node_t const *__next = __node->__select_lr(__diff < 0);
+            __node_t *__next = __node->__select_lr(__diff < 0);
 
             if (!__next)
                 break;
@@ -1676,32 +1786,6 @@ public:
     }
 
     template<typename _K>
-    iterator lower_bound(_K const& k)
-    {
-        __node_t *__node = __root;
-
-        while (__node) {
-            auto& item = __node->__item();
-
-            // diff = k <=> item
-            int __diff = !__cmp(k, __tree_value_t::key(item)) -
-                    !__cmp(__tree_value_t::key(item), k);
-
-            if (unlikely(__diff == 0))
-                break;
-
-            __node_t *__next_node = __node->__select_lr(__diff < 0);
-
-            if (unlikely(!__next_node))
-                break;
-
-            __node = __next_node;
-        }
-
-        return iterator(__node);
-    }
-
-    template<typename _K>
     iterator upper_bound(_K const& __key)
     {
 
@@ -1722,6 +1806,10 @@ private:
             __item_type __instance;
 
             __storage_t()
+            {
+            }
+
+            ~__storage_t()
             {
             }
         } __storage;
@@ -1796,13 +1884,21 @@ private:
         return __node;
     }
 
+    // Find an existing key, null if no exact match
+    template<typename _K>
+    __node_t *__tree_find(_K const& __k)
+    {
+        return const_cast<__node_t*>(static_cast<__basic_tree const*>(this)->
+                                     __tree_find(__k));
+    }
+
     // Find the insertion point and insert the node
     // Sets found_dup to true if an equal node was found
     // Returns the found existing node or newly inserted node
     // insert: __n is nullptr when the node hasn't been created yet,
     // emplace: __n is the node with the value constructed into it already
     __node_t *__tree_ins(__node_t *__n, bool &__found_dup,
-                         __item_type const &__val)
+                         key_type const &__key)
     {
         __found_dup = false;
         int __diff = -1;
@@ -1818,10 +1914,8 @@ private:
                 auto const& __rhs = __s->__item();
 
                 // diff = lhs <=> rhs
-                __diff = !__cmp(__tree_value_t::key(__val),
-                                __tree_value_t::key(__rhs)) -
-                        !__cmp(__tree_value_t::key(__rhs),
-                               __tree_value_t::key(__val));
+                __diff = !__cmp(__key, __tree_value_t::key(__rhs)) -
+                        !__cmp(__tree_value_t::key(__rhs), __key);
 
                 if (unlikely(__diff == 0))
                 {
@@ -1842,10 +1936,6 @@ private:
 
             // Placement new into memory
             __n = new (__n_mem) __node_t();
-
-            // Forwarding placement construct item
-            new (reinterpret_cast<pointer>(__n->__storage.__mem.data))
-                    __item_type(__val);
         }
 
         // New node is initially a leaf
@@ -1913,6 +2003,12 @@ private:
         return __curr;
     }
 
+    static __node_t *__tree_next(__node_t *__curr)
+    {
+        return const_cast<__node_t*>(
+                    __tree_next((__node_t const *)__curr));
+    }
+
     static __node_t const *__tree_prev(__node_t const *__curr)
     {
         if (__curr) {
@@ -1937,37 +2033,16 @@ private:
         return __curr;
     }
 
+    static __node_t *__tree_prev(__node_t *__curr)
+    {
+        return const_cast<__node_t*>(__tree_prev((__node_t const *)__curr));
+    }
+
 private:
     __node_t *__root;
     size_type __current_size;
     _Compare __cmp;
     __node_allocator_t __alloc;
-};
-
-template<typename _K, typename _V, typename _C>
-class __basic_map_comp {
-public:
-    bool operator()(pair<_K const, _V> const& __lhs,
-                    pair<_K const, _V> const& __rhs) const
-    {
-        return _C()(__lhs.first, __rhs.first);
-    }
-
-    template<typename _U,
-             typename = typename _U::is_transparent>
-    bool operator()(pair<_K const, _V> const& __lhs,
-                    _U const& __rhs) const
-    {
-        return _C()(__lhs.first, __rhs);
-    }
-
-    template<typename _U,
-             typename = typename _U::is_transparent>
-    bool operator()(_U const& __lhs,
-                    pair<_K const, _V> const& __rhs)
-    {
-        return _C()(__lhs, __rhs.first);
-    }
 };
 
 template<typename _K, typename _C = less<_K>, typename _A = allocator<_K>>
@@ -1981,3 +2056,11 @@ using map = __basic_tree<_K, _V, _C, _A>;
 
 __END_NAMESPACE_STD
 
+__BEGIN_NAMESPACE_EXT
+
+using fast_tree_alloc_t = ext::bump_allocator<void, ext::page_allocator<char>>;
+
+template<typename _T, typename _C>
+using fast_set = std::set<_T, _C, fast_tree_alloc_t>;
+
+__END_NAMESPACE_EXT

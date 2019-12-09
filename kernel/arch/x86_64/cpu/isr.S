@@ -104,7 +104,7 @@ isr_section_name \int_num
         // -1    5*8(%rsp) ss
         // -2    4*8(%rsp) rsp
         // -3    3*8(%rsp) rflags
-        // -4    2*8(%rsp) ss
+        // -4    2*8(%rsp) cs
         // -5    1*8(%rsp) rip
         // -6    0*8(%rsp) error code
         .cfi_def_cfa rsp,6*8
@@ -419,7 +419,7 @@ isr_entry 0 255
      // -1    6*8(%rsp) ss
      // -2    5*8(%rsp) rsp
      // -3    4*8(%rsp) rflags
-     // -4    3*8(%rsp) ss
+     // -4    3*8(%rsp) cs
      // -5    2*8(%rsp) rip
      // -6    1*8(%rsp) error code
      // -7    0*8(%rsp) interrupt number and ctx_flags
@@ -1314,7 +1314,7 @@ protection_barrier_ibpb:
     mov $ CPU_MSR_PRED_CMD_IBPB,%eax
 
     push_cfi %rdx
-    xor %edx,%edx
+    mov $ 0,%edx
 
     push_cfi %rcx
     mov $ CPU_MSR_PRED_CMD,%ecx
@@ -1476,15 +1476,12 @@ isr_sysret64:
     mov %eax,%r12d
     // not r13
     // not r14
-    // not r15
+    mov %eax,%r15d
 
     // Prevent IRQ while swapped to user gs or using user stack
     // in kernel mode
     cli
 
-    //ldmxcsr THREAD_SC_MXCSR_OFS(%rbx)
-    //fldcw THREAD_SC_FCW87_OFS(%rbx)
-    //call cpu_clear_fpu
     mov %eax,%ebx
 
     // Protect kernel gs before loading user gs
@@ -1494,6 +1491,9 @@ isr_sysret64:
     insn_fixup
     wrfsbase %r13
     wrgsbase %r14
+
+    mov %eax,%r13d
+    mov %eax,%r14d
 
     mov %rsi,%rsp
     .cfi_undefined rip
@@ -2054,6 +2054,24 @@ nofault_memcpy:
 
 .balign 16
 .Lmisaligned_dest:
+    // If destination is not 32 bit aligned, don't bother trying 32 bit
+    test $3,%edi
+    jnz .Lmisaligned_dest_tiny
+
+    // If there are less than 32 bits to be moved, don't do 32 bit
+    cmp $4,%rdx
+    jb .Lmisaligned_dest_tiny
+
+    movl (%rsi),%eax
+    add $4,%rsi
+    movl %eax,(%rdi)
+    add $4,%rdi
+    add $-4,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_misaligned_mainloop
+
+.balign 16
+.Lmisaligned_dest_tiny:
     movzbl (%rsi),%eax
     add $1,%rsi
     movb %al,(%rdi)

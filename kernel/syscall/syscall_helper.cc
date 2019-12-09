@@ -3,5 +3,5 @@
 
 bool verify_accessible(void const *addr, size_t len, bool writable)
 {
-    return mpresent(uintptr_t(addr), len);
+    return len == 0 || mpresent(uintptr_t(addr), len);
 }

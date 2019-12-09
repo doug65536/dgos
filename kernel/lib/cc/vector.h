@@ -167,12 +167,39 @@ public:
 
     void swap(vector& __other);
 
+    template<int _Dir, bool _Is_const>
+    class vector_iter_base
+            : public contiguous_iterator_tag
+    {
+        using subclass =  typename conditional<_Is_const,
+            const_reverse_iterator, reverse_iterator>::type;
+
+        using base_result = typename conditional<_Is_const,
+            const_iterator, iterator>::type;
+
+    public:
+        base_result base() const
+        {
+            subclass self = *static_cast<subclass const*>(this);
+            return base_result(self.__p);
+        }
+    };
+
+    template<bool _Is_const>
+    class vector_iter_base<1, _Is_const>
+            : public contiguous_iterator_tag
+    {
+        // No base method on forward iterators
+    };
+
     // Iterator
     template<int _Dir, bool _Is_const>
-    class vector_iter : public contiguous_iterator_tag
+    class vector_iter : public vector_iter_base<_Dir, _Is_const>
     {
     private:
         friend class vector;
+        friend class vector_iter_base<_Dir, _Is_const>;
+
         _always_inline explicit constexpr vector_iter(pointer __ip);
 
     public:
@@ -1043,7 +1070,7 @@ template<int _Dir, bool _Is_const>
 constexpr typename vector<_T,_Alloc>::pointer
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator->()
 {
-    return __p;
+    return &__p[-(_Dir < 0)];
 }
 
 template<typename _T, typename _Alloc>
@@ -1051,7 +1078,7 @@ template<int _Dir, bool _Is_const>
 constexpr typename vector<_T,_Alloc>::const_pointer
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator->() const
 {
-    return __p;
+    return &__p[-(_Dir < 0)];
 }
 
 template<typename _T, typename _Alloc>

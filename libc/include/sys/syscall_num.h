@@ -326,3 +326,6 @@
 #define SYS_probe_pci_for           315
 #define SYS_render_batch            316
 #define SYS_posix_spawn             317
+#define SYS_opendir                 318
+#define SYS_readdir_r               319
+#define SYS_closedir                320

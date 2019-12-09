@@ -49,7 +49,7 @@ reloc_self:
     movw $ 0x100,%ax
     movw %ax,%es
     mov $ ZEROBASED(___initialized_data_en),%cx
-    sub $ ZEROBASED(___initialized_data_st),%cx
+    sub $ ZEROBASED(___text_st),%cx
     shrw $1,%cx
     xorw %si,%si
     xorw %di,%di

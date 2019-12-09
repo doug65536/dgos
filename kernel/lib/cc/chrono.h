@@ -4,6 +4,7 @@
 #include "type_traits.h"
 #include "time.h"
 #include "numeric.h"
+#include "numeric_limits.h"
 #include "export.h"
 
 __BEGIN_NAMESPACE_STD
@@ -323,6 +324,9 @@ public:
         return __point + rhs;
     }
 
+    static constexpr time_point<_Clock, _Duration> max();
+    static constexpr time_point min();
+
 private:
     duration __point;
 };
@@ -390,6 +394,14 @@ using sys_seconds = sys_time<seconds>;
 
 // System time time_point in days since epoch
 //using sys_days = sys_time<days>;
+
+template<typename _Clock, typename _Duration>
+constexpr time_point<_Clock, _Duration> time_point<_Clock, _Duration>::max()
+{
+    return time_point(std::numeric_limits<std::chrono::
+                      high_resolution_clock::duration::rep>::max());
+}
+
 
 __END_NAMESPACE // chrono
 __END_NAMESPACE_STD

@@ -109,15 +109,16 @@ SECTIONS {
 		*(.igot.plt)
 	} :data
 
-	.tdata : {
+	.tdata ALIGN(16) : {
 		PROVIDE_HIDDEN(___tdata_st = .);
 		*(.tdata .tdata.* .gnu.linkonce.td.*)
 		PROVIDE_HIDDEN(___tdata_en = .);
 	} :data :tls
 
-	.tbss (NOLOAD) : {
+	.tbss ALIGN(8) (NOLOAD) : {
 		PROVIDE_HIDDEN(___tbss_st = .);
 		*(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon)
+		. = ALIGN(8);
 		PROVIDE_HIDDEN(___tbss_en = .);
 	} :data :tls
 

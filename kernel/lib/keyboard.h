@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "chrono.h"
 
 // Special keys are encoded as codepoints beyond
 // the unicode range
@@ -214,7 +215,9 @@ char const *keybd_special_text(int codepoint);
 int keybd_event(keyboard_event_t event);
 
 // Called to read the keyboard queue
-keyboard_event_t keybd_waitevent(void);
+keyboard_event_t keybd_waitevent(
+        std::chrono::steady_clock::time_point const& timeout_time);
+keyboard_event_t keybd_waitevent();
 
 class keybd_dev_t {
     virtual int set_layout_name(char const *name);

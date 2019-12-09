@@ -12,6 +12,10 @@ struct time_of_day_t {
     uint8_t month;
     uint8_t year;
     uint8_t century;
+
+    inline constexpr int fullYear() const {
+        return century * 100 + year;
+    }
 };
 
 typedef time_of_day_t (*time_ofday_handler_t)();

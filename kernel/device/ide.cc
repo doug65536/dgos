@@ -1,5 +1,12 @@
 // pci driver: C=STORAGE, S=IDE
 
+#include "kmodule.h"
+#include "pci.h"
+
+PCI_DRIVER_BY_CLASS(
+        ide,
+        PCI_DEV_CLASS_STORAGE, PCI_SUBCLASS_STORAGE_ATA, -1);
+
 #include "dev_storage.h"
 #include "ata.h"
 #include "cpu/ioport.h"
@@ -36,13 +43,13 @@ struct ide_chan_ports_t {
     uint8_t irq;
 };
 
-struct ide_if_factory_t final : public storage_if_factory_t {
-    ide_if_factory_t() : storage_if_factory_t("ide") {}
+struct ide_if_factory_t final
+    : public storage_if_factory_t
+{
+    ide_if_factory_t();
+
     virtual std::vector<storage_if_base_t *> detect(void) override;
 };
-
-static ide_if_factory_t ide_if_factory;
-STORAGE_REGISTER_FACTORY(ide_if);
 
 struct ide_if_t final : public storage_if_base_t, public zero_init_t {
     STORAGE_IF_IMPL
@@ -228,6 +235,12 @@ static std::vector<ide_dev_t*> ide_devs;
 #define ATA_BMDMA_REG_STATUS_n(secondary)   ((((secondary) != 0) << 3) + 2)
 #define ATA_BMDMA_REG_PRD_n(secondary)      ((((secondary) != 0) << 3) + 4)
 
+ide_if_factory_t::ide_if_factory_t()
+    : storage_if_factory_t("ide")
+{
+    storage_if_register_factory(this);
+}
+
 std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
 {
     std::vector<storage_if_base_t*> list;
@@ -322,8 +335,9 @@ std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
 
         if (unlikely(!ide_ifs.push_back(if_)))
             panic_oom();
-        if (unlikely(!list.push_back(if_.release())))
+        if (unlikely(!list.push_back(if_.get())))
             panic_oom();
+        if_.release();
     } while (pci_enumerate_next(&pci_iter));
 
     return list;
@@ -622,8 +636,9 @@ void ide_if_t::ide_chan_t::detect_devices(
         dev->is_atapi = is_atapi;
         if (unlikely(!ide_devs.push_back(dev)))
             panic_oom();
-        if (unlikely(!list.push_back(dev.release())))
+        if (unlikely(!list.push_back(dev.get())))
             panic_oom();
+        dev.release();
 
         std::unique_ptr<ata_identify_t> ident =
                 new (std::nothrow) ata_identify_t;
@@ -1266,3 +1281,5 @@ long ide_dev_t::info(storage_dev_info_t key)
         return -1;
     }
 }
+
+static ide_if_factory_t ide_if_factory;

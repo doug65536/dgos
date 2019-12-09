@@ -96,6 +96,13 @@ public:
         return mmap(nullptr, __sz);
     }
 
+    // Make the destruct a noop
+    void release()
+    {
+        __m = nullptr;
+        __sz = 0;
+    }
+
     void reset(_T *__new_p = (_T*)MAP_FAILED, size_t __new_sz = 0)
     {
         if (__m != MAP_FAILED)

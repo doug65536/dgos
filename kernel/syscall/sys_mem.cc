@@ -21,7 +21,7 @@ static bool validate_user_mmop(
 void *sys_mmap(void *addr, size_t len, int prot,
                int flags, int fd, off_t offset)
 {
-    if (!validate_user_mmop(addr, len, prot, flags))
+    if (unlikely(!validate_user_mmop(addr, len, prot, flags)))
         return (void*)errno_t::EINVAL;
 
     void *result = mmap(addr, len, prot, flags | MAP_USER, fd, offset);

@@ -24,6 +24,7 @@ static futex_tab_t futex_tab;
 
 void sys_exit(int exitcode)
 {
+
     process_t::exit(-1, exitcode);
 }
 
