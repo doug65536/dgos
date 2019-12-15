@@ -177,7 +177,7 @@ struct usbxhci_slotctx_t {
     // Root hub port number
     uint8_t root_hub_port_num;
 
-    // Number of hubs (0 if not a hub)
+    // Number of ports on the hub (0 if not a hub)
     uint8_t num_ports;
 
     // if low/full speed and connected to high spd hub,
