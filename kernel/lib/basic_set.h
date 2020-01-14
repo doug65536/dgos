@@ -644,8 +644,6 @@ public:
 
     static _T *__rotate_leftright(_T *_X, _T *_Z)
     {
-        // inferred and buggy
-
         _T *_Y, *__t3, *__t2;
 
         // Z is by 2 higher than its sibling
