@@ -425,10 +425,6 @@ public:
     {
         _T *_X, *_N, *_G;
 
-#if !defined(hack) && 0
-        bool hack_ = false;
-#endif
-
         // Loop (possibly up to the root)
         for (_X = _Z->__parent; _X != nullptr; _X = _Z->__parent) {
             // X->balance has to be updated:
@@ -443,21 +439,6 @@ public:
                     if (_Z->__balance < 0) {
                         // Right Left Case     (see figure 5)
                         // Double rotation: Right(Z) then Left(X)
-#if !defined(hack) && 0
-                        if constexpr (is_same<typename _O::value_type,
-                                      std::pair<uintptr_t,uintptr_t>
-                                      >::value) {
-                            printdbg("debug rightleft should work"
-                                     ": _N=%#zx"
-                                     ", _X=%#zx"
-                                     ", _Z=%#zx\n",
-                                     uintptr_t(_N),
-                                     uintptr_t(_X),
-                                     uintptr_t(_Z));
-                            hack_ = true;
-                            __owner->dump("before rightleft");
-                        }
-#endif
                         _N = __rotate_rightleft(_X, _Z);
                     } else {
                         // Right Right Case    (see figure 4)
@@ -486,21 +467,6 @@ public:
                     if (_Z->__balance > 0) {
                         // Double rotation: Left(Z) then Right(X)
 
-#if !defined(hack) && 0
-                        if constexpr (is_same<typename _O::value_type,
-                                      std::pair<uintptr_t,uintptr_t>
-                                      >::value) {
-                            printdbg("debug leftright probably bad"
-                                     ": _N=%#zx"
-                                     ", _X=%#zx"
-                                     ", _Z=%#zx\n",
-                                     uintptr_t(_N),
-                                     uintptr_t(_X),
-                                     uintptr_t(_Z));
-                            hack_ = true;
-                            __owner->dump("before leftright");
-                        }
-#endif
                         _N = __rotate_leftright(_X, _Z);
                     } else                           // Left Left Case
                         // Single rotation Right(X)
@@ -539,17 +505,6 @@ public:
 
         // Unless loop is left via break,
         // the height of the total tree increases by 1.
-
-#if !defined(hack) && 0
-        if (hack_) {
-            if constexpr (is_same<typename _O::value_type,
-                          std::pair<uintptr_t,uintptr_t>
-                          >::value) {
-                __owner->dump("after double rotation");
-            }
-        }
-#endif
-
     }
 
     static void __retrace_delete(_T *&__root_ptr, _T *_N)
