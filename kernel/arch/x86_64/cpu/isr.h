@@ -1,7 +1,10 @@
 #pragma once
 
 #define ISR_CTX_CTX_FLAGS_FAST_BIT  7
-#define ISR_CTX_CTX_FLAGS_FAST_QWBIT  (7+8)
+#define ISR_CTX_CTX_FLAGS_FAST_QWBIT    (7+8)
+
+#define ISR_CTX_CTX_FLAGS_FIXGS_BIT 6
+#define ISR_CTX_CTX_FLAGS_FIXGS_QWBIT   (6+8)
 
 #define ISR_CTX_OFS_INTERRUPT       (18*8)
 #define ISR_CTX_OFS_RBP             (17*8)
@@ -286,7 +289,7 @@ void isr_save_fxsave(void);
 void isr_restore_fxrstor(void);
 
 _noreturn
-void isr_sysret64(uintptr_t rip, uintptr_t rsp);
+void isr_sysret64(uintptr_t rip, uintptr_t rsp, uintptr_t kernel_rsp);
 
 isr_fxsave_context_t *isr_save_fpu_ctx64(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx64(thread_info_t *incoming_ctx);

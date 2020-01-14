@@ -35,7 +35,7 @@ UNITTEST(test_stress_sort)
     static int const item_count = 5113;
     static uint32_t const rand_cap =
             ((uint64_t(1) << 32) - (uint64_t(1) << 32) % shuffle_count) - 1;
-    int items[item_count];
+    std::unique_ptr<int[]> items(new (std::nothrow) int[item_count]);
 
     for (int i = 0; i < item_count; ++i)
         items[i] = i;
@@ -54,7 +54,7 @@ UNITTEST(test_stress_sort)
         }
 
         auto st = std::chrono::high_resolution_clock::now();
-        std::sort(items, items + item_count);
+        std::sort(items.get(), items.get() + item_count);
         auto en = std::chrono::high_resolution_clock::now();
         auto ns = std::chrono::microseconds(en - st).count();
 

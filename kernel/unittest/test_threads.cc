@@ -6,6 +6,11 @@ struct test_thread_variation_t {
     bool volatile stop;
 };
 
+UNITTEST(test_framebuffer)
+{
+    printk("To framebuffer?\n");
+}
+
 static int test_thread_worker(void *variation)
 {
     test_thread_variation_t *var = (test_thread_variation_t*)variation;

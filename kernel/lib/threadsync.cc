@@ -658,8 +658,8 @@ EXPORT bool condvar_wait_mcslock(condition_var_t *var,
     return condvar_wait_ex(var, state, timeout_time);
 }
 
-EXPORT bool condvar_wait(condition_var_t *var, mutex_t *mutex,
-                         int64_t timeout_time)
+EXPORT bool condvar_wait_mutex(condition_var_t *var, mutex_t *mutex,
+                               int64_t timeout_time)
 {
     assert(mutex->owner == thread_get_id());
     condvar_mutex_t state(mutex);

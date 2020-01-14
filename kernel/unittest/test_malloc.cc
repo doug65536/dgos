@@ -2,6 +2,371 @@
 #include "stdlib.h"
 #include "mm.h"
 #include "likely.h"
+#include "memory.h"
+
+#include "contig_alloc.h"
+
+UNITTEST(test_contig_init)
+{
+    contiguous_allocator_t uut;
+
+    // 1MB of free space at 4MB line
+    uut.init(0x400000, 0x100000, "test");
+
+    size_t range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        eq(size_t(0x400000), range.base);
+        eq(size_t(0x100000), range.size);
+        ++range_count;
+        return true;
+    });
+
+    eq(size_t(1), range_count);
+}
+
+UNITTEST(test_contig_alloc_free)
+{
+    contiguous_allocator_t uut;
+
+    //                                                                  +--+B
+    //                                                                  |  |
+    //                                                                 >+--+A
+    //
+    //                                                          +--+9   +--+9
+    //                                                          |  |    |  |
+    //  +--+8   +--+8   +--+8   +--+8   +--+8   +--+8   +--+8  >|..|8   |  |
+    //  |  |    |  |    |  |    |  |    |  |    |  |    |  |    |  |    |  |
+    //  |  |    +--+7   +--+7   +--+7   +--+7   +--+7   +--+7   +--+7   +--+7
+    //  |  |    .  .
+    //  |  |    .  .                            +--+6   +--+6   +--+6   +--+6
+    //  |  |    .  .                            |  |    |  |    |  |    |  |
+    //  |  |    .  .            +--+5   +--+5  >|..|5   |  |    |  |    |  |
+    //  |  |    .  .            |  |    |  |    |  |    |  |    |  |    |  |
+    //  |  |    .  .           >+--+4   |..|4   |  |    |  |    |  |    |  |
+    //  |  |    .  .                    |  |    |  |    |  |    |  |    |  |
+    //  |  |    .  .                   >+--+3   +--+3   |..|    |  |    |  |
+    //  |  |    .  .                                    |  |    |  |    |  |
+    //  |  |    .  .    +--+2   +--+2   +--+2   +--+2  >|..|2   |  |    |  |
+    //  |  |    .  .    |  |    |  |    |  |    |  |    |  |    |  |    |  |
+    //  |  |    .  .   >+--+1   +--+1   +--+1   +--+1   +--+1   +--+1   +--+1
+    //  |  |    .  .
+    // >+--+0  <....
+    //  IA@0      A7    F1@1    F1@4    F1@3    F1@5    F1@1    F1@8    F1@8
+    //   a        b      c       d       e       f       g       h       i
+    //   |        |      |       |       |       |       |       |       |
+    //  Init    Alloc    | non-adjacent  | end-adjacent  |   adjacent    |
+    //                   |   in hole     |    in hole    |    at end     |
+    //                   |               |               |               |
+    //             non-adjacent    start-adjacent   close hole    non-adjacent
+    //               at start         in hole                         at end
+    //
+
+    // a) Space at 4MB line
+    uut.init(0x400000, 0x8000, "test");
+
+    // b) Allocate
+    uintptr_t addr = uut.alloc_linear(0x7000);
+
+    eq(uintptr_t(0x400000), addr);
+
+    size_t range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        eq(size_t(0x407000), range.base);
+        eq(size_t(0x001000), range.size);
+        ++range_count;
+        return true;
+    });
+
+    eq(size_t(1), range_count);
+
+    // c) Free non-adjacent block
+    uut.release_linear(addr + 0x1000, 0x1000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x401000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        case 1:
+            eq(size_t(0x407000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(2), range_count);
+
+    // d) not adjacent in hole
+    uut.release_linear(addr + 0x4000, 0x1000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x401000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        case 1:
+            eq(size_t(0x404000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        case 2:
+            eq(size_t(0x407000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(3), range_count);
+
+    // e) extend start in hole
+    uut.release_linear(addr + 0x3000, 0x1000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x401000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        case 1:
+            eq(size_t(0x403000), range.base);
+            eq(size_t(0x002000), range.size);
+            break;
+        case 2:
+            eq(size_t(0x407000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(3), range_count);
+
+    // f) extend end in hole
+    uut.release_linear(addr + 0x5000, 0x1000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x401000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        case 1:
+            eq(size_t(0x403000), range.base);
+            eq(size_t(0x003000), range.size);
+            break;
+        case 2:
+            eq(size_t(0x407000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(3), range_count);
+
+    // g) close hole
+    uut.release_linear(addr + 0x2000, 0x1000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x401000), range.base);
+            eq(size_t(0x005000), range.size);
+            break;
+        case 1:
+            eq(size_t(0x407000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(2), range_count);
+
+    // h) adjacent at end
+    uut.release_linear(addr + 0x8000, 0x1000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x401000), range.base);
+            eq(size_t(0x005000), range.size);
+            break;
+        case 1:
+            eq(size_t(0x407000), range.base);
+            eq(size_t(0x002000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(2), range_count);
+
+    // i) non-adjacent at end
+    uut.release_linear(addr + 0xA000, 0x1000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x401000), range.base);
+            eq(size_t(0x005000), range.size);
+            break;
+        case 1:
+            eq(size_t(0x407000), range.base);
+            eq(size_t(0x002000), range.size);
+            break;
+        case 2:
+            eq(size_t(0x40A000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(3), range_count);
+
+    // Free whole thing, extending start and end
+    uut.release_linear(addr + 0x800, 0xB000);
+
+    range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x400800), range.base);
+            eq(size_t(0x00B000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(1), range_count);
+}
+
+UNITTEST(test_contiguous_alloc_take_taken)
+{
+    contiguous_allocator_t uut;
+
+    uut.init(0x400000, 0x1000, "test");
+    eq(true, uut.take_linear(0x4200, 0x1000, false));
+    uut.dump("");
+
+    size_t range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x400000), range.base);
+            eq(size_t(0x001000), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(1), range_count);
+}
+
+UNITTEST(test_contiguous_alloc_take_some_start)
+{
+    contiguous_allocator_t uut;
+
+    uut.init(0x400000, 0x1000, "test");
+    eq(true, uut.take_linear(0x3ff000, 0x1800, false));
+    uut.dump("");
+
+    size_t range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x400800), range.base);
+            eq(size_t(0x000800), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(1), range_count);
+}
+
+UNITTEST(test_contiguous_alloc_take_some_mid)
+{
+    contiguous_allocator_t uut;
+
+    uut.init(0x400000, 0x2000, "test");
+    eq(true, uut.take_linear(0x400400, 0x0800, false));
+    uut.dump("");
+
+    size_t range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x400000), range.base);
+            eq(size_t(0x000400), range.size);
+            break;
+        case 1:
+            eq(size_t(0x400c00), range.base);
+            eq(size_t(0x001400), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(2), range_count);
+}
+
+UNITTEST(test_contiguous_alloc_take_some_end)
+{
+    contiguous_allocator_t uut;
+
+    uut.init(0x400000, 0x1000, "test");
+    eq(true, uut.take_linear(0x400800, 0x1000, false));
+    uut.dump("");
+
+    size_t range_count = 0;
+    uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
+        switch (range_count++) {
+        case 0:
+            eq(size_t(0x400000), range.base);
+            eq(size_t(0x000800), range.size);
+            break;
+        default:
+            break;
+        }
+        return true;
+    });
+
+    eq(size_t(1), range_count);
+}
 
 _const
 static size_t mem_fill_value(size_t input)
@@ -23,7 +388,7 @@ DISABLED_UNITTEST(test_mmap_oom)
 
     constexpr size_t max_items = 256;
 
-    item items[max_items] = {};
+    std::unique_ptr<item[]> items(new (std::nothrow) item[max_items]());
     size_t item_count;
 
     for (size_t pass = 0; pass < 2; ++pass) {

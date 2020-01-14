@@ -134,45 +134,100 @@ private:
 
     int cursor_x;
     int cursor_y;
+    int width;
+    int height;
+
+    int clamp_x(int x)
+    {
+        if (x >= width)
+            cursor_x = width - 1;
+        else if (x >= 0)
+            cursor_x = x;
+        else
+            cursor_x = 0;
+
+        return cursor_x;
+    }
+
+    int clamp_y(int y)
+    {
+        if (y >= height)
+            cursor_y = height - 1;
+        else if (y >= 0)
+            cursor_y = y;
+        else
+            cursor_y = 0;
+
+        return cursor_y;
+    }
+
+    void erase_all()
+    {
+
+    }
+
+    void erase_rect(int sx, int sy, int ex, int ey)
+    {
+
+    }
+
+    // Positive moves the content of the screen up
+    void scroll(int distance_up)
+    {
+
+    }
 
     void parse_csi(char32_t final)
     {
         int np;
         int params[NPAR];
 
+        np = parse_csi_integers(csi.begin(), params);
+
         switch (final) {
         case 'A':
             // CUU - cursor up N times, do nothing at edge of screen
-            np = parse_csi_integers(csi.begin(), params);
+            clamp_y(cursor_y - (np == 0 ? 1 : params[0]));
 
             break;
 
         case 'B':
             // CUD cursor down N times, do nothing at edge of screen
+            clamp_y(cursor_y + (np == 0 ? 1 : params[0]));
 
             break;
 
         case 'C':
             // CUF cursor forward N times, do nothing at edge of screen
+            clamp_x(cursor_x + (np == 0 ? 1 : params[0]));
+
             break;
 
         case 'D':
             // CUB cursor back N times, do nothing at edge of screen
+            clamp_x(cursor_x - (np == 0 ? 1 : params[0]));
 
             break;
 
         case 'E':
             // CNL cursor beginning of line N lines down
+            clamp_y(cursor_y + (np == 0 ? 1 : params[0]));
+
+            cursor_x = 0;
 
             break;
 
         case 'F':
             // CPL cursor beginning of line N lines up
+            clamp_y(cursor_y - (np == 0 ? 1 : params[0]));
+
+            cursor_x = 0;
 
             break;
 
         case 'G':
             // CHA cursor to absolute column N
+            clamp_x(cursor_x + (np == 0 ? 0 : params[0]));
 
             break;
 
@@ -182,6 +237,12 @@ private:
         case 'f':
             // HVP horizontal vertical position N;M
             // fall through
+
+            if (np == 2) {
+                clamp_x(params[0]);
+                clamp_y(params[1]);
+            }
+
             break;
 
         case 'J':
@@ -191,6 +252,35 @@ private:
             //  (N=2): entire screen cursor to top left,
             //  (N=3): entire scrollback cursor to top left
 
+            if (np == 0 || (np > 0 && params[0] == 0)) {
+                // Cursor to end of screen
+                if (cursor_x > 0) {
+                    // To EOL on cursor line,
+                    erase_rect(cursor_x, cursor_y, width, cursor_y + 1);
+                    // then rest of screen
+                    erase_rect(0, cursor_y + 1, width, height);
+                } else {
+                    // Rest of screen
+                    erase_rect(0, cursor_y, width, height);
+                }
+            } else if (np == 1 && params[0] == 1) {
+                // Cursor to beginning of screen
+                if (cursor_x > 0) {
+                    // Rest of screen
+                    erase_rect(0, 0, width, cursor_y);
+                    // then to BOL on cursor line
+                    erase_rect(0, cursor_y, cursor_x, cursor_y + 1);
+                } else {
+                    erase_rect(0, 0, width, cursor_y);
+                }
+            } else if (np == 1 && params[0] == 2) {
+                erase_rect(0, 0, width, height);
+                cursor_x = 0;
+                cursor_y = 0;
+            } else if (np == 1 && params[0] == 3) {
+                erase_all();
+            }
+
             break;
 
         case 'K':
@@ -199,17 +289,32 @@ private:
             //  (N=1): cursor to beginning of line,
             //  (N=2): clear entire line
 
+            if (np == 0 || (np == 1 && params[0] == 0)) {
+                // cursor to EOL
+                erase_rect(cursor_x, cursor_y, width, cursor_y + 1);
+            } else if (np == 1 && params[0] == 1) {
+                // cursor to beginning of line
+                erase_rect(0, cursor_y, cursor_x, cursor_y + 1);
+            } else if (np == 1 && params[0] == 2) {
+                // clear entire line
+                erase_rect(0, cursor_y, width, cursor_y + 1);
+            }
+
             break;
 
         case 'S':
             // SU - scroll up
             //  N=line count
+            if (np == 1)
+                scroll(params[0]);
 
             break;
 
         case 'T':
             // SD - scroll down
             //  N=line count
+            if (np == 1)
+                scroll(-params[0]);
 
             break;
 

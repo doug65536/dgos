@@ -40,7 +40,9 @@ char *strdup(char const *s);
 
 int strtoi(char const *str, char **end, int base);
 long strtol(char const *str, char **end, int base);
+unsigned long strtoul(char const *str, char **end, int base);
 long long strtoll(char const *str, char **end, int base);
+unsigned long long strtoull(char const *str, char **end, int base);
 
 int atoi(char const *str);
 int atol(char const *str);

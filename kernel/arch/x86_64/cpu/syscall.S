@@ -143,7 +143,7 @@ syscall_entry:
     // params rdi, rsi, rdx, r10, r8, r9
     // return rax
     // CPU puts rip in rcx
-    // CPU puts rflags in r11 (which is clobbered)
+    // CPU puts rflags in r11
     // on return, rflags is initialized to CPU_EFLAGS_IF | 2
     // CPU is configured to clear EFLAGS IF, DF, TF, AC on entry
     // still on the caller's stack though!
@@ -157,14 +157,15 @@ syscall_entry:
     cmpq $ SYSCALL_COUNT,%rax
     jae 0f
 
+    // Save flags
+    mov %r11,%gs:CPU_INFO_SYSCALL_FLAGS_OFS
+
     // Read function pointer from vector table
     lea syscall_handlers(%rip),%r11
     movq (%r11,%rax,8),%rax
 
-    xor %r11d,%r11d
-
     // Get pointer to current CPU's TSS from CPU-local data
-    movq %gs:CPU_INFO_TSS_PTR_OFS(%r11),%r11
+    movq %gs:CPU_INFO_TSS_PTR_OFS,%r11
 
     // Get privilege change stack from TSS data (just like an interrupt would)
     movq TSS_RSP0_OFS(%r11),%r11
@@ -175,21 +176,25 @@ syscall_entry:
     .cfi_def_cfa r11,0
     .cfi_register rsp,r11
 
-    // IRQs are okay at this point
-    sti
-
     // Push user stack pointer to syscall stack
     pushq %r11
     .cfi_def_cfa rsp,8
     .cfi_offset rsp,-1*8
 
+    // Push flags to syscall stack
+    push_cfi %gs:CPU_INFO_SYSCALL_FLAGS_OFS
+    .cfi_offset eflags,-2*8
+
     // Push return address to syscall stack
     push_cfi %rcx
-    .cfi_offset rip,-2*8
+    .cfi_offset rip,-3*8
 
     // call IBPB or patched with nop if not available
     insn_fixup
     call protection_barrier
+
+    // IRQs are okay at this point
+    sti
 
     // Move 4th parameter to proper place
     movq %r10,%rcx
@@ -213,8 +218,8 @@ syscall_entry:
     pop_cfi %rcx
     .cfi_register rip,rcx
 
-    // Set return rflags
-    movl $ SYSCALL_RFLAGS,%r11d
+    // Restore return flags
+    pop_cfi %r11
 
     insn_fixup
     call protection_barrier

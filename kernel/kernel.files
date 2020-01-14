@@ -23,6 +23,9 @@
 ../emu/bochs/bochs-debugger-iso-efi-boot-commands
 ../emu/bochs/bochs-debugger-iso-efi-kernel-commands
 ../emu/bochs/bochs-iso-efi-config.bxrc
+../emu/qemu/qemu_monitor_cmd
+../emu/qemu/qemu_profiling_syms
+../emu/qemu/qemu_profile
 ../genfont.py
 ../kernel_exports.sh
 ../toolchain/build-crossgcc-binutils.patch
@@ -37,6 +40,9 @@ arch/x86_64/cpu/mptables.h
 arch/x86_64/cpu/nofault.cc
 arch/x86_64/cpu/nofault.h
 arch/x86_64/cpu/nofault.cc
+arch/x86_64/cpu/perf.cc
+arch/x86_64/cpu/perf.h
+arch/x86_64/cpu/perf_reg.bits
 arch/x86_64/cpu/pic.bits
 arch/x86_64/cpu/picbits.h
 arch/x86_64/cpu/spinlock_arch.h
@@ -64,6 +70,8 @@ device/module_tag.h
 device/nvme.bits.h
 device/pci.bits.h
 device/rtl8139.bits
+device/symbol_server.cc
+device/symbol_server.h
 device/usb.cc
 device/usb_hid.bits
 device/usb_hid.cc
@@ -124,6 +132,8 @@ lib/dev_char.h
 lib/dev_graphics.cc
 lib/dev_graphics.h
 lib/dev_usb_ctl.h
+lib/engunit.cc
+lib/engunit.h
 lib/kmodule.h
 lib/radix_tree.cc
 lib/radix_tree.h
@@ -134,6 +144,8 @@ lib/thread_irq.cc
 lib/thread_irq.h
 lib/ubsan.cc
 lib/ubsan.h
+lib/uleb.cc
+lib/uleb.h
 lib/user_mem.h
 syscall/sys_exit.cc
 syscall/sys_exit.h
@@ -433,6 +445,7 @@ arch/x86_64/cpu/segrw.cc
 ../toolchain/build-crossgcc-versions
 unittest/test_allocator.cc
 unittest/test_bit.cc
+unittest/test_block.cc
 unittest/test_chrono.cc
 unittest/test_filesystem.cc
 unittest/test_malloc.cc

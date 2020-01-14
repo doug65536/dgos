@@ -33,8 +33,35 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 {
     virtio_pci_cap_hdr_t cap_rec;
 
-    // Make sure bus master and memory space is enabled, disable I/O space
-    pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_MSE, PCI_CMD_IOSE);
+    // 4.1.2.3 " Transitional devices MUST have the
+    // Transitional PCI Device ID in the range 0x1000 to 0x103f."
+    is_transitional = pci_iter.config.device >= 0x1000 &&
+            pci_iter.config.device < 0x1040;
+
+
+    if (is_transitional) {
+        printdbg("virtio: found transitional device\n");
+        // "Transitional devices MUST have a PCI Revision ID of 0."
+        if (pci_iter.config.revision != 0) {
+            printdbg("virtio: unexpected transitional pci revision"
+                     ", expected 0, got %x\n",
+                     pci_iter.config.revision);
+        }
+
+        // "Transitional devices MUST have the PCI Subsystem
+        // Device ID matching the Virtio Device ID"
+        if (pci_iter.config.subsystem_id != pci_iter.config.device) {
+            printdbg("virtio: unexpected transitional pci subsystem id"
+                     ", expected %x, got %x\n",
+                     pci_iter.config.device,
+                     pci_iter.config.subsystem_id);
+        }
+    } else {
+        printdbg("virtio: found modern device\n");
+    }
+
+    // Make sure bus master, memory space, and I/O space are enabled
+    pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_MSE | PCI_CMD_IOSE, 0);
 
     VIRTIO_TRACE("Initializing vendor=%#x, device=%#x\n",
                  pci_iter.config.vendor, pci_iter.config.device);
@@ -270,12 +297,12 @@ isr_context_t *virtio_base_t::irq_handler(int irq, isr_context_t *ctx)
 //            if (irq_islevel(irq))
 //                irq_setmask(irq, false);
 
-            workq::enqueue([=] {
+//            workq::enqueue([=] {
                 dev->irq_handler(irq - dev->irq_range.base);
 
 //                if (irq_islevel(irq))
 //                    irq_setmask(irq, true);
-            });
+//            });
         }
     }
     return ctx;
@@ -471,6 +498,7 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
 
     bool skip = false;
     size_t avail_head = atomic_ld_acq(&avail_hdr->idx);
+    size_t chain_start = ~size_t(0);
     for (size_t i = 0; i < count; ++i) {
         if (!skip) {
             size_t id = index_of(desc[i]);
@@ -478,10 +506,13 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
             iocp->set_expect(1);
             completions[id] = iocp;
 
-            avail_ring[avail_head++ & mask] = id;
+            chain_start = id;
         }
 
         skip = desc[i]->flags.bits.next;
+
+        if (!skip && chain_start != ~size_t(0))
+            avail_ring[avail_head++ & mask] = chain_start;
     }
 
     // Update used idx
@@ -607,11 +638,13 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 
     VIRTIO_TRACE("Probing for %s device\n", name);
 
+    // Spec 4.1.2 PCI Device Discovery
     if (unlikely(!pci_enumerate_begin(&pci_iter, dev_class,
                                       -1, VIRTIO_VENDOR, device)))
         return 0;
 
     do {
+        // Include the entire range, including transitional
         if (unlikely(pci_iter.config.device < VIRTIO_DEV_MIN ||
                      pci_iter.config.device > VIRTIO_DEV_MAX))
             continue;

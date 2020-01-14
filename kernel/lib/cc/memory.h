@@ -20,6 +20,8 @@
 
 #include "printk.h"
 
+#include "heap.h"
+
 __BEGIN_NAMESPACE_STD
 
 template<typename _T>
@@ -132,7 +134,7 @@ struct page_allocator<void>
 };
 
 template<typename T, typename Alloc = std::allocator<char>,
-         size_t chunk_size = PAGESIZE << 4>
+         size_t chunk_size = PAGESIZE << 6>
 class bump_allocator_impl
     : public refcounted<bump_allocator_impl<T>>
 {
@@ -175,7 +177,7 @@ public:
     void destroy() override final
     {
         reinterpret_cast<T*>(this)->~T();
-        Allocator().deallocate((char*)this, sizeof(bump_allocator_impl));
+        alloc.deallocate((char*)this, sizeof(bump_allocator_impl));
     }
 
     T *allocate(size_t __n)
@@ -189,8 +191,8 @@ public:
         if (likely(first_free))
         {
             T *result = reinterpret_cast<T*>(first_free->storage.data);
-            printdbg("bump allocator reusing freed block at %#zx\n",
-                     uintptr_t(result));
+//            printdbg("bump allocator reusing freed block at %#zx\n",
+//                     uintptr_t(result));
 
             // Advance first_free to next item
             first_free = first_free->next_free;
@@ -242,8 +244,8 @@ public:
     void deallocate(T *__p, size_t __n)
     {
         assert(__n == 1);
-        printdbg("bump allocator item freed at %#zx\n",
-                 uintptr_t(__p));
+//        printdbg("bump allocator item freed at %#zx\n",
+//                 uintptr_t(__p));
 
         // Either write next pointer into last block, or,
         // write that into first_free instead
@@ -310,11 +312,21 @@ public:
             impl = new (mem) bump_allocator_impl<_T, _Alloc>();
         }
 
-        return impl->allocate(__n);
+        value_type *mem = impl->allocate(__n);
+
+#if HEAP_DEBUG
+        if (mem)
+            memset((void*)mem, 0xf0, sizeof(value_type) * __n);
+#endif
+
+        return mem;
     }
 
     void deallocate(value_type * __p, size_t __n)
     {
+#if HEAP_DEBUG
+        memset((void*)__p, 0xfe, sizeof(value_type) * __n);
+#endif
         return impl->deallocate(__p, __n);
     }
 

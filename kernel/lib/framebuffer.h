@@ -3,6 +3,7 @@
 #include "vesainfo.h"
 
 #include "vector.h"
+#include "cxxstring.h"
 
 void fb_init(void);
 
@@ -18,6 +19,8 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color);
 void fb_clip_aa_line(int x0, int y0, int x1, int y1);
 
 void fb_update(void);
+
+void fb_draw_char(int x, int y, char32_t codepoint, uint32_t fg, uint32_t bg);
 
 struct vec2_t {
     int32_t x;
@@ -44,6 +47,12 @@ struct rect_t {
 
     rect_t() : st{}, en{} {}
     rect_t(vec2_t const& st, vec2_t const& en) : st(st), en(en) {}
+
+    inline bool is_inside(vec2_t const& p) const
+    {
+        return p.x >= st.x && p.y >= st.y &&
+                p.x < en.x && p.y < en.y;
+    }
 };
 
 // Backing that represents a raw byte array
@@ -62,20 +71,6 @@ struct rect_backing_t : public backing_t {
                 vec2_t const& src_pos);
 
     void fill(vec2_t const& pos, vec2_t const& area, uint32_t color);
-};
-
-// Buffer hyper-specialized to represent a scrolling history which only
-// advances in the direction where it is as though all the content moved
-// up and the newly exposed area is cleared. None of the content is
-// actually moved, only a marker representing the top of the history changes.
-// All drawing operations need to be offset and possibly split into two
-// portions, one doing the end of the backing at the top of the destination
-// area, and when doing the wrapped around beginning of the backing in
-// the second portion of the destination area. Most draws won't span this
-// way so most of the time the cost is very low, and scrolls cost only
-// the time to clear the new area.
-struct text_backing_t : public rect_backing_t {
-    int top_line;
 };
 
 enum struct window_style_t {

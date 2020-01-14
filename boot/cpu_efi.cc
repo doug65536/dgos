@@ -4,13 +4,25 @@
 #include "malloc.h"
 #include "assert.h"
 #include "halt.h"
+#include "elf64decl.h"
+#include "string.h"
 
 extern "C" _noreturn void code64_run_kernel(
         uint64_t entry, void *params, uint64_t cr3, bool nx_available);
+
 extern char code64_run_kernel_end[];
 
-void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt)
+void reloc_kernel(uint64_t distance, Elf64_Rela const *elf_rela, size_t relcnt)
 {
+    while (relcnt--) {
+        uint64_t offset = elf_rela->r_offset;
+        uint64_t addend = elf_rela->r_addend;
+        ++elf_rela;
+        uint64_t value = distance + addend;
+        void *spot = (void*)(offset + distance);
+        addend += distance;
+        memcpy(spot, &value, sizeof(value));
+    }
 }
 
 // This only runs on the BSP

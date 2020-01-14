@@ -405,6 +405,8 @@ protected:
 
     bool use_msi = false;
 
+    bool is_transitional = false;
+
     pci_irq_range_t irq_range;
 
     std::unique_ptr<virtio_virtqueue_t[]> queues;

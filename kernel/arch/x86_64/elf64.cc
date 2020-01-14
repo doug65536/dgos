@@ -1,3 +1,4 @@
+#include "kmodule.h"
 #include "elf64.h"
 #include "elf64_decl.h"
 #include "debug.h"
@@ -20,8 +21,10 @@
 #include "kmodule.h"
 #include "mutex.h"
 #include "basic_set.h"
+#include "uleb.h"
+#include "vector.h"
 
-#define ELF64_DEBUG     1
+#define ELF64_DEBUG     0
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) printdbg(__VA_ARGS__)
 #else
@@ -66,11 +69,11 @@ struct kernel_ht_t {
     Elf64_Word hash_nchain = 0;
     Elf64_Word const * hash_buckets = nullptr;
     Elf64_Word const * hash_chains = nullptr;
-    Elf64_Sym const * symtab;
-    char const *strtab;
+    Elf64_Sym const * symtab = nullptr;
+    char const *strtab = nullptr;
 
     // Assigned zero after relocations applied
-    uintptr_t base_adj;
+    uintptr_t base_adj = 0;
 };
 
 static kernel_ht_t export_ht;
@@ -215,7 +218,6 @@ private:
     void apply_ph_perm();
     void install_plt_handler();
     errno_t apply_relocs();
-    kernel_ht_t mount_hashtab(uintptr_t addr);
 };
 
 // Shared module loader
@@ -234,7 +236,7 @@ module_t *modload_load_image(void const *image, size_t image_sz,
                              char *ret_needed,
                              errno_t *ret_errno)
 {
-    std::unique_ptr<module_t> module(new (std::nothrow) module_t{});
+    std::unique_ptr<module_t> module(new (std::nothrow) module_t());
 
     if (unlikely(!module)) {
         if (ret_errno)
@@ -313,10 +315,11 @@ static constexpr char const *get_relocation_type(size_t type) {
 // This function's purpose is to act as a place to put a breakpoint
 // with commands that magically load the symbols for a module when loaded
 
+_noinline
 void modload_load_symbols(char const *path,
                           uintptr_t text_addr, uintptr_t base_addr)
 {
-    printdbg("gdb: add-symbol-file %s %#zx\n", path, text_addr);
+    size_t cpu_nr = thread_cpu_number();
 
     // Automated breakpoint is placed here to load symbols
     // The debugger is actually going to dereference path and get addr
@@ -324,11 +327,17 @@ void modload_load_symbols(char const *path,
     // the actual path string into memory there (flow analysis could discard
     // it without the memory clobber)
     //__asm__ __volatile__ ("" : : : "memory");
-    __asm__ __volatile__ ("outl %%eax,%%dx"
+
+    // bochs hack, autoload symbols using rdi and rsi as string ptr and adj
+    __asm__ __volatile__ ("outl %%eax,%%dx\n"
+                          ".global modload_symbols_autoloaded\n"
+                          "modload_symbols_autoloaded:\n"
                           :
-                          : "d" (0x8A02), "D" (path)
+                          : "a" (cpu_nr), "d" (0x8A02), "D" (path)
                           , "S" (text_addr), "c" (base_addr)
                           : "memory");
+
+    printdbg("gdb: add-symbol-file %s %#zx\n", path, text_addr);
 }
 
 static errno_t load_failed(errno_t err)
@@ -636,7 +645,6 @@ void module_t::install_plt_handler()
     plt_slots[2] = Elf64_Addr((void*)__module_dynlink_plt_thunk);
 }
 
-
 static Elf64_Addr modload_lookup_name(
         kernel_ht_t *ht, char const *name, Elf64_Word hash,
         bool expect_missing, bool recurse)
@@ -646,10 +654,17 @@ static Elf64_Addr modload_lookup_name(
     for (Elf64_Word i = ht->hash_buckets[bucket]; i != 0;
          i = ht->hash_chains[i]) {
         Elf64_Sym const *chk_sym = ht->symtab + i;
+        // Ignore SHN_UNDEF
+        if (chk_sym->st_shndx == SHN_UNDEF)
+            continue;
         Elf64_Word name_index = chk_sym->st_name;
         char const *chk_name = ht->strtab + name_index;
-        if (likely(!strcmp(chk_name, name)))
+        if (likely(!strcmp(chk_name, name))) {
+//            int sym_bind = ELF64_ST_BIND(chk_sym->st_info);
+//            int sym_type = ELF64_ST_TYPE(chk_sym->st_info);
+
             return chk_sym->st_value + ht->base_adj;
+        }
     }
 
     // Look in each module
@@ -704,6 +719,7 @@ errno_t module_t::apply_relocs()
             void const *operand = (void*)(rela_ptr[i].r_offset + base_adj);
             Elf64_Word sym_idx = ELF64_R_SYM(rela_ptr[i].r_info);
             Elf64_Word sym_type = ELF64_R_TYPE(rela_ptr[i].r_info);
+            char const * const type_txt = get_relocation_type(sym_type);
 
             auto const& sym = syms[sym_idx];
 
@@ -751,13 +767,11 @@ errno_t module_t::apply_relocs()
 
             uint64_t value;
 
-            char const * const type_txt = get_relocation_type(sym_type);
-
             switch (sym_type) {
             case R_AMD64_JUMP_SLOT://7
                 // word64 S
 
-                if (dt_bind_now || true) {
+                if (dt_bind_now) {// || true) {
                     // Link it all right now
                     value = S;
                     *(int64_t*)operand = S;
@@ -1168,10 +1182,53 @@ void __module_dynamic_linker(plt_stub_data_t *data)
     data->result = sym;
 }
 
-EXPORT void __module_register_frame(void const * const *__module_dso_handle,
-                                    void *__frame)
-{
+class eh_frame_hdr_hdr_t {
+public:
+    uint8_t ver;
+    uint8_t eh_frame_ptr_enc;
+    uint8_t fde_count_enc;
+    uint8_t table_enc;
+    // followed by encoded eh_frame_ptr
+    // followed by encoded fde_count
+    // followed by binary search table
 
+    struct ent_t {
+        uint64_t initial_loc;
+        uint64_t address;
+    };
+    std::vector<ent_t> search_table;
+
+    eh_frame_hdr_hdr_t(uint8_t const *&input)
+    {
+        ver = *input++;
+        eh_frame_ptr_enc = *input++;
+        fde_count_enc = *input++;
+        table_enc = *input++;
+
+        uint64_t eh_frame_ptr = read_enc_val(input, eh_frame_ptr_enc);
+        uint64_t eh_frame_cnt = read_enc_val(input, fde_count_enc);
+
+        search_table.reserve(eh_frame_cnt);
+
+        for (size_t i = 0; i < eh_frame_cnt; ++i) {
+            ent_t ent;
+            ent.initial_loc = read_enc_val(input, table_enc);
+            ent.address = read_enc_val(input, table_enc);
+            search_table.push_back(ent);
+        }
+    }
+};
+
+EXPORT void __module_register_frame(void const * const *__module_dso_handle,
+                                    void *__frame, size_t __size)
+{
+    __register_frame(__frame, __size);
+}
+
+EXPORT void __module_unregister_frame(void const * const *__module_dso_handle,
+                                      void *__frame)
+{
+    __deregister_frame(__frame);
 }
 
 struct early_atexit_t {
@@ -1220,7 +1277,7 @@ EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
     return 0;
 }
 
-module_t *modload_closest(ptrdiff_t address)
+EXPORT module_t *modload_closest(ptrdiff_t address)
 {
     ptrdiff_t closest = PTRDIFF_MAX;
     module_t *closest_module = nullptr;
@@ -1240,12 +1297,29 @@ module_t *modload_closest(ptrdiff_t address)
     return closest_module;
 }
 
-std::string const& modload_get_name(module_t *module)
+EXPORT std::string const& modload_get_name(module_t *module)
 {
     return module->module_name;
 }
 
-ptrdiff_t modload_get_base(module_t *module)
+EXPORT uintptr_t modload_get_base(module_t *module)
 {
     return module->base_adj;
+}
+
+EXPORT module_t *modload_get_index(size_t i)
+{
+    return i < loaded_modules.size()
+            ? loaded_modules[i].get()
+            : nullptr;
+}
+
+EXPORT size_t modload_get_count()
+{
+    return loaded_modules.size();
+}
+
+EXPORT size_t modload_get_size(module_t *module)
+{
+    return module->max_vaddr - module->min_vaddr;
 }

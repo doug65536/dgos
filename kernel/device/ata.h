@@ -4,6 +4,7 @@
 #include "bswap.h"
 #include "printk.h"
 #include "export.h"
+#include "string.h"
 
 enum struct ata_cmd_t : uint8_t {
     NOP                 = 0x00,
@@ -472,7 +473,7 @@ struct ata_identify_t {
     uint16_t :1;
     uint16_t word_160_supported:1;
 
-    // Word 161-167
+    //  Word 161-167
     uint16_t cf_reserved[168-161];
 
     // Word 168
@@ -745,3 +746,99 @@ EXPORT format_flag_info_t extern const ide_flags_error[];
 
 #define ATA_FEATURE_XFER_MODE_UDMA_n(n) (0x40 | (n))
 #define ATA_FEATURE_XFER_MODE_MWDMA_n(n) (0x20 | (n))
+
+// ACS-2 4.18.3.2
+// A 48-bit, 16-bit pair of bit endian lba and count, respectively
+// Used by trim to specify LBA:COUNT ranges
+struct acs_lba_range_t {
+    static constexpr const uint64_t max_lba = (UINT64_C(1) << 48) - 1;
+    static constexpr const size_t max_cnt = (size_t(1) << 16) - 1;
+
+    uint16_t parts[4];
+
+    _always_inline
+    acs_lba_range_t()
+        : parts{}
+    {
+    }
+
+    _always_inline
+    explicit acs_lba_range_t(uint64_t raw)
+    {
+        C_ASSERT(sizeof(raw) == sizeof(parts));
+        memcpy(parts, &raw, sizeof(parts));
+    }
+
+    // Get 64-bit native-endian value of big-endian data
+    // The memory representation will binary-match the object
+    _always_inline
+    uint64_t get_raw() const
+    {
+        uint64_t result = 0;
+        C_ASSERT(sizeof(result) == sizeof(parts));
+        memcpy(&result, parts, sizeof(result));
+        return result;
+    }
+
+    _always_inline
+    void const *data() const
+    {
+        return parts;
+    }
+
+    // True if count is nonzero
+    operator bool() const
+    {
+        return parts[3] != 0;
+    }
+
+    _always_inline
+    acs_lba_range_t(uint64_t lba, uint_least16_t count)
+    {
+        set(lba, count);
+    }
+
+    // Swap the data into big-endian format and store as
+    _always_inline
+    acs_lba_range_t& set(uint64_t lba, uint_least16_t count)
+    {
+        assert(lba < UINT64_C(1) << 48);
+        assert(count < UINT16_C(1) << 16);
+        parts[0] = htons(uint16_t(lba >> 32));
+        parts[1] = htons(uint16_t(lba >> 16));
+        parts[2] = htons(uint16_t(lba));
+        parts[3] = htons(count);
+        return *this;
+    }
+
+    _always_inline
+    acs_lba_range_t& set_lba(uint64_t lba)
+    {
+        assert(lba < UINT64_C(1) << 48);
+        parts[0] = htons(uint16_t(lba >> 32));
+        parts[1] = htons(uint16_t(lba >> 16));
+        parts[2] = htons(uint16_t(lba));
+        return *this;
+    }
+
+    _always_inline
+    uint64_t get_lba() const
+    {
+        return (uint64_t(ntohs(parts[0])) << 32) |
+                (uint64_t(ntohs(parts[1])) << 16) |
+                (uint64_t(ntohs(parts[2])));
+    }
+
+    _always_inline
+    uint16_t get_count() const
+    {
+        return ntohs(parts[3]);
+    }
+
+    _always_inline
+    acs_lba_range_t& set_count(uint_least16_t count) {
+        assert(count < UINT16_C(1) << 16);
+        parts[3] = htons(count);
+        return *this;
+    }
+};

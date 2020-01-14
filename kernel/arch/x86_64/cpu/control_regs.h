@@ -3,7 +3,7 @@
 #include "types.h"
 #include "cpuid.h"
 #include "atomic.h"
-
+#include "thread.h"
 #include "control_regs_constants.h"
 
 struct table_register_t {
@@ -588,7 +588,7 @@ static _always_inline void cpu_fninit()
     );
 }
 
-static _always_inline void cpu_fxsave(void *fpuctx)
+static _always_inline void cpu_fxsave64(void *fpuctx)
 {
     __asm__ __volatile__ (
         "fxsave64 (%0)\n\t"
@@ -598,7 +598,7 @@ static _always_inline void cpu_fxsave(void *fpuctx)
     );
 }
 
-static _always_inline void cpu_fxrstor(void const *fpuctx)
+static _always_inline void cpu_fxrstor64(void const *fpuctx)
 {
     __asm__ __volatile__ (
         "fxrstor64 (%0)\n\t"
@@ -608,10 +608,40 @@ static _always_inline void cpu_fxrstor(void const *fpuctx)
     );
 }
 
-static _always_inline void cpu_xsave(void *fpuctx)
+static _always_inline void cpu_fxsave32(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        "fxsave (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+static _always_inline void cpu_fxrstor32(void const *fpuctx)
+{
+    __asm__ __volatile__ (
+        "fxrstor (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+static _always_inline void cpu_xsave64(void *fpuctx)
 {
     __asm__ __volatile__ (
         "xsave64 (%[fpuctx])\n\t"
+        :
+        : "a" (-1), "d" (-1), [fpuctx] "D" (fpuctx)
+        : "memory"
+    );
+}
+
+static _always_inline void cpu_xsave32(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        "xsave (%[fpuctx])\n\t"
         :
         : "a" (-1), "d" (-1), [fpuctx] "D" (fpuctx)
         : "memory"
@@ -930,7 +960,7 @@ template<typename T>
 static _always_inline void cpu_wait_masked(
         bool is_equal, T const volatile *value, T wait_value, T mask)
 {
-    if (cpuid_has_mwait()) {
+    if (spincount_mask && cpuid_has_mwait()) {
         while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value)) {
             pause();
 
@@ -942,8 +972,12 @@ static _always_inline void cpu_wait_masked(
                 return;
         }
     } else {
-        while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value))
-            pause();
+        while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value)) {
+            if (spincount_mask == 0)
+                thread_yield();
+            else
+                pause();
+        }
     }
 }
 

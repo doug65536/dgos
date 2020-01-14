@@ -1,6 +1,10 @@
 #pragma once
 #include "types.h"
 
+// Enable wiping freed memory with 0xfe
+// and filling allocated memory with 0xf0
+#define HEAP_DEBUG  1
+
 struct heap_t;
 
 // Fast heap

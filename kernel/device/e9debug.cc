@@ -27,7 +27,7 @@ static void e9debug_serial_ready(void*)
         uart_ready = true;
 
         // Send some VT102 initialization sequences
-        uart->write(vt102_reset, sizeof(vt102_reset)-1, sizeof(vt102_reset)-1);
+        uart->write(vt102_reset, sizeof(vt102_reset)-1);
     } else {
         uart_ready = false;
     }
@@ -54,7 +54,7 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
     }
 
     if (uart_ready)
-        uart->write(str, len, len);
+        uart->write(str, len);
 
     return n;
 }

@@ -32,9 +32,16 @@ struct fat32_fs_t final : public fs_base_t {
 
     friend class fat32_factory_t;
 
+    // Allowed 8.3 characters, not including letters and digits
+    static constexpr char const allowed_dos_chars[] =
+            "_^$~!#%&-{}@`'()";
+
     struct full_lfn_t {
-        fat32_dir_union_t fragments[(256 + 12) / 13 + 1];
-        uint8_t lfn_entry_count;
+        fat32_dir_union_t fragments[(256 + 12) / 13 + 1] = {};
+        uint8_t lfn_entry_count = 0;
+
+        // Debugging magic, reconstructs the filename
+        std::string str() const;
     };
 
     struct file_handle_t : public fs_file_info_t {
@@ -94,6 +101,13 @@ struct fat32_fs_t final : public fs_base_t {
     static size_t name_from_dirents(char *pathname,
                                     full_lfn_t const *full);
 
+    // Returns the uppercased character if it is a legal DOS filename
+    // character, otherwise returns zero
+    static char32_t conv_dos_char(char32_t codepoint,
+                                bool *flag_lower = nullptr,
+                                bool *flag_upper = nullptr,
+                                bool *flag_long = nullptr);
+
     _const
     static bool is_eof(cluster_t cluster);
 
@@ -152,6 +166,8 @@ struct fat32_fs_t final : public fs_base_t {
             void *buf, size_t size, off_t offset, bool read);
 
     void generate_unique_shortname(full_lfn_t& lfn, uint64_t dir_index);
+
+    static char *name_from_lfns(char *pathname, full_lfn_t const *full);
 
     using lock_type = std::shared_mutex;
     using read_lock = std::shared_lock<lock_type>;
@@ -282,41 +298,30 @@ void fat32_fs_t::fcbname_from_lfn(
         full_lfn_t *full, char *fcbname,
         char16_t const *lfn, size_t lfn_len)
 {
-    memset(fcbname, ' ', 11);
+    memset(fcbname, ' ', 8 + 3);
 
     bool any_upper = false;
     bool any_lower = false;
     bool any_long = false;
 
-    size_t last_dot = 0;
-    for (size_t i = lfn_len; !last_dot && i > 0; --i)
-        if (lfn[i-1] == '.')
+    size_t last_dot = lfn_len;
+    for (size_t i = lfn_len; i > 0; --i) {
+        if (lfn[i-1] == '.') {
             last_dot = i - 1;
-    if (!last_dot)
-        last_dot = lfn_len;
+            break;
+        }
+    }
+
+    if (last_dot > 8)
+        any_long = true;
 
     size_t i;
     size_t out = 0;
     for (i = 0; i < last_dot && out < 8; ++i) {
-        if ((lfn[i] >= 'A' && lfn[i] <= 'Z') ||
-                (lfn[i] >= '0' && lfn[i] <= '9')) {
-            // Accept uppercase alphanumeric as is
-            any_upper = true;
-            fcbname[out++] = lfn[i];
-        } else if (lfn[i] >= 'a' && lfn[i] <= 'z') {
-            // Convert lowercase alphabetic to uppercase
-            any_lower = true;
-            fcbname[out++] = lfn[i] + ('A' - 'a');
-        } else if (lfn[i] <= ' ' || lfn[i] >= 0x7F ||
-                   strchr("\"'*+,/:;<=>?[\\]|", lfn[i])) {
-            // Convert disallowed to underscore
-            any_long = true;
-            fcbname[out++] = '_';
-        } else {
-            // Accept everything else as is
-            any_long = true;
-            fcbname[out++] = lfn[i];
-        }
+        char32_t out_char = conv_dos_char(
+                    lfn[i], &any_lower, &any_upper, &any_long);
+        out_char = out_char ? out_char : '_';
+        fcbname[out++] = out_char;
     }
 
     fat32_dir_entry_t &fcbfrag = full->fragments[
@@ -325,10 +330,10 @@ void fat32_fs_t::fcbname_from_lfn(
     if (!any_long && any_lower && !any_upper)
         fcbfrag.lowercase_flags |= FAT_LOWERCASE_NAME;
 
-    if (i < last_dot) {
-        fcbname[6] = '~';
-        fcbname[7] = '1';
-    }
+//    if (i < last_dot) { fixme
+//        fcbname[6] = '~';
+//        fcbname[7] = '1';
+//    }
 
     any_upper = false;
     any_lower = false;
@@ -336,16 +341,10 @@ void fat32_fs_t::fcbname_from_lfn(
 
     out = 8;
     for (i = last_dot + 1; i < lfn_len && out < 11; ++i) {
-        if ((lfn[i] >= 'A' && lfn[i] <= 'Z') ||
-                (lfn[i] >= '0' && lfn[i] <= '9')) {
-            any_upper = true;
-            fcbname[out++] = lfn[i];
-        } else if (lfn[i] >= 'a' && lfn[i] <= 'z') {
-            any_lower = true;
-            fcbname[out++] = lfn[i] + ('A' - 'a');
-        } else {
-            any_long = true;
-        }
+        char32_t out_char = conv_dos_char(
+                    lfn[i], &any_lower, &any_upper, &any_long);
+        out_char = out_char ? out_char : '_';
+        fcbname[out++] = out_char;
     }
 
     if (i < lfn_len)
@@ -354,7 +353,7 @@ void fat32_fs_t::fcbname_from_lfn(
     if (!any_long && any_lower && !any_upper)
         fcbfrag.lowercase_flags |= FAT_LOWERCASE_EXT;
 
-    if (fcbfrag.lowercase_flags) {
+    if (!any_long && fcbfrag.lowercase_flags) {
         full->fragments[0].short_entry = fcbfrag;
         full->lfn_entry_count = 0;
     }
@@ -363,14 +362,14 @@ void fat32_fs_t::fcbname_from_lfn(
 void fat32_fs_t::dirents_from_name(
         full_lfn_t *full, char const *pathname, size_t name_len)
 {
-    memset(full, 0, sizeof(*full));
+    *full = {};
 
     char16_t lfn[256];
 
     char const *utf8_in = pathname;
     char const *utf8_end = pathname + name_len;
     char16_t *utf16_out = lfn;
-    int codepoint;
+    char32_t codepoint;
 
     do {
         codepoint = utf8_to_ucs4_upd(utf8_in);
@@ -380,12 +379,10 @@ void fat32_fs_t::dirents_from_name(
 
     size_t len = utf16_out - lfn;
 
-    uint8_t &lfn_entries = full->lfn_entry_count;
-
-    lfn_entries = (len + 12) / 13;
+    full->lfn_entry_count = (len + 12) / 13;
 
     int fragment_ofs = 0;
-    fat32_dir_union_t *frag = full->fragments + lfn_entries - 1;
+    fat32_dir_union_t *frag = full->fragments + full->lfn_entry_count - 1;
     for (size_t ofs = 0; ofs < len || fragment_ofs != 0; ++ofs) {
         uint8_t *dest;
 
@@ -393,12 +390,15 @@ void fat32_fs_t::dirents_from_name(
             frag->long_entry.attr = FAT_LONGNAME;
 
         if (fragment_ofs < 5) {
+            // Goes in the 1st region, 5 misaligned characters
             dest = frag->long_entry.name +
                     (fragment_ofs << 1);
         } else if (fragment_ofs < 11) {
+            // Goes in the 2nd region, 6 characters
             dest = frag->long_entry.name2 +
                     ((fragment_ofs - 5) << 1);
         } else {
+            // Goes in the 3rd region, 2 characters
             dest = frag->long_entry.name3 +
                     ((fragment_ofs - 11) << 1);
         }
@@ -417,14 +417,12 @@ void fat32_fs_t::dirents_from_name(
         }
     }
 
-    full->lfn_entry_count = lfn_entries;
-
-    char *fcbname = full->fragments[lfn_entries].short_entry.name;
+    char *fcbname = full->fragments[full->lfn_entry_count].short_entry.name;
     fcbname_from_lfn(full, fcbname, lfn, len);
 
     uint8_t checksum = lfn_checksum(fcbname);
 
-    for (size_t i = 0; i < lfn_entries; ++i) {
+    for (size_t i = 0; i < full->lfn_entry_count; ++i) {
         full->fragments[i].long_entry.checksum = checksum;
         full->fragments[i].long_entry.ordinal =
                 i == 0
@@ -433,8 +431,44 @@ void fat32_fs_t::dirents_from_name(
     }
 }
 
-size_t fat32_fs_t::name_from_dirents(char *pathname,
-                                      full_lfn_t const *full)
+char *fat32_fs_t::name_from_lfns(char *pathname, full_lfn_t const *full)
+{
+    uint16_t chunk[(sizeof(full->fragments[0].long_entry.name) +
+            sizeof(full->fragments[0].long_entry.name2) +
+            sizeof(full->fragments[0].long_entry.name3)) /
+            sizeof(uint16_t)];
+
+    char *out = pathname;
+
+    fat32_dir_union_t const *frag = full->fragments +
+            full->lfn_entry_count - 1;
+
+    for (size_t i = 0; i < full->lfn_entry_count; ++i, --frag) {
+        memcpy(chunk,
+               frag->long_entry.name,
+               sizeof(frag->long_entry.name));
+
+        memcpy(chunk + 5,
+               frag->long_entry.name2,
+               sizeof(frag->long_entry.name2));
+
+        memcpy(chunk + 5 + 6,
+               frag->long_entry.name3,
+               sizeof(frag->long_entry.name3));
+
+        uint16_t const *in = chunk;
+        while ((in < (chunk + countof(chunk))) &&
+               *in && (*in != 0xFFFFU)) {
+            int codepoint = utf16_to_ucs4(in, &in);
+            out += ucs4_to_utf8(out, codepoint);
+        }
+    }
+
+    return out;
+}
+
+size_t fat32_fs_t::name_from_dirents(
+        char *pathname, full_lfn_t const *full)
 {
     if (unlikely(full->lfn_entry_count == 0)) {
         // Copy short name
@@ -479,38 +513,40 @@ size_t fat32_fs_t::name_from_dirents(char *pathname,
         return name_len;
     }
 
-    uint16_t chunk[(sizeof(full->fragments[0].long_entry.name) +
-            sizeof(full->fragments[0].long_entry.name2) +
-            sizeof(full->fragments[0].long_entry.name3)) /
-            sizeof(uint16_t)];
-
-    char *out = pathname;
-
-    fat32_dir_union_t const *frag = full->fragments +
-            full->lfn_entry_count - 1;
-
-    for (size_t i = 0; i < full->lfn_entry_count; ++i, --frag) {
-        memcpy(chunk,
-               frag->long_entry.name,
-               sizeof(frag->long_entry.name));
-
-        memcpy(chunk + 5,
-               frag->long_entry.name2,
-               sizeof(frag->long_entry.name2));
-
-        memcpy(chunk + 5 + 6,
-               frag->long_entry.name3,
-               sizeof(frag->long_entry.name3));
-
-        uint16_t const *in = chunk;
-        while ((in < (chunk + countof(chunk))) &&
-               *in && (*in != 0xFFFFU)) {
-            int codepoint = utf16_to_ucs4(in, &in);
-            out += ucs4_to_utf8(out, codepoint);
-        }
-    }
+    char *out = name_from_lfns(pathname, full);
 
     return out - pathname;
+}
+
+char32_t fat32_fs_t::conv_dos_char(
+        char32_t codepoint,
+        bool *flag_lower,
+        bool *flag_upper, bool *flag_long)
+{
+    if (codepoint >= 'A' && codepoint <= 'Z') {
+        if (flag_upper)
+            *flag_upper = true;
+
+        return codepoint;
+    }
+
+    if (codepoint >= 'a' && codepoint <= 'z') {
+        if (flag_lower)
+            *flag_lower = true;
+
+        return codepoint + 'A' - 'a';
+    }
+
+    if ((codepoint >= '0' && codepoint <= '9') ||
+               (codepoint > 32 && codepoint < 127 &&
+                strchr(allowed_dos_chars, codepoint))) {
+        return codepoint;
+    }
+
+    if (flag_long)
+        *flag_long = true;
+
+    return 0;
 }
 
 bool fat32_fs_t::is_eof(cluster_t cluster)
@@ -531,7 +567,7 @@ bool fat32_fs_t::is_dirent_free(fat32_dir_union_t const *de)
 }
 
 int32_t fat32_fs_t::extend_fat_chain(cluster_t *clusters,
-                                    int32_t count, cluster_t cluster)
+                                     int32_t count, cluster_t cluster)
 {
     int32_t allocated;
 
@@ -655,13 +691,11 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
                 // Found short-name-only directory entry
                 result = de;
                 return false;
-            } else if (lfn.lfn_entry_count &&
+            }
+
+            if (lfn.lfn_entry_count &&
                        match_index == lfn.lfn_entry_count &&
-                       last_checksum == checksum &&
-                       !memcmp(de->short_entry.name,
-                               lfn.fragments[lfn.lfn_entry_count]
-                               .short_entry.name,
-                               sizeof(de->short_entry.name)))
+                       last_checksum == checksum)
             {
                 // Found long filename
                 result = de;
@@ -1453,7 +1487,7 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
     size_t index;
     size_t distance;
 
-    memset(&lfn, 0, sizeof(lfn));
+    lfn = {};
 
     char expected_fragments = 0;
 
@@ -1932,3 +1966,10 @@ int fat32_fs_t::poll(fs_file_info_t *fi,
 }
 
 static fat32_factory_t fat32_factory;
+
+std::string fat32_fs_t::full_lfn_t::str() const
+{
+    char name[NAME_MAX+1];
+    size_t len = name_from_dirents(name, this);
+    return std::string(name, name + len);
+}

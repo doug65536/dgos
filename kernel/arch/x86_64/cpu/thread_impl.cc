@@ -53,7 +53,7 @@ enum thread_state_t : uint32_t {
 
     // Flag keeps other cpus from taking thread
     // until after stack switch
-    THREAD_BUSY = 0x80000000U,
+    THREAD_BUSY = 0x00000010U,
     THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
     THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY,
     THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
@@ -253,7 +253,9 @@ struct alignas(128) cpu_info_t {
 
     thread_info_t * volatile cur_thread = nullptr;
 
+    // Accessed every syscall
     tss_t *tss_ptr = nullptr;
+    uintptr_t syscall_flags;
 
     bool online = false;
     fpu_state_t fpu_state = discarded;
@@ -281,7 +283,7 @@ struct alignas(128) cpu_info_t {
     uint32_t time_ratio = 0;
 
     uint32_t busy_ratio = 0;
-    uint32_t busy_percent = 0;
+    uint32_t busy_percent_x1k = 0;
 
     uint32_t cr0_shadow = 0;
     unsigned cpu_nr = 0;
@@ -305,17 +307,21 @@ struct alignas(128) cpu_info_t {
 
     // Tree sorted in order of when timestamp was issued.
     // Only threads that are ready to run appear in this tree.
-    // Threads that block on I/O and keep a timeslice issued further in
-    // the past get drastically more priority than threads that used up
+    // Threads that block on I/O and keep an old timeslice issued further
+    // in the past get drastically more priority than threads that used up
     // their timeslice, and recently got a newer timeslice.
     ready_map_t ready_list;
+
+    thread_t slih_return;
 };
+// Make sure pointer arithmetic would never do a divide
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
 // Verify asm_constants.h values
 C_ASSERT(offsetof(cpu_info_t, self) == CPU_INFO_SELF_OFS);
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
+C_ASSERT(offsetof(cpu_info_t, syscall_flags) == CPU_INFO_SYSCALL_FLAGS_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
 C_ASSERT(offsetof(cpu_info_t, tlb_shootdown_count) ==
          CPU_INFO_TLB_SHOOTDOWN_COUNT_OFS);
@@ -323,7 +329,8 @@ C_ASSERT(offsetof(cpu_info_t, locks_held) == CPU_INFO_LOCKS_HELD_OFS);
 C_ASSERT(offsetof(cpu_info_t, csw_deferred) == CPU_INFO_CSW_DEFERRED_OFS);
 C_ASSERT(offsetof(cpu_info_t, after_csw_fn) == CPU_INFO_AFTER_CSW_FN_OFS);
 C_ASSERT(offsetof(cpu_info_t, after_csw_vp) == CPU_INFO_AFTER_CSW_VP_OFS);
-static cpu_info_t cpus[MAX_CPUS];
+cpu_info_t cpus[MAX_CPUS];
+cpu_info_t *cpus_end = cpus + MAX_CPUS;
 
 _constructor(ctor_cpu_init_cpus)
 static void cpus_init_t()
@@ -540,7 +547,7 @@ static thread_t thread_create_with_state(
         xsave_stack = thread_allocate_stack(
                     i, xsave_stack_size, "xsave", 0);
 
-        assert(sse_context_size > 512);
+        assert(sse_context_size >= 512);
         thread->xsave_ptr = xsave_stack - sse_context_size;
     } else {
         thread->xsave_ptr = nullptr;
@@ -584,6 +591,8 @@ static thread_t thread_create_with_state(
     ISR_CTX_REG_ES(ctx) = GDT_SEL_USER_DATA | 3;
     ISR_CTX_REG_FS(ctx) = GDT_SEL_USER_DATA | 3;
     ISR_CTX_REG_GS(ctx) = GDT_SEL_USER_DATA | 3;
+
+    ISR_CTX_REG_RBP(ctx) = uintptr_t(&ISR_CTX_REG_RBP(ctx));
 
     ISR_CTX_REG_RDI(ctx) = uintptr_t(fn);
     ISR_CTX_REG_RSI(ctx) = uintptr_t(userdata);
@@ -819,9 +828,22 @@ static thread_info_t *thread_choose_next(
     if (unlikely(thread_count < cpu_count))
         return outgoing;
 
+    thread_info_t &slih_thread = threads[cpu_count + cpu_nr];
+
     // If the SLIH thread is ready, instantly choose that thread
-    if (unlikely(threads[cpu_count + cpu_nr].state == THREAD_IS_READY))
+    if (unlikely(slih_thread.state == THREAD_IS_READY)) {
         return threads + (cpu_count + cpu_nr);
+    }
+
+    // If the current thread is SLIH, and it is not ready, return to the
+    // interrupted thread
+    if (outgoing->thread_id >= thread_t(cpu_count) &&
+            outgoing->thread_id < thread_t(cpu_count * 2) &&
+            slih_thread.state != THREAD_IS_RUNNING) {
+        thread_info_t &return_thread = threads[cpu->slih_return];
+        if (return_thread.state == THREAD_IS_READY)
+            return &return_thread;
+    }
 
     // Consider each thread, excluding idle threads
     size_t count = thread_count - cpu_count;
@@ -1058,10 +1080,9 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     //
     // Accumulate used and busy time on this CPU
 
+    if (uint32_t(thread->thread_id) > cpu_count)
+        cpu->busy_ratio += elapsed;
     cpu->time_ratio += elapsed;
-    // Time spent in idle thread is not considered busy even though technically it
-    // was probably very busy executing a halt continuously
-    cpu->busy_ratio += elapsed & -(thread->thread_id >= int(cpu_count));
 
     // Normalize ratio to < 32768
     uint8_t time_scale = bit_msb_set(cpu->time_ratio);
@@ -1072,10 +1093,11 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     }
 
     if (likely(cpu->time_ratio)) {
-        int busy_percent = 100 * cpu->busy_ratio / cpu->time_ratio;
-        atomic_st_rel(&cpu->busy_percent, busy_percent);
+        // 1032 == 1.032%
+        int busy_percent = 100000 * cpu->busy_ratio / cpu->time_ratio;
+        atomic_st_rel(&cpu->busy_percent_x1k, busy_percent);
     } else {
-        atomic_st_rel(&cpu->busy_percent, 0);
+        atomic_st_rel(&cpu->busy_percent_x1k, 0);
     }
 
     thread_state_t state = atomic_ld_acq(&thread->state);
@@ -1107,6 +1129,13 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
                 atomic_cmpxchg(&thread->state,
                                THREAD_IS_READY, THREAD_IS_RUNNING) ==
                    THREAD_IS_READY) {
+
+            bool to_slih = thread->thread_id >= thread_t(cpu_count) &&
+                    thread->thread_id < thread_t(cpu_count * 2);
+
+            if (to_slih)
+                cpu->slih_return = outgoing->thread_id;
+
             break;
         }
 
@@ -1746,9 +1775,9 @@ void thread_pcid_free(int pcid)
     pcid_alloc_map[0] &= ~(UINT64_C(1) << word);
 }
 
-int thread_cpu_usage(int cpu)
+EXPORT unsigned thread_cpu_usage_x1k(size_t cpu)
 {
-    return atomic_ld_acq(&cpus[cpu].busy_percent);
+    return 100000 - atomic_ld_acq(&cpus[cpu].busy_percent_x1k);
 }
 
 void thread_add_cpu_irq_time(uint64_t tsc_ticks)

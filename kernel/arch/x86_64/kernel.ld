@@ -30,7 +30,7 @@ SECTIONS {
 	/* r-- begins */
 	. = ALIGN(4K);
 
-	PROVIDE_HIDDEN(__image_start = .);
+	PROVIDE(__image_start = .);
 
 	. += SIZEOF_HEADERS;
 

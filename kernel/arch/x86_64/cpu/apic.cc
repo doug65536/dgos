@@ -321,6 +321,9 @@ static std::vector<uint8_t> acpi_slit_table;
 
 class lapic_t {
 public:
+    virtual void set_cpu_count(size_t cpu_count) {}
+    virtual void per_cpu_init(size_t cpu_nr) {}
+
     virtual void command(uint32_t dest, uint32_t cmd) = 0;
 
     virtual uint32_t read32(uint32_t offset) = 0;
@@ -339,6 +342,9 @@ public:
 
     virtual bool reg_readable(uint32_t reg) = 0;
     virtual bool reg_exists(uint32_t reg) = 0;
+
+    // Unavoidable
+    virtual bool is_x2() const { return true; }
 
 protected:
     static bool reg_maybe_exists(uint32_t reg)
@@ -362,6 +368,8 @@ protected:
 };
 
 class lapic_x_t : public lapic_t {
+    bool is_x2() const override final { return false; }
+
     void command(uint32_t dest, uint32_t cmd) override final
     {
         cpu_scoped_irq_disable intr_enabled;
@@ -535,11 +543,14 @@ private:
     static constexpr uint32_t const msr_kvm_eoi = 0x4b564d04;
     void paravirt_eoi();
 
+    void set_cpu_count(size_t cpu_count) override final;
+    void per_cpu_init(size_t cpu_nr) override final;
+
     std::unique_ptr<cacheline_t[]> cpus;
     size_t cpu_count;
 };
 
-union lapic_both_t {
+union lapic_any_t {
     lapic_x_t apic_x;
     lapic_x2_t apic_x2;
     lapic_kvm_t apic_kvm;
@@ -548,28 +559,50 @@ union lapic_both_t {
     struct x2apic_tag_t {};
     struct kvmpvapic_tag_t {};
 
-    lapic_both_t()
+    lapic_any_t()
     {
     }
 
-    lapic_both_t(xapic_tag_t)
+    lapic_any_t(xapic_tag_t)
         : apic_x{}
     {
     }
 
-    lapic_both_t(x2apic_tag_t)
+    lapic_any_t(x2apic_tag_t)
         : apic_x2{}
     {
     }
 
-    lapic_both_t(kvmpvapic_tag_t)
+    lapic_any_t(kvmpvapic_tag_t)
         : apic_kvm{}
     {
     }
+
+    ~lapic_any_t()
+    {
+
+    }
+
+    static lapic_t *create_x(lapic_any_t *storage)
+    {
+        lapic_any_t *any = new (storage) lapic_any_t(xapic_tag_t());
+        return &any->apic_x;
+    }
+
+    static lapic_t *create_x2(lapic_any_t *storage)
+    {
+        lapic_any_t *any = new (storage) lapic_any_t(x2apic_tag_t());
+        return &any->apic_x2;
+    }
+
+    static lapic_t *create_kvm(lapic_any_t *storage)
+    {
+        lapic_any_t *any = new (storage) lapic_any_t(kvmpvapic_tag_t());
+        return &any->apic_kvm;
+    }
 };
 
-static lapic_x_t apic_x;
-static lapic_x2_t apic_x2;
+static lapic_any_t apic_instance;
 static lapic_t *apic;
 
 //.....
@@ -1496,7 +1529,7 @@ static void apic_online(int enabled, int spurious_intr, int err_intr)
     }
 
     // LDR is read only in x2APIC mode
-    if (apic != &apic_x2)
+    if (!apic->is_x2())
         apic->write32(APIC_REG_LDR, 0xFFFFFFFF);
 
     apic->write32(APIC_REG_SIR, sir);
@@ -1641,9 +1674,15 @@ int apic_init(int ap)
     }
 
     if (cpuid_has_x2apic()) {
-        APIC_TRACE("Using x2APIC\n");
-        if (!ap)
-            apic = &apic_x2;
+        if (!ap) {
+//            if (cpuid_is_kvm()) {
+//                APIC_TRACE("Using KVM paravirtualized x2APIC\n");
+//                apic = lapic_any_t::create_kvm(&apic_instance);
+//            } else {
+                APIC_TRACE("Using x2APIC\n");
+                apic = lapic_any_t::create_x2(&apic_instance);
+//            }
+        }
 
         cpu_msr_set(CPU_APIC_BASE_MSR, apic_base_msr |
                 CPU_APIC_BASE_GENABLE| CPU_APIC_BASE_X2ENABLE);
@@ -1660,7 +1699,7 @@ int apic_init(int ap)
             if (unlikely(apic_ptr == MAP_FAILED))
                 panic_oom();
 
-            apic = &apic_x;
+            apic = lapic_any_t::create_x(&apic_instance);
         }
 
         cpu_msr_set(CPU_APIC_BASE_MSR,
@@ -1861,6 +1900,8 @@ void apic_start_smp(void)
 
     thread_init_cpu_count(apic_id_count);
 
+    apic->set_cpu_count(apic_id_count);
+
     // Populate critical cpu local info on every cpu that is needed very early
     for (size_t i = 0; i < apic_id_count; ++i)
         thread_init_cpu(i, apic_id_list[i]);
@@ -1935,7 +1976,7 @@ void apic_start_smp(void)
     // Do per-cpu ACPI configuration
     apic_config_cpu();
 
-    ioapic_irq_setcpu(0, 1);
+    //ioapic_irq_setcpu(0, 1);
 }
 
 uint32_t apic_timer_count(void)
@@ -2061,6 +2102,19 @@ static uint64_t apic_rdtsc_nsleep_handler(uint64_t nanosec)
     return (now - begin) * clk_to_ns_numer / clk_to_ns_denom;
 }
 
+static void clk_to_ns_reduce()
+{
+    uint8_t numer_ceil_log2 = bit_log2(clk_to_ns_numer);
+    uint8_t denom_ceil_log2 = bit_log2(clk_to_ns_denom);
+    uint8_t max_ceil_log2 = std::max(numer_ceil_log2, denom_ceil_log2);
+
+    if (max_ceil_log2 > 16) {
+        uint8_t shr = max_ceil_log2 - 16;
+        clk_to_ns_numer >>= shr;
+        clk_to_ns_denom >>= shr;
+    }
+}
+
 static void apic_calibrate()
 {
     cpuid_t info{};
@@ -2164,6 +2218,9 @@ static void apic_calibrate()
 
     clk_to_ns_numer = 1000000000 / clk_to_ns_gcd;
     clk_to_ns_denom = rdtsc_freq / clk_to_ns_gcd;
+
+    // Cap to avoid overflow
+    clk_to_ns_reduce();
 
     //APIC_TRACE("clk_to_ns_numer: %" PRId64 "\n", clk_to_ns_numer);
     //APIC_TRACE("clk_to_ns_denom: %" PRId64 "\n", clk_to_ns_denom);
@@ -2347,6 +2404,7 @@ void apic_config_cpu()
 {
     int cpu_number = thread_cpu_number();
     uint32_t apic_id = thread_get_cpu_apic_id(cpu_number);
+    apic->per_cpu_init(cpu_number);
 
     // Apply NMI input delivery types
     for (acpi_madt_lnmi_t const& mapping : lapic_lint_nmi) {
@@ -2648,18 +2706,23 @@ uint32_t acpi_cpu_count()
 
 lapic_kvm_t::lapic_kvm_t()
 {
-    cpu_count = thread_cpu_count();
-    cpus.reset(new (std::nothrow) cacheline_t[cpu_count]);
+}
 
-    // Initialize the MSR on every CPU
-    workq::enqueue_on_all_barrier([&] (size_t i) {
-        // [63:2] = physical address of 32 bit paravirt dword
-        // [1] = reserved, MBZ
-        // [0] = enable paravirtualized EOI
-        uint64_t kvm_eoi = mphysaddr(&cpus[i].values[0]);
-        kvm_eoi |= 1;
-        cpu_msr_set(msr_kvm_eoi, kvm_eoi);
-    });
+void lapic_kvm_t::set_cpu_count(size_t cpu_count)
+{
+    cpus.reset(new (std::nothrow) cacheline_t[cpu_count]);
+    if (unlikely(!cpus))
+        panic_oom();
+}
+
+void lapic_kvm_t::per_cpu_init(size_t cpu_nr)
+{
+    // [63:2] = physical address of 32 bit paravirt dword
+    // [1] = reserved, MBZ
+    // [0] = enable paravirtualized EOI
+    uint64_t kvm_eoi = mphysaddr(&cpus[cpu_nr].values[0]);
+    kvm_eoi |= 1;
+    cpu_msr_set(msr_kvm_eoi, kvm_eoi);
 }
 
 lapic_kvm_t::~lapic_kvm_t()
@@ -2670,8 +2733,8 @@ lapic_kvm_t::~lapic_kvm_t()
 void lapic_kvm_t::write32(uint32_t offset, uint32_t val)
 {
     // Redirect EOI write to paravirtualized EOI
-    if (offset == APIC_REG_EOI)
-        paravirt_eoi();
+    if (cpu_count && offset == APIC_REG_EOI)
+        return paravirt_eoi();
 
     return lapic_x2_t::write32(offset, val);
 }
@@ -2682,4 +2745,12 @@ void lapic_kvm_t::paravirt_eoi()
     // It was not set, cannot do paravirtualized EOI
     if (unlikely(!atomic_btr(&cpus[cpu].values[0], 0)))
         lapic_x2_t::write32(APIC_REG_EOI, 0);
+}
+
+void apic_hook_perf_local_irq(intr_handler_t handler, const char *name)
+{
+    intr_hook(INTR_EX_NMI, handler, name, eoi_none);
+    apic->write32(APIC_REG_LVT_PMCR,
+                  APIC_LVT_VECTOR_n(INTR_EX_NMI) |
+                  APIC_LVT_DELIVERY_n(APIC_LVT_DELIVERY_NMI));
 }

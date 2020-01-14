@@ -493,6 +493,17 @@ public:
         unsigned count;
     };
 
+    // Not locked but it is approximate because it is stale information anyway
+    _always_inline uint64_t get_free_page_count()
+    {
+        return free_page_count;
+    }
+
+    _always_inline uint64_t get_phys_mem_size()
+    {
+        return highest_usable;
+    }
+
 private:
     _always_inline size_t index_from_addr(physaddr_t addr) const
     {
@@ -588,7 +599,7 @@ static void mmu_free_phys(physaddr_t addr)
     phys_allocator.release_one(addr);
 }
 
-static physaddr_t mmu_alloc_phys(int low)
+static physaddr_t mmu_alloc_phys(int low = 0)
 {
     physaddr_t page;
 
@@ -1318,7 +1329,7 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
     if (likely(thread_cpu_count()))
         atomic_inc((cpu_gs_ptr<uint64_t, CPU_INFO_PF_COUNT_OFS>()));
 
-    printdbg("page fault\n");
+    //printdbg("page fault\n");
 
     uintptr_t fault_addr = cpu_fault_address_get();
 
@@ -1378,7 +1389,7 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
         // If it is lazy allocated
         if ((pte & (PTE_ADDR | PTE_EX_DEVICE)) == PTE_ADDR) {
             // Allocate a page
-            physaddr_t page = mmu_alloc_phys(0);
+            physaddr_t page = mmu_alloc_phys();
 
             assert(page != 0);
 
@@ -1640,7 +1651,9 @@ void mmu_init()
     physaddr_t root_phys_addr;
     pte_t *pt;
 
-    // Create the new root
+    TRACE_INIT("Configuring page attribute table MSR\n");
+    mmu_configure_pat();
+
     TRACE_INIT("Creating new PML4\n");
 
     // Get a page
@@ -1660,8 +1673,6 @@ void mmu_init()
     pt[PT_RECURSE] = root_phys_addr | ptflags;
 
     root_physaddr = root_phys_addr;
-
-    mmu_configure_pat();
 
     cpu_page_directory_set(root_phys_addr);
 
@@ -1697,9 +1708,6 @@ void mmu_init()
     }
 
     linear_allocator.set_early_base(&linear_base);
-    //near_allocator.set_early_base(&near_base);
-    //contig_phys_allocator.set_early_base(&contiguous_start);
-    //hole_allocator;
 
     contig_phys_allocator.init(contiguous_start, contig_pool_size,
                                "contiguous_physical");
@@ -1744,10 +1752,6 @@ void mmu_init()
 
     malloc_startup(nullptr);
 
-    // Prepare 4MB contiguous physical memory
-    // allocator with a capacity of 128
-    //contig_phys_allocator.early_init(4 << 20, "contig_phys_allocator");
-
     assert(malloc_validate(false));
 
     uintptr_t kmembase = linear_allocator.early_init(
@@ -1757,8 +1761,6 @@ void mmu_init()
 
     clear_phys_state.reserve_addr();
 
-    //near_allocator.early_init(-(4ULL << 20) - near_base, "near_allocator");
-
     // Allocate guard page
     linear_allocator.alloc_linear(PAGE_SIZE);
 
@@ -1766,7 +1768,7 @@ void mmu_init()
     // need to worry about process-specific page directory synchronization
     for (size_t i = 256; i < 512; ++i) {
         if (PT0_PTR[i] == 0) {
-            physaddr_t page = mmu_alloc_phys(0);
+            physaddr_t page = mmu_alloc_phys();
             clear_phys(page);
             // Global bit MBZ in PML4e on AMD
             PT0_PTR[i] = page | PTE_WRITABLE | PTE_PRESENT;
@@ -2016,7 +2018,7 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
         for (size_t i = 0; i < range_count; ++i) {
             pte_t old = base[i];
             if (!(old & PTE_PRESENT)) {
-                physaddr_t const page = mmu_alloc_phys(0);
+                physaddr_t const page = mmu_alloc_phys();
 
                 assert(page);
                 if (unlikely(!page))
@@ -2066,6 +2068,7 @@ static _always_inline T select_mask(bool cond, T true_val, T false_val)
 
 EXPORT void *mm_alloc_space(size_t size)
 {
+    linear_allocator.dump("mm_alloc_space\n");
     return (void*)linear_allocator.alloc_linear(round_up(size));
 }
 
@@ -2225,7 +2228,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
             if ((prot & (PROT_READ | PROT_WRITE)) &&
                     !(flags & (MAP_NOCOMMIT | MAP_DEVICE))) {
-                paddr = mmu_alloc_phys(0);
+                paddr = mmu_alloc_phys();
 
                 if (paddr && !(flags & MAP_UNINITIALIZED))
                     clear_phys(paddr);
@@ -2515,6 +2518,8 @@ EXPORT int munmap(void *addr, size_t size)
             present_mask = ptes_present(ptes);
     }
 
+    free_batch.flush();
+
     if (freed)
         mmu_send_tlb_shootdown();
 
@@ -2525,7 +2530,13 @@ EXPORT int munmap(void *addr, size_t size)
             //: (a >= uintptr_t(___text_st)) ? &near_allocator
             : &linear_allocator;
 
+    if (addr == (void*)0xfffffd0052257000 && size==0x40000)
+        allocator->dump("late bug 2");
+
     allocator->release_linear((linaddr_t)addr - misalignment, size);
+
+    if (addr == (void*)0xfffffd0052257000 && size==0x40000)
+        allocator->dump("after late bug 2");
 
     return 0;
 }
@@ -2903,7 +2914,7 @@ EXPORT uintptr_t mphysaddr(void volatile *addr)
     // If page is being demand paged
     if (pte_is_demand(pte)) {
         // Commit a page
-        page = mmu_alloc_phys(0);
+        page = mmu_alloc_phys();
 
         clear_phys(page);
 
@@ -3591,7 +3602,7 @@ uintptr_t mm_fork_kernel_text()
     pte_t constexpr flags = PTE_PRESENT | PTE_WRITABLE;
 
     // Clone root page directory
-    physaddr_t page = mmu_alloc_phys(0);
+    physaddr_t page = mmu_alloc_phys();
     mmu_map_page(uintptr_t(window), page, flags);
     cpu_page_invalidate(uintptr_t(window));
     memcpy(window, master_pagedir, PAGE_SIZE);
@@ -3609,7 +3620,7 @@ uintptr_t mm_fork_kernel_text()
     for (size_t level = 0; level < 4; ++level) {
         for (pte_t *pte = st_ptes[level]; pte <= en_ptes[level]; ++pte) {
             // Allocate clone
-            page = mmu_alloc_phys(0);
+            page = mmu_alloc_phys();
 
             // Map original
             mmu_map_page(src_linaddr, (*pte & PTE_ADDR), flags);
@@ -3664,3 +3675,18 @@ void mm_set_master_pagedir()
 // |   4   |   64G |      (21) |   ~2MB |
 // |   5   |    4T |      (27) | ~128MB |
 // +-------+-------+-----------+--------+
+
+uint_least64_t mm_memory_remaining()
+{
+    return phys_allocator.get_free_page_count();
+}
+
+uint_least64_t mm_get_free_page_count()
+{
+    return phys_allocator.get_free_page_count();
+}
+
+uint_least64_t mm_get_phys_mem_size()
+{
+    return phys_allocator.get_phys_mem_size();
+}

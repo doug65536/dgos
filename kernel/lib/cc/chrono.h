@@ -324,6 +324,36 @@ public:
         return __point + rhs;
     }
 
+    bool operator<(time_point const& rhs) const
+    {
+        return __point.count() < rhs.__point.count();
+    }
+
+    bool operator<=(time_point const& rhs) const
+    {
+        return __point.count() <= rhs.__point.count();
+    }
+
+    bool operator==(time_point const& rhs) const
+    {
+        return __point.count() == rhs.__point.count();
+    }
+
+    bool operator!=(time_point const& rhs) const
+    {
+        return __point.count() != rhs.__point.count();
+    }
+
+    bool operator>=(time_point const& rhs) const
+    {
+        return __point.count() >= rhs.__point.count();
+    }
+
+    bool operator>(time_point const& rhs) const
+    {
+        return __point.count() > rhs.__point.count();
+    }
+
     static constexpr time_point<_Clock, _Duration> max();
     static constexpr time_point min();
 

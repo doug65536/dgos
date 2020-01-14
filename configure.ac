@@ -27,6 +27,11 @@ AS_IF([test x"$AR" == x"NOT_FOUND"],
     [AC_MSG_FAILURE([Cannot find ar])])
 AC_SUBST([AR])
 
+AC_CHECK_TOOL([NM], [nm], [NOT_FOUND])
+AS_IF([test x"$NM" == x"NOT_FOUND"],
+    [AC_MSG_FAILURE([Cannot find nm])])
+AC_SUBST([NM])
+
 AC_CHECK_TOOL([RANLIB], [ranlib], [NOT_FOUND])
 AS_IF([test x"$RANLIB" == x"NOT_FOUND"],
     [AC_MSG_FAILURE([Cannot find ranlib])])
@@ -147,7 +152,7 @@ AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
 AS_VAR_SET([COMPILER_WERROR],[])
-for flag in Wall Wextra Wpedantic Werror; do
+for flag in W Wall Wextra Wpedantic Werror; do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_WERROR], [" -$flag"])])
 done
@@ -175,7 +180,7 @@ AC_SUBST([ASAN_FLAGS])
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
 		std=c++17 fno-fat-lto-objects ggdb3 \
-		fno-integrated-as Wall Wextra Wpedantic Wdouble-promotion Wformat \
+		fno-integrated-as W Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
 		Wstrict-overflow \
 		Wtautological-compare \
@@ -274,6 +279,15 @@ do
 done
 AC_SUBST([ASM_DEBUG_INFO_FLAGS])
 
+AS_VAR_SET([UBSAN_FLAGS], [])
+for flag in fsanitize=undefined
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([UBSAN_FLAGS], [" -$flag"])],
+		[], [])
+done
+AC_SUBST([UBSAN_FLAGS])
+
 AS_VAR_SET([SMALLEST_CODE_FLAGS],[])
 AX_CHECK_COMPILE_FLAG([-Oz],
 	[AS_VAR_SET([SMALLEST_CODE_FLAGS], [-Oz])],
@@ -319,6 +333,16 @@ do
 done
 AC_SUBST([NO_FLOAT_FLAGS])
 
+# This should be big enough to fit one max path as local variables
+AS_VAR_SET([WARN_STACK_USAGE_FLAGS], [])
+for flag in Wstack-usage=4176
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([WARN_STACK_USAGE_FLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([WARN_STACK_USAGE_FLAGS])
+
 #Wl,--eh-frame-hdr
 
 USER64_FLAGS=
@@ -330,20 +354,20 @@ for flag in \
 	mpreferred-stack-boundary=4 \
 	fPIE \
 	Wl,--no-eh-frame-hdr \
-	Wl,-T$srcdir/user/user64_phdrs.ld \
 	fno-exceptions fno-rtti \
 	Wl,-z,max-page-size=4096 \
-	Wl,-z,separate-code \
 	Wl,-z,relro \
 	Wl,-z,now \
 	Wl,--relax \
-	Wl,-g
+	Wl,-g \
+	Wl,-T$srcdir/user/user64_phdrs.ld
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([USER64_FLAGS], [" -$flag"])]
 		[], [])
 done
 AC_SUBST([USER64_FLAGS])
+#Wl,-z,separate-code
 
 USERLIB64_FLAGS=
 for flag in \
@@ -602,6 +626,18 @@ AS_VAR_SET([TUNE_FLAGS], [])
 
 AS_VAR_SET([DEBUGGING_CODE_FLAGS], [" -Og $NO_SIBLING_CALLS_FLAGS"])
 
+AC_ARG_ENABLE(ubsan,
+	AS_HELP_STRING([--enable-ubsan],
+		[Enable undefined behaviour sanitizer]), [
+		AC_MSG_NOTICE([Enabling UBSAN])
+
+		AS_VAR_SET([SANITIZE_UNDEFINED_FLAGS], ["$UBSAN_FLAGS"])
+	], [
+		AC_MSG_NOTICE([Disabling UBSAN])
+		AS_VAR_SET([SANITIZE_UNDEFINED_FLAGS], [""])
+	]
+)
+AC_SUBST([SANITIZE_UNDEFINED_FLAGS])
 AS_VAR_SET([OPTIMIZE_SPEED_FLAGS], [])
 AS_VAR_SET([OPTIMIZE_SIZE_FLAGS], [])
 AC_ARG_ENABLE(lto,

@@ -570,6 +570,8 @@ private:
 
     static errno_t status_to_errno(int status_type, int status);
 
+    static bool error_occurred();
+
     nvme_mmio_t volatile *mmio_base;
     pci_config_hdr_t config;
     pci_irq_range_t irq_range;
@@ -822,7 +824,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     errno_t status = blocking_setfeatures.wait().first;
 
     if (status != errno_t::OK)
-        return false;
+        return error_occurred();
 
     queue_count = std::min(requested_queue_count, max_queues);
 
@@ -1119,15 +1121,29 @@ void nvme_if_t::io_handler(void *data, nvme_cmp_t& cmp,
 
     errno_t err = status_to_errno(status_type, status);
 
+    if (unlikely(err != errno_t::OK))
+        error_occurred();
+
     iocp->set_result({err, 0});
     iocp->invoke();
 }
 
 errno_t nvme_if_t::status_to_errno(int status_type, int status)
 {
-    return status_type == 0 && status == 0
+    errno_t result = status_type == 0 && status == 0
             ? errno_t::OK
             : errno_t::EIO;
+
+    if (unlikely(result != errno_t::OK))
+        error_occurred();
+
+    return result;
+}
+
+bool nvme_if_t::error_occurred()
+{
+    NVME_TRACE("error");
+    return false;
 }
 
 void nvme_if_t::setfeat_queues_handler(

@@ -136,6 +136,13 @@ public:
         return *this << '{' << __rhs.first << ',' << __rhs.second << '}';
     }
 
+    template<typename _F, typename _R,
+             typename... _A>
+    debug_out_t& operator<<(_R (*__f)(_A...))
+    {
+        return *this << '<' << uintptr_t(__f) << '>';
+    }
+
     // nullptr
     _always_inline debug_out_t& operator<<(nullptr_t n)
     {

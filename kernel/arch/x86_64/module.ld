@@ -18,12 +18,21 @@ SECTIONS {
 	. = 0;
 	. += SIZEOF_HEADERS;
 
-	.rodata : {
+	.rodata ALIGN(8) : {
 		PROVIDE_HIDDEN(___rodata_st = .);
 
 		PROVIDE_HIDDEN(___callout_array_st = .);
 		*(SORT(.callout_array.*))
 		PROVIDE_HIDDEN(___callout_array_en = .);
+
+		. = ALIGN(8);
+		PROVIDE_HIDDEN(___rodata_fixup_insn_st = .);
+		*(.rodata.fixup.insn)
+		PROVIDE_HIDDEN(___rodata_fixup_insn_en = .);
+
+		PROVIDE_HIDDEN(___rodata_fixup_swapgs_st = .);
+		*(.rodata.fixup.swapgs)
+		PROVIDE_HIDDEN(___rodata_fixup_swapgs_en = .);
 
 		. = ALIGN(64);
 		PROVIDE_HIDDEN(___rodata = .);
@@ -37,48 +46,52 @@ SECTIONS {
 		PROVIDE_HIDDEN(___rodata_en = .);
 	} :read
 
-	.driver : {
+	.driver ALIGN(8) : {
 		*(.driver)
 	} :read :driv
 
-	.gnu.version : {
+	.gnu.version ALIGN(8) : {
 		*(.gnu.version)
 	} :read
 
-	.gnu.version_r : {
+	.gnu.version_r ALIGN(8) : {
 		*(.gnu.version_r)
 	} :read
 
-	.gnu.version_d : {
+	.gnu.version_d ALIGN(8) : {
 		*(.gnu.version_d)
 	} :read
 
-	.eh_frame : {
+	.eh_frame ALIGN(8) : {
 		PROVIDE_HIDDEN(___eh_frame_st = .);
 		KEEP(*(.eh_frame))
 		*(.eh_frame.*)
 		PROVIDE_HIDDEN(___eh_frame_en = .);
 	} :read :ehfr
 
-	.hash : {
+	.gcc_except_table ALIGN(8) : {
+		*(.gcc_except_table .gcc_except_table.*)
+	} :read
+
+	.hash ALIGN(8) : {
 		PROVIDE_HIDDEN(___hash_st = .);
 		*(.hash);
 		PROVIDE_HIDDEN(___hash_en = .);
 	} :read
 
-	.dynsym : {
+	.dynsym ALIGN(8) : {
 		PROVIDE_HIDDEN(___dynsym_st = .);
 		*(.dynsym);
 		PROVIDE_HIDDEN(___dynsym_en = .);
 	} :read
 
-	.dynstr : {
+	.dynstr ALIGN(8) : {
 		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	} :read
 
-	.rela.plt : {
+	.rela.plt ALIGN(8) : {
 		PROVIDE_HIDDEN(___rela_plt = .);
 		*(.rela.plt)
 		PROVIDE_HIDDEN (__rela_iplt_start = .);
@@ -86,7 +99,7 @@ SECTIONS {
 		PROVIDE_HIDDEN (__rela_iplt_end = .);
 	} :read
 
-	.rela.dyn : {
+	.rela.dyn ALIGN(8) : {
 		PROVIDE_HIDDEN(___rela_dyn_st = .);
 		*(.rela.init)
 		*(.rela.init_array)
@@ -109,16 +122,12 @@ SECTIONS {
 		PROVIDE_HIDDEN (__rela_dyn_en = .);
 	} :read
 
-	.gcc_except_table : {
-		*(.gcc_except_table .gcc_except_table.*)
-	} :read
-
-	.plt.got : {
+	.plt.got ALIGN(8) : {
 		PROVIDE_HIDDEN(___plt_got = .);
 		*(.plt.got)
 	} :read
 
-	.plt.bnd : {
+	.plt.bnd ALIGN(8) : {
 		PROVIDE_HIDDEN(___plt_bnd = .);
 		*(.plt.bnd)
 	} :read
@@ -130,7 +139,7 @@ SECTIONS {
 	 * the symbol address when auto-loading kernel symbols
 	 */
 
-	.text : {
+	.text ALIGN(4K) : {
 		PROVIDE_HIDDEN(___text_st = .);
 		*(.entry)
 		*(.text)
@@ -141,7 +150,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___text_en = .);
 	} :text
 
-	.plt : {
+	.plt ALIGN(8) : {
 		PROVIDE_HIDDEN(___plt_st = .);
 		*(.plt)
 		*(.iplt)
@@ -150,33 +159,33 @@ SECTIONS {
 
 	. = ALIGN(4K);
 
-	.got : {
+	.got ALIGN(8) : {
 		PROVIDE_HIDDEN(___got = .);
 		*(.got)
 	} :data
 
-	.got.plt : {
+	.got.plt ALIGN(8) : {
 		*(.got.plt)
 	} :data
 
-	.igot.plt : {
+	.igot.plt ALIGN(8) : {
 		*(.igot.plt)
 	} :data
 
-	.dynamic : {
+	.dynamic ALIGN(8) : {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);
 	} :dyna :data
 
-	.init_array : {
+	.init_array ALIGN(8) : {
 		PROVIDE_HIDDEN(___init_st = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		PROVIDE_HIDDEN(___init_en = .);
 	} :data
 
-	.fini_array : {
+	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(___fini_st = .);
 		*(.fini_array)
 		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
@@ -186,12 +195,12 @@ SECTIONS {
 	/* . = ALIGN(4K); */
 
 	/* Initialized data */
-	.data : {
+	.data ALIGN(8) : {
 		*(.data)
 		*(SORT(.data.*))
 	} :data
 
-	.bss : {
+	.bss ALIGN(8) : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(.dynbss)

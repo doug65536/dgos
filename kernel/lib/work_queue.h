@@ -160,15 +160,15 @@ void workq::enqueue_on_all_barrier(T &&functor)
     size_t done_count = 0;
 
     for (size_t i = 0; i != cpu_count; ++i) {
-        enqueue_on_cpu(i, [=] {
+        enqueue_on_cpu(i, [&, i] {
             functor(i);
-        });
 
-        workq_impl::scoped_lock lock(wait_lock);
-        if (++done_count == cpu_count) {
-            lock.unlock();
-            wait_done.notify_all();
-        }
+            workq_impl::scoped_lock lock(wait_lock);
+            if (++done_count == cpu_count) {
+                lock.unlock();
+                wait_done.notify_all();
+            }
+        });
     }
 
     std::unique_lock<ext::mcslock> lock(wait_lock);

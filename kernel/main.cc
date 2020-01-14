@@ -37,6 +37,7 @@
 #include "cpu/except_asm.h"
 #include "fs/tmpfs.h"
 #include "bootloader.h"
+#include "engunit.h"
 
 kernel_params_t *kernel_params;
 
@@ -47,12 +48,12 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   4
+#define ENABLE_SHELL_THREAD         0
+#define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_MMAP_STRESS_THREAD   0
+#define ENABLE_MMAP_STRESS_THREAD   1
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
@@ -388,30 +389,62 @@ static int stress_mmap_thread(void *p)
 {
     (void)p;
     void *block;
-    uint64_t seed = 42;
+    uint64_t last_free = mm_memory_remaining();
+
+    size_t block_count = 256;
+    std::unique_ptr<std::pair<uintptr_t, uintptr_t>[]> blocks(
+                new (std::nothrow)
+                std::pair<uintptr_t, uintptr_t>[block_count]);
+    size_t current = 0;
+
+    rand_lfs113_t rand;
+
+    size_t total_sz = 0;
+    size_t sz;
+    int divisor = 2000;
     for (;;) {
-        for (size_t sz = 4096; sz <= (4 << 20); sz <<= 1) {
-            uint64_t time_st = time_ns();
-            for (unsigned iter = 0; iter < 10000; ++iter) {
-                //int size = rand_r_range(&seed, 1, 4 << 20);
-                //assert(size >= 1);
-                //assert(size < 131072);
+        uint64_t time_st = time_ns();
+        for (unsigned iter = 0; iter < 1; ++iter) {
+            sz = 42 + (rand.lfsr113_rand() >> (32 - 17));
+            total_sz += sz;
 
-                block = mmap(nullptr, sz,
-                             PROT_READ | PROT_WRITE,
-                             0, -1, 0);
+            std::pair<uintptr_t, uintptr_t> &
+                    current_block = blocks[current];
+            if (blocks[current].second)
+                munmap((void*)current_block.first, current_block.second);
 
-                memset(block, 0xcc, sz);
+            block = mmap(nullptr, sz,
+                         PROT_READ | PROT_WRITE,
+                         0, -1, 0);
 
-                munmap(block, sz);
-            }
+            blocks[current] = {uintptr_t(block), sz};
 
-            uint64_t time_en = time_ns();
-            printk("Ran mmap test iteration, sz: %7zd"
-                   ", time: %6" PRIu64 " ns\n",
-                   sz, (time_en - time_st)/10000);
+            if (++current == block_count)
+                current = 0;
+
+            memset(block, 0xcc, sz);
+
+//            if (!--divisor) {
+//                divisor = 20;
+//                uint64_t free_pages = mm_memory_remaining();
+//                if (last_free != free_pages) {
+//                    last_free = free_pages;
+//                    printdbg("Free: %" PRIu64 " pages\n",
+//                             free_pages);
+//                }
+//            }
+        }
+
+        uint64_t time_en = time_ns();
+        if (--divisor == 0) {
+            divisor = 2000;
+            printk("Ran mmap test iteration, sz: %s"
+                   ", time: %6" PRIu64 " ns (%.3s)\n",
+                   engineering_t(total_sz).ptr(), (time_en - time_st)/1,
+                   engineering_t(sz).ptr());
         }
     }
+
     return 0;
 }
 #endif
@@ -743,10 +776,10 @@ static int init_thread(void *)
     keybd_init();
 
     tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
-    modload_init();
 
-    //printk("Running set<int> self test\n");
-    //std::set<int>::test();
+    callout_call(callout_type_t::tmpfs_up);
+
+    modload_init();
 
     pid_t init_pid = -1;
     if (unlikely(process_t::spawn(&init_pid, "init", {}, {}) != 0))
@@ -914,7 +947,7 @@ static int init_thread(void *)
     printk("Running mmap stress with %d threads\n",
              ENABLE_MMAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
-        thread_create(stress_mmap_thread, nullptr, 0, false);
+        thread_create(stress_mmap_thread, nullptr, 0, false, false);
     }
 #endif
 
@@ -925,6 +958,8 @@ static int init_thread(void *)
         thread_create(stress_heap_thread, nullptr, 0, false);
     }
 #endif
+
+    callout_call(callout_type_t::init_thread_done, false);
 
     printk("init_thread completed\n");
 
@@ -1080,4 +1115,11 @@ extern "C" _noreturn int main(void)
 extern "C" _noreturn void mp_main()
 {
     cpu_init_ap();
+}
+
+extern char ___init_brk[];
+
+EXPORT size_t kernel_get_size()
+{
+    return ___init_brk - __image_start;
 }

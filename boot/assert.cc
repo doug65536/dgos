@@ -5,7 +5,7 @@ _noinline void cpu_debug_break()
 {
 }
 
-int assert_failed(tchar const *expr,
+int __assert_failed(tchar const *expr,
                    tchar const *msg,
                    tchar const *file,
                    int line)

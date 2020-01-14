@@ -1,12 +1,13 @@
 #include <stdlib.h>
 //#include "../../kernel/lib/cc/algorithm.h"
 #include <sys/mman.h>
+#include <sys/likely.h>
 
 void *malloc(size_t sz)
 {
     void *mem = mmap(nullptr, sz + 64, PROT_READ | PROT_WRITE,
                 MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-    if (mem == MAP_FAILED)
+    if (unlikely(mem == MAP_FAILED))
         return nullptr;
 
     *(size_t*)mem = sz;

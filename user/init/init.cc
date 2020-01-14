@@ -82,6 +82,8 @@ int main(int argc, char **argv, char **envp)
 
 //    dir = opendir("/dev/something");
 
+    load_module("symsrv.km");
+
     load_module("unittest.km");
 
     // fixme: check ACPI

@@ -802,7 +802,7 @@ gdbstub_t::rx_state_t gdbstub_t::reply(char const *data, size_t size)
         assert(ack == 0 || ack == '-');
 
         GDBSTUB_TRACE("Sending reply\n");
-        port->write(reply_buf, reply_index, reply_index);
+        port->write(reply_buf, reply_index);
 
         GDBSTUB_TRACE("Waiting for ACK\n");
         port->read(&ack, 1, 1);
@@ -876,13 +876,13 @@ void gdbstub_t::data_received(char const *data, size_t size)
             if (cmd_sum == cmd_checksum) {
                 // Send ACK
                 printk("gdbstub command: %s\n", cmd_buf);
-                port->write("+", 1, 1);
+                port->write("+", 1);
                 cmd_state = handle_packet();
                 nonsense = false;
             } else {
                 // Send NACK
                 GDBSTUB_TRACE("Sending NAK, wrong checksum!\n");
-                port->write("-", 1, 1);
+                port->write("-", 1);
                 cmd_state = rx_state_t::IDLE;
             }
 
@@ -892,7 +892,7 @@ void gdbstub_t::data_received(char const *data, size_t size)
     }
 
     if (nonsense) {
-        port->write("-", 1, 1);
+        port->write("-", 1);
         cmd_state = rx_state_t::IDLE;
     }
 }

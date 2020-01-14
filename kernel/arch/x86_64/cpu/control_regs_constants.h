@@ -136,6 +136,9 @@
 
 #define CPU_MSR_IA32_PAT_n(n,v) ((uint64_t)(v) << ((n) << 3))
 
+#define CPU_MSR_MPERF   0xE7
+#define CPU_MSR_APERF   0xE8
+
 //
 // CR0
 
@@ -539,7 +542,7 @@
 #define CPUID_EXTL2CACHE        0x80000006
 #define CPUID_APM               0x80000007
 #define CPUID_ADDRSIZES         0x80000008
-
+#define CPUID_HYPERVISOR        0x40000000
 
 //
 // Exception error code

@@ -97,3 +97,21 @@ void std::detail::throw_bad_alloc()
 {
     throw std::bad_alloc();
 }
+
+std::string ext::to_hex(unsigned long long value, bool prefix)
+{
+    char digits[20];
+    char *out = digits + sizeof(digits);
+
+    do {
+        int nibble = value & 0xf;
+        *--out = nibble < 10 ? nibble + '0' : nibble - 10 + 'a';
+    } while (value >>= 4);
+
+    if (prefix) {
+        *--out = 'x';
+        *--out = '0';
+    }
+
+    return std::string(out, digits + sizeof(digits));
+}

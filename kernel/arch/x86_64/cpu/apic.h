@@ -4,6 +4,7 @@
 
 int apic_init(int ap);
 void apic_start_smp(void);
+void apic_init_apic_smp();
 unsigned apic_get_id(void);
 size_t apic_cpu_count();
 
@@ -33,6 +34,8 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        bool aligned = false);
 
 void apic_config_cpu();
+
+void apic_hook_perf_local_irq(intr_handler_t handler, char const *name);
 
 int acpi_have8259pic(void);
 

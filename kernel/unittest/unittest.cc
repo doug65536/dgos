@@ -118,16 +118,6 @@ void unittest::unit::set_ctx(unit_ctx *ctx)
     this->ctx = ctx;
 }
 
-void unittest::unit::eq(char const *expect, char *value,
-                        const char *file, int line)
-{
-    if (strcmp(expect, value)) {
-        dbgout << name << " expected \"" << expect <<
-                  " but got " << value << '\n';
-        fail(file, line);
-    }
-}
-
 template void unittest::unit::eq(int const&, int const&,
     const char *file, int line);
 template void unittest::unit::eq(uint32_t const&, uint32_t const&,
@@ -187,4 +177,14 @@ int unittest::unit::thread_fn(void *arg)
     unittest::unit *test = (unittest::unit *)arg;
     test->invoke();
     return 0;
+}
+
+void unittest::unit::eq_str(const char *expect,
+    const char *value, const char *file, int line)
+{
+    if (unlikely(strcmp(expect, value))) {
+        dbgout << name << " expected \"" << expect << '"' <<
+        " but got " << value << '\n';
+        fail(file, line);
+    }
 }

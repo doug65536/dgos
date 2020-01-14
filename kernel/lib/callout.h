@@ -36,6 +36,7 @@ enum struct callout_type_t : uint32_t {
     smp_online = 'T',
     //constructors_ran = 'C',
     tss_list_ready = 128,
+    init_thread_done = 130,
 
     // from init_thread
     driver_base= 'D',
@@ -47,7 +48,8 @@ enum struct callout_type_t : uint32_t {
     nics_ready = 129,
     usb = 'U',
 
-    devfs_ready = 256
+    devfs_ready = 256,
+    tmpfs_up
 };
 
 struct callout_t {

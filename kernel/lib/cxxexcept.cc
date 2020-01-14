@@ -13,6 +13,7 @@
 #include "string.h"
 #include "mutex.h"
 #include "cpu/atomic.h"
+#include "uleb.h"
 
 #define DEBUG_CXXEXCEPT 1
 #if DEBUG_CXXEXCEPT
@@ -254,102 +255,6 @@ void test_throw()
     }
 }
 #endif
-
-uintptr_t decode_uleb128(uint8_t const *&in)
-{
-    uintptr_t result = 0;
-    uint8_t shift = 0;
-    for (;;) {
-        uint8_t byte = *in++;
-        result |= uintptr_t(byte & 0x7F) << shift;
-        if ((byte & 0x80) == 0)
-            break;
-        shift += 7;
-    }
-    return result;
-}
-
-intptr_t decode_sleb128(uint8_t const *&in)
-{
-    intptr_t result = 0;
-    uint8_t shift = 0;
-    for (;;) {
-        uint8_t byte = *in++;
-        result |= uintptr_t(byte & 0x7F) << shift;
-        if ((byte & 0x80) == 0 && (byte & 0x40)) {
-            if (shift < sizeof(intptr_t)*8)
-                result |= ~uintptr_t(0) << shift;
-            break;
-        }
-        shift += 7;
-    }
-    return result;
-}
-
-#define DW_EH_PE_absptr		0x00
-#define DW_EH_PE_omit		0xff
-
-#define DW_EH_PE_uleb128	0x01
-#define DW_EH_PE_udata2		0x02
-#define DW_EH_PE_udata4		0x03
-#define DW_EH_PE_udata8		0x04
-#define DW_EH_PE_sleb128	0x09
-#define DW_EH_PE_sdata2		0x0A
-#define DW_EH_PE_sdata4		0x0B
-#define DW_EH_PE_sdata8		0x0C
-#define DW_EH_PE_signed		0x08
-
-#define DW_EH_PE_pcrel		0x10
-#define DW_EH_PE_textrel	0x20
-#define DW_EH_PE_datarel	0x30
-#define DW_EH_PE_funcrel	0x40
-#define DW_EH_PE_aligned	0x50
-
-#define DW_EH_PE_indirect	0x80
-
-template<typename T>
-uint64_t fetch_enc_val(LSDA_ptr &input)
-{
-    T data = 0;
-    memcpy(&data, input, sizeof(data));
-    input += sizeof(data);
-    return uint64_t(data);
-}
-
-uint64_t read_enc_val(LSDA_ptr &input, uint8_t encoding)
-{
-    switch (encoding & 0xF) {
-    case DW_EH_PE_omit:
-        return 0;
-
-    case DW_EH_PE_uleb128:  // 0x01
-        return decode_uleb128(input);
-
-    case DW_EH_PE_udata2:   // 0x02
-        return fetch_enc_val<uint16_t>(input);
-
-    case DW_EH_PE_udata4:   // 0x03
-        return fetch_enc_val<uint32_t>(input);
-
-    case DW_EH_PE_udata8:   // 0x04
-        return fetch_enc_val<uint64_t>(input);
-
-    case DW_EH_PE_sleb128:  // 0x09
-        return decode_sleb128(input);
-
-    case DW_EH_PE_sdata2:   // 0x0A
-        return fetch_enc_val<int16_t>(input);
-
-    case DW_EH_PE_sdata4:   // 0x0B
-        return fetch_enc_val<int32_t>(input);
-
-    case DW_EH_PE_sdata8:   // 0x0C
-        return fetch_enc_val<int64_t>(input);
-
-    }
-
-    panic("Unhandled dwarf frame information encoding\n");
-}
 
 
 struct tblent_t {

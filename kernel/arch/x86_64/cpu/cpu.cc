@@ -27,7 +27,9 @@
 
 uint32_t default_mxcsr_mask;
 
+__attribute__((__visibility__("hidden")))
 extern uint8_t * const ___rodata_fixup_insn_st[];
+__attribute__((__visibility__("hidden")))
 extern uint8_t * const ___rodata_fixup_insn_en[];
 
 static uint8_t const stac_insn[] = {
@@ -123,7 +125,19 @@ static uint8_t const fxrstor64_rsi_insn[] = {
 };
 
 static uint8_t const jmp_disp32_insn[] = {
-    0xe9, 0x00, 0x00, 0x00  // jmp further_than_signed_byte_displacement
+    0xe9, 0x00, 0x00, 0x00, 0x00  // jmp further_than_signed_byte_displacement
+};
+
+static uint8_t const data16_prefix[] = {
+    0x66
+};
+
+static uint8_t const ds_prefix[] = {
+    0x3E
+};
+
+static uint8_t const call_disp32_insn[] = {
+    0xE8
 };
 
 static uint8_t const *xsave64_insn(xsave_support_t support)
@@ -178,7 +192,7 @@ static uint8_t const *xrstor64_insn(xsave_support_t support)
 {
     switch (support) {
     default:
-    case xsave_support_t::FXSAVE: return fxrstor_rsi_insn;
+    case xsave_support_t::FXSAVE: return fxrstor64_rsi_insn;
     case xsave_support_t::XSAVE:
     case xsave_support_t::XSAVEC:
     case xsave_support_t::XSAVEOPT: return xrstor64_rsi_insn;
@@ -190,7 +204,7 @@ static size_t xrstor64_sz(xsave_support_t support)
 {
     switch (support) {
     default:
-    case xsave_support_t::FXSAVE: return sizeof(fxrstor_rsi_insn);
+    case xsave_support_t::FXSAVE: return sizeof(fxrstor64_rsi_insn);
     case xsave_support_t::XSAVE:
     case xsave_support_t::XSAVEC:
     case xsave_support_t::XSAVEOPT: return sizeof(xrstor64_rsi_insn);
@@ -231,6 +245,222 @@ extern "C" void soft_rdgsbase_r14();
 extern "C" void soft_wrfsbase_r13();
 extern "C" void soft_wrgsbase_r14();
 
+extern "C"
+EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
+                             uint8_t * const *rodata_en)
+{
+    // Perform code patch fixups
+    for (uint8_t * const *fixup_ptr = rodata_st;
+         fixup_ptr < rodata_en; ++fixup_ptr) {
+        uint8_t *code = *fixup_ptr;
+
+        uintptr_t addr = uintptr_t(code);
+        uintptr_t next = 0;
+
+        intptr_t dist = 0;
+        size_t old_sz = 0;
+        size_t new_sz = 0;
+
+        switch (*code) {
+        case 0xE8:
+            // Call instruction
+            int32_t disp32;
+            old_sz = 5;
+
+            disp32 = 0;
+            next = addr + 5;
+            memcpy(&disp32, code + 1, sizeof(disp32));
+
+            uintptr_t dest_addr;
+            dest_addr = next + disp32;
+
+            if (dest_addr == uintptr_t(protection_barrier)) {
+                // No point calling protection barrier if
+                // the CPU does not have IBPB
+                cpu_scoped_wp_disable wp_dis;
+                if (cpuid_has_ibpb()) {
+                    // Call actual ibpb function
+                    new_sz = 5;
+                    dist = uintptr_t(protection_barrier_ibpb) - next;
+                } else {
+                    // nop it out
+                    new_sz = 0;
+                }
+
+                break;
+            }
+
+            printdbg("Ignoring useless or unrecognized"
+                     " insn_fixup on call at %#zx\n",
+                     uintptr_t(code));
+
+            continue;
+
+        case 0xF3:
+            // rd/wr fs/gs base
+
+            //
+            // Read and write fsbase r13
+
+            if (unlikely(!memcmp(code, rdfsbase_r13_insn,
+                                sizeof(rdfsbase_r13_insn)) &&
+                         !memcmp(code + sizeof(rdfsbase_r13_insn),
+                                 rdgsbase_r14_insn,
+                                 sizeof(rdgsbase_r14_insn)))) {
+                // Both at once in one
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                old_sz = sizeof(rdfsbase_r13_insn) +
+                        sizeof(rdgsbase_r14_insn);
+                new_sz = 5;
+                next = addr + new_sz;
+                dist = uintptr_t(soft_rdfsgsbase_r13r14) - next;
+            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
+                                        sizeof(wrfsbase_r13_insn)) &&
+                                !memcmp(code + sizeof(wrfsbase_r13_insn),
+                                        wrgsbase_r14_insn,
+                                        sizeof(wrgsbase_r14_insn)))) {
+                // Both at once in one
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                old_sz = sizeof(wrfsbase_r13_insn) +
+                        sizeof(wrgsbase_r14_insn);
+                new_sz = 5;
+                next = addr + new_sz;
+                dist = uintptr_t(soft_wrfsgsbase_r13r14) - next;
+            } else if (unlikely(!memcmp(code, rdfsbase_r13_insn,
+                                        sizeof(rdfsbase_r13_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                old_sz = sizeof(rdfsbase_r13_insn);
+                new_sz = 5;
+                next = addr + new_sz;
+                dist = uintptr_t(soft_rdfsbase_r13) - next;
+            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
+                                        sizeof(wrfsbase_r13_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                old_sz = sizeof(wrfsbase_r13_insn);
+                new_sz = 5;
+                next = addr + new_sz;
+                dist = uintptr_t(soft_wrfsbase_r13) - next;
+            } else if (unlikely(!memcmp(code, rdgsbase_r14_insn,
+                                        sizeof(rdgsbase_r14_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                old_sz = sizeof(rdgsbase_r14_insn);
+                new_sz = 5;
+                next = addr + new_sz;
+                dist = uintptr_t(soft_rdgsbase_r14) - next;
+            } else if (unlikely(!memcmp(code, wrgsbase_r14_insn,
+                                        sizeof(wrgsbase_r14_insn)))) {
+                if (cpuid_has_fsgsbase())
+                    continue;
+
+                old_sz = sizeof(wrgsbase_r14_insn);
+                new_sz = 5;
+                next = addr + new_sz;
+                dist = uintptr_t(soft_wrgsbase_r14) - next;
+            }
+            break;
+
+        case 0xC5:
+            if (unlikely(!memcmp(code, vzeroall_nopw_insn,
+                                 sizeof(vzeroall_nopw_insn)))) {
+                if (cpuid_has_avx())
+                    continue;
+
+                old_sz = sizeof(vzeroall_nopw_insn);
+                new_sz = 5;
+                next = addr + new_sz;
+                dist = uintptr_t(soft_vzeroall) - next;
+            }
+            break;
+
+        case 0x0f:
+            // 32 bit fxsave/fxrstor
+            if (unlikely(!memcmp(code, fxsave_rsi_insn,
+                                 sizeof(fxsave_rsi_insn)))) {
+                old_sz = xsave32_sz(xsave_support_t::FXSAVE);
+                new_sz = xsave32_sz(xsave_support);
+                cpu_patch_code(code, xsave32_insn(xsave_support),
+                               xsave32_sz(xsave_support));
+                break;
+            } else if (unlikely(!memcmp(code, fxrstor_rsi_insn,
+                                        sizeof(fxrstor_rsi_insn)))) {
+                old_sz = xrstor32_sz(xsave_support_t::FXSAVE);
+                new_sz = xrstor32_sz(xsave_support);
+                cpu_patch_code(code, xrstor32_insn(xsave_support),
+                               xrstor32_sz(xsave_support));
+                break;
+            } else if (unlikely(!memcmp(code, stac_insn,
+                                        sizeof(stac_insn)))) {
+                if (cpuid_has_smap())
+                    continue;
+
+                old_sz = sizeof(stac_insn);
+                new_sz = 0;
+                break;
+            } else if (unlikely(!memcmp(code, clac_insn,
+                                        sizeof(clac_insn)))) {
+                if (cpuid_has_smap())
+                    continue;
+
+                old_sz = sizeof(clac_insn);
+                new_sz = 0;
+                break;
+            }
+            break;
+
+        case 0x48:
+            // 64-bit fxsave64/fxrstor64
+            if (unlikely(!memcmp(code, fxsave64_rsi_insn,
+                                 sizeof(fxsave64_rsi_insn)))) {
+                old_sz = xsave64_sz(xsave_support_t::FXSAVE);
+                new_sz = xsave64_sz(xsave_support);
+                cpu_patch_code(code, xsave64_insn(xsave_support),
+                               xsave64_sz(xsave_support));
+                break;
+            } else if (unlikely(!memcmp(code, fxrstor64_rsi_insn,
+                                        sizeof(fxrstor64_rsi_insn)))) {
+                old_sz = xrstor64_sz(xsave_support_t::FXSAVE);
+                new_sz = xrstor64_sz(xsave_support);
+                cpu_patch_code(code, xrstor64_insn(xsave_support),
+                               xrstor64_sz(xsave_support));
+                break;
+            }
+            break;
+
+        }
+
+        if (!dist && new_sz == old_sz)
+            continue;
+
+        assert(new_sz <= old_sz);
+
+        // Disable write protection and interrupts temporarily
+        cpu_scoped_wp_disable wp_dis;
+        cpu_scoped_irq_disable irq_dis;
+
+        // Replace with a call
+        if (dist) {
+            // Relocation truncated to fit? Doubt it but unhandled if so
+            if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
+                panic("Relocation would be truncated to fit");
+
+            code[0] = call_disp32_insn[0];
+            memcpy(code + 1, &dist, sizeof(uint32_t));
+        }
+
+        if (old_sz > new_sz)
+            cpu_patch_nop(code + new_sz, old_sz - new_sz);
+    }
+}
 
 void cpu_init_early(int ap)
 {
@@ -264,7 +494,7 @@ void cpu_init_early(int ap)
     if (!ap) {
         // Detect the MXCSR mask from fxsave context
         isr_fxsave_context_t __aligned(64) fctx;
-        cpu_fxsave(&fctx);
+        cpu_fxsave64(&fctx);
         if (fctx.mxcsr_mask)
             default_mxcsr_mask = fctx.mxcsr_mask;
         else
@@ -292,180 +522,8 @@ void cpu_init_early(int ap)
 
     idt_xsave_detect(ap);
 
-    // Perform code patch fixups
-    for (uint8_t * const *fixup_ptr = ___rodata_fixup_insn_st;
-         !ap && fixup_ptr < ___rodata_fixup_insn_en; ++fixup_ptr) {
-        uint8_t *code = *fixup_ptr;
-
-        uintptr_t addr = uintptr_t(code);
-        uintptr_t next = 0;
-
-        size_t replace_sz = 0;
-
-        intptr_t dist = 0;
-
-        switch (*code) {
-        case 0xE8:
-            // Call instruction
-            int32_t disp32;
-            next = addr + 5;
-            memcpy(&disp32, code + 1, sizeof(disp32));
-
-            uintptr_t dest_addr;
-            dest_addr = next + disp32;
-
-            if (dest_addr == uintptr_t(protection_barrier)) {
-                // No point calling protection barrier if
-                // the CPU does not have IBPB, nop it out
-                cpu_scoped_wp_disable wp_dis;
-                if (!cpuid_has_ibpb()) {
-                    cpu_patch_nop(code, 5);
-                } else {
-                    replace_sz = 5;
-                    next = addr + 5;
-                    dist = uintptr_t(protection_barrier_ibpb) - next;
-                    break;
-                }
-            }
-
-            continue;
-
-        case 0xF3:
-            // rd/wr fs/gs base
-
-            //
-            // Read and write fsbase r13
-
-            if (unlikely(!memcmp(code, rdfsbase_r13_insn,
-                                sizeof(rdfsbase_r13_insn)) &&
-                         !memcmp(code + sizeof(rdfsbase_r13_insn),
-                                 rdgsbase_r14_insn,
-                                 sizeof(rdgsbase_r14_insn)))) {
-                // Both at once in one
-                if (cpuid_has_fsgsbase())
-                    continue;
-
-                replace_sz = 10;
-                next = addr + 5;
-                dist = uintptr_t(soft_rdfsgsbase_r13r14) - next;
-            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
-                                        sizeof(wrfsbase_r13_insn)) &&
-                                !memcmp(code + sizeof(wrfsbase_r13_insn),
-                                        wrgsbase_r14_insn,
-                                        sizeof(wrgsbase_r14_insn)))) {
-                // Both at once in one
-                if (cpuid_has_fsgsbase())
-                    continue;
-
-                replace_sz = 10;
-                next = addr + 5;
-                dist = uintptr_t(soft_wrfsgsbase_r13r14) - next;
-            } else if (unlikely(!memcmp(code, rdfsbase_r13_insn,
-                                        sizeof(rdfsbase_r13_insn)))) {
-                if (cpuid_has_fsgsbase())
-                    continue;
-
-                replace_sz = 5;
-                next = addr + replace_sz;
-                dist = uintptr_t(soft_rdfsbase_r13) - next;
-            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
-                                        sizeof(wrfsbase_r13_insn)))) {
-                if (cpuid_has_fsgsbase())
-                    continue;
-
-                replace_sz = 5;
-                next = addr + replace_sz;
-                dist = uintptr_t(soft_wrfsbase_r13) - next;
-            } else if (unlikely(!memcmp(code, rdgsbase_r14_insn,
-                                        sizeof(rdgsbase_r14_insn)))) {
-                if (cpuid_has_fsgsbase())
-                    continue;
-
-                replace_sz = 5;
-                next = addr + replace_sz;
-                dist = uintptr_t(soft_rdgsbase_r14) - next;
-            } else if (unlikely(!memcmp(code, wrgsbase_r14_insn,
-                                        sizeof(wrgsbase_r14_insn)))) {
-                if (cpuid_has_fsgsbase())
-                    continue;
-
-                replace_sz = 5;
-                next = addr + replace_sz;
-                dist = uintptr_t(soft_wrgsbase_r14) - next;
-            }
-            break;
-
-        case 0xC5:
-            if (unlikely(!memcmp(code, vzeroall_nopw_insn,
-                                 sizeof(vzeroall_nopw_insn)))) {
-                if (cpuid_has_avx())
-                    continue;
-
-                replace_sz = 5;
-                next = addr + replace_sz;
-                dist = uintptr_t(soft_vzeroall) - next;
-            }
-            break;
-
-        case 0x0f:
-            if (unlikely(!memcmp(code, fxsave_rsi_insn,
-                                 sizeof(fxsave_rsi_insn)))) {
-                cpu_patch_code(code, xsave32_insn(xsave_support),
-                               xsave32_sz(xsave_support));
-                continue;
-            } else if (unlikely(!memcmp(code, fxrstor_rsi_insn,
-                                        sizeof(fxrstor_rsi_insn)))) {
-                cpu_patch_code(code, xrstor32_insn(xsave_support),
-                               xrstor32_sz(xsave_support));
-                continue;
-            } else if (unlikely(!memcmp(code, stac_insn,
-                                        sizeof(stac_insn)))) {
-                if (!cpuid_has_smap())
-                    cpu_patch_nop(code, sizeof(stac_insn));
-                continue;
-            } else if (unlikely(!memcmp(code, clac_insn,
-                                        sizeof(clac_insn)))) {
-                if (!cpuid_has_smap())
-                    cpu_patch_nop(code, sizeof(stac_insn));
-                continue;
-            }
-            break;
-
-        case 0x48:
-            if (unlikely(!memcmp(code, fxsave64_rsi_insn,
-                                 sizeof(fxsave64_rsi_insn)))) {
-                cpu_patch_code(code, xsave64_insn(xsave_support),
-                               xsave64_sz(xsave_support));
-                continue;
-            } else if (unlikely(!memcmp(code, fxrstor64_rsi_insn,
-                                        sizeof(fxrstor64_rsi_insn)))) {
-                cpu_patch_code(code, xrstor64_insn(xsave_support),
-                               xrstor64_sz(xsave_support));
-                continue;
-            }
-            break;
-
-        }
-
-        if (unlikely(dist == 0))
-            panic("Not valid\n");
-
-        // Replace with a call
-
-        // Relocation truncated to fit? Doubt it but unhandled if so
-        if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
-            panic("Relocation would be truncated to fit");
-
-        // Disable write protection and interrupts temporarily
-        cpu_scoped_wp_disable wp_dis;
-        cpu_scoped_irq_disable irq_dis;
-
-        code[0] = 0xE8;
-        memcpy(code + 1, &dist, sizeof(uint32_t));
-
-        if (unlikely(replace_sz > 5))
-            cpu_patch_nop(code + 5, replace_sz - 5);
-    }
+    if (!ap)
+        cpu_apply_fixups(___rodata_fixup_insn_st, ___rodata_fixup_insn_en);
 }
 
 _constructor(ctor_cpu_init_bsp)
@@ -794,15 +852,17 @@ void cpu_patch_nop(void *addr, size_t size)
 
         // Place a number of 0x66 prefixes for sizes over 8 bytes
         if (insn_sz > 8) {
-            out = std::fill_n(out, insn_sz - 8, 0x66);
+            out = std::fill_n(out, insn_sz - 8, data16_prefix[0]);
             insn_sz = 8;
         }
 
         cpu_patch_code(out, nop_insns + nop_lookup[insn_sz - 1], insn_sz);
 
-        // Serializing instruction
-        cpu_fault_address_set(0);
+        out += insn_sz;
     }
+
+    // Serializing instruction
+    cpu_fault_address_set(0);
 }
 
 bool cpu_patch_jmp(void *addr, size_t size, void const *jmp_target)

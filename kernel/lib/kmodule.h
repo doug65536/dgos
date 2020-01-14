@@ -4,12 +4,26 @@
 
 __BEGIN_DECLS
 
+__attribute__((__visibility__("hidden")))
+extern uint8_t * const ___rodata_fixup_insn_st[];
+__attribute__((__visibility__("hidden")))
+extern uint8_t * const ___rodata_fixup_insn_en[];
+
+extern "C"
+void cpu_apply_fixups(uint8_t * const *rodata_st,
+                      uint8_t * const *rodata_en);
+
 using module_entry_fn_t = int(*)(int __argc, char const **__argv);
 
 int module_main(int __argc, char const * const * __argv);
 
 void __module_register_frame(void const * const *__module_dso_handle,
-                             void *__frame);
+                             void *__frame, size_t size);
+void __module_unregister_frame(void const * const *__module_dso_handle,
+                               void *__frame);
+
+void __register_frame(void *addr, size_t size);
+void __deregister_frame(void *addr);
 
 __END_DECLS
 

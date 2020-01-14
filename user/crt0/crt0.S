@@ -97,3 +97,13 @@ _start:
 //    popq %rbp
 //    ret
 
+/// %{!shared:
+///  %{!symbolic:
+///   %{pg:gcrt0.o%s}
+///   %{!pg:
+///    %{p:mcrt0.o%s}
+///    %{!p:crt0.o%s}
+///   }
+///  }
+/// }
+/// crtbegin.o%s

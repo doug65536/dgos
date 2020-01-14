@@ -180,6 +180,7 @@ thread_cpu_mask_t const* thread_get_affinity(int id);
 
 size_t thread_get_cpu_count();
 int thread_cpu_number();
+unsigned thread_cpu_usage_x1k(size_t cpu);
 
 thread_t thread_get_id(void);
 

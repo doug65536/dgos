@@ -158,7 +158,15 @@ EXPORT void std::condition_variable::notify_n(size_t n)
 EXPORT void std::condition_variable::wait(std::unique_lock<mutex> &lock)
 {
     assert(lock.is_locked());
-    condvar_wait(&m, &lock.native_handle());
+    condvar_wait_mutex(&m, &lock.native_handle());
+    assert(lock.is_locked());
+}
+
+EXPORT void std::condition_variable::wait(
+        std::unique_lock<ext::irq_mutex> &lock)
+{
+    assert(lock.is_locked());
+    condvar_wait_mutex(&m, &lock.native_handle());
     assert(lock.is_locked());
 }
 
@@ -189,7 +197,20 @@ EXPORT std::cv_status std::condition_variable::wait_until(
 {
     assert(lock.is_locked());
 
-    bool result = condvar_wait(
+    bool result = condvar_wait_mutex(
+                &m, &lock.native_handle(), timeout_time);
+
+    assert(lock.is_locked());
+
+    return result ? std::cv_status::no_timeout : std::cv_status::timeout;
+}
+
+EXPORT std::cv_status std::condition_variable::wait_until(
+        std::unique_lock<ext::irq_mutex>& lock, int64_t timeout_time)
+{
+    assert(lock.is_locked());
+
+    bool result = condvar_wait_mutex(
                 &m, &lock.native_handle(), timeout_time);
 
     assert(lock.is_locked());

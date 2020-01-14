@@ -5,6 +5,7 @@
 #%.c %.h %.out: %.y
 #	lemon $<
 #
+
 noinst_PROGRAMS =
 
 DUMPDIR = $(top_builddir)/dump
@@ -23,14 +24,15 @@ STDLIB_STATIC_FILES_INSTALLED = \
 STDLIB_SHARED_FILES_INSTALLED = \
 	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.so,$(STDLIB_FILE_NAMES))
 
-ALL_INSTALLED = $(STARTUP_FILES_INSTALLED) $(STDLIB_STATIC_FILES_INSTALLED)
+ALL_STDLIB_INSTALLED = \
+	$(STARTUP_FILES_INSTALLED) \
+	$(STDLIB_STATIC_FILES_INSTALLED)
 
 BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
 	$(generated_headers) \
-	$(STARTUP_FILES_INSTALLED) \
-	$(STDLIB_FILES_INSTALLED)
+	$(ALL_STDLIB_INSTALLED)
 
 BOOTLOADER_COMMON_FLAGS = \
 	-D__DGOS__
@@ -50,6 +52,7 @@ bin_PROGRAMS =
 #bootefi-i386
 
 generate_symbols_list =
+generate_kallsym_list =
 
 # mbr-elf
 
@@ -732,6 +735,10 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/contig_alloc.cc \
 	kernel/lib/contig_alloc.h \
 	kernel/lib/user_mem.h \
+	kernel/lib/uleb.cc \
+	kernel/lib/uleb.h \
+	kernel/lib/engunit.cc \
+	kernel/lib/engunit.h \
 	kernel/fs/ext4.cc \
 	kernel/fs/devfs.cc \
 	kernel/fs/tmpfs.cc \
@@ -794,6 +801,9 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/idt.h \
 	kernel/arch/x86_64/cpu/interrupts.cc \
 	kernel/arch/x86_64/cpu/interrupts.h \
+	kernel/arch/x86_64/cpu/perf.cc \
+	kernel/arch/x86_64/cpu/perf.h \
+	kernel/arch/x86_64/cpu/perf_reg.bits.h \
 	kernel/arch/x86_64/cpu/ioport.cc \
 	kernel/arch/x86_64/cpu/ioport.h \
 	kernel/arch/x86_64/cpu/isr.h \
@@ -889,7 +899,8 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(INVISIBILITY_FLAGS) \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
-	-fsanitize=undefined
+	$(SANITIZE_UNDEFINED_FLAGS) \
+	$(WARN_STACK_USAGE_FLAGS)
 
 #-fsanitize-undefined-trap-on-error
 #$(NO_EXCEPTIONS_FLAGS)
@@ -962,6 +973,7 @@ KERNEL_GENERIC_FLAGS = \
 
 bin_PROGRAMS += kernel-generic
 generate_symbols_list += kernel-generic
+generate_kallsym_list += kernel-generic
 
 kernel_generic_SOURCES = $(KERNEL_SOURCES_SHARED)
 
@@ -988,6 +1000,7 @@ EXTRA_kernel_generic_DEPENDENCIES = \
 
 bin_PROGRAMS += kernel-tracing
 generate_symbols_list += kernel-tracing
+generate_kallsym_list += kernel-tracing
 
 kernel_tracing_SOURCES = \
 	$(KERNEL_SOURCES_SHARED)
@@ -1019,6 +1032,7 @@ EXTRA_kernel_tracing_DEPENDENCIES = \
 
 bin_PROGRAMS += kernel-asan
 generate_symbols_list += kernel-asan
+generate_kallsym_list += kernel-asan
 
 kernel_asan_SOURCES = \
 	$(KERNEL_SOURCES_SHARED)
@@ -1073,6 +1087,10 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 		-Wl,--end-group
 
 #-O3 -march=native
+
+# ----------------------------------------------------------------------------
+#
+
 
 # ----------------------------------------------------------------------------
 # crt0
@@ -1146,7 +1164,7 @@ $(foreach header,$(INCLUDES_NAMES),$(eval \
 	$(call deploy_sysroot_header,$(header)) \
 ))
 
-startupcode: $(STARTUPFILES) $(ALL_INSTALLED)
+startupcode: $(STARTUPFILES)
 
 .PHONY: startupcode
 
@@ -1192,7 +1210,7 @@ $(top_srcdir)/user/shell/grammar.c \
 EXTRA_shell_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
 	$(top_srcdir)/user/shell/grammar.c \
-	$(ALL_INSTALLED) \
+	$(ALL_STDLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 # ----------------------------------------------------------------------------
@@ -1475,8 +1493,7 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
 	libc/src/sys/socket/socket.cc \
-	libc/src/sys/module/
-	init_module.cc \
+	libc/src/sys/module/init_module.cc \
 	libc/src/sys/module/probe_pci_for.cc \
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
@@ -1607,7 +1624,7 @@ $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/sysroot/lib/libc.a
 		-o libc_tests \
 		$(LIBC_TESTS) \
 		-static -nostdlib -g -fno-builtin \
-		$(STDLIB_FILES_INSTALLED) -lgcc
+		$(ALL_STDLIB_INSTALLED) -lgcc
 
 test_compile: $(top_builddir)/libc_tests
 
@@ -1648,7 +1665,7 @@ dhcpclient_SOURCES = \
 dhcpclient_CXXFLAGS = -isystem sysroot/include
 
 EXTRA_dhcpclient_DEPENDENCIES = \
-	$(ALL_INSTALLED) \
+	$(ALL_STDLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 bin_PROGRAMS += ls
@@ -1660,7 +1677,7 @@ ls_SOURCES = \
 ls_CXXFLAGS = -isystem sysroot/include
 
 EXTRA_ls_DEPENDENCIES = \
-	$(ALL_INSTALLED) \
+	$(ALL_STDLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 #==========
@@ -1668,6 +1685,7 @@ EXTRA_ls_DEPENDENCIES = \
 
 KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(FREESTANDING_FLAGS) \
+	$(NO_REDZONE_FLAGS) \
 	-D__DGOS_KERNEL__ \
 	$(INVISIBILITY_FLAGS) \
 	$(NO_RTTI_FLAGS) \
@@ -1684,7 +1702,8 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
-	-fsanitize=undefined
+	$(SANITIZE_UNDEFINED_FLAGS) \
+	$(WARN_STACK_USAGE_FLAGS)
 
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_RTTI_FLAGS)
@@ -1695,6 +1714,7 @@ KERNEL_MODULE_LDFLAGS_SHARED = \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
 	-Wl,--relax \
+	-Wl,--eh-frame-hdr \
 	$(LINKER_DEBUG) \
 	$(NOSTDLIB_FLAGS)
 
@@ -1729,8 +1749,31 @@ EXTRA_libkm_a_DEPENDENCIES =
 
 #==========
 
+bin_PROGRAMS += symsrv.km
+generate_symbols_list += symsrv.km
+generate_kallsym_list += symsrv.km
+
+symsrv_km_SOURCES = \
+	kernel/device/symbol_server.cc \
+	kernel/device/symbol_server.h
+
+symsrv_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+symsrv_km_LDFLAGS = \
+	$(call KERNEL_MODULE_LDFLAGS_FN,symsrv)
+
+symsrv_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_symsrv_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
 bin_PROGRAMS += usbxhci.km
 generate_symbols_list += usbxhci.km
+generate_kallsym_list += usbxhci.km
 
 usbxhci_km_SOURCES = \
 	kernel/device/usb_xhci.cc
@@ -1751,6 +1794,7 @@ EXTRA_usbxhci_km_DEPENDENCIES = \
 
 bin_PROGRAMS += usbmsc.km
 generate_symbols_list += usbmsc.km
+generate_kallsym_list += usbmsc.km
 
 usbmsc_km_SOURCES = \
 	kernel/device/usb_storage.cc \
@@ -1772,6 +1816,7 @@ EXTRA_usbmsc_km_DEPENDENCIES = \
 
 bin_PROGRAMS += rtl8139.km
 generate_symbols_list += rtl8139.km
+generate_kallsym_list += rtl8139.km
 
 rtl8139_km_SOURCES = \
 	kernel/device/rtl8139.cc
@@ -1792,6 +1837,7 @@ EXTRA_rtl8139_km_DEPENDENCIES = \
 
 bin_PROGRAMS += nvme.km
 generate_symbols_list += nvme.km
+generate_kallsym_list += nvme.km
 
 nvme_km_SOURCES = \
 	kernel/device/nvme.cc \
@@ -1813,6 +1859,7 @@ EXTRA_nvme_km_DEPENDENCIES = \
 
 bin_PROGRAMS += unittest.km
 generate_symbols_list += unittest.km
+generate_kallsym_list += unittest.km
 
 unittest_km_SOURCES = \
 	kernel/unittest/unittest.cc \
@@ -1828,6 +1875,7 @@ unittest_km_SOURCES = \
 	kernel/unittest/test_printk.cc \
 	kernel/unittest/test_chrono.cc \
 	kernel/unittest/test_nofault.cc \
+	kernel/unittest/test_block.cc \
 	kernel/unittest/test_filesystem.cc
 
 unittest_km_CXXFLAGS = \
@@ -1846,6 +1894,7 @@ EXTRA_unittest_km_DEPENDENCIES = \
 
 bin_PROGRAMS += keyb8042.km
 generate_symbols_list += keyb8042.km
+generate_kallsym_list += keyb8042.km
 
 keyb8042_km_SOURCES = \
 	kernel/device/keyb8042.cc
@@ -1866,6 +1915,7 @@ EXTRA_keyb8042_km_DEPENDENCIES = \
 
 bin_PROGRAMS += ahci.km
 generate_symbols_list += ahci.km
+generate_kallsym_list += ahci.km
 
 ahci_km_SOURCES = \
 	kernel/device/ahci.cc
@@ -1886,6 +1936,7 @@ EXTRA_ahci_km_DEPENDENCIES = \
 
 bin_PROGRAMS += ide.km
 generate_symbols_list += ide.km
+generate_kallsym_list += ide.km
 
 
 ide_km_SOURCES = \
@@ -1907,6 +1958,7 @@ EXTRA_ide_km_DEPENDENCIES = \
 
 bin_PROGRAMS += virtio-base.km
 generate_symbols_list += virtio-base.km
+generate_kallsym_list += virtio-base.km
 
 virtio_base_km_SOURCES = \
 	kernel/device/virtio-base.cc \
@@ -1928,6 +1980,7 @@ EXTRA_virtio_base_km_DEPENDENCIES = \
 
 bin_PROGRAMS += virtio-blk.km
 generate_symbols_list += virtio-blk.km
+generate_kallsym_list += virtio-blk.km
 
 
 virtio_blk_km_SOURCES = \
@@ -1951,6 +2004,7 @@ EXTRA_virtio_blk_km_DEPENDENCIES = \
 
 bin_PROGRAMS += virtio-gpu.km
 generate_symbols_list += virtio-gpu.km
+generate_kallsym_list += virtio-gpu.km
 
 virtio_gpu_km_SOURCES = \
 	kernel/device/virtio-gpu.cc \
@@ -1973,6 +2027,7 @@ EXTRA_virtio_gpu_km_DEPENDENCIES = \
 
 bin_PROGRAMS += fat32.km
 generate_symbols_list += fat32.km
+generate_kallsym_list += fat32.km
 
 fat32_km_SOURCES = \
 	kernel/fs/fat32.cc \
@@ -1994,6 +2049,7 @@ EXTRA_fat32_km_DEPENDENCIES = \
 
 bin_PROGRAMS += iso9660.km
 generate_symbols_list += iso9660.km
+generate_kallsym_list += iso9660.km
 
 iso9660_km_SOURCES = \
 	kernel/fs/iso9660.cc \
@@ -2016,6 +2072,7 @@ EXTRA_iso9660_km_DEPENDENCIES = \
 
 bin_PROGRAMS += mbr.km
 generate_symbols_list += mbr.km
+generate_kallsym_list += mbr.km
 
 mbr_km_SOURCES = \
 	kernel/fs/mbr.cc
@@ -2036,6 +2093,7 @@ EXTRA_mbr_km_DEPENDENCIES = \
 
 bin_PROGRAMS += gpt.km
 generate_symbols_list += gpt.km
+generate_kallsym_list += gpt.km
 
 gpt_km_SOURCES = \
 	kernel/fs/gpt.cc
@@ -2086,7 +2144,7 @@ user_shell_CCASFLAGS = \
 	-isystem sysroot/include
 
 EXTRA_user_shell_DEPENDENCIES = \
-	$(ALL_INSTALLED)
+	$(ALL_STDLIB_INSTALLED)
 
 #==========
 
@@ -2110,7 +2168,8 @@ init_CFLAGS = \
 init_SOURCES = \
 	user/init/init.cc
 
-init_LDFLAGS = -Wl,--no-eh-frame-hdr
+init_LDFLAGS = -Wl,-Bdynamic
+#-Wl,--no-eh-frame-hdr
 
 init_LDADD =
 
@@ -2121,8 +2180,7 @@ init_CCASFLAGS = \
 
 EXTRA_init_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
-	$(STARTUP_FILES_INSTALLED) \
-	$(STDLIB_FILES_INSTALLED) \
+	$(ALL_STDLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 #===========
@@ -2133,6 +2191,10 @@ MODULE_LIST = $(subst %,$(top_builddir)/%,$(MODULE_FILENAMES))
 SYMBOL_FILE = sym/$(1).sym
 
 CPIO_LIST = $(MODULE_LIST) $(generate_symbols_outputs)
+
+all-kernel: kernel-generic $(MODULE_LIST)
+
+.PHONY: all-kernel
 
 $(top_builddir)/sym/:
 	$(MKDIR) -p "$@"
@@ -2195,6 +2257,7 @@ BITFIELD_FILES = \
 	$(top_srcdir)/kernel/device/usb_xhci.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/perf_reg.bits \
 	$(top_srcdir)/kernel/device/acpi.bits \
 	$(top_srcdir)/kernel/device/ahci.bits \
 	$(top_srcdir)/kernel/device/es173x.bits \
@@ -2241,6 +2304,9 @@ $(DUMPDIR)/qemu-debug-out:
 	$(MKDIR) -p "$(@D)"
 	mkfifo "$@"
 
+$(top_builddir)/iso_stage:
+	mkdir -p "$(top_builddir)/iso_stage"
+
 $(DUMPDIR)/call-trace-out:
 	$(MKDIR) -p "$(@D)"
 	mkfifo "$@"
@@ -2254,7 +2320,7 @@ QEMU_EXTRA_DEPS = \
 QEMU_CPUS = $(shell $(NPROC))
 QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
-QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
+QEMU_CPU = host,migratable=false,host-cache-info=true,fsgsbase
 
 QEMU_RAM = 160M
 
@@ -2294,22 +2360,27 @@ QEMU_NET = \
 #	-nic model=e1000,id=nic_e1000
 
 QEMU_MONITOR = \
-	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet \
+	-mon qemu-monitor,mode=readline
 
 QEMU_DEBUGCON = \
 	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
 	-device isa-debugcon,chardev=qemu-debug-out \
+	\
 	-chardev pipe,path=$(DUMPDIR)/call-trace-out,id=call-trace-out \
 	-device isa-debugcon,iobase=0xEA,chardev=call-trace-out \
-	-mon qemu-monitor,mode=readline
+	\
+	-chardev stdio,id=seabios \
+	-device isa-debugcon,iobase=0x402,chardev=seabios
 
 #-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0
 
 QEMU_SERIAL = \
 	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
 	-device isa-serial,chardev=qemu-serial-socket,id=com1 \
-	-chardev stdio,id=seabios \
-	-device isa-debugcon,iobase=0x402,chardev=seabios
+	\
+	-chardev socket,id=qemu-symsrv-socket,host=localhost,port=7789,server,nowait,nodelay \
+	-device isa-serial,chardev=qemu-symsrv-socket,id=com2
 
 QEMU_SOUND = -soundhw es1370
 
@@ -2415,7 +2486,7 @@ QEMU_VIDEO_gl = \
 	-vga virtio
 
 # Connect to debug log
-monitor-debug-output:
+monitor-debug-output: $(DUMPDIR)/qemu-debug-out
 	while true; do cat "$(DUMPDIR)/qemu-debug-out"; done
 
 # Connect to console
@@ -2474,12 +2545,19 @@ $(eval $(call qemu_launcher,$(rt),$(np),$(bt),$(bm),$(fs),$(sc),$(vo),$(em))) \
 	) \
 )
 
-debug-tcg: debug-smp-bios-hd-gpt-nvme-vga-tcg
+debug-tcg: debug-smp-bios-hd-gpt-ahci-vga-tcg
 
 .PHONY: debug-tcg
 
 # ---
 # Generate symbols
+
+define genkallsym =
+$$(top_builddir)/sym/$(1)-kallsyms: $(1) $$(top_srcdir)/Makefile.am
+	$$(NM) --demangle --defined-only -n "$$<" > "$$@"
+endef
+
+$(foreach name,$(generate_kallsym_list),$(eval $(call genkallsym,$(name))))
 
 define gensym =
 $$(top_builddir)/sym/$(1).sym: $$(top_builddir)/$(1) \
@@ -2491,7 +2569,8 @@ endef
 
 $(foreach name,$(generate_symbols_list),$(eval $(call gensym,$(name))))
 
-generate_symbols_outputs = $(patsubst %,sym/%.sym,$(generate_symbols_list))
+generate_symbols_outputs = $(patsubst %,sym/%.sym,$(generate_symbols_list)) \
+	$(patsubst %,sym/%-kallsyms,$(generate_kallsym_list))
 
 # ----------------------------------------------------------------------------
 # Bochs launcher
@@ -2531,9 +2610,17 @@ $(foreach media,$(BOCHS_MEDIA), \
 	) \
 )
 
-debug: debug-up-bios-hd-gpt-nvme-vga-tcg
+debug: debug-up-bios-hd-gpt-ahci-vga-tcg
 
 .PHONY: debug
+
+debug-kvm: debug-up-bios-hd-gpt-ahci-vga-kvm
+
+.PHONY: debug-kvm
+
+run-kvm: run-up-bios-hd-gpt-ahci-vga-kvm
+
+.PHONY: run-kvm
 
 debug-bochs: debug-gpt-bios-bochs-kernel
 
@@ -2542,3 +2629,7 @@ debug-bochs: debug-gpt-bios-bochs-kernel
 debug-bochs-boot: debug-gpt-bios-bochs-boot
 
 .PHONY: debug-bochs-boot
+
+run: run-up-bios-hd-gpt-ahci-vga-tcg
+
+.PHONY: run

@@ -185,6 +185,10 @@ struct Elf64_Sym {
     Elf64_Xword st_size; /* Size of object (e.g., common) */
 } _packed;
 
+#define ELF64_ST_BIND(i) ((i) >> 4)
+#define ELF64_ST_TYPE(i) ((i) & 0xF)
+#define ELF64_ST_INFO(b, t) (((b) << 4) | ((t) & 0xf))
+
 // Symbol bindings
 #define STB_LOCAL 0 //Not visible outside the object file
 #define STB_GLOBAL 1 //Global symbol, visible to all object files

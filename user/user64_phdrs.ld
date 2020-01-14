@@ -2,23 +2,24 @@ ENTRY(_start)
 
 PHDRS {
 	read PT_LOAD FLAGS(4);
-	hdr PT_PHDR FILEHDR PHDRS FLAGS(4);
 	tls PT_TLS FLAGS(0);
 	exec PT_LOAD FLAGS(5);
 	data PT_LOAD FLAGS(6);
+	/*hdr PT_PHDR FILEHDR PHDRS FLAGS(4);*/
 }
 
 SECTIONS {
+	. = 0x400000;
+	. += SIZEOF_HEADERS;
+
 	PROVIDE_HIDDEN(__image_start = .);
 
-	.rodata 0x400000 : {
-		. += SIZEOF_HEADERS;
-
+	.rodata : {
 		PROVIDE_HIDDEN(__rodata_start = .);
 		*(.rodata)
 		*(.rodata.*)
 		PROVIDE_HIDDEN(__rodata_end = .);
-	} :read :hdr
+	} /*:hdr*/ :read
 
 	.tm_clone_table : {
 		*(.tm_clone_table)
@@ -133,6 +134,7 @@ SECTIONS {
 
 	PROVIDE_HIDDEN(__image_end = .);
 
+/*
 	.debug          0 : { *(.debug)         } :NONE
 	.debug_info		0 : { *(.debug_info)    } :NONE
 	.debug_abbrev	0 : { *(.debug_abbrev)  } :NONE
@@ -144,4 +146,5 @@ SECTIONS {
 	.debug_str		0 : { *(.debug_str)     } :NONE
 	.debug_loc		0 : { *(.debug_loc)     } :NONE
 	.comment        0 : { *(.comment)       } :NONE
+*/
 }

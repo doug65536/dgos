@@ -1,0 +1,5 @@
+#!/bin/bash
+scriptroot="$(cd "$(dirname "$0")" && pwd)"
+"$scriptroot/qemu_profiling_syms" localhost 7789 "$@" | \
+    head -n -1 | \
+    tail -n +7

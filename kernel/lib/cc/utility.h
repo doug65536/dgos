@@ -61,50 +61,50 @@ struct pair
     second_type second;
 };
 
-template<typename T1, typename T2>
-constexpr bool operator==(pair<T1,T2> const& lhs,
-                          pair<T1,T2> const& rhs)
+template<typename _T1, typename _T2>
+constexpr bool operator==(pair<_T1,_T2> const& __lhs,
+                          pair<_T1,_T2> const& __rhs)
 {
-    return lhs.first == rhs.first && lhs.second == rhs.second;
+    return __lhs.first == __rhs.first && __lhs.second == __rhs.second;
 }
 
-template<typename T1, typename T2>
-constexpr bool operator!=( pair<T1,T2> const& lhs,
-                                  pair<T1,T2> const& rhs )
+template<typename _T1, typename _T2>
+constexpr bool operator!=(pair<_T1,_T2> const& __lhs,
+                          pair<_T1,_T2> const& __rhs )
 {
-    return !(lhs.first == rhs.first) || !(lhs.second == rhs.second);
+    return !(__lhs.first == __rhs.first) || !(__lhs.second == __rhs.second);
 }
 
-template<typename T1, typename T2>
-constexpr bool operator<( pair<T1,T2> const& lhs,
-                                 pair<T1,T2> const& rhs )
+template<typename _T1, typename _T2>
+constexpr bool operator<(pair<_T1,_T2> const& __lhs,
+                         pair<_T1,_T2> const& __rhs )
 {
-    return lhs.first < rhs.first
+    return (__lhs.first < __rhs.first)
             ? true
-            : rhs.first < lhs.first
+            : ((__rhs.first < __lhs.first)
               ? false
-              : rhs.second < rhs.second;
+              : (__lhs.second < __rhs.second));
 }
 
-template<typename T1, typename T2>
-constexpr bool operator<=( pair<T1,T2> const& lhs,
-                                  pair<T1,T2> const& rhs )
+template<typename _T1, typename _T2>
+constexpr bool operator<=(pair<_T1,_T2> const& __lhs,
+                          pair<_T1,_T2> const& __rhs)
 {
-    return !(rhs < lhs);
+    return !(__rhs < __lhs);
 }
 
-template<typename T1, typename T2>
-constexpr bool operator>( pair<T1,T2> const& lhs,
-                                 pair<T1,T2> const& rhs )
+template<typename _T1, typename _T2>
+constexpr bool operator>(pair<_T1,_T2> const& __lhs,
+                         pair<_T1,_T2> const& __rhs )
 {
-    return rhs < lhs;
+    return __rhs < __lhs;
 }
 
-template<typename T1, typename T2>
-constexpr bool operator>=( pair<T1,T2> const& lhs,
-                                  pair<T1,T2> const& rhs )
+template<typename _T1, typename _T2>
+constexpr bool operator>=(pair<_T1,_T2> const& __lhs,
+                          pair<_T1,_T2> const& __rhs )
 {
-    return !(lhs < rhs);
+    return !(__lhs < __rhs);
 }
 
 template<typename _T>

@@ -111,7 +111,7 @@ static fs_base_t *file_fs_from_path(char const *path, size_t& consumed)
     return fs_from_id(0);
 }
 
-filetab_t *file_new_filetab(void)
+static filetab_t *file_new_filetab(void)
 {
     file_table_scoped_lock lock(file_table_lock);
     filetab_t *item = nullptr;
@@ -160,12 +160,12 @@ bool file_ref_filetab(int id)
 
 REGISTER_CALLOUT(file_init, nullptr, callout_type_t::heap_ready, "000");
 
-int file_creat(char const *path, mode_t mode)
+EXPORT int file_creat(char const *path, mode_t mode)
 {
     return file_open(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }
 
-int file_open(char const *path, int flags, mode_t mode)
+EXPORT int file_open(char const *path, int flags, mode_t mode)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(path, consumed);
@@ -195,7 +195,7 @@ int file_open(char const *path, int flags, mode_t mode)
     return id;
 }
 
-int file_close(int id)
+EXPORT int file_close(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -212,7 +212,7 @@ int file_close(int id)
     return status;
 }
 
-ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
+EXPORT ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -221,7 +221,7 @@ ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
     return fh->fs->read(fh->fi, (char*)buf, bytes, ofs);
 }
 
-ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs)
+EXPORT ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -230,7 +230,7 @@ ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs)
     return fh->fs->write(fh->fi, (char*)buf, bytes, ofs);
 }
 
-int file_syncfs(int id)
+EXPORT int file_syncfs(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -239,7 +239,7 @@ int file_syncfs(int id)
     return fh->fs->flush(fh->fi);
 }
 
-off_t file_seek(int id, off_t ofs, int whence)
+EXPORT off_t file_seek(int id, off_t ofs, int whence)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -287,7 +287,7 @@ off_t file_seek(int id, off_t ofs, int whence)
     return fh->pos;
 }
 
-int file_ftruncate(int id, off_t size)
+EXPORT int file_ftruncate(int id, off_t size)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -296,7 +296,8 @@ int file_ftruncate(int id, off_t size)
     return fh->fs->ftruncate(fh->fi, size);
 }
 
-int file_ioctl(int id, int cmd, void* arg, unsigned int flags, void* data)
+EXPORT int file_ioctl(int id, int cmd, void* arg,
+                      unsigned int flags, void* data)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -305,7 +306,7 @@ int file_ioctl(int id, int cmd, void* arg, unsigned int flags, void* data)
     return fh->fs->ioctl(fh->fi, cmd, arg, flags, data);
 }
 
-ssize_t file_read(int id, void *buf, size_t bytes)
+EXPORT ssize_t file_read(int id, void *buf, size_t bytes)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -318,7 +319,7 @@ ssize_t file_read(int id, void *buf, size_t bytes)
     return size;
 }
 
-ssize_t file_write(int id, void const *buf, size_t bytes)
+EXPORT ssize_t file_write(int id, void const *buf, size_t bytes)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -331,7 +332,7 @@ ssize_t file_write(int id, void const *buf, size_t bytes)
     return size;
 }
 
-int file_fsync(int id)
+EXPORT int file_fsync(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -340,7 +341,7 @@ int file_fsync(int id)
     return fh->fs->fsync(fh->fi, 0);
 }
 
-int file_fdatasync(int id)
+EXPORT int file_fdatasync(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))

@@ -25,8 +25,8 @@ if [[ ! -f sysroot/libc/libc.a ]]; then
 	echo Bootstrapping sysroot
 	compileflags=( "-nostdlib" "-nostartfiles" )
 	configureflags=()
-set +x
-		"$scriptroot/configure" --host "$HOST" \
+
+	"$scriptroot/configure" --host "$HOST" \
 		CFLAGS="$(join_by ' ' ${compileflags[@]})" \
 			CXXFLAGS="$CFLAGS" \
 			LDFLAGS="$CFLAGS" \

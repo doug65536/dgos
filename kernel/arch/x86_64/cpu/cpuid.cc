@@ -3,6 +3,7 @@
 #include "string.h"
 #include "likely.h"
 #include "control_regs_constants.h"
+#include "assert.h"
 
 // max_leaf[0] holds max supported leaf
 // max_leaf[1] holds max supported extended leaf
@@ -10,6 +11,14 @@ static uint32_t max_leaf[2];
 
 cpuid_cache_t cpuid_cache;
 int cpuid_nx_mask;
+
+static char const sig_hv_tcg[12] = {
+    'T', 'C', 'G', 'T', 'C', 'G', 'T', 'C', 'G', 'T', 'C', 'G'
+};
+
+static char const sig_hv_kvm[12] = {
+    'K', 'V', 'M', 'K', 'V', 'M', 'K', 'V', 'M', 0, 0, 0
+};
 
 void cpuid_init()
 {
@@ -52,6 +61,7 @@ void cpuid_init()
         cpuid_cache.has_2mpage  = info.edx & (1U << 3);
         cpuid_cache.has_1gpage  = info.edx & (1U << 26);
         cpuid_cache.has_nx      = info.edx & (1U << 20);
+        cpuid_cache.has_perfctr = info.ecx & (1U << 23);
     }
 
     if (cpuid(&info, CPUID_INFO_EXT_FEATURES, 0)) {
@@ -91,6 +101,25 @@ void cpuid_init()
 
     if (cpuid_cache.is_intel)
         cpuid_cache.bug_meltdown = true;
+
+    if (cpuid_is_hypervisor() && cpuid(&info, CPUID_HYPERVISOR, 0)) {
+        char str[12];
+        memcpy(str + 0, &info.ebx, 4);
+        memcpy(str + 4, &info.ecx, 4);
+        memcpy(str + 8, &info.edx, 4);
+
+        C_ASSERT(sizeof(sig_hv_kvm) == 12);
+        C_ASSERT(sizeof(sig_hv_tcg) == 12);
+
+        if (!memcmp(sig_hv_kvm, str, 12))
+            cpuid_cache.hv_type = hv_type_t::KVM;
+        else if (!memcmp(sig_hv_tcg, str, 12))
+            cpuid_cache.hv_type = hv_type_t::TCG;
+        else
+            cpuid_cache.hv_type = hv_type_t::UNKNOWN;
+    } else {
+        cpuid_cache.hv_type = hv_type_t::NONE;
+    }
 }
 
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)

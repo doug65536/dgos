@@ -21,7 +21,8 @@ int sys_init_module(char const *module, ptrdiff_t module_sz,
 
     ext::unique_mmap<char> mem;
 
-    if (unlikely(!mem.mmap(nullptr, module_sz, PROT_READ | PROT_WRITE,
+    if (unlikely(!mem.mmap(nullptr, module_sz,
+                           PROT_READ | PROT_WRITE,
                            MAP_POPULATE, -1, 0)))
         return -int(errno_t::ENOMEM);
 

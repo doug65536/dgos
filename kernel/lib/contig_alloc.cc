@@ -1,8 +1,10 @@
 #include "contig_alloc.h"
 #include "printk.h"
+#include "engunit.h"
 
 #include "inttypes.h"
 #include "cpu/atomic.h"
+#include "mmu.h"
 
 #define DEBUG_LINEAR_SANITY     0
 #define DEBUG_ADDR_ALLOC        0
@@ -27,6 +29,8 @@ void contiguous_allocator_t::set_early_base(linaddr_t *base_ptr)
 
 uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
 {
+    scoped_lock lock(free_addr_lock);
+
     this->name = name;
 
 //    linaddr_t initial_addr = *linear_base_ptr;
@@ -44,7 +48,6 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
         // and align to 1GB boundary to make pointers more readable
         aligned_base = prev_base;
 
-
         // Page align
         aligned_base = (aligned_base + PAGE_SIZE - 1) & -PAGE_SIZE;
 
@@ -52,13 +55,17 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
 //        aligned_base += (1 << 30) - 1;
 //        aligned_base &= -(1 << 30);
 
-        std::pair<tree_t::iterator, bool> ins_by_size =
-                free_addr_by_size.insert({size, aligned_base});
+
+        mm_get_free_page_count();
+
+
+        std::pair<tree_t::iterator, bool>
+                ins_by_size = free_addr_by_size.insert({size, aligned_base});
 
         free_addr_by_addr.share_allocator(free_addr_by_size);
 
-        std::pair<tree_t::iterator, bool> ins_by_addr =
-            free_addr_by_addr.insert({aligned_base, size});
+        std::pair<tree_t::iterator, bool>
+                ins_by_addr = free_addr_by_addr.insert({aligned_base, size});
 
         if (likely(*linear_base_ptr == prev_base))
             break;
@@ -70,18 +77,19 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
         // retry...
     }
 
-    validate();
+    ready = true;
+
+    validate_locked(lock);
 
     return aligned_base;
 }
 
-void contiguous_allocator_t::init(
+EXPORT void contiguous_allocator_t::init(
         linaddr_t addr, size_t size, char const *name)
 {
-    this->name = name;
+    scoped_lock lock(free_addr_lock);
 
-//    free_addr_by_addr.init(contiguous_allocator_cmp_key, nullptr);
-//    free_addr_by_size.init(contiguous_allocator_cmp_both, nullptr);
+    this->name = name;
 
     if (size) {
         free_addr_by_size.insert({size, addr});
@@ -89,13 +97,12 @@ void contiguous_allocator_t::init(
         free_addr_by_addr.insert({addr, size});
     }
 
-    validate();
+    validate_locked(lock);
 
-    //dump("After init\n");
     ready = true;
 }
 
-uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
+EXPORT uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 {
     linaddr_t addr;
 
@@ -103,8 +110,14 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
         scoped_lock lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
-        dump("Before Alloc %#" PRIx64 "\n", size);
+        //dump("Before Alloc %#" PRIx64 "\n", size);
+        validate_locked(lock);
 #endif
+
+//        free_addr_by_size.dump("by size before alloc_linear");
+//        free_addr_by_size.validate();
+//        free_addr_by_addr.dump("addr before alloc_linear");
+//        free_addr_by_addr.validate();
 
         // Find the lowest address item that is big enough
         tree_t::iterator place = free_addr_by_size.lower_bound({size, 0});
@@ -117,29 +130,37 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 
         assert(by_size.first >= size);
 
-        // Erase the pair of entries
-        free_addr_by_size.erase(place);
+        // Extract the pair of entries
+        tree_t::node_type node_by_size = free_addr_by_size.extract(place);
 
-        bool did_del = free_addr_by_addr.erase({by_size.second,
-                                                by_size.first}) > 0;
-        assert(did_del);
+        tree_t::node_type node_by_addr =
+                free_addr_by_addr.extract({by_size.second,
+                                           by_size.first});
+
+        assert(bool(node_by_size));
+        assert(bool(node_by_addr));
+
+        std::pair<tree_t::iterator, bool> chk;
 
         if (by_size.first > size) {
             // Insert remainder by size
-            free_addr_by_size.insert({by_size.first - size,
-                                      by_size.second + size});
+            node_by_size.value() = { by_size.first - size,
+                    by_size.second + size };
+            chk = free_addr_by_size.insert(std::move(node_by_size));
+            assert(chk.second);
 
             // Insert remainder by address
-            free_addr_by_addr.insert({by_size.second + size,
-                                      by_size.first - size});
+            node_by_addr.value() = {by_size.second + size,
+                    by_size.first - size};
+            chk = free_addr_by_addr.insert(std::move(node_by_addr));
+            assert(chk.second);
         }
 
         addr = by_size.second;
 
-        validate();
-
 #if DEBUG_ADDR_ALLOC
-        dump("after alloc_linear sz=%#zx addr=%#zx\n", size, addr);
+        //dump("after alloc_linear sz=%#zx addr=%#zx\n", size, addr);
+        validate_locked(lock);
 #endif
 
 #if DEBUG_LINEAR_SANITY
@@ -148,7 +169,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 #endif
 
 #if DEBUG_ADDR_ALLOC
-        printdbg("Took address space @ %#" PRIx64
+        printdbg("Allocated address space @ %#" PRIx64
                  ", size=%#" PRIx64 "\n", addr, size);
 #endif
     } else {
@@ -216,271 +237,428 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
  *
  */
 
-bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
-                                         bool require_free)
+EXPORT bool contiguous_allocator_t::take_linear(
+        linaddr_t addr, size_t size, bool require_free)
 {
+    scoped_lock lock(free_addr_lock);
+
+#if DEBUG_ADDR_ALLOC
+    //dump("---- Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
+#endif
+
+    assert(size > 0);
+
+    assert(free_addr_by_addr.size() == free_addr_by_size.size());
+
     assert(!free_addr_by_addr.empty());
     assert(!free_addr_by_size.empty());
 
-    scoped_lock lock(free_addr_lock);
+    uintptr_t end = addr + size;
 
-    linaddr_t end = addr + size;
+    tree_t::iterator lo_it = free_addr_by_addr.lower_bound({addr, 0});
+    tree_t::iterator hi_it = free_addr_by_addr.lower_bound({end, 0});
+    tree_t::value_type item;
+    tree_t::value_type pred;
+    tree_t::iterator pred_it;
 
-    // Find the last free range that begins before or at the address
-    tree_t::iterator by_addr_place = free_addr_by_addr.lower_bound({addr, 0});
+    std::pair<tree_t::iterator, bool> chk;
 
-    tree_t::iterator next_place;
+    if (lo_it != free_addr_by_addr.begin()) {
+        pred_it = lo_it;
+        --pred_it;
+        pred = *pred_it;
+    }
 
-    tree_t::value_type new_before;
-    tree_t::value_type new_after;
+    if (lo_it != free_addr_by_addr.end()) {
+        item = *lo_it;
+    }
 
-    for (; by_addr_place != free_addr_by_addr.end();
-         by_addr_place = next_place) {
-        tree_t::value_type by_addr = *by_addr_place;
+    uintptr_t item_end = item.first + item.second;
+    uintptr_t pred_end = pred.first + pred.second;
 
-        // Check for sane virtual address (48 bit signed)
-        assert((by_addr.first + (UINT64_C(1) << 47)) <
-               (UINT64_C(1) << 48));
-        // Check for sane size
-        assert(by_addr.second < (UINT64_C(1) << 48));
-
-        if (by_addr.first <= addr && (by_addr.first + by_addr.second) >= end) {
-            // The free range entry begins before or at the addr,
-            // and the block ends at or after addr+size
-            // Therefore, need to punch a hole in this free block
-
-            next_place = by_addr_place + 1;
-
-            // Delete the size entry
-            free_addr_by_size.erase({by_addr.second, by_addr.first});
-
-            // Delete the address entry
-            free_addr_by_addr.erase(by_addr_place);
-
-            // Free space up to beginning of hole
-            new_before = {
-                // addr
-                by_addr.first,
-                // size
-                addr - by_addr.first
-            };
-
-            // Free space after end of hole
-            new_after = {
-                // addr
-                end,
-                // size
-                (by_addr.first + by_addr.second) - end
-            };
-
-            // Insert the by-address free entry before the range if not null
-            if (new_before.second > 0)
-                free_addr_by_addr.insert(new_before);
-
-            // Insert the by-address free entry after the range if not null
-            if (new_after.second > 0)
-                free_addr_by_addr.insert(new_after);
-
-            // Insert the by-size free entry before the range if not null
-            if (new_before.second > 0)
-                free_addr_by_size.insert({new_before.second, new_before.first});
-
-            // Insert the by-size free entry after the range if not null
-            if (new_after.second > 0)
-                free_addr_by_size.insert({new_after.second, new_after.first});
-
-            validate();
-
-            // Easiest case, whole thing in one range, all done
-            return true;
-        } else if (require_free) {
-            // At this point, the range didn't lie entirely within a free
-            // range, and they want to fail if it isn't all free, so fail
+    if (require_free) {
+        if (addr >= item.first && addr < item_end &&
+                end - item.first < size)
             return false;
-        } else if (by_addr.first >= end) {
-            // Ran off the end of relevant range, therefore done
-//            dump("Nothing to do, allocating addr=%#zx, size=%#zx\n",
-//                 addr, size);
-            return true;
-        } else if (by_addr.first < addr &&
-                   by_addr.first + by_addr.second > addr) {
-            //
-            // The found free block is before the range and overlaps it
 
-            next_place = by_addr_place + 1;
+        if (addr >= pred.first && addr < pred_end &&
+                end - pred.first < size)
+            return false;
+    }
 
-            // Delete the size entry
-            free_addr_by_size.erase({by_addr.second, by_addr.first});
+    tree_t::value_type before;
+    tree_t::value_type after;
 
-            // Delete the address entry
-            free_addr_by_addr.erase(by_addr_place);
+    tree_t::node_type item_by_addr;
+    tree_t::node_type item_by_size;
 
-            // Create a smaller block that does not overlap taken range
-            // Chop off size so that range ends at addr
-            by_addr.second = addr - by_addr.first;
+    if (pred.second) {
 
-            // Insert smaller range by address
-            free_addr_by_addr.insert(by_addr);
+        if (pred_end > addr) {
+            // Carve some out of predecessor
+            before = {pred.first,
+                      addr > pred.first
+                      ? addr - pred.first
+                      : 0};
 
-            // Insert smaller range by size
-            free_addr_by_size.insert({by_addr.second, by_addr.first});
+            after = {end,
+                     pred_end > end
+                     ? pred_end - end
+                     : 0};
 
-            validate();
+            item_by_addr = free_addr_by_addr.extract(pred_it);
+            item_by_size = free_addr_by_size.extract({pred.second,
+                                                      pred.first});
+            assert((bool)item_by_size);
 
-            // Keep going...
-            continue;
-        } else if (by_addr.first >= addr && by_addr.first + by_addr.second <= end) {
-            //
-            // Range completely covers block, delete block
+            if (before.second) {
+                item_by_addr.value() = before;
 
-            next_place = by_addr_place + 1;
+                item_by_size.value() = {before.second, before.first};
 
-            free_addr_by_size.erase({by_addr.second, by_addr.first});
+                chk = free_addr_by_addr.insert(std::move(item_by_addr));
+                assert(chk.second);
 
-            free_addr_by_addr.erase(by_addr_place);
+                chk = free_addr_by_size.insert(std::move(item_by_size));
+                assert(chk.second);
+            }
 
-            validate();
+            if (after.second) {
+                if (item_by_addr) {
+                    item_by_addr.value() = after;
 
-            // Keep going...
-            continue;
-        } else if (by_addr.first > addr && by_addr.first < end) {
-            //
-            // Range cut off some of beginning of block
+                    item_by_size.value() = {after.second, after.first};
 
-            next_place = by_addr_place + 1;
+                    chk = free_addr_by_addr.insert(std::move(item_by_addr));
+                    assert(chk.second);
 
-            free_addr_by_size.erase({by_addr.second, by_addr.first});
-            free_addr_by_addr.erase(by_addr_place);
+                    chk = free_addr_by_size.insert(std::move(item_by_size));
+                    assert(chk.second);
+                } else {
+                    chk = free_addr_by_addr.insert(after);
+                    assert(chk.second);
 
-            size_t removed = end - by_addr.second;
-
-            by_addr.first += removed;
-            by_addr.second -= removed;
-
-            free_addr_by_addr.insert({by_addr.first, by_addr.second});
-            free_addr_by_size.insert({by_addr.second, by_addr.first});
-
-            validate();
-
-            // Keep going...
-            continue;
-        } else if (by_addr.first + by_addr.second <= addr) {
-            // We went past relevant range, done
-            return true;
-        } else {
-            assert(!"What now?");
+                    chk = free_addr_by_size.insert({after.second,
+                                                    after.first});
+                    assert(chk.second);
+                }
+            }
         }
     }
+
+    while (lo_it != free_addr_by_addr.end() && lo_it != hi_it) {
+        tree_t::value_type item = *lo_it;
+
+        if (item.first >= end)
+            break;
+
+        uintptr_t item_end = item.first + item.second;
+
+        before = {item.first,
+                  addr > item.first
+                  ? addr - item.first
+                  : 0};
+
+        after = {end,
+                 item_end > end
+                 ? item_end - end
+                 : 0};
+
+        item_by_addr = free_addr_by_addr.extract(lo_it);
+        item_by_size = free_addr_by_size.extract({item.second,
+                                                 item.first});
+        assert(bool(item_by_addr));
+        assert(bool(item_by_size));
+
+        if (before.second) {
+            item_by_addr.value() = before;
+
+            item_by_size.value() = {before.second, before.first};
+
+            chk = free_addr_by_addr.insert(std::move(item_by_addr));
+            assert(chk.second);
+
+            chk = free_addr_by_size.insert(std::move(item_by_size));
+            assert(chk.second);
+        }
+
+        if (after.second) {
+            if (item_by_addr) {
+                item_by_addr.value() = after;
+
+                item_by_size.value() = {after.second, after.first};
+
+                chk = free_addr_by_addr.insert(std::move(item_by_addr));
+                assert(chk.second);
+
+                chk = free_addr_by_size.insert(std::move(item_by_size));
+                assert(chk.second);
+            } else {
+                chk = free_addr_by_addr.insert(after);
+                assert(chk.second);
+
+                chk = free_addr_by_size.insert({after.second, after.first});
+                assert(chk.second);
+            }
+        }
+    }
+
+    assert(free_addr_by_addr.size() == free_addr_by_size.size());
 
     return true;
 }
 
-void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
+EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 {
-    linaddr_t end = addr + size;
-
     scoped_lock lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
-    dump("---- Free %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
+    //dump("---- Free %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
+    validate_locked(lock);
+
+    if (addr == 0xfffffd0052257000 && size == 0x40000)
+        dump_locked(lock, "before bug");
 #endif
 
-    // Find the nearest free block before the freed range
-    tree_t::iterator pred_it = free_addr_by_addr.lower_bound({addr, 0});
+    assert(free_addr_by_addr.size() == free_addr_by_size.size());
 
-    tree_t::key_type pred{};
+    tree_t::value_type range{addr, size};
+    uintptr_t end = addr + size;
 
-    if (pred_it != free_addr_by_addr.end())
-        pred = *pred_it;
+    std::pair<tree_t::iterator, bool>
+            ins = free_addr_by_addr.insert(range);
 
-    uint64_t pred_end = pred.first + pred.second;
+    if (addr == 0xfffffd0052257000 && size == 0x40000)
+        dump_locked(lock, "bug insert");
 
-    uintptr_t freed_end = addr + size;
-
-    // See if we landed inside an already free range,
-    // do nothing if so
-    if (unlikely(pred.first < addr && pred_end >= freed_end))
+    // Did we luckily free a range that already exactly exists?
+    if (unlikely(!ins.second))
         return;
 
-    // Find the nearest free block after the freed range
-    tree_t::iterator succ_it = free_addr_by_addr.lower_bound({end, ~0UL});
+    std::pair<tree_t::iterator, bool>
+            ins_size = free_addr_by_size.insert({range.second, range.first});
 
-    tree_t::value_type succ{};
 
-    if (succ_it != free_addr_by_addr.end() && succ_it != pred_it)
-        succ = *succ_it;
-    else if (succ_it != free_addr_by_addr.end())
-        succ = pred;
+    if (addr == 0xfffffd0052257000 && size == 0x40000)
+        assert(ins.second == ins_size.second);
 
-    int coalesce_pred = ((pred.first + pred.second) == addr);
-    int coalesce_succ = (succ.first == end);
+    tree_t::node_type ins_node;
+    tree_t::node_type ins_size_node;
 
-    if (coalesce_pred) {
-        addr -= pred.second;
-        size += pred.second;
-        free_addr_by_addr.erase(pred_it);
+    // Do this before we extract, because it makes traversal work
+    tree_t::iterator succ_it = ins.first;
+    ++succ_it;
 
-        free_addr_by_size.erase({pred.second, pred.first});
+    std::pair<tree_t::iterator, bool> chk;
+
+    // If there is a predecessor
+    if (ins.first != free_addr_by_addr.begin()) {
+        // See if we need to coalesce with predecessor
+        tree_t::iterator pred_it = ins.first;
+        --pred_it;
+
+        tree_t::value_type pred = *pred_it;
+
+        size_t pred_end = pred.first + pred.second;
+
+        // If overlapping or adjacent
+        if (pred.first <= addr && pred_end >= addr) {
+            // If freeing inside an already freed region
+            if (addr > pred.first) {
+                // Move start of freed region to line up with
+                // overlapping one being replaced
+                addr = pred.first;
+                size = end - addr;
+            }
+
+            // If freeing inside an already freed region
+            if (end < pred_end) {
+                end = pred_end;
+                // Move end of freed region to line up with
+                // overlapping one being replaced
+                size = end - addr;
+            }
+
+            // Remove interfering/adjacent/overlapping free range
+            free_addr_by_addr.erase(pred_it);
+            size_t n = free_addr_by_size.erase({pred.second,
+                                                pred.first});
+            assert(n == 1);
+
+            //free_addr_by_addr.dump("after erasing interfering node");
+
+            // Extract the new node
+            ins_node = free_addr_by_addr.extract(ins.first);
+            assert(bool(ins_node));
+
+            //free_addr_by_addr.dump("after extracting inserted node");
+
+            ins_size_node = free_addr_by_size.extract({ins.first->second,
+                                                       ins.first->first});
+            assert(bool(ins_node));
+
+            // Adjust the inserted range to cover entire area of predecessor
+            addr = pred.first;
+            size = end - pred.first;
+
+            ins_node.value() = {addr, size};
+            ins_size_node.value() = {size, addr};
+        }
     }
 
-    if (coalesce_succ) {
-        size += succ.second;
-        free_addr_by_addr.erase(succ_it);
+    while (succ_it != free_addr_by_addr.end()) {
+        tree_t::value_type succ = *succ_it;
+        uintptr_t succ_end = succ.first + succ.second;
 
-        free_addr_by_size.erase({succ.second, succ.first});
+        // Stop coalescing when hitting node that begins after
+        // end of inserted range
+        if (succ.first > end)
+            break;
+
+        // Coalesce with successor
+        succ_it = free_addr_by_addr.erase(succ_it);
+        size_t n = free_addr_by_size.erase({succ.second, succ.first});
+        assert(n == 1);
+
+        if (!ins_node) {
+            ins_node = free_addr_by_addr.extract(ins.first);
+            assert(bool(ins_node));
+
+            ins_size_node = free_addr_by_size.extract({ins.first->second,
+                                                       ins.first->first});
+            assert(bool(ins_size_node));
+        }
+
+        size = succ_end - addr;
+
+        ins_node.value() = {addr, size};
+        ins_size_node.value() = {size, addr};
     }
 
-    free_addr_by_size.insert({size, addr});
-    free_addr_by_addr.insert({addr, size});
+    if (succ_it == free_addr_by_addr.end() && addr + size < end) {
+        // Freed region extends past end of existing nodes
+        size = end - addr;
+
+        if (!ins_node) {
+            ins_node = free_addr_by_addr.extract(ins.first);
+            assert(bool(ins_node));
+
+            ins_size_node = free_addr_by_size.extract({ins.first->second,
+                                                       ins.first->first});
+            assert(bool(ins_size_node));
+        }
+
+        ins_node.value() = {addr, size};
+        ins_size_node.value() = {size, addr};
+    }
+
+    assert(addr == ins.first->first);
+    assert(size == ins.first->second);
+
+    if (ins_node) {
+        assert(bool(ins_size_node));
+
+        chk = free_addr_by_addr.insert(std::move(ins_node));
+        assert(chk.second);
+
+        //dump("after inserting extracted node");
+
+        chk = free_addr_by_size.insert(std::move(ins_size_node));
+        assert(chk.second);
+    }
+
+    assert(free_addr_by_addr.size() == free_addr_by_size.size());
 
 #if DEBUG_ADDR_ALLOC
-    dump("Addr map by addr (after free)");
+    if (addr == 0xfffffd0052257000 && size==0x40000)
+        dump_locked(lock, "after bug");
+
+    //dump("Addr map by addr (after free)");
+    validate_locked(lock);
 #endif
 }
 
-void contiguous_allocator_t::dump(char const *format, ...) const
+
+
+EXPORT void contiguous_allocator_t::dump(char const *format, ...) const
 {
     va_list ap;
     va_start(ap, format);
-    vprintdbg(format, ap);
+    dumpv(format, ap);
     va_end(ap);
+}
 
-    printdbg("By addr\n");
+EXPORT void contiguous_allocator_t::dumpv(char const *format, va_list ap) const
+{
+    scoped_lock lock(free_addr_lock);
+    return dump_lockedv(lock, format, ap);
+}
+
+EXPORT void contiguous_allocator_t::dump_lockedv(
+        scoped_lock &lock, char const *format, va_list ap) const
+{
+    vprintdbg(format, ap);
+
+    printdbg("\nBy addr\n");
     for (tree_t::const_iterator st = free_addr_by_addr.begin(),
          en = free_addr_by_addr.end(), it = st, prev; it != en; ++it) {
+        engineering_t eng(it->second);
+
         if (it != st && prev->first + prev->second < it->first) {
-            printdbg("gap, addr=%#zx, size=%#zx\n",
+            printdbg("---  addr=%#zx, size=%#zx (%s)\n",
                      prev->first + prev->second, it->first -
-                     (prev->first + prev->second));
+                     (prev->first + prev->second),
+                     engineering_t(it->first -
+                                   (prev->first + prev->second)).ptr());
         }
 
-        printdbg("ent, addr=%#zx, size=%#zx\n", it->first, it->second);
+
+        printdbg("ent, addr=%#zx, size=%#zx (%s)\n",
+                 it->first, it->second,
+                 eng.ptr());
 
         prev = it;
     }
+    free_addr_by_addr.dump("tree");
 
-    printdbg("By size\n");
+    printdbg("\nBy size\n");
     dump_addr_tree(&free_addr_by_size, "size", "addr");
+    free_addr_by_size.dump("tree");
 }
 
-bool contiguous_allocator_t::validate() const
+
+EXPORT void contiguous_allocator_t::dump_locked(
+        scoped_lock &lock, char const *format, ...) const
 {
+    va_list ap;
+    va_start(ap, format);
+    dump_lockedv(lock, format, ap);
+    va_end(ap);
+}
+
+EXPORT bool contiguous_allocator_t::validate_locked(scoped_lock& lock) const
+{
+    free_addr_by_addr.validate();
+    free_addr_by_size.validate();
+
     // Every by-addr entry matches a corresponding by-size entry
-    for (tree_t::const_iterator it = free_addr_by_addr.begin(), en =
-         free_addr_by_addr.end(); it != en; ++it) {
-        tree_t::const_iterator other =
-                free_addr_by_size.find({it->second, it->first});
+    for (tree_t::const_iterator
+         it = free_addr_by_addr.begin(),
+         en = free_addr_by_addr.end();
+         it != en; ++it) {
+        tree_t::const_iterator
+                other = free_addr_by_size.find({it->second, it->first});
         if (other == free_addr_by_size.end())
-            return validation_failed();
+            return validation_failed(lock);
     }
 
     // Every by-size entry matches a corresponding by-address entry
     for (tree_t::const_iterator it = free_addr_by_size.begin(),
          en = free_addr_by_size.end(); it != en; ++it) {
-        tree_t::const_iterator other =
-                free_addr_by_addr.find({it->second, it->first});
+        tree_t::const_iterator
+                other = free_addr_by_addr.find({it->second, it->first});
         if (unlikely(other == free_addr_by_addr.end())) {
-            return validation_failed();
+            return validation_failed(lock);
         }
     }
 
@@ -492,7 +670,7 @@ bool contiguous_allocator_t::validate() const
             uintptr_t end = prev->first + prev->second;
 
             if (unlikely(end > it->first))
-                return validation_failed();
+                return validation_failed(lock);
         }
 
         prev = it;
@@ -501,9 +679,10 @@ bool contiguous_allocator_t::validate() const
     return true;
 }
 
-bool contiguous_allocator_t::validation_failed() const
+_noinline
+bool contiguous_allocator_t::validation_failed(scoped_lock &lock) const
 {
-    dump("contiguous allocator validation failed\n");
-
+    dump_locked(lock, "contiguous allocator validation failed\n");
+    cpu_debug_break();
     return false;
 }

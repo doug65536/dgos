@@ -515,3 +515,16 @@ fs_base_t *fs_from_id(size_t id);
 void probe_storage_factory(storage_if_factory_t *factory);
 
 __END_DECLS
+
+class intern_str_t {
+public:
+    std::shared_mutex intern_lock;
+    std::vector<char *> intern_lookup;
+
+    // Intern if necessary, and hold a ref to the string
+    intern_str_t(char const *s)
+    {
+
+    }
+    size_t token;
+};

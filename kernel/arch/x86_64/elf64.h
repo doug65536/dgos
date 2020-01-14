@@ -26,7 +26,10 @@ int modload_run(module_t *module);
 
 module_t *modload_closest(ptrdiff_t address);
 std::string const& modload_get_name(module_t *module);
-ptrdiff_t modload_get_base(module_t *module);
+uintptr_t modload_get_base(module_t *module);
+size_t modload_get_size(module_t *module);
+size_t modload_get_count();
+module_t *modload_get_index(size_t i);
 
 int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle);
 

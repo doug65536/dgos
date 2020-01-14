@@ -293,7 +293,22 @@ constexpr _RandomIt lower_bound(_RandomIt __first, _RandomIt __last,
         __st = __is_less ? __md + 1 : __st;
         __en = __is_less ? __en : __md;
     }
-    return __first + __md;
+    return __first + __st;
+}
+
+template<typename _RandomIt, typename _Val, typename _Compare>
+constexpr _RandomIt lower_bound(_RandomIt __first, _RandomIt __last,
+                                _Val const& __val, _Compare __cmp)
+{
+    size_t __st = 0;
+    size_t __en = __last - __first;
+    while (__st < __en) {
+        size_t __md = ((__en - __st) >> 1) + __st;
+        bool __is_less = __cmp(__first[__md], __val);
+        __st = __is_less ? __md + 1 : __st;
+        __en = __is_less ? __en : __md;
+    }
+    return __first + __st;
 }
 
 __BEGIN_NAMESPACE_DETAIL
@@ -328,18 +343,18 @@ extern uintptr_t quicksort_swp_count;
 
 // Partition an array given an inclusive index range, return partition index
 template<typename _T, typename _Compare>
-constexpr size_t hoare_partition(_T* a, size_t __lo, size_t __hi,
+constexpr size_t hoare_partition(_T* __a, size_t __lo, size_t __hi,
                                  _Compare&& __is_less)
 {
-    _T *__pivot = a + (__lo + ((__hi - __lo) >> 1));
+    _T *__pivot = __a + (__lo + ((__hi - __lo) >> 1));
 
     for (;;) {
-        while (__is_less(a[__lo], *__pivot)) {
+        while (__is_less(__a[__lo], *__pivot)) {
             ++quicksort_cmp_count;
             ++__lo;
         }
 
-        while (__is_less(*__pivot, a[__hi])) {
+        while (__is_less(*__pivot, __a[__hi])) {
             ++quicksort_cmp_count;
             --__hi;
         }
@@ -348,13 +363,13 @@ constexpr size_t hoare_partition(_T* a, size_t __lo, size_t __hi,
             return __hi;
 
         ++quicksort_swp_count;
-        std::swap(a[__lo], a[__hi]);
+        std::swap(__a[__lo], __a[__hi]);
 
         // Pivot follows the swap if it was involved
-        __pivot = __pivot == &a[__hi]
-                ? &a[__lo]
-                : __pivot == &a[__lo]
-                ? &a[__hi]
+        __pivot = __pivot == &__a[__hi]
+                ? &__a[__lo]
+                : __pivot == &__a[__lo]
+                ? &__a[__hi]
                 : __pivot;
 
         ++__lo;

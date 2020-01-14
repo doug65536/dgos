@@ -424,3 +424,10 @@ public:
 
 private:
 };
+
+_use_result
+uint_least64_t mm_memory_remaining();
+_use_result
+uint_least64_t mm_get_free_page_count();
+_use_result
+uint_least64_t mm_get_phys_mem_size();

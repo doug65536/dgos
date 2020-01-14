@@ -222,26 +222,25 @@ static T strto(char const *str, char **end, int base)
     for (;; ++str) {
         char c = *str;
 
-        if (c >= '0' && c <= '9')
+        if (c >= '0' && c <= '9') {
             digit = c - '0';
-        else if (c >= 'A' && c <= 'Z')
+        } else if (c >= 'A' && c <= 'Z') {
             digit = c + 10 - 'A';
-        else if (c >= 'a' && c <= 'z')
+        } else if (c >= 'a' && c <= 'z') {
             digit = c + 10 - 'a';
-        else if (c == '-' && sign == 0) {
+        } else if (c == '-' && sign == 0) {
             sign = -1;
             continue;
         } else if (c == '+' && sign == 0) {
             sign = 1;
             continue;
+        } else {
+            break;
         }
-        else
+
+        if (unsigned(digit) >= unsigned(base))
             break;
 
-        if (digit >= base)
-            break;
-
-        ++str;
         n *= base;
         n += digit;
     }
@@ -262,7 +261,17 @@ EXPORT long strtol(char const *str, char **end, int base)
     return strto<long>(str, end, base);
 }
 
+EXPORT unsigned long strtoul(char const *str, char **end, int base)
+{
+    return strto<unsigned long>(str, end, base);
+}
+
 EXPORT long long strtoll(char const *str, char **end, int base)
 {
     return strto<long long>(str, end, base);
+}
+
+EXPORT unsigned long long strtoull(char const *str, char **end, int base)
+{
+    return strto<unsigned long long>(str, end, base);
 }

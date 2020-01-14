@@ -3,6 +3,7 @@
 #include "utility.h"
 #include "export.h"
 #include "chrono.h"
+#include "cpu/control_regs.h"
 
 __BEGIN_NAMESPACE_STD
 class mutex;
@@ -17,6 +18,7 @@ class ticketlock;
 class spinlock;
 class shared_spinlock;
 class mcslock;
+class irq_mutex;
 __END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_EXT
@@ -363,6 +365,47 @@ private:
     bool locked;
 };
 
+__END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+class irq_mutex
+{
+public:
+    using mutex_type = std::mutex::mutex_type;
+
+    mutex_type& native_handle()
+    {
+        return inner_lock.native_handle();
+    }
+
+    void lock()
+    {
+        irq_was_enabled = cpu_irq_save_disable();
+        inner_lock.lock();
+    }
+
+    bool try_lock()
+    {
+        irq_was_enabled = cpu_irq_save_disable();
+        if (inner_lock.try_lock())
+            return true;
+        cpu_irq_toggle(irq_was_enabled);
+    }
+
+    void unlock()
+    {
+        inner_lock.unlock();
+        cpu_irq_toggle(irq_was_enabled);
+    }
+
+private:
+    std::mutex inner_lock;
+    bool irq_was_enabled = false;
+};
+__END_NAMESPACE_EXT
+
+__BEGIN_NAMESPACE_STD
+
 enum class cv_status
 {
     no_timeout,
@@ -382,6 +425,7 @@ public:
     void notify_n(size_t n);
 
     void wait(unique_lock<mutex>& lock);
+    void wait(unique_lock<ext::irq_mutex>& lock);
     void wait(unique_lock<ext::spinlock>& lock);
     void wait(unique_lock<ext::ticketlock>& lock);
     void wait(unique_lock<ext::mcslock>& lock);
@@ -389,6 +433,15 @@ public:
     template<typename _Clock, typename _Duration>
     cv_status wait_until(unique_lock<mutex>& lock,
                     chrono::time_point<_Clock, _Duration> const& timeout_time)
+    {
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
+    }
+
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(
+            unique_lock<ext::irq_mutex>& lock,
+            chrono::time_point<_Clock, _Duration> const& timeout_time)
     {
         return wait_until(lock, chrono::steady_clock::time_point(
                               timeout_time).time_since_epoch().count());
@@ -425,6 +478,9 @@ private:
     cv_status wait_until(unique_lock<mutex>& lock,
                          int64_t timeout_time);
 
+    cv_status wait_until(unique_lock<ext::irq_mutex>& lock,
+                         int64_t timeout_time);
+
     cv_status wait_until(unique_lock<ext::spinlock>& lock,
                          int64_t timeout_time);
 
@@ -437,7 +493,6 @@ private:
 
     condition_var_t m;
 };
-
 __END_NAMESPACE_STD
 
 __BEGIN_NAMESPACE_EXT

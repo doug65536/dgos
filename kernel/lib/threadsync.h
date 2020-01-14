@@ -85,7 +85,7 @@ bool rwlock_have_ex(rwlock_t *rwlock);
 
 void condvar_init(condition_var_t *var);
 void condvar_destroy(condition_var_t *var);
-bool condvar_wait(condition_var_t *var, mutex_t *mutex,
+bool condvar_wait_mutex(condition_var_t *var, mutex_t *mutex,
                   int64_t timeout_time = 0);
 void condvar_wake_one(condition_var_t *var);
 void condvar_wake_all(condition_var_t *var);

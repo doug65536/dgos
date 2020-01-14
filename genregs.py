@@ -50,6 +50,7 @@ def print_line(line):
 
 def write_one_prefix(prefix_data):
 	suffix = ''
+	cast = ''
 	max_len = 0
 	prefix = prefix_data['name']
 	prefix_comment = prefix_data['comment']
@@ -63,6 +64,7 @@ def write_one_prefix(prefix_data):
 			max_len = n
 		if item['bit'] + item['bits'] > 32:
 			suffix = 'L'
+			cast = 'uint64_t'
 
 	if prefix_comment is not None:
 		print('')
@@ -106,9 +108,9 @@ def write_one_prefix(prefix_data):
 
 	print('')
 	for item in items:
-		print_line('{} ((n) << {}_{}_BIT)'.format(
+		print_line('{0} ({3}(n) << {1}_{2}_BIT)'.format(
 			define(prefix, item['name'], '_n(n)', max_len),
-			prefix, item['name']
+			prefix, item['name'], cast
 		))
 
 	print('')

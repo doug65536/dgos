@@ -133,7 +133,7 @@ UNITTEST(test_set_int_insert_dup)
     heap_validate();
 }
 
-UNITTEST(test_set_int_excess_iter_inc_at_end)
+UNITTEST(test_set_int_excess_iter_incdec_at_ends)
 {
     heap_validate();
 
@@ -162,6 +162,23 @@ UNITTEST(test_set_int_excess_iter_inc_at_end)
     eq(true, c.rend() == rit);
     eq(true, c.crend() == crit);
 
+    mit = c.begin();
+    cit = c.begin();
+    rit = c.begin();
+    crit = c.begin();
+
+    // Decrement inappropriately at begin
+    --mit;
+    --cit;
+    --rit;
+    --crit;
+
+    // And still at begin, without blowing up
+    eq(true, c.begin() == mit);
+    eq(true, c.cbegin() == cit);
+    eq(true, c.rbegin() == rit);
+    eq(true, c.crbegin() == crit);
+
     heap_validate();
 }
 
@@ -181,6 +198,45 @@ UNITTEST(test_set_int_construct_insert_churn)
     }
 
     heap_validate();
+}
+
+UNITTEST(test_set_first_last)
+{
+    heap_validate();
+
+    std::set<int> c;
+    for (int i = 0; i < 100; ++i)
+        c.insert(i);
+
+    for (int i = 0; i < 50; ++i) {
+        //c.dump("firstlast");
+
+        eq(i, *c.begin());
+        eq(i, *c.cbegin());
+        eq(99 - i, *c.rbegin());
+        eq(99 - i, *c.crbegin());
+
+        std::set<int>::iterator fit = c.erase(c.begin());
+
+        eq(true, fit == c.begin());
+
+        std::set<int>::iterator lit = c.erase(c.rbegin().current());
+
+        eq(true, lit == c.end());
+
+        if (i != 49) {
+            eq(i + 1, *c.begin());
+            eq(i + 1, *c.cbegin());
+            eq(99 - i - 1, *c.rbegin());
+            eq(99 - i - 1, *c.crbegin());
+        } else {
+            eq(true, c.empty());
+            eq(true, c.begin() == c.end());
+            eq(true, c.cbegin() == c.cend());
+            eq(true, c.rbegin() == c.rend());
+            eq(true, c.crbegin() == c.crend());
+        }
+    }
 }
 
 UNITTEST(test_set_int_insert_1k)
@@ -272,6 +328,8 @@ UNITTEST(test_set_int_insert_reverse)
 
     }
 
+    c.dump();
+
     eq(true, c.validate());
 
     eq(size_t(e), c.size());
@@ -358,8 +416,8 @@ UNITTEST(test_set_int_complex_erase)
 
     for (int i = 0; i < 64 + 1024 + 64; ++i) {
         if (i < 64 + 1024) {
-            std::pair<std::set<int>::iterator, bool> ins_pair =
-                    c.insert(inserted_en++);
+            std::pair<std::set<int>::iterator, bool>
+                    ins_pair = c.insert(inserted_en++);
 
             ne(nullptr, &*ins_pair.first);
             eq(true, ins_pair.second);
@@ -385,7 +443,7 @@ UNITTEST(test_set_int_complex_erase)
     eq(true, c.validate());
 }
 
-DISABLED_UNITTEST(test_set_int_every_insert_permutation)
+UNITTEST(test_set_int_every_insert_permutation)
 {
     std::set<int> c;
 
@@ -396,37 +454,34 @@ DISABLED_UNITTEST(test_set_int_every_insert_permutation)
     for (int i = 0; i < 8; ++i)
         order.push_back(i);
 
-    for (int seed = 0; seed < 8; ++seed) {
+    do {
         c.clear();
 
-        do {
-            c.clear();
-            for (int i = 0; i < 8; ++i) {
-                int key = order[i];
+        for (int i = 0; i < 8; ++i) {
+            int key = order[i];
 
-                std::pair<std::set<int>::iterator, bool>
-                        ins_pair = c.insert(key);
+            std::pair<std::set<int>::iterator, bool>
+                    ins_pair = c.insert(key);
 
-                ne(nullptr, &*ins_pair.first);
-                eq(true, ins_pair.second);
-                eq(key, *ins_pair.first);
+            ne(nullptr, &*ins_pair.first);
+            eq(true, ins_pair.second);
+            eq(key, *ins_pair.first);
 
-                eq(true, c.validate());
+            eq(true, c.validate());
 
-                for (int k = 0; k <= i; ++k) {
-                    key = order[i];
-                    auto it = c.find(key);
-                    eq(true, c.end() != it);
-                    eq(key, *it);
-                }
+            for (int k = 0; k <= i; ++k) {
+                key = order[i];
+                auto it = c.find(key);
+                eq(true, c.end() != it);
+                eq(key, *it);
             }
-        } while (std::next_permutation(order.begin(), order.end()));
+        }
+    } while (std::next_permutation(order.begin(), order.end()));
 
-        std::reverse(order.begin(), order.end());
-    }
+    std::reverse(order.begin(), order.end());
 }
 
-UNITTEST(test_set_int_every_erase_order)
+UNITTEST(test_set_int_every_erase_permutation)
 {
     std::vector<int> order;
     std::set<int> c;
@@ -460,17 +515,17 @@ UNITTEST(test_set_int_every_erase_order)
             // Make sure all the ones erased are gone
             for (int k = 0; k <= i; ++k)
                 eq(true, c.end() == c.find(order[k]));
-        }
 
-        eq(true, c.validate());
+            eq(true, c.validate());
+        }
     } while (std::next_permutation(order.begin(), order.end()));
 }
 
 UNITTEST(test_map_insert)
 {
     std::map<int, short> c;
-    std::pair<std::map<int, short>::iterator, bool> ins =
-            c.insert({42, 6500});
+    std::pair<std::map<int, short>::iterator, bool>
+            ins = c.insert({42, 6500});
     eq(true, c.end() != ins.first);
     eq(42, ins.first->first);
     eq(6500, ins.first->second);

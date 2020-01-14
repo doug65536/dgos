@@ -32,6 +32,13 @@ _generic_target bool cpuid_ebx_bit(int bit, uint32_t eax, uint32_t ecx);
 _generic_target bool cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
 _generic_target bool cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
 
+enum struct hv_type_t : uint8_t {
+    NONE,
+    KVM,
+    TCG,
+    UNKNOWN
+};
+
 struct cpuid_cache_t {
     unsigned family     :12;
     unsigned model      :12;
@@ -58,6 +65,7 @@ struct cpuid_cache_t {
     bool has_2mpage     :1;
     bool has_1gpage     :1;
     bool has_nx         :1;
+    bool has_perfctr    :1;
     bool has_fsgsbase   :1;
     bool has_umip       :1;
     bool has_smep       :1;
@@ -74,6 +82,8 @@ struct cpuid_cache_t {
     bool has_l1df       :1;
 
     bool bug_meltdown   :1;
+
+    hv_type_t hv_type;
 
     uint16_t min_monitor_line;
     uint16_t max_monitor_line;
@@ -124,6 +134,12 @@ CPUID_CONST_INLINE bool cpuid_is_hypervisor()
 CPUID_CONST_INLINE bool cpuid_has_nx()
 {
     return cpuid_cache.has_nx;
+}
+
+// Performance counter MSRs
+CPUID_CONST_INLINE bool cpuid_has_perf_ctr()
+{
+    return cpuid_cache.has_perfctr;
 }
 
 // SSE instructions
@@ -288,33 +304,43 @@ CPUID_CONST_INLINE uint8_t cpuid_paddr_bits()
     return cpuid_cache.paddr_bits;
 }
 
-CPUID_CONST_INLINE uint8_t cpuid_has_bug_meltdown()
+CPUID_CONST_INLINE bool cpuid_has_bug_meltdown()
 {
     return cpuid_cache.bug_meltdown;
 }
 
-CPUID_CONST_INLINE uint8_t cpuid_has_ibpb()
+CPUID_CONST_INLINE bool cpuid_has_ibpb()
 {
     // Same as ibrs
     return cpuid_cache.has_ibrs;
 }
 
-CPUID_CONST_INLINE uint8_t cpuid_has_ibrs()
+CPUID_CONST_INLINE bool cpuid_has_ibrs()
 {
     return cpuid_cache.has_ibrs;
 }
 
-CPUID_CONST_INLINE uint8_t cpuid_has_stibp()
+CPUID_CONST_INLINE bool cpuid_has_stibp()
 {
     return cpuid_cache.has_stibp;
 }
 
-CPUID_CONST_INLINE uint8_t cpuid_has_ssbd()
+CPUID_CONST_INLINE bool cpuid_has_ssbd()
 {
     return cpuid_cache.has_ssbd;
 }
 
-CPUID_CONST_INLINE uint8_t cpuid_has_l1d_flush()
+CPUID_CONST_INLINE bool cpuid_has_l1d_flush()
 {
     return cpuid_cache.has_l1df;
+}
+
+CPUID_CONST_INLINE bool cpuid_is_kvm()
+{
+    return cpuid_cache.hv_type == hv_type_t::KVM;
+}
+
+CPUID_CONST_INLINE bool cpuid_is_tcg()
+{
+    return cpuid_cache.hv_type == hv_type_t::TCG;
 }

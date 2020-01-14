@@ -109,7 +109,7 @@
 15:8 LOW LBA low
 7:0 SECCOUNT
 
--- AHCI_HP_SS 3.3.10 Port SATA status
+-- AHCI_HP_SS 3.3.10 Port SATA status (SStatus)
 
 11:8 IPM Interface power management
 7:4 SPD Interface speed
@@ -130,3 +130,9 @@
 -- AHCI_HP_SS_IPM_PARTIAL=2
 -- AHCI_HP_SS_IPM_SLUMBER=6
 -- AHCI_HP_SS_IPM_DEVSLEEP=8
+
+-- AHCI_HP_SC 3.3.11 Port ATA Control (SControl)
+
+11:8 IPM Interface power management
+7:4 SPD Interface speed
+3:0 DET Device detection

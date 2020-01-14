@@ -5,7 +5,7 @@
 #include "export.h"
 #include "debug.h"
 
-EXPORT int assert_failed(char const *expr,
+EXPORT int __assert_failed(char const *expr,
                          char const *msg,
                          char const *file,
                          int line)

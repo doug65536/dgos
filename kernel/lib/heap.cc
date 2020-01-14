@@ -13,10 +13,6 @@
 #include "mm.h"
 #endif
 
-// Enable wiping freed memory with 0xfe
-// and filling allocated memory with 0xf0
-#define HEAP_DEBUG  1
-
 // Enable an extremely large number of validations to occur around things
 #define HEAP_EXCESSIVE_VALIDATION  0
 
@@ -308,6 +304,10 @@ void heap_t::large_free(heap_hdr_t *hdr, size_t size)
 
 void *heap_t::alloc(size_t size)
 {
+    // Assert on utterly ridiculous size
+    // or negative values
+    assert(size < UINT64_C(1) << 36);
+
     if (unlikely(size == 0))
         return nullptr;
 

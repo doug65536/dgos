@@ -17,8 +17,6 @@ type="$2"
 output="$3"
 input="$4"
 
-set -x
-
 if [[ $type == "e" ]]; then
 	$OBJDUMP --syms --demangle --wide "$input" | \
 		grep -P '^[0-9a-f]+\s' | \

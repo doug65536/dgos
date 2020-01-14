@@ -78,9 +78,9 @@ enum struct virtio_blk_op_t : uint8_t {
 };
 
 class virtio_blk_if_t final
-        : public virtio_base_t
-        , public storage_if_base_t
+        : public storage_if_base_t
         , public storage_dev_base_t
+        , public virtio_base_t
 {
     struct per_queue_t;
 
@@ -283,19 +283,23 @@ int virtio_blk_if_t::per_queue_t::io(request_t *request)
 
     size_t i;
     for (i = 0; i < range_count; ++i) {
-        desc_chain[i + 1]->addr = phys_ranges[i].physaddr;
-        desc_chain[i + 1]->len = phys_ranges[i].size;
-        desc_chain[i + 1]->flags.bits.write =
-                (request->op == virtio_blk_op_t::read);
         desc_chain[i]->next = req_queue->index_of(desc_chain[i + 1]);
         desc_chain[i]->flags.bits.next = true;
+
+        desc_chain[i + 1]->addr = phys_ranges[i].physaddr;
+        desc_chain[i + 1]->len = phys_ranges[i].size;
+        desc_chain[i + 1]->flags.bits.write =   // writes RAM
+                (request->op == virtio_blk_op_t::read);
     }
+
+    desc_chain[i]->next = req_queue->index_of(desc_chain[i + 1]);
+    desc_chain[i]->flags.bits.next = true;
 
     desc_chain[i + 1]->addr = mphysaddr(&request->status);
     desc_chain[i + 1]->len = sizeof(request->status);
+    desc_chain[i + 1]->next = -1;
+    desc_chain[i + 1]->flags.bits.next = false;
     desc_chain[i + 1]->flags.bits.write = true;
-    desc_chain[i]->next = req_queue->index_of(desc_chain[i + 1]);
-    desc_chain[i]->flags.bits.next = true;
 
     request->io_iocp.reset(&virtio_blk_if_t::io_completion,
                            uintptr_t(request));

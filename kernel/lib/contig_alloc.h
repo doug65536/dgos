@@ -8,6 +8,8 @@
 // Contiguous allocator
 
 struct contiguous_allocator_t {
+    using lock_type = ext::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 public:
     using linaddr_t = uintptr_t;
 
@@ -22,9 +24,12 @@ public:
     bool take_linear(linaddr_t addr, size_t size, bool require_free);
     void release_linear(uintptr_t addr, size_t size);
     void dump(char const *format, ...) const;
+    void dumpv(char const *format, va_list ap) const;
+    void dump_locked(scoped_lock& lock, char const *format, ...) const;
+    void dump_lockedv(scoped_lock& lock, char const *format, va_list ap) const;
 
-    bool validate() const;
-    bool validation_failed() const;
+    bool validate_locked(scoped_lock &lock) const;
+    bool validation_failed(scoped_lock &lock) const;
 
     struct mmu_range_t {
         linaddr_t base;
@@ -42,9 +47,7 @@ public:
     void each_rv(F callback);
 
 private:
-    using lock_type = ext::mcslock;
-    using scoped_lock = std::unique_lock<lock_type>;
-    lock_type free_addr_lock;
+    lock_type mutable free_addr_lock;
     tree_t free_addr_by_size;
     tree_t free_addr_by_addr;
     linaddr_t *linear_base_ptr = nullptr;

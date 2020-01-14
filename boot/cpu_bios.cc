@@ -247,11 +247,11 @@ extern "C" void code64_run_kernel(void *p);
 extern "C" void code64_reloc_kernel(void *p);
 extern "C" void code64_copy_kernel(void *p);
 
-void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt)
+void reloc_kernel(uint64_t distance, Elf64_Rela const *elf_rela, size_t relcnt)
 {
     struct {
         uint64_t distance;
-        void *elf_rela;
+        void const *elf_rela;
         size_t relcnt;
     } arg = {
         distance,

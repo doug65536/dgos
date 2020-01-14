@@ -3,6 +3,7 @@
 #include "string.h"
 #include "printk.h"
 #include "likely.h"
+#include "type_traits.h"
 
 namespace unittest {
 
@@ -61,7 +62,7 @@ public:
 
     virtual void invoke() = 0;
 
-    void eq(char const *expect, char *value,
+    void eq_str(char const *expect, char const *value,
             char const *file = __builtin_FILE(),
             int line = __builtin_LINE());
 
@@ -130,22 +131,22 @@ private:
 };
 
 template<typename T, typename U>
-void unit::eq_np(T const& expect, U const& value,
-        char const *file, int line)
-{
-    if (unlikely(!(expect == value))) {
-        dbgout << name << " got wrong value\n";
-        fail(file, line);
-    }
-}
-
-template<typename T, typename U>
 void unit::eq(T const& expect, U const& value,
         char const *file, int line)
 {
     if (unlikely(!(expect == value))) {
         dbgout << name << " expected \"" << expect << '"' <<
                   " but got " << value << '\n';
+        fail(file, line);
+    }
+}
+
+template<typename T, typename U>
+void unit::eq_np(T const& expect, U const& value,
+        char const *file, int line)
+{
+    if (unlikely(!(expect == value))) {
+        dbgout << name << " has unwanted value\n";
         fail(file, line);
     }
 }

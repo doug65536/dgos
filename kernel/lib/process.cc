@@ -524,8 +524,8 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp)
 {
     //
     if (!__setjmp(&exit_jmpbuf)) {
-        // First time
-        isr_sysret64(ip, sp);
+        // When interrupts occur, use the stack space we have here
+        isr_sysret64(ip, sp, uint64_t(exit_jmpbuf.rsp) & -16);
         __builtin_trap();
     }
 
@@ -535,8 +535,7 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp)
 
 void *process_t::get_allocator()
 {
-    process_t *process = thread_current_process();
-    return process->linear_allocator;
+    return linear_allocator;
 }
 
 void process_t::set_allocator(void *allocator)

@@ -25,7 +25,7 @@ UNITTEST(test_printk_literal)
     int len = snprintf(buffer.data(), buffer.size(), "Literal");
 
     eq(7, len);
-    eq("Literal", buffer.data());
+    eq_str("Literal", buffer.data());
     still_0xEE_padded(this, buffer, len);
 }
 
@@ -35,31 +35,31 @@ UNITTEST(test_printk_d)
 
     int len = snprintf(buffer.data(), buffer.size(), "%d", 0);
     eq(1, len);
-    eq("0", buffer.data());
+    eq_str("0", buffer.data());
     still_0xEE_padded(this, buffer, len);
 
     std::fill_n(buffer.data(), buffer.size(), 0xEE);
     len = snprintf(buffer.data(), buffer.size(), "%d", -42);
     eq(3, len);
-    eq("-42", buffer.data());
+    eq_str("-42", buffer.data());
     still_0xEE_padded(this, buffer, len);
 
     std::fill_n(buffer.data(), buffer.size(), 0xEE);
     len = snprintf(buffer.data(), buffer.size(), "%d", 42);
     eq(2, len);
-    eq("42", buffer.data());
+    eq_str("42", buffer.data());
     still_0xEE_padded(this, buffer, len);
 
     std::fill_n(buffer.data(), buffer.size(), 0xEE);
     len = snprintf(buffer.data(), buffer.size(), "%d", 2147483647);
     eq(10, len);
-    eq("2147483647", buffer.data());
+    eq_str("2147483647", buffer.data());
     still_0xEE_padded(this, buffer, len);
 
     std::fill_n(buffer.data(), buffer.size(), 0xEE);
     len = snprintf(buffer.data(), buffer.size(), "%d", -2147483647-1);
     eq(11, len);
-    eq("-2147483648", buffer.data());
+    eq_str("-2147483648", buffer.data());
     still_0xEE_padded(this, buffer, len);
 }
 
@@ -70,7 +70,7 @@ UNITTEST(test_printk_u)
     std::fill_n(buffer.data(), buffer.size(), 0xEE);
     int len = snprintf(buffer.data(), buffer.size(), "%u", 4294967295U);
     eq(10, len);
-    eq("4294967295", buffer.data());
+    eq_str("4294967295", buffer.data());
     still_0xEE_padded(this, buffer, len);
 }
 

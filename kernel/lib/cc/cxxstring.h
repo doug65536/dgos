@@ -353,7 +353,13 @@ public:
 
     bool resize(size_type __sz)
     {
-        return __str.resize(__sz);
+        if (likely(__str.resize(__sz))) {
+            if (unlikely(!__str.reserve(__sz + 1)))
+                return false;
+            __str[__sz] = 0;
+            return true;
+        }
+        return false;
     }
 
     bool resize(size_type __sz, _CharT __ch)
@@ -431,11 +437,12 @@ public:
 
     basic_string& append(basic_string const& __rhs)
     {
-        if (unlikely(!__str.reserve(__str.size() + __rhs.size())))
+        if (unlikely(!__str.reserve(__str.size() + __rhs.size() + 1)))
             detail::throw_bad_alloc();
 
         for (_CharT const& __ch : __rhs)
             __str.push_back(__ch);
+        __str[__str.size()] = 0;
 
         return *this;
     }
@@ -466,13 +473,14 @@ public:
         if (__count > __max_count)
             __count = __max_count;
 
-        if (unlikely(!__str.reserve(__str.size() + __count)))
+        if (unlikely(!__str.reserve(__str.size() + __count + 1)))
             detail::throw_bad_alloc();
 
         const_iterator __end = __rhs.begin() + (__pos + __count);
 
         for (const_iterator __src = __rhs.cbegin(); __src != __end; ++__src)
             __str.push_back(*__src);
+        __str[__str.size()] = 0;
 
         return *this;
     }
@@ -481,12 +489,13 @@ public:
     {
         _CharT const *__end = __s + __count;
         size_type __sz = __end - __s;
-        if (unlikely(!__str.reserve(__str.size() + __sz)))
+        if (unlikely(!__str.reserve(__str.size() + __sz + 1)))
             detail::throw_bad_alloc();
 
         for ( ; __s != __end; ++__s)
             __str.push_back(*__s);
 
+        __str[__str.size()] = 0;
         return *this;
     }
 
@@ -496,23 +505,26 @@ public:
         for (__end = __s; *__end; ++__end);
         size_type __sz = __end - __s;
 
-        if (unlikely(!__str.reserve(__str.size() + __sz)))
+        if (unlikely(!__str.reserve(__str.size() + __sz + 1)))
             detail::throw_bad_alloc();
 
         for ( ; __s != __end; ++__s)
             __str.push_back(*__s);
+
+        __str[__str.size()] = 0;
         return *this;
     }
 
     template<typename _InputIt >
     basic_string& append(_InputIt __first, _InputIt __last)
     {
-        if (unlikely(!__str.reserve(__str.size() + (__last - __first))))
+        if (unlikely(!__str.reserve(__str.size() + (__last - __first) + 1)))
             detail::throw_bad_alloc();
 
         for ( ; __first != __last; ++__first)
             __str.push_back(*__first);
 
+        __str[__str.size()] = 0;
         return *this;
     }
 
@@ -972,11 +984,11 @@ struct hash<basic_string<_CharT, _Traits, _Alloc>> {
 };
 
 string to_string(int value);
-string to_string( long value );
-string to_string( long long value );
-string to_string( unsigned value );
-string to_string( unsigned long value );
-string to_string( unsigned long long value );
+string to_string(long value);
+string to_string(long long value);
+string to_string(unsigned value);
+string to_string(unsigned long value);
+string to_string(unsigned long long value);
 #ifndef __DGOS_KERNEL__
 string to_string( float value );
 string to_string( double value );
@@ -984,6 +996,26 @@ string to_string( long double value );
 #endif
 
 __END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+
+std::string to_hex(unsigned long long value, bool prefix = true);
+
+template<typename _T,
+         typename = typename std::enable_if<std::is_integral<_T>::value>::type>
+std::string to_hex(_T value, bool prefix)
+{
+    if (std::is_same<_T, long long>::value)
+        return to_hex((unsigned long long)value, prefix);
+
+    if (std::is_signed<_T>::value)
+        return to_hex((unsigned long long)value & ~-(1ULL << (8*sizeof(_T))),
+                      prefix);
+
+    return to_hex((long long)value & ~-(1LL << (8*sizeof(_T))), prefix);
+}
+
+__END_NAMESPACE_EXT
 
 // Explicit instantiations
 extern template class std::char_traits<char>;

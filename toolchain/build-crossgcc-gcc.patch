@@ -22,7 +22,7 @@ diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i
 +MULTILIB_OPTIONS  += ffreestanding
 +MULTILIB_DIRNAMES  += freestanding
 +
-+#MULTILIB_EXCEPTIONS +=
++MULTILIB_EXCEPTIONS += *m32/*mno-red-zone
 +
 diff -durN gcc-6.2.0/gcc/config.gcc gcc-6.2.0.patched/gcc/config.gcc
 --- gcc-6.2.0/gcc/config.gcc	2016-06-08 06:34:25.000000000 -0700

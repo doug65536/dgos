@@ -5,13 +5,20 @@
 ## Bootloader
 
 - Can boot from hard disk, flash drive, or CD/DVD using BIOS or EFI
+- Either MBR -> bootloader in partition boot sector reserved area,
+  or GPT boot to EFI system partition (GPT hybrid format, working MBR present)
+- BIOS boot runs in 32 bit protected mode, EFI boot runs in 64 bit long mode
 - Implemented mostly in C++
 - Custom bootloader, supports FAT32 with LFN and ISO9660 with Joliet
   boot with unified booloader
+- Filesystem accesses abstracted to use own filesystem implementation
+  and BIOS calls for BIOS boot, or use EFI provided filesystem APIs for EFI
 - Builds page tables and enters ELF64 kernel with CPU fully in long mode
 - Implements SMP trampoline
-- Gets physical memory map from BIOS
+- Gets physical memory map from BIOS or EFI
 - Uses memory map throughout, can tolerate arbitrarily fragmented memory map
+- Memory map is handed over to kernel so all bootloader allocations are
+  accounted in the map
 - Enumerates VESA BIOS video modes and configures video card for kernel
 - Implements basic exception handlers
 - Shows loading progress bar
@@ -19,6 +26,8 @@
   kernel to be loaded to an arbitrary address for kernel address space
   layout randomization.
 - Implements boot menu
+- Abstracts screen output and keyboard input so it can use BIOS
+  or EFI accordingly
 
 ## Kernel
 
@@ -28,8 +37,8 @@
 - Processor affinity
 - full SSE/AVX/AVX2/AVX-512 support using
   fxsave/fxrstor or xsave/xsavec/xsaveopt/xrstor where available
-- Super fast recursive paging implementation
-- Super fast small block heap implementation
+- Recursive paging
+- Per-CPU small block heap
 - Position independent executable memory model with address randomization
 - Demand paged memory
 - Lazy TLB shootdown
@@ -41,7 +50,7 @@
 - GSBASE based CPU-local storage
 - FSBASE per thread
 - Interrupt Stack Table support with emergency stacks for critical exceptions
-- Spinlocks, Reader/Writer Spinlocks
+- MCS locks, Spinlocks, Reader/Writer Spinlocks
 - Mutex, Condition Variable, Reader/Writer locks
 - 8259 or LAPIC/IO-APIC support, multiple IO-APICs supported
 - PCI MSI IRQ support including multiple message capability
@@ -71,8 +80,6 @@
 - Non-temporal memory operations
 - SSE/AVX2 optimized memory operations
 - Framebuffer with offscreen shadow buffer and clipping blitter
-- Smooth subpixel precise line drawing algorithm
-- Linux compatible syscall interface
 - Try/Catch unhandled exception hooking
 - Port 0xE9 based debug output
 - Abstract NIC interface layer
@@ -86,3 +93,6 @@
 - Instrumented call trace generation with ncurses viewer
 - KASAN address sanitizer
 - UBSAN (undefined behavior sanitizer)
+- All filesystems, partition parsers, and device drivers in separate
+  dynamically loaded modules
+- Kernel unit test module (for unit testing parts of the kernel)

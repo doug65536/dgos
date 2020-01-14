@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set +x
-
 IMG="$1"
 TOPSRC="$2"
 

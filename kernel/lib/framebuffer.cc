@@ -1,3 +1,4 @@
+#if 0
 #include "framebuffer.h"
 #include "thread.h"
 #include "mm.h"
@@ -13,14 +14,88 @@
 
 #define CHARHEIGHT 16
 
+struct pix_fmt_t {
+    uint8_t mask_size_r;
+    uint8_t mask_size_g;
+    uint8_t mask_size_b;
+    uint8_t mask_size_a;
+    uint8_t mask_pos_r;
+    uint8_t mask_pos_g;
+    uint8_t mask_pos_b;
+    uint8_t mask_pos_a;
+};
+
+// The values are for little endian machine
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+// The letters in the name are byte order
+static const pix_fmt_t fb_rgba32{8, 8, 8, 8,   0, 8, 16, 24};
+static const pix_fmt_t fb_bgra32{8, 8, 8, 8,   16, 8, 0, 24};
+
+static const pix_fmt_t fb_rgb24{8, 8, 8, 0,   0, 8, 16, 0};
+static const pix_fmt_t fb_bgr24{8, 8, 8, 0,   16, 8, 0, 0};
+
+static const pix_fmt_t fb_rgb565{5, 6, 5, 0,   0, 5, 11, 0};
+static const pix_fmt_t fb_rgb555{5, 5, 5, 0,   0, 5, 10, 0};
+#else
+// The letters in the name are opposite of byte order
+static constexpr const pix_fmt_t fb_bgra32{8, 8, 8, 8,   8, 16, 24, 0};
+static constexpr const pix_fmt_t fb_rgba32{8, 8, 8, 8,   24, 16, 8, 0};
+
+static constexpr const pix_fmt_t fb_rgb24{8, 8, 8, 0,   16, 8, 0, 0};
+static constexpr const pix_fmt_t fb_bgr24{8, 8, 8, 0,   0, 8, 16, 0};
+
+static constexpr const pix_fmt_t fb_rgb565{5, 6, 5, 0,   11, 5, 0, 0};
+static constexpr const pix_fmt_t fb_rgb555{5, 5, 5, 0,   10, 5, 0, 0};
+#endif
+
+struct surface_t {
+    rect_t area;
+    int pitch;
+
+    uint8_t *backing;
+
+    uint8_t bpp, byte_pp;
+    pix_fmt_t pix_fmt;
+
+    surface_t map_noclip(rect_t region);
+    surface_t map(rect_t region);
+    void clear(uint32_t color);
+    void fill_rect(rect_t rect, uint32_t color);
+    void move_rect(rect_t dst, vec2_t src);
+    void draw_chars(vec2_t pos, char32_t *str, size_t len);
+    void blt(rect_t dst, vec2_t src, surface_t *src_surface);
+};
+
+struct fb_coord_t {
+    int x;
+    int y;
+};
+
+struct fb_rect_t {
+    fb_coord_t st;
+    fb_coord_t en;
+};
+
+struct framebuffer_t {
+    uint8_t *video_mem;
+    uint8_t *backing;
+    vbe_selected_mode_t mode;
+    fb_rect_t dirty;
+};
+
+static framebuffer_t fb;
+
 struct bitmap_glyph_t {
     uint8_t bits[CHARHEIGHT];
 };
+
+bitmap_glyph_t const *get_glyph(size_t codepoint);
 
 // Linked in font
 extern bitmap_glyph_t const _binary_u_vga16_raw_start[];
 extern bitmap_glyph_t const _binary_u_vga16_raw_end[];
 
+#if 0
 class framebuffer_console_factory_t
         : public text_dev_factory_t
         , public zero_init_t {
@@ -39,6 +114,7 @@ class framebuffer_console_t : public text_dev_base_t {
 public:
     framebuffer_console_t()
     {
+        screen = (void*)fb.video_mem;
     }
 
     static size_t glyph_index(size_t codepoint);
@@ -51,26 +127,43 @@ private:
     // text_dev_base_t interface
     TEXT_DEV_IMPL
 
+    // The offscreen back buffer copy of the frame bitmap
+    void *shadow = nullptr;
+
+    void *screen = nullptr;
+
+    // The onscreen mapping of the frame bitmap
+    //void *shadow;
+
     friend class framebuffer_console_factory_t;
 
     static void static_init();
 
-    int cursor_x;
-    int cursor_y;
-    int cursor_on;
+    void fill_region(int sx, int sy, int ex, int ey, int character);
 
-    int width;
-    int height;
+    void move_cursor_if_on();
+    void move_cursor_to(int x, int y);
 
-    int ofs_x;
-    int ofs_y;
+    void cap_position(int *px, int *py);
+    void advance_cursor(int distance);
+    void next_line();
 
-    int fg_color;
-    int bg_color;
+    int cursor_x = 0;
+    int cursor_y = 0;
+    int cursor_on = 0;
 
-    int mouse_x;
-    int mouse_y;
-    int mouse_on;
+    int width = 0;
+    int height = 0;
+
+    int ofs_x = 0;
+    int ofs_y = 0;
+
+    int fg_color = 0x123456;
+    int bg_color = 0;
+
+    int mouse_x = 0;
+    int mouse_y = 0;
+    int mouse_on = 0;
 
     static constexpr bitmap_glyph_t const * const glyphs =
             _binary_u_vga16_raw_start;
@@ -96,27 +189,17 @@ uint8_t framebuffer_console_t::ascii_lookup[1 + ascii_max - ascii_min];
 uint16_t framebuffer_console_t::replacement;
 size_t framebuffer_console_t::glyph_count;
 uint16_t *framebuffer_console_t::glyph_codepoints;
+#endif// framebuffer_console
+
+size_t glyph_count;
+uint16_t *glyph_codepoints;
+static constexpr size_t const ascii_min = 32;
+static constexpr size_t const ascii_max = 126;
+uint8_t ascii_lookup[1 + ascii_max - ascii_min];
+size_t glyph_index(size_t codepoint);
+uint16_t replacement;
 
 #define USE_NONTEMPORAL 0
-
-struct fb_coord_t {
-    int x;
-    int y;
-};
-
-struct fb_rect_t {
-    fb_coord_t st;
-    fb_coord_t en;
-};
-
-struct framebuffer_t {
-    uint8_t *video_mem;
-    uint8_t *backing;
-    vbe_selected_mode_t mode;
-    fb_rect_t dirty;
-};
-
-static framebuffer_t fb;
 
 static _always_inline void fb_reset_dirty(void)
 {
@@ -136,7 +219,7 @@ void fb_init(void)
 
     fb.mode = *mode_info;
 
-    size_t screen_size = fb.mode.width * fb.mode.height * sizeof(uint32_t);
+    size_t screen_size = fb.mode.pitch * fb.mode.height * sizeof(uint32_t);
 
     // Round the back buffer size up to a multiple of the cache line size
     screen_size = (screen_size + 63) & -64;
@@ -529,7 +612,7 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
         /// b = grBG
         /// c = BGRb
         /// possible misalignments are
-        /// 3, 2, 1, which, interestingly, is also the number of pixels
+        /// 3, 2, 1, which is also the number of pixels
         /// remaining until it is dword aligned again
         pixel_color &= 0xFFFFFF;
 
@@ -560,14 +643,17 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
         grp[2] = (pixel_color << 8) | (pixel_color >> 16);
 
         while (sy < ey) {
-            memcpy(dest, grp, left_sz);
+            if (left_sz)
+                memcpy(dest, grp, left_sz);
 
             for (int x = sx; x + 3 < ex; ++x) {
                 *((uint32_t*)dest++) = grp[0];
                 *((uint32_t*)dest++) = grp[1];
                 *((uint32_t*)dest++) = grp[2];
             }
-            memcpy(dest, grp, right_sz);
+
+            if (right_sz)
+                memcpy(dest, grp, right_sz);
 
             dest += skip;
             ++sy;
@@ -593,17 +679,29 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
     }
 }
 
-static void scroll_rect(int sx _unused, int sy _unused,
-                        int ex _unused, int ey _unused,
-                        int dx _unused, int dy _unused) {
+static void blt_rect_noclip(surface_t *dst, int dx, int dy,
+                            surface_t *src, int dw, int dh,
+                            int sx, int sy)
+{
+    int dxe = dx + dw;
+    int dye = dy + dh;
+    int sxe = sx + dw;
+    int sye = sx + dh;
+
 
 }
 
-static void draw_char(int x, int y, bitmap_glyph_t const * restrict glyph,
-                      uint32_t fg, uint32_t bg)
+static void scroll_rect(int sx _unused, int sy _unused,
+                        int ex _unused, int ey _unused,
+                        int dx _unused, int dy _unused)
 {
-    if (unlikely(unsigned(x + 8) > fb.mode.width ||
-                 unsigned(y + CHARHEIGHT) > fb.mode.height))
+}
+
+static void fb_draw_char(vec2_t pos, bitmap_glyph_t const * restrict glyph,
+                         uint32_t fg, uint32_t bg)
+{
+    if (unlikely(unsigned(pos.x + 8) > fb.mode.width ||
+                 unsigned(pos.y + CHARHEIGHT) > fb.mode.height))
         return;
 
     // Simple, unclipped...
@@ -618,10 +716,10 @@ static void draw_char(int x, int y, bitmap_glyph_t const * restrict glyph,
         }
     }
 
-    size_t sx = x;
-    size_t sy = y;
-    size_t ex = x + 8;
-    size_t ey = y + CHARHEIGHT;
+    size_t sx = pos.x;
+    size_t sy = pos.y;
+    size_t ex = pos.x + 8;
+    size_t ey = pos.y + CHARHEIGHT;
 
     fg = rgb(fg);
     bg = rgb(bg);
@@ -668,6 +766,12 @@ static void draw_char(int x, int y, bitmap_glyph_t const * restrict glyph,
     }
 }
 
+void fb_draw_char(vec2_t pos, char32_t codepoint, uint32_t fg, uint32_t bg)
+{
+    bitmap_glyph_t const *glyph = get_glyph(codepoint);
+    fb_draw_char(pos, glyph, fg, bg);
+}
+
 void scroll_up(size_t dist, uint32_t bg)
 {
     if (fb.mode.pitch == fb.mode.width * fb.mode.byte_pp) {
@@ -675,29 +779,55 @@ void scroll_up(size_t dist, uint32_t bg)
         uint8_t *dst = fb.video_mem;
         memmove(dst, src, fb.mode.pitch *
                 (fb.mode.height - dist));
-        fill_rect(0, fb.mode.height - dist,
-                  fb.mode.width, fb.mode.height, bg);
+    } else {
+        uint8_t *src = fb.video_mem + dist * fb.mode.pitch;
+        uint8_t *dst = fb.video_mem;
+        for (size_t i = 0; i < dist; ++i) {
+            memmove(dst, src, fb.mode.pitch * fb.mode.width);
+            src += fb.mode.pitch;
+            dst += fb.mode.pitch;
+        }
     }
+    fill_rect(0, fb.mode.height - dist,
+              fb.mode.width, fb.mode.height, bg);
 }
 
-static void draw_str(int x, int y, char const* str,
+static size_t draw_chars(surface_t *s, vec2_t pos,
+                     char const *str,
+                     uint32_t fg, uint32_t bg)
+{
+    if (unlikely(!s->area.is_inside(pos)))
+        return 0;
+
+    int se = s->area.en.x;
+    char const *orig_str = str;
+    while (char32_t codepoint = utf8_to_ucs4_upd(str) && pos.x < se) {
+        fb_draw_char(pos, codepoint, fg, bg);
+
+        pos.x += 9;
+    }
+
+    return str - orig_str;
+}
+
+static void draw_str(vec2_t pos, char const* str,
                      uint32_t fg, uint32_t bg)
 {
     while (char32_t codepoint = utf8_to_ucs4_upd(str)) {
-        auto glyph = framebuffer_console_t::glyph(codepoint);
-        draw_char(x, y, glyph, fg, bg);
-        x += framebuffer_console_t::font_width;
+        auto glyph = get_glyph(codepoint);
+        fb_draw_char(pos, glyph, fg, bg);
+        pos.x += 9;
 
-        if (unlikely(x + 9 > fb.mode.width)) {
+        if (unlikely(pos.x + 9 > fb.mode.width)) {
             // Went off the right side
-            x = 0;
-            if (unlikely(y + CHARHEIGHT > fb.mode.height)) {
-                size_t dist = y + CHARHEIGHT - fb.mode.height;
+            pos.x = 0;
+            if (unlikely(pos.y + CHARHEIGHT > fb.mode.height)) {
+                size_t dist = pos.y + CHARHEIGHT - fb.mode.height;
 
                 scroll_up(dist, bg);
-                y = fb.mode.height - CHARHEIGHT;
+                pos.y = fb.mode.height - CHARHEIGHT;
             } else {
-                y += CHARHEIGHT;
+                pos.y += CHARHEIGHT;
             }
         }
     }
@@ -705,7 +835,8 @@ static void draw_str(int x, int y, char const* str,
 
 ///
 
-void framebuffer_console_t::static_init()
+_constructor(ctor_ctors_ran)
+void fb_early_init()
 {
     // Detect the number of items from size
     auto en = uintptr_t(_binary_u_vga16_raw_end);
@@ -714,15 +845,24 @@ void framebuffer_console_t::static_init()
     glyph_count = sz / (sizeof(bitmap_glyph_t) + sizeof(uint16_t));
     glyph_codepoints = (uint16_t*)(_binary_u_vga16_raw_start + glyph_count);
 
-    if (replacement)
-        return;
-
     // Populate ASCII glyph lookup table
     for (size_t i = ascii_min; i <= ascii_max; ++i)
         ascii_lookup[i - ascii_min] = glyph_index(i);
 
+//    instances[0].fg_color = 0xe0c0d0;
+
     // Lookup unicode replacement character
     replacement = glyph_index(0xFFFD);
+}
+
+void move_cursor_if_on()
+{
+    if (cursor_on)
+        move_cursor_to(cursor_x, cursor_y);
+}
+
+void move_cursor_to(int x, int y)
+{
 }
 
 static void test_framebuffer_thread()
@@ -897,116 +1037,129 @@ int framebuffer_console_t::cursor_is_shown()
 
 //// negative x move the screen content left
 //// negative y move the screen content up
-//void framebuffer_console_t::scroll_screen(int x, int y)
-//{
-//    int row_size = width;
-//    int row_count;
-//    int row_step;
-//    int clear_start_row;
-//    int clear_end_row;
-//    int clear_start_col;
-//    int clear_end_col;
-//    uint16_t *src;
-//    uint16_t *dst;
+void framebuffer_console_t::scroll_screen(int x, int y)
+{
+    int row_size = width;
+    int row_count;
+    int row_step;
+    int clear_start_row;
+    int clear_end_row;
+    int clear_start_col;
+    int clear_end_col;
+    void *src;
+    void *dst;
 
-//    // Extreme move distance clears screen
-//    if ((x < 0 && -x >= width) ||
-//            (x > 0 && x >= width) ||
-//            (y < 0 && -y >= height) ||
-//            (y > 0 && y >= height)) {
-//        clear_screen();
+    // Extreme move distance clears screen
+    if ((x < 0 && -x >= width) ||
+            (x > 0 && x >= width) ||
+            (y < 0 && -y >= height) ||
+            (y > 0 && y >= height)) {
+        clear_screen();
 
-//        // Cursor tries to move with content
+        // Cursor tries to move with content
 
-//        cursor_x += x;
-//        cursor_y += y;
+        cursor_x += x;
+        cursor_y += y;
 
-//        cap_position(&cursor_x, &cursor_y);
-//        move_cursor_if_on();
-//        return;
-//    }
+        cap_position(&cursor_x, &cursor_y);
+        move_cursor_if_on();
+        return;
+    }
 
-//    if (y <= 0) {
-//        // Up
-//        src = shadow - (y * width);
-//        dst = shadow;
-//        row_count = height + y;
-//        // Loop from top to bottom
-//        row_step = width;
-//        // Clear the bottom
-//        clear_end_row = height;
-//        clear_start_row = clear_end_row + y;
-//    } else {
-//        // Down
-//        dst = shadow + ((height - 1) * width);
-//        src = shadow + ((height - y - 1) * width);
-//        row_count = height - y;
-//        // Loop from bottom to top
-//        row_step = -width;
-//        // Clear the top
-//        clear_start_row = 0;
-//        clear_end_row = y;
-//    }
+    if (y <= 0) {
+        // Up
+        src = (char*)shadow - (y * width) * fb.mode.byte_pp;
+        dst = (char*)shadow;
+        row_count = height + y;
+        // Loop from top to bottom
+        row_step = width;
+        // Clear the bottom
+        clear_end_row = height;
+        clear_start_row = clear_end_row + y;
+    } else {
+        // Down
+        dst = shadow + ((height - 1) * width);
+        src = shadow + ((height - y - 1) * width);
+        row_count = height - y;
+        // Loop from bottom to top
+        row_step = -width;
+        // Clear the top
+        clear_start_row = 0;
+        clear_end_row = y;
+    }
 
-//    if (x <= 0) {
-//        // Left
-//        row_size += x;
-//        src -= x;
-//        // Clear right side
-//        clear_start_col = width + x;
-//        clear_end_col = width;
-//    } else {
-//        // Right
-//        row_size -= x;
-//        src += x;
-//        // Clear left side
-//        clear_start_col = 0;
-//        clear_end_col = x;
-//    }
+    if (x <= 0) {
+        // Left
+        row_size += x;
+        src -= x;
+        // Clear right side
+        clear_start_col = width + x;
+        clear_end_col = width;
+    } else {
+        // Right
+        row_size -= x;
+        src += x;
+        // Clear left side
+        clear_start_col = 0;
+        clear_end_col = x;
+    }
 
-//    while (row_count--) {
-//        memmove(dst, src, row_size * sizeof(*dst));
-//        dst += row_step;
-//        src += row_step;
-//    }
+    while (row_count--) {
+        memmove(dst, src, row_size * fb.mode.byte_pp);
+        dst += row_step;
+        src += row_step;
+    }
 
-//    // Clear top/bottom
-//    if (clear_start_row != clear_end_row) {
-//        fill_region(
-//                    0,
-//                    clear_start_row,
-//                    width,
-//                    clear_end_row,
-//                    ' ');
-//    }
+    // Clear top/bottom
+    if (clear_start_row != clear_end_row) {
+        fill_region(
+                    0,
+                    clear_start_row,
+                    width,
+                    clear_end_row,
+                    ' ');
+    }
 
-//    // Clear left/right
-//    if (clear_start_col != clear_end_col) {
-//        fill_region(
-//                    clear_start_col,
-//                    clear_start_row ? clear_start_row : clear_end_row,
-//                    clear_end_col,
-//                    clear_start_row ? height : clear_start_row,
-//                    ' ');
-//    }
+    // Clear left/right
+    if (clear_start_col != clear_end_col) {
+        fill_region(
+                    clear_start_col,
+                    clear_start_row ? clear_start_row : clear_end_row,
+                    clear_end_col,
+                    clear_start_row ? height : clear_start_row,
+                    ' ');
+    }
 
-//    int mouse_was_shown = mouse_toggle(0);
+    int mouse_was_shown = mouse_toggle(0);
 //    memcpy(video_mem, shadow,
 //           width * height * sizeof(*shadow));
-//    mouse_toggle(mouse_was_shown);
-//}
+    mouse_toggle(mouse_was_shown);
+}
 
-//void framebuffer_console_t::advance_cursor(int distance)
-//{
-//    cursor_x += distance;
-//    if (cursor_x >= width) {
-//        cursor_x = 0;
-//        if (++cursor_y >= height) {
-//            cursor_y = height - 1;
-//            scroll_screen(0, -1);
-//        }
-//    }
-//}
+void framebuffer_console_t::cap_position(int *px, int *py)
+{
+    if (*px < 0)
+        *px = 0;
+    else if (*px >= width)
+        *px = width - 1;
+
+    if (*py < 0)
+        *py = 0;
+    else if (*py >= height)
+        *py = height - 1;
+}
+
+void framebuffer_console_t::advance_cursor(int distance)
+{
+    cursor_x += distance;
+    if (cursor_x >= width) {
+        cursor_x = 0;
+        if (++cursor_y >= height) {
+            cursor_y = height - 1;
+            scroll_screen(0, -1);
+        }
+    }
+}
 
 void framebuffer_console_t::putc(int character _unused)
 {
@@ -1041,7 +1194,7 @@ void framebuffer_console_t::putc_xy(int x _unused, int y _unused,
                                     int character _unused)
 {
     auto glyph = framebuffer_console_t::glyph(character);
-    draw_char(x * 9, y * 16, glyph, fg_color, bg_color);
+    fb_draw_char(x * 9, y * 16, glyph, fg_color, bg_color);
 
 }
 
@@ -1052,6 +1205,19 @@ int framebuffer_console_t::print(char const *s _unused)
 
 int framebuffer_console_t::write(char const *s _unused, intptr_t len _unused)
 {
+    for (intptr_t i = 0; i < len; ++i) {
+        switch (*s) {
+        default:
+            putc_xy(cursor_x, cursor_y, *s);
+            advance_cursor(1);
+            continue;
+
+        case '\n':
+            next_line();
+            break;
+
+        }
+    }
     return 0;
 }
 
@@ -1151,7 +1317,7 @@ int framebuffer_console_factory_t::detect(text_dev_base_t ***ptrs)
     return 1;
 }
 
-size_t framebuffer_console_t::glyph_index(size_t codepoint)
+size_t glyph_index(size_t codepoint)
 {
     if (likely(replacement && codepoint >= ascii_min && codepoint <= ascii_max))
         return ascii_lookup[codepoint - ascii_min];
@@ -1174,7 +1340,7 @@ size_t framebuffer_console_t::glyph_index(size_t codepoint)
     return st;
 }
 
-bitmap_glyph_t const *framebuffer_console_t::glyph(size_t codepoint)
+bitmap_glyph_t const *get_glyph(size_t codepoint)
 {
     size_t i = glyph_index(codepoint);
 
@@ -1194,3 +1360,41 @@ void fb_change_backing(const vbe_selected_mode_t &mode)
 
     test_framebuffer_thread();
 }
+
+surface_t surface_t::map_noclip(rect_t region)
+{
+    int rw = region.en.x - region.st.x;
+    int rh = region.en.y - region.st.y;
+
+    int ap = (w - rw) * byte_pp;
+
+    surface_t result;
+
+    result.x = x + region.st.x;
+    result.y = y + region.st.y;
+    result.w = region.en.x - region.st.x;
+    result.h = region.en.y - region.st.y;
+    result.pitch = pitch + ap;
+    result.backing = backing;
+    result.bpp = bpp;
+    result.byte_pp = byte_pp;
+    result.pix_fmt = pix_fmt;
+
+    return result;
+}
+
+surface_t surface_t::map(rect_t region)
+{
+    region.st.x = std::max(region.st.x, 0);
+    region.st.y = std::max(region.st.y, 0);
+    region.en.x = std::max(region.en.x, 0);
+    region.en.y = std::max(region.en.y, 0);
+
+    region.st.x = std::min(region.st.x, w);
+    region.en.x = std::min(region.en.x, w);
+    region.st.y = std::min(region.st.y, h);
+    region.en.y = std::min(region.en.y, h);
+
+    return map_noclip(region);
+}
+#endif

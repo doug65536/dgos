@@ -139,8 +139,11 @@ static void pit8254_set_rate(unsigned hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
-static void pit8254_irq_handler()
+static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
 {
+    (void)irq;
+    assert(irq == PIT_IRQ);
+
     atomic_inc(&timer_ticks);
     atomic_add(&timer_ns, tick_ns);
 
@@ -153,14 +156,6 @@ static void pit8254_irq_handler()
 //            printdbg("PIT Time: %8" PRId64 "\n", timer_ns);
 //        });
     }
-}
-
-static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
-{
-    (void)irq;
-    assert(irq == PIT_IRQ);
-
-    pit8254_irq_handler();
 
     return ctx;
 }
