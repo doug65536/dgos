@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+__BEGIN_DECLS
+
 // The <unistd.h> header shall define the following symbolic constants.
 // The values shall be suitable for use in #if preprocessing directives.
 
@@ -983,3 +985,5 @@ ssize_t      write(int, void const *, size_t);
 
 extern char  *optarg;
 extern int    opterr, optind, optopt;
+
+__END_DECLS

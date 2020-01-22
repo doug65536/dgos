@@ -8,7 +8,7 @@
 #include <dirent.h>
 #include <string.h>
 
-__thread int testtls = 42;
+__BEGIN_DECLS
 
 __attribute__((__format__(__printf__, 1, 0), __noreturn__))
 void verr(char const *format, va_list ap)
@@ -132,3 +132,4 @@ int main(int argc, char **argv, char **envp)
         load_module("rtl8139.km");
 
 }
+__END_DECLS

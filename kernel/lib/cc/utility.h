@@ -50,10 +50,31 @@ struct pair
     {
     }
 
-    constexpr pair(first_type __first_value,
-                   second_type __second_value)
+    constexpr pair(first_type const& __first_value,
+                   second_type const& __second_value)
         : first(__first_value)
         , second(__second_value)
+    {
+    }
+
+    constexpr pair(first_type&& __first_value,
+                   second_type const& __second_value)
+        : first(move(__first_value))
+        , second(__second_value)
+    {
+    }
+
+    constexpr pair(first_type const& __first_value,
+                   second_type&& __second_value)
+        : first(__first_value)
+        , second(move(__second_value))
+    {
+    }
+
+    constexpr pair(first_type&& __first_value,
+                   second_type&& __second_value)
+        : first(move(__first_value))
+        , second(move(__second_value))
     {
     }
 

@@ -99,6 +99,10 @@ static uint16_t mp_isa_bus_id;
 
 static uint64_t apic_timer_freq;
 
+// The largest number of nanoseconds that will not overflow a 64 bit
+// apic_timer_freq * ns / 1000000000
+static uint64_t apic_ns_limit;
+
 static unsigned ioapic_count;
 static mp_ioapic_t ioapic_list[16];
 
@@ -1574,13 +1578,13 @@ void apic_dump_regs(int ap)
 
 static void apic_calibrate();
 
-static void apic_configure_timer(
+static void apic_configure_timer_hw(
         uint32_t dcr, uint32_t icr, uint8_t timer_mode,
         uint8_t intr, bool mask = false)
 {
-    APIC_TRACE("configuring timer,"
-               " dcr=%#x, icr=%#x, mode=%#x, intr=%#x, mask=%d\n",
-               dcr, icr, timer_mode, intr, mask);
+//    APIC_TRACE("configuring timer,"
+//               " dcr=%#x, icr=%#x, mode=%#x, intr=%#x, mask=%d\n",
+//               dcr, icr, timer_mode, intr, mask);
     apic->write32(APIC_REG_LVT_DCR, dcr);
     apic->write32(APIC_REG_LVT_TR, APIC_LVT_VECTOR_n(intr) |
                   APIC_LVT_TR_MODE_n(timer_mode) |
@@ -1599,6 +1603,25 @@ static const constexpr uint8_t apic_shr_to_dcr[] = {
     APIC_LVT_DCR_BY_128
 };
 
+
+// convert ns=1/1e+9th of a second unit to ticks=1/apic_timer_freq
+//
+//
+
+uint64_t apic_ns_to_ticks(uint64_t ns)
+{
+    // Clamp the input to prevent overflow
+    ns = (ns <= apic_ns_limit) ? ns : apic_ns_limit;
+
+    // Intermediate result from multiply guaranteed to fit 64 bits
+    uint64_t ticks = apic_timer_freq * ns / 1000000000;
+
+    // Clamp the output (39 bits), the highest APIC tick count possible
+    ticks = (ticks <= 0x7FFFFFFF80) ? ticks : 0x7FFFFFFF80;
+
+    return ticks;
+}
+
 // The maximum possible ticks value is 32+7=39 bits
 // 0x7FFFFFFF80
 // Rounds to nearest when resolution is insufficient due to divisor
@@ -1607,10 +1630,10 @@ static const constexpr uint8_t apic_shr_to_dcr[] = {
 EXPORT uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask)
 {
     if (ticks <= INT32_MAX) {
-        apic_configure_timer(APIC_LVT_DCR_BY_1, ticks,
-                             one_shot ? APIC_LVT_TR_MODE_ONESHOT
-                                      : APIC_LVT_TR_MODE_PERIODIC,
-                             INTR_APIC_TIMER, mask);
+        apic_configure_timer_hw(APIC_LVT_DCR_BY_1, ticks,
+                                one_shot ? APIC_LVT_TR_MODE_ONESHOT
+                                         : APIC_LVT_TR_MODE_PERIODIC,
+                                INTR_APIC_TIMER, mask);
         return ticks;
     }
 
@@ -1653,10 +1676,10 @@ EXPORT uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask)
 
     uint32_t dcr = apic_shr_to_dcr[shift];
 
-    apic_configure_timer(dcr, ticks,
-                         one_shot ? APIC_LVT_TR_MODE_ONESHOT
-                                  : APIC_LVT_TR_MODE_PERIODIC,
-                         INTR_APIC_TIMER, mask);
+    apic_configure_timer_hw(dcr, ticks,
+                            one_shot ? APIC_LVT_TR_MODE_ONESHOT
+                                     : APIC_LVT_TR_MODE_PERIODIC,
+                            INTR_APIC_TIMER, mask);
 
     return ticks << shift;
 }
@@ -1743,10 +1766,11 @@ int apic_init(int ap)
 
     if (ap) {
         APIC_TRACE("Configuring AP timer\n");
-        apic_configure_timer(APIC_LVT_DCR_BY_1,
-                             apic_timer_freq / 20,
-                             APIC_LVT_TR_MODE_PERIODIC,
-                             INTR_APIC_TIMER);
+        apic_configure_timer_hw(APIC_LVT_DCR_BY_1,
+                                ~0U,
+                                APIC_LVT_TR_MODE_PERIODIC |
+                                APIC_LVT_DELIVERY_MASK,
+                                INTR_APIC_TIMER);
     }
 
     return 1;
@@ -1876,11 +1900,12 @@ static void apic_detect_topology(void)
 
 void apic_start_smp(void)
 {
-    // Start the timer here because interrupts are enable by now
-    apic_configure_timer(APIC_LVT_DCR_BY_1,
-                         apic_timer_freq / 60,
-                         APIC_LVT_TR_MODE_PERIODIC,
-                         INTR_APIC_TIMER);
+    // Initialize APIC timer
+    apic_configure_timer_hw(APIC_LVT_DCR_BY_1,
+                            ~0U,
+                            APIC_LVT_TR_MODE_ONESHOT |
+                            APIC_LVT_DELIVERY_MASK,
+                            INTR_APIC_TIMER);
 
     APIC_TRACE("%d CPUs\n", apic_id_count);
 
@@ -2122,14 +2147,15 @@ static void apic_calibrate()
             info.eax >= 0x40000010 && cpuid(&info, 0x40000010, 0)) {
         rdtsc_freq = (info.eax + 500) * 1000;
         apic_timer_freq = info.ebx * UINT64_C(1000);
+        apic_ns_limit = UINT64_MAX / apic_timer_freq;
     } else if (acpi_pm_timer_raw() >= 0) {
         //
         // Have PM timer
 
         // Program timer (should be high enough to measure 858ms @ 5GHz)
-        apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
-                             APIC_LVT_TR_MODE_n(APIC_LVT_TR_MODE_ONESHOT),
-                             INTR_APIC_TIMER, true);
+        apic_configure_timer_hw(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
+                                APIC_LVT_TR_MODE_ONESHOT,
+                                INTR_APIC_TIMER, false);
 
         uint32_t tmr_st = acpi_pm_timer_raw();
         uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);
@@ -2157,6 +2183,11 @@ static void apic_calibrate()
         uint64_t ccr_freq = (ccr_elap * 1000000000) / tmr_nsec;
 
         apic_timer_freq = ccr_freq;
+        // hardware limit is about 549s@1GHz, or 5,490s@100MHz
+        // utilized limit is lower, since we avoid 128 bit operations
+        // 184 to 18.4s, assuming probable timer freq range 100MHz-1GHz
+        // Real hardware likely being 100MHz, and KVM being 1GHz
+        apic_ns_limit = INT64_MAX / apic_timer_freq;
 
         // Round APIC frequency to nearest multiple of 333kHz
 //        apic_timer_freq += 166666;
@@ -2170,9 +2201,9 @@ static void apic_calibrate()
         rdtsc_freq = cpu_freq;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
-        apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
-                             APIC_LVT_TR_MODE_n(APIC_LVT_TR_MODE_ONESHOT),
-                             INTR_APIC_TIMER, true);
+        apic_configure_timer_hw(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
+                                APIC_LVT_TR_MODE_ONESHOT,
+                                INTR_APIC_TIMER, true);
 
         // Note starting values of both the timer and the timestamp counter
         uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);
@@ -2202,6 +2233,7 @@ static void apic_calibrate()
 
         // Remember both frequencies
         apic_timer_freq = ccr_freq;
+        apic_ns_limit = UINT64_MAX / apic_timer_freq;
         rdtsc_freq = cpu_freq;
     }
 

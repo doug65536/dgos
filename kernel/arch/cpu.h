@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "export.h"
 
 __BEGIN_DECLS
 
@@ -17,7 +18,7 @@ bool cpu_patch_jmp(void *addr, size_t size, const void *jmp_target);
 void cpu_patch_calls(void const *call_target,
                      size_t point_count, uint32_t **points);
 
-extern uint32_t default_mxcsr_mask;
+HIDDEN extern uint32_t default_mxcsr_mask;
 
 bool cpu_msr_set_safe(uint32_t msr, uint64_t value);
 bool cpu_msr_get_safe(uint32_t msr, uint64_t &value);

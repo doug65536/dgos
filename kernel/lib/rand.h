@@ -8,10 +8,10 @@ int rand_r(uint64_t *seed);
 int rand_r_range(uint64_t *seed, int min, int max);
 
 struct lfsr113_state_t {
-    uint32_t seed_z1 = 12345;
-    uint32_t seed_z2 = 12345;
-    uint32_t seed_z3 = 12345;
-    uint32_t seed_z4 = 12345;
+    uint32_t seed_z1 = 987654321;
+    uint32_t seed_z2 = 987654321;
+    uint32_t seed_z3 = 987654321;
+    uint32_t seed_z4 = 987654321;
 };
 
 void lfsr113_autoseed(lfsr113_state_t *state);
@@ -37,6 +37,11 @@ public:
        seed_z4 = ((seed_z4 & 0xFFFFFF80U) << 13) ^ b;
 
        return seed_z1 ^ seed_z2 ^ seed_z3 ^ seed_z4;
+    }
+
+    void seed(uint32_t s)
+    {
+        lfsr113_seed(this, s);
     }
 };
 

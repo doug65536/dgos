@@ -33,7 +33,7 @@ floppy_bootsig_check: disabled=0
 # no floppyb
 pci: enabled=1, chipset=i440fx
 vga: extension=vbe, update_freq=5, realtime=1
-cpu: count=1:1:1, ips=24000000, quantum=32, model=bx_generic
+cpu: count=1:1:2, ips=24000000, quantum=32, model=bx_generic
 #cpu: ips=240000000, model=bx_generic
 cpu: reset_on_triple_fault=0, cpuid_limit_winnt=0, ignore_bad_msrs=0
 cpu: mwait_is_nop=true

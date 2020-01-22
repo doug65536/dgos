@@ -127,10 +127,10 @@ SECTIONS {
 	} /*:dyna :writ*/
 
 	.init_array : {
-		PROVIDE_HIDDEN(__init_array_start = .);
+		PROVIDE(__init_array_start) = .;
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		PROVIDE_HIDDEN(__init_array_end = .);
+		PROVIDE(__init_array_end = .);
 	} /*:writ*/
 
 	.fini_array : {

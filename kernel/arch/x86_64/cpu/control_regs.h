@@ -960,7 +960,7 @@ template<typename T>
 static _always_inline void cpu_wait_masked(
         bool is_equal, T const volatile *value, T wait_value, T mask)
 {
-    if (spincount_mask && cpuid_has_mwait()) {
+    if (spincount_mask && use_mwait && cpuid_has_mwait()) {
         while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value)) {
             pause();
 
@@ -988,7 +988,7 @@ template<typename T>
 static _always_inline void cpu_wait_unmasked(
         bool is_equal, T const volatile *value, T wait_value)
 {
-    if (cpuid_has_mwait()) {
+    if (use_mwait && cpuid_has_mwait()) {
         while (is_equal != (atomic_ld_acq(value) == wait_value)) {
             pause();
 

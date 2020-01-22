@@ -23,6 +23,7 @@
 #include "basic_set.h"
 #include "uleb.h"
 #include "vector.h"
+#include "main.h"
 
 #define ELF64_DEBUG     0
 #if ELF64_DEBUG
@@ -97,35 +98,54 @@ void modload_init(void)
     export_ht.base_adj = 0;
 }
 
-#if ELF64_DEBUG
 static std::string module_reloc_type(size_t sym_type)
 {
     switch (sym_type) {
-    case R_AMD64_NONE: return "R_AMD64_NONE";
-    case R_AMD64_64: return "R_AMD64_64";
-    case R_AMD64_PC32: return "R_AMD64_PC32";
-    case R_AMD64_GOT32: return "R_AMD64_GOT32";
-    case R_AMD64_PLT32: return "R_AMD64_PLT32";
-    case R_AMD64_COPY: return "R_AMD64_COPY";
-    case R_AMD64_GLOB_DAT: return "R_AMD64_GLOB_DAT";
-    case R_AMD64_JUMP_SLOT: return "R_AMD64_JUMP_SLOT";
-    case R_AMD64_RELATIVE: return "R_AMD64_RELATIVE";
-    case R_AMD64_GOTPCREL: return "R_AMD64_GOTPCREL";
-    case R_AMD64_32: return "R_AMD64_32";
-    case R_AMD64_32S: return "R_AMD64_32S";
-    case R_AMD64_16: return "R_AMD64_16";
-    case R_AMD64_PC16: return "R_AMD64_PC16";
-    case R_AMD64_8: return "R_AMD64_8";
-    case R_AMD64_PC8: return "R_AMD64_PC8";
-    case R_AMD64_PC64: return "R_AMD64_PC64";
-    case R_AMD64_GOTOFF64: return "R_AMD64_GOTOFF64";
-    case R_AMD64_GOTPC32: return "R_AMD64_GOTPC32";
-    case R_AMD64_SIZE32: return "R_AMD64_SIZE32";
-    case R_AMD64_SIZE64: return "R_AMD64_SIZE64";
+	case R_AMD64_NONE: return "R_AMD64_NONE";
+
+	case R_AMD64_64: return "R_AMD64_64";
+	case R_AMD64_32S: return "R_AMD64_32S";
+	case R_AMD64_32: return "R_AMD64_32";
+	case R_AMD64_16: return "R_AMD64_16";
+	case R_AMD64_8: return "R_AMD64_8";
+
+	case R_AMD64_PC64: return "R_AMD64_PC64";
+	case R_AMD64_PC32: return "R_AMD64_PC32";
+	case R_AMD64_PC16: return "R_AMD64_PC16";
+	case R_AMD64_PC8: return "R_AMD64_PC8";
+
+	case R_X86_64_DTPMOD64: return "R_X86_64_DTPMOD64";
+	case R_X86_64_DTPOFF64: return "R_X86_64_DTPOFF64";
+	case R_X86_64_TPOFF64: return "R_X86_64_TPOFF64";
+	case R_X86_64_TLSGD: return "R_X86_64_TLSGD";
+	case R_X86_64_TLSLD: return "R_X86_64_TLSLD";
+	case R_X86_64_DTPOFF32: return "R_X86_64_DTPOFF32";
+	case R_X86_64_GOTTPOFF: return "R_X86_64_GOTTPOFF";
+	case R_X86_64_TPOFF32: return "R_X86_64_TPOFF32";
+	case R_X86_64_GOTPC32_TLSDESC: return "R_X86_64_GOTPC32_TLSDESC";
+	case R_X86_64_TLSDESC_CALL: return "R_X86_64_TLSDESC_CALL";
+	case R_X86_64_TLSDESC: return "R_X86_64_TLSDESC";
+
+	case R_AMD64_GOT32: return "R_AMD64_GOT32";
+	case R_AMD64_PLT32: return "R_AMD64_PLT32";
+	case R_AMD64_COPY: return "R_AMD64_COPY";
+
+	case R_AMD64_GLOB_DAT: return "R_AMD64_GLOB_DAT";
+	case R_AMD64_JUMP_SLOT: return "R_AMD64_JUMP_SLOT";
+
+	case R_AMD64_RELATIVE: return "R_AMD64_RELATIVE";
+	case R_AMD64_GOTPCREL: return "R_AMD64_GOTPCREL";
+
+	case R_AMD64_GOTOFF64: return "R_AMD64_GOTOFF64";
+	case R_AMD64_GOTPC32: return "R_AMD64_GOTPC32";
+
+	case R_AMD64_SIZE32: return "R_AMD64_SIZE32";
+	case R_AMD64_SIZE64: return "R_AMD64_SIZE64";
+
+	case R_AMD64_REX_GOTPCRELX: return "R_AMD64_REX_GOTPCRELX";
     }
     return "Unknown";
 }
-#endif
 
 class module_t
 {
@@ -266,7 +286,7 @@ int modload_run(module_t *module)
     return module->run();
 }
 
-static char const * const relocation_types_0_15[16] = {
+static char const * const relocation_types_0_23[27] = {
     "NONE",
     "64",
     "PC32",
@@ -282,18 +302,26 @@ static char const * const relocation_types_0_15[16] = {
     "16",
     "PC16",
     "8",
-    "PC8"
-};
-
-static char const * const relocation_types_24_26[3] = {
+    "PC8",
+    "DTPMOD64",
+    "DTPOFF64",
+    "TPOFF64",
+    "TLSGD",
+    "TLSLD",
+    "DTPOFF32",
+    "GOTTPOFF",
+    "TPOFF32"
     "PC64",
     "GOTOFF64",
     "GOTPC32"
 };
 
-static char const * const relocation_types_32_33[2] = {
+static char const * const relocation_types_32_36[5] = {
     "SIZE32",
-    "SIZE64"
+    "SIZE64",
+    "GOTPC32_TLSDESC",
+    "TLSDESC_CALL",
+    "TLSDESC"
 };
 
 static char const * const relocation_types_42_42[1] = {
@@ -301,12 +329,10 @@ static char const * const relocation_types_42_42[1] = {
 };
 
 static constexpr char const *get_relocation_type(size_t type) {
-    if (type < 16)
-        return relocation_types_0_15[type];
-    if (type >= 24 && type <= 26)
-        return relocation_types_24_26[type - 24];
-    if (type >= 32 && type <= 33)
-        return relocation_types_32_33[type - 32];
+    if (type <= 23)
+        return relocation_types_0_23[type];
+    if (type >= 32 && type <= 36)
+        return relocation_types_32_36[type - 32];
     if (type >= 42 && type <= 42)
         return relocation_types_42_42[type - 42];
     return "<unrecognized relocation!>";
@@ -890,6 +916,22 @@ errno_t module_t::apply_relocs()
                 value = S + A - P;
                 goto int8_common;
 
+            // === TLS ===
+
+//            case R_X86_64_DTPMOD64:
+//                ELF64_TRACE("DTPMOD64, value=%#zx, operand=%#zx"
+//                            ", *operand=%#zx\n",
+//                            value, uintptr_t(operand),
+//                            *(uintptr_t*)operand);
+//                continue;
+
+//            case R_X86_64_DTPOFF64:
+//                ELF64_TRACE("DTPMOD64, value=%#zx, operand=%#zx"
+//                            ", *operand=%#zx\n",
+//                            value, uintptr_t(operand),
+//                            *(uintptr_t*)operand);
+//                continue;
+
             // === No operation ===
 
             case R_AMD64_NONE:
@@ -1279,6 +1321,12 @@ EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
 
 EXPORT module_t *modload_closest(ptrdiff_t address)
 {
+    if (address >= ptrdiff_t(__image_start) &&
+            address < ptrdiff_t(___init_brk)) {
+        // Not a module, it's the kernel
+        return nullptr;
+    }
+
     ptrdiff_t closest = PTRDIFF_MAX;
     module_t *closest_module = nullptr;
 
@@ -1287,7 +1335,7 @@ EXPORT module_t *modload_closest(ptrdiff_t address)
     for (std::unique_ptr<module_t>& module: loaded_modules) {
         if (address >= module->base_adj) {
             ptrdiff_t distance = address - module->base_adj;
-            if (closest > distance) {
+            if (distance > 0 && closest > distance) {
                 closest = distance;
                 closest_module = module.get();
             }
@@ -1323,3 +1371,8 @@ EXPORT size_t modload_get_size(module_t *module)
 {
     return module->max_vaddr - module->min_vaddr;
 }
+
+//EXPORT void *__tls_get_addr(void *a, void *b)
+//{
+//    return nullptr;
+//}

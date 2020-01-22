@@ -662,8 +662,7 @@ isr_common:
     // If we are restoring a fast context then jump to simpler code
     // Fast context will have sign bit of ctx flag field set
     // (packed in interrupt value)
-    movl ISR_CTX_OFS_INTERRUPT(%rax),%edi
-    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
+    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT, ISR_CTX_OFS_INTERRUPT(%rax)
     jc .Lrestore_fast_ctx
 
     // Branches here from fast switcher if we switched to a slow context
@@ -970,8 +969,7 @@ thread_yield:
     call thread_schedule
 
     // See if we are restoring a fast context
-    movl ISR_CTX_OFS_INTERRUPT(%rax),%edi
-    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
+    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,ISR_CTX_OFS_INTERRUPT(%rax)
     jnc .Lrestore_slow_ctx
 
     // Could branch here from full interrupt handler to restore a fast context

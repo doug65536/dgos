@@ -533,6 +533,11 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp)
     return exitcode;
 }
 
+bool process_t::is_main_thread(thread_t tid)
+{
+    return threads.front() == tid;
+}
+
 void *process_t::get_allocator()
 {
     return linear_allocator;

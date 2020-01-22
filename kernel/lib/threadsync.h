@@ -92,14 +92,14 @@ void condvar_wake_all(condition_var_t *var);
 void condvar_wake_n(condition_var_t *var, size_t n);
 
 bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *spinlock,
-                           int64_t timeout_time = 0);
+                           int64_t timeout_time = INT64_MAX);
 bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *spinlock,
-                             int64_t timeout_time = 0);
+                             int64_t timeout_time = INT64_MAX);
 
 bool condvar_wait_mcslock(condition_var_t *var,
                           mcs_queue_ent_t * volatile *root,
                           mcs_queue_ent_t * node,
-                          int64_t timeout_time = 0);
+                          int64_t timeout_time = INT64_MAX);
 
 __END_DECLS
 

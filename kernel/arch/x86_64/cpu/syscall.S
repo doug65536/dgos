@@ -33,7 +33,7 @@
 .hidden syscall32_entry
 syscall32_entry:
     .cfi_startproc
-    .cfi_signal_frame
+    //.cfi_signal_frame
     .cfi_def_cfa rsp,0
     .cfi_register rip,rcx
     .cfi_register rsp,rsp

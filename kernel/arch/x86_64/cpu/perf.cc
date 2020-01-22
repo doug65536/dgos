@@ -60,15 +60,28 @@ static std::vector<padded_rand_lfs113_t> perf_rand;
 static uint32_t volatile perf_event = 0xC0;
 static uint8_t volatile perf_event_scale = 13;
 
-static size_t perf_tokenize(char const *st, char const *en)
+using token_map_t = std::map<std::string, size_t>;
+static token_map_t token_map;
+
+static size_t perf_tokenize(char const *st, char const *en, bool force = true)
 {
     if (st && !en)
         en = st + strlen(st);
 
-    // Don't even bother deduplicating. I like them being
-    // unique across modules.
+    std::string text(st, en);
+
+    if (!force) {
+        token_map_t::iterator existing_it = token_map.find(text);
+        if (existing_it != token_map.end())
+            return existing_it->second;
+    }
+
     size_t token = perf_tokens.size();
-    perf_tokens.emplace_back(st, en);
+    perf_tokens.push_back(std::move(text));
+
+    if (!force)
+        token_map.emplace(perf_tokens.back(), token);
+
     return token;
 }
 

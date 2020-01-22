@@ -24,3 +24,4 @@ libg
 src/new
 src/sys/module
 src
+src/sys/tls

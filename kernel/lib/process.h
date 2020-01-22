@@ -214,6 +214,8 @@ struct process_t
 
     int enter_user(uintptr_t ip, uintptr_t sp);
 
+    bool is_main_thread(thread_t tid);
+
 private:
     using thread_list = std::vector<thread_t>;
     thread_list threads;

@@ -79,6 +79,8 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 {
     std::vector<part_dev_t *> list;
 
+    char const *drive_name = (char const *)drive->info(STORAGE_INFO_NAME);
+
     long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
     if (unlikely(sector_size < 128))
@@ -87,6 +89,8 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     std::unique_ptr<uint8_t[]> sector(new (std::nothrow)
                                       uint8_t[sector_size]());
 
+    GPT_TRACE("Reading 1 %lu byte block at LBA 1 from %s\n",
+              sector_size, drive_name);
 
     gpt_hdr_t hdr;
 
@@ -103,7 +107,12 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     for (uint32_t i = 0; i < hdr.part_ent_count; ++i) {
         std::unique_ptr<part_dev_t> part;
 
-        if (unlikely(drive->read_blocks(sector, 1, hdr.part_ent_lba + i) < 0))
+        uint64_t lba = hdr.part_ent_lba + i;
+
+        GPT_TRACE("Reading 1 %lu byte block at LBA %" PRIu64 " from %s\n",
+                  sector_size, lba, drive_name);
+
+        if (unlikely(drive->read_blocks(sector, 1, lba) < 0))
             return list;
 
         memcpy(&ptent, sector, sizeof(ptent));
@@ -114,6 +123,8 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
             part->lba_st = ptent.lba_st;
             part->lba_len = ptent.lba_en - ptent.lba_st + 1;
             part->name = "fat32";
+            GPT_TRACE("Found %" PRIu64 " block partition at LBA"
+                      " %" PRIu64, part->lba_len, part->lba_st);
 
             partitions.push_back(part);
             if (likely(list.push_back(part.get())))
@@ -121,6 +132,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
         }
     }
 
+    GPT_TRACE("Found %zu partitions on %s\n", list.size(), drive_name);
     return list;
 }
 

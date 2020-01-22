@@ -9,15 +9,15 @@ __BEGIN_DECLS
 // These are implemented in assembly to ensure that link time optimizations
 // will assume that all call clobbered context is clobbered.
 extern long syscall6(long p0, long p1, long p2, long p3,
-                     long p4, long p5, long num);
+                     long p4, long p5, unsigned num);
 extern long syscall5(long p0, long p1, long p2, long p3,
-                     long p4, long num);
+                     long p4, unsigned num);
 extern long syscall4(long p0, long p1, long p2, long p3,
-                     long num);
-extern long syscall3(long p0, long p1, long p2, long num);
-extern long syscall2(long p0, long p1, long num);
-extern long syscall1(long p0, long num);
-extern long syscall0(long num);
+                     unsigned num);
+extern long syscall3(long p0, long p1, long p2, unsigned num);
+extern long syscall2(long p0, long p1, unsigned num);
+extern long syscall1(long p0, unsigned num);
+extern long syscall0(unsigned num);
 
 static _always_inline long syscallv(long number, va_list ap)
 {

@@ -33,4 +33,6 @@ module_t *modload_get_index(size_t i);
 
 int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle);
 
+void *__tls_get_addr(void *a, void *b);
+
 __END_DECLS

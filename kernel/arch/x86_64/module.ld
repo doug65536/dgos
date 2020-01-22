@@ -179,10 +179,10 @@ SECTIONS {
 	} :dyna :data
 
 	.init_array ALIGN(8) : {
-		PROVIDE_HIDDEN(___init_st = .);
+		PROVIDE_HIDDEN(__init_array_start = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		PROVIDE_HIDDEN(___init_en = .);
+		PROVIDE_HIDDEN(__init_array_end = .);
 	} :data
 
 	.fini_array ALIGN(8) : {

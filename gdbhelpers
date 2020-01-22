@@ -3,7 +3,8 @@ define startupbreakpoints
 	set architecture i386:x86-64
 	#set architecture i386
 	set osabi none
-	set scheduler-locking off
+	#set scheduler-locking off
+	set scheduler-locking step
 	set range-stepping off
 	thbreak entry
 	commands
@@ -227,7 +228,7 @@ define walkunwind
 		set $ctx = threads[$tid].ctx
 		if $ctx
 			printf "\n"
-			printf "Unwinding thread %d state=0x%x\n", $tid, threads[$tid].state
+			printf "Unwinding thread %d state=0x%x -----------------------------------------------\n", $tid, threads[$tid].state
 			python
 try:
 	gdb.execute("walkunwind_ctx $ctx.gpr")

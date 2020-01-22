@@ -182,9 +182,9 @@ bsp_init:
 #endif
 
     // Call the constructors
-    leaq ___ctors_st(%rip),%rdi
-    leaq ___ctors_en(%rip),%rsi
-    call invoke_function_array
+    leaq __init_array_start(%rip),%rdi
+    leaq __init_array_end(%rip),%rsi
+    call __invoke_function_array
 
     call main
 
@@ -235,6 +235,7 @@ early_tss_end:
 
 .section .text, "ax", @progbits
 .balign 16
+.type exit,@function
 .global exit
 .hidden exit
 exit:
@@ -243,12 +244,13 @@ exit:
     // and deliberately hangs
 0:  leaq ___dtors_st(%rip),%rdi
     leaq ___dtors_en(%rip),%rsi
-    call invoke_function_array
+    call __invoke_function_array
 
     call halt_forever
 
 .balign 16
-invoke_function_array:
+.type __invoke_function_array,@function
+__invoke_function_array:
     .cfi_startproc
 
     push_cfi %rbx
@@ -271,6 +273,7 @@ invoke_function_array:
     ret
 
 .balign 16
+.type register_eh_frame,@function
 .global register_eh_frame
 register_eh_frame:
     // Register .eh_frame for libgcc unwind
@@ -280,6 +283,7 @@ register_eh_frame:
     jmp __register_frame
 
 .balign 16
+.type __cxa_pure_virtual,@function
 .global __cxa_pure_virtual
 // Not .hidden!
 __cxa_pure_virtual:

@@ -128,14 +128,12 @@ SECTIONS {
     .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
     .exception_ranges   : ONLY_IF_RW { *(.exception_ranges .exception_ranges*) }
 
-	. = ALIGN(4K);
-
 	/*
 	 * text must be the first executable section to correctly infer
 	 * the symbol address when auto-loading kernel symbols
 	 */
 
-	.text : {
+	.text ALIGN(4K) : {
 		PROVIDE_HIDDEN(___text_st = .);
 		*(.entry)
 		*(.text)
@@ -146,7 +144,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___text_en = .);
 	} :text
 
-	.plt : {
+	.plt ALIGN(16) : {
 		PROVIDE_HIDDEN(___plt_st = .);
 		*(.plt)
 		*(.iplt)
@@ -168,20 +166,20 @@ SECTIONS {
 		*(.igot.plt)
 	} :data
 
-	.dynamic : {
+	.dynamic ALIGN(8) : {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);
 	} :dyna :data
 
-	.init_array : {
-		PROVIDE_HIDDEN(___init_st = .);
+	.init_array ALIGN(8) : {
+		PROVIDE_HIDDEN(__init_array_start = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		PROVIDE_HIDDEN(___init_en = .);
+		PROVIDE_HIDDEN(__init_array_end = .);
 	} :data
 
-	.fini_array : {
+	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(___fini_st = .);
 		*(.fini_array)
 		*(SORT_BY_INIT_PRIORITY(.fini_array.*))

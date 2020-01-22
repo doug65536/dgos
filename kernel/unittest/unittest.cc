@@ -4,6 +4,10 @@
 #include "vector.h"
 #include "cxxstring.h"
 
+__thread int test_tls;
+__thread int test_tls_2;
+__thread int test_tls_3;
+
 unittest::unit *unittest::unit::list_st;
 unittest::unit *unittest::unit::list_en;
 
@@ -62,6 +66,36 @@ public:
 };
 
 __END_NAMESPACE
+
+template<typename T>
+class uniform_distribution_t {
+public:
+    uniform_distribution_t(T a, T b, T r)
+        : a(a)
+    {
+        T d = b - a;
+
+        // How many of the entire range fits in max
+        T c = m / d;
+
+        m = d * c;
+    }
+
+    bool operator()(T input, T& result) const
+    {
+        if (input < m) {
+            // Good number
+            result = (input % m) + a;
+            return true;
+        }
+
+        // Provided random number is no good, try again
+        return false;
+    }
+
+    T a;
+    T m;
+};
 
 int module_main(int argc, char const * const * argv)
 {

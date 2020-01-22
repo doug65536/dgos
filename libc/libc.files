@@ -10,6 +10,7 @@ include/sys/limits.h
 include/sys/module.h
 include/sys/socket.h
 include/sys/syscall_num.h
+include/sys/tls.h
 libg/debug.cc
 math/cos.cc
 math/log.cc
@@ -100,6 +101,7 @@ src/sys/syscall3.S
 src/sys/syscall4.S
 src/sys/syscall5.S
 src/sys/syscall6.S
+src/sys/tls/tls_get_addr.cc
 src/unistd/_exit.cc
 src/unistd/access.cc
 src/unistd/alarm.cc

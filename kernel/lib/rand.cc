@@ -7,10 +7,26 @@
 
 EXPORT void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
 {
-    state->seed_z1 = seed;
-    state->seed_z2 = seed;
-    state->seed_z3 = seed;
-    state->seed_z4 = seed;
+    /**** VERY IMPORTANT **** :
+      The initial seeds z1, z2, z3, z4  MUST be larger than
+      1, 7, 15, and 127 respectively.
+    ****/
+
+    uint64_t seed_seed = uint64_t(seed) << 16;
+
+    state->seed_z1 = rand_r(&seed_seed);
+    state->seed_z2 = rand_r(&seed_seed);
+    state->seed_z3 = rand_r(&seed_seed);
+    state->seed_z4 = rand_r(&seed_seed);
+
+    if (state->seed_z1 < 1)
+        state->seed_z1 = 71;
+    if (state->seed_z2 < 7)
+        state->seed_z2 += 61;
+    if (state->seed_z3 < 15)
+        state->seed_z3 += 93;
+    if (state->seed_z4 < 127)
+        state->seed_z4 += 293;
 }
 
 EXPORT void lfsr113_autoseed(lfsr113_state_t *state)

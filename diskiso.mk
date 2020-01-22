@@ -22,9 +22,11 @@ $(top_builddir)/isodisk.img: \
 		$(top_srcdir)/populate_iso.sh \
 		\
 		$(top_builddir)/fatpart.img \
-		$(shell $(FIND) -L "$(top_builddir)/iso_stage") \
 		\
 		$(top_builddir)/iso_stage \
+		$(shell test [ "$(top_builddir)/iso_stage" ] && \
+			$(FIND) -L "$(top_builddir)/iso_stage" || true) \
+		\
 		$(top_builddir)/bootiso-bin
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)
 	size=$$(wc -c < bootiso-bin) && \

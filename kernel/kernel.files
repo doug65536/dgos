@@ -47,6 +47,8 @@ arch/x86_64/cpu/pic.bits
 arch/x86_64/cpu/picbits.h
 arch/x86_64/cpu/spinlock_arch.h
 arch/x86_64/cpu_bug.h
+arch/x86_64/cpu/phys_alloc.cc
+arch/x86_64/cpu/phys_alloc.h
 arch/x86_64/user_mem.cc
 device/acpi.bits
 device/acpi.bits.h

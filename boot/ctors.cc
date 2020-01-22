@@ -3,7 +3,7 @@
 
 typedef void (*funcptr)();
 
-extern funcptr const ___ctors_st[], ___ctors_en[];
+extern funcptr const __init_array_start[], __init_array_end[];
 extern funcptr const ___dtors_st[], ___dtors_en[];
 
 void invoke_func_array(funcptr const *st, funcptr const *en)
@@ -20,7 +20,7 @@ void invoke_func_array(funcptr const *st, funcptr const *en)
 
 void ctors_invoke()
 {
-    invoke_func_array(___ctors_st, ___ctors_en);
+    invoke_func_array(__init_array_start, __init_array_end);
 }
 
 void dtors_invoke()

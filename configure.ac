@@ -359,15 +359,33 @@ for flag in \
 	Wl,-z,relro \
 	Wl,-z,now \
 	Wl,--relax \
-	Wl,-g \
-	Wl,-T$srcdir/user/user64_phdrs.ld
+	Wl,-g
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([USER64_FLAGS], [" -$flag"])]
 		[], [])
 done
 AC_SUBST([USER64_FLAGS])
-#Wl,-z,separate-code
+
+USER64_SO_FLAGS=
+for flag in \
+	dynamic
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USER64_SO_FLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USER64_SO_FLAGS])
+
+USER64_EXE_FLAGS=
+for flag in \
+	Wl,-T$srcdir/user/user64_phdrs.ld
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USER64_EXE_FLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USER64_EXE_FLAGS])
 
 USERLIB64_FLAGS=
 for flag in \

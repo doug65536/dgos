@@ -416,6 +416,18 @@ struct Elf64_Dyn {
 #define R_AMD64_PC16        13  // word16  S + A - P
 #define R_AMD64_PC8         15  // word8   S + A - P
 
+#define R_X86_64_DTPMOD64   16
+#define R_X86_64_DTPOFF64   17
+#define R_X86_64_TPOFF64    18
+#define R_X86_64_TLSGD      19
+#define R_X86_64_TLSLD      20
+#define R_X86_64_DTPOFF32   21
+#define R_X86_64_GOTTPOFF   22
+#define R_X86_64_TPOFF32    23
+#define R_X86_64_GOTPC32_TLSDESC    34
+#define R_X86_64_TLSDESC_CALL    35
+#define R_X86_64_TLSDESC    36
+
 #define R_AMD64_GOT32       3   // word32  G + A
 #define R_AMD64_PLT32       4   // word32  L + A - P
 #define R_AMD64_COPY        5   // None    Refer to the explanation

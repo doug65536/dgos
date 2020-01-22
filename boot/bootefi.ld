@@ -49,12 +49,12 @@ SECTIONS {
 		*(.edata)
 
 		. = ALIGN(16);
-		___ctors_st = .;
+		PROVIDE(__init_array_start = .);
 		*(.ctors)
 		*(SORT_BY_INIT_PRIORITY(.ctors.*))
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		___ctors_en = .;
+		PROVIDE(__init_array_end = .);
 
 		. = ALIGN(16);
 		___dtors_st = .;

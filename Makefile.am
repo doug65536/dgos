@@ -625,6 +625,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/syscall.S \
 	kernel/arch/x86_64/cpu/nofault.cc \
 	kernel/arch/x86_64/cpu/nofault.h \
+	kernel/arch/x86_64/cpu/phys_alloc.cc \
+	kernel/arch/x86_64/cpu/phys_alloc.h \
 	kernel/arch/x86_64/user_mem.cc \
 	kernel/main.cc \
 	kernel/lib/assert.cc \
@@ -1184,7 +1186,8 @@ shell_CXXFLAGS = \
 	-isystem $(top_builddir)/sysroot/include \
 	-g \
 	$(COMPILER_FLAGS) \
-	$(USER64_FLAGS)
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
 
 #$(RETPOLINE_FLAGS)
 
@@ -1193,8 +1196,9 @@ shell_CFLAGS = \
 
 shell_CCASFLAGS =
 shell_LDFLAGS = \
-	-Wl,--orphan-handling,warn \
 	-Wl,-Map,$(top_builddir)/shell.map
+
+#-Wl,--orphan-handling,warn
 
 shell_LDADD =
 
@@ -1388,6 +1392,8 @@ libc_a_SOURCES = \
 	libc/src/sys/mman/munlock.cc \
 	libc/src/sys/mman/madvise.cc \
 	libc/src/sys/ioctl/ioctl.cc \
+	libc/src/sys/tls/tls_get_addr.h \
+	libc/src/sys/tls/tls_get_addr.cc \
 	libc/src/unistd/access.cc \
 	libc/src/unistd/alarm.cc \
 	libc/src/unistd/chdir.cc \
@@ -1510,29 +1516,29 @@ libc_a_CXXFLAGS = \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
-#bin_PROGRAMS += libc.so
-#generate_symbols_list += libc.so
+bin_PROGRAMS += libc.so
+generate_symbols_list += libc.so
 
-#libc_so_SOURCES = $(libc_a_SOURCES)
+libc_so_SOURCES = $(libc_a_SOURCES)
 
-#libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) \
-#	$(USERLIB64_FLAGS) \
-#	-fPIC -shared -nostdlib
+libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) \
+	$(USERLIB64_FLAGS) \
+	-fPIC -shared -nostdlib -ftls-model=global-dynamic
 
-#libc_so_CFLAGS = $(libc_a_CFLAGS) \
-#	-fPIC -shared -nostdlib
+libc_so_CFLAGS = $(libc_a_CFLAGS) \
+	-fPIC -shared -nostdlib
 
-#libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) \
-#	-fPIC -shared -nostdlib
+libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) \
+	-fPIC -shared -nostdlib
 
-#libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fno-pie -fPIC -shared -nostdlib \
-#	-isystem $(top_srcdir)/libc/include \
-#	$(FREESTANDING_FLAGS) \
-#	$(OPTIMIZE_SPEED_FLAGS) \
-#	$(COMPILER_FLAGS) \
-#	$(USERLIB64_LDFLAGS) -Wl,--export-dynamic -Wl,-shared
+libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fno-pie -fPIC -shared -nostdlib \
+	-isystem $(top_srcdir)/libc/include \
+	$(FREESTANDING_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS) \
+	$(USERLIB64_LDFLAGS) -Wl,-shared
 
-#EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
+EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
 
 noinst_LIBRARIES += libm.a
 
@@ -1547,15 +1553,15 @@ libm_a_CXXFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
 
-#bin_PROGRAMS += libm.so
-#
-#libm_so_SOURCES = $(libm_a_SOURCES) -fPIC -shared -nostdlib
-#libm_so_CXXFLAGS = $(libm_a_CXXFLAGS) -fPIC -shared -nostdlib
-#libm_so_CFLAGS = $(libm_a_CFLAGS) -fPIC -shared -nostdlib
-#libm_so_CCASFLAGS = $(libm_a_CCASFLAGS) -fPIC -shared -nostdlib
-#libm_so_LDFLAGS = $(libm_a_LDFLAGS) -fPIC -shared -nostdlib
-#EXTRA_libm_so_DEPENDENCIES = $(EXTRA_libm_a_DEPENDENCIES)
-#libm_so_LDADD = -lgcc
+bin_PROGRAMS += libm.so
+
+libm_so_SOURCES = $(libm_a_SOURCES) -fPIC -shared -nostdlib
+libm_so_CXXFLAGS = $(libm_a_CXXFLAGS) -fPIC -shared -nostdlib
+libm_so_CFLAGS = $(libm_a_CFLAGS) -fPIC -shared -nostdlib
+libm_so_CCASFLAGS = $(libm_a_CCASFLAGS) -fPIC -shared -nostdlib
+libm_so_LDFLAGS = $(libm_a_LDFLAGS) -fPIC -shared -nostdlib
+EXTRA_libm_so_DEPENDENCIES = $(EXTRA_libm_a_DEPENDENCIES)
+libm_so_LDADD = -lgcc
 
 noinst_LIBRARIES += libstdc++.a
 
@@ -1570,21 +1576,21 @@ libstdc___a_CXXFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
 
-#noinst_PROGRAMS += libstdc++.so
+noinst_PROGRAMS += libstdc++.so
 
-#libstdc___so_SOURCES = \
-#	libc/cxx/terminate.cc \
-#	libc/cxx/abi/cxa_allocate_exception.cc
+libstdc___so_SOURCES = \
+	libc/cxx/terminate.cc \
+	libc/cxx/abi/cxa_allocate_exception.cc
 
-#libstdc___so_CXXFLAGS = \
-#	-isystem $(top_srcdir)/libc/include \
-#	$(FREESTANDING_FLAGS) \
-#	$(OPTIMIZE_SPEED_FLAGS) \
-#	$(COMPILER_FLAGS) \
-#	$(USERLIB64_FLAGS)
+libstdc___so_CXXFLAGS = \
+	-isystem $(top_srcdir)/libc/include \
+	$(FREESTANDING_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS) \
+	$(USERLIB64_FLAGS)
 
-#libstdc___so_LDFLAGS = \
-#	$(USERLIB64_LDFLAGS)
+libstdc___so_LDFLAGS = \
+	$(USERLIB64_LDFLAGS)
 
 # ----------------------------------------------------------------------------
 # libc unit tests
@@ -1703,7 +1709,8 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(COMPILER_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(SANITIZE_UNDEFINED_FLAGS) \
-	$(WARN_STACK_USAGE_FLAGS)
+	$(WARN_STACK_USAGE_FLAGS) \
+	-ftls-model=global-dynamic
 
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_RTTI_FLAGS)
@@ -2156,14 +2163,16 @@ init_CXXFLAGS = \
 	-ggdb \
 	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
-	$(USER64_FLAGS)
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
 
 init_CFLAGS = \
 	-DFROMCFLAGS  \
 	-ggdb \
 	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
-	$(USER64_FLAGS)
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
 
 init_SOURCES = \
 	user/init/init.cc
@@ -2182,6 +2191,47 @@ EXTRA_init_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
 	$(ALL_STDLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
+
+#===========
+
+bin_PROGRAMS += init-shared
+generate_symbols_list += init-shared
+
+init_shared_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS) \
+	-ftls-model=global-dynamic
+
+init_shared_CFLAGS = \
+	-DFROMCFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
+
+init_shared_SOURCES = \
+	user/init/init.cc
+
+init_shared_LDFLAGS = -dynamic
+#-Wl,--no-eh-frame-hdr
+
+init_shared_LDADD =  libc.so
+
+init_shared_CCASFLAGS = \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(COMPILER_FLAGS) \
+	-isystem $(top_builddir)/sysroot/include
+
+EXTRA_init_shared_DEPENDENCIES = \
+	$(top_srcdir)/user/user64_phdrs.ld \
+	$(ALL_STDLIB_INSTALLED) \
+	$(INCLUDES_DEPLOYED)
+
 
 #===========
 
@@ -2555,6 +2605,12 @@ debug-tcg: debug-smp-bios-hd-gpt-ahci-vga-tcg
 define genkallsym =
 $$(top_builddir)/sym/$(1)-kallsyms: $(1) $$(top_srcdir)/Makefile.am
 	$$(NM) --demangle --defined-only -n "$$<" > "$$@"
+
+$$(top_builddir)/sym/$(1)-klinesyms: $(1) $$(top_srcdir)/Makefile.am
+	$$(OBJDUMP) --dwarf=decodedline "$$<" | \
+		$$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+)\s*x?/\1 \2 \3/g' | \
+		grep -P '.*\s+\d+\s+0x[0-9a-f]+' > "$$@"
+
 endef
 
 $(foreach name,$(generate_kallsym_list),$(eval $(call genkallsym,$(name))))
@@ -2570,7 +2626,8 @@ endef
 $(foreach name,$(generate_symbols_list),$(eval $(call gensym,$(name))))
 
 generate_symbols_outputs = $(patsubst %,sym/%.sym,$(generate_symbols_list)) \
-	$(patsubst %,sym/%-kallsyms,$(generate_kallsym_list))
+	$(patsubst %,sym/%-kallsyms,$(generate_kallsym_list)) \
+	$(patsubst %,sym/%-klinesyms,$(generate_kallsym_list))
 
 # ----------------------------------------------------------------------------
 # Bochs launcher

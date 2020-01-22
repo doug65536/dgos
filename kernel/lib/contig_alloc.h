@@ -8,7 +8,7 @@
 // Contiguous allocator
 
 struct contiguous_allocator_t {
-    using lock_type = ext::mcslock;
+    using lock_type = ext::irq_mutex;
     using scoped_lock = std::unique_lock<lock_type>;
 public:
     using linaddr_t = uintptr_t;
@@ -28,6 +28,7 @@ public:
     void dump_locked(scoped_lock& lock, char const *format, ...) const;
     void dump_lockedv(scoped_lock& lock, char const *format, va_list ap) const;
 
+    bool validate() const;
     bool validate_locked(scoped_lock &lock) const;
     bool validation_failed(scoped_lock &lock) const;
 

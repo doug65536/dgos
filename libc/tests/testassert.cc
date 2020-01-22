@@ -19,10 +19,10 @@ int main()
     for (size_t i = 0; i < test_cases_count; ++i) {
         case_failed = false;
         case_pass = false;
-        
+
         test_cases[i]();
     }
-    
+
     return 0;
 }
 

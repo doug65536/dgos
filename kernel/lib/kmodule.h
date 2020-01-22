@@ -1,13 +1,12 @@
 #pragma once
 #include "types.h"
+#include "export.h"
 #include "algorithm.h"
 
 __BEGIN_DECLS
 
-__attribute__((__visibility__("hidden")))
-extern uint8_t * const ___rodata_fixup_insn_st[];
-__attribute__((__visibility__("hidden")))
-extern uint8_t * const ___rodata_fixup_insn_en[];
+HIDDEN extern uint8_t * const ___rodata_fixup_insn_st[];
+HIDDEN extern uint8_t * const ___rodata_fixup_insn_en[];
 
 extern "C"
 void cpu_apply_fixups(uint8_t * const *rodata_st,

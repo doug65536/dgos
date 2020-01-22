@@ -201,12 +201,12 @@ SECTIONS {
 	. = ALIGN(4K);
 
 	.init_array : {
-		PROVIDE_HIDDEN(___ctors_st = .);
+		PROVIDE_HIDDEN(__init_array_start = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		*(.ctors)
 		*(SORT_BY_INIT_PRIORITY(.ctors.*))
-		PROVIDE_HIDDEN(___ctors_en = .);
+		PROVIDE_HIDDEN(__init_array_end = .);
 	} :data
 
 	.fini_array : {

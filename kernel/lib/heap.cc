@@ -104,18 +104,23 @@ public:
     void *operator new(size_t) noexcept;
     void operator delete(void *) noexcept;
 
+    _malloc _assume_aligned(16) _alloc_size(2)
     void *alloc(size_t size);
+    _malloc _assume_aligned(16) _alloc_size(2, 3)
     void *calloc(size_t num, size_t size);
+    _assume_aligned(16) _alloc_size(3)
     void *realloc(void *block, size_t size);
     void free(void *block);
     bool maybe_blk(void *block);
     bool validate(bool dump = false) const;
     bool validate_locked(bool dump, scoped_lock const& lock) const;
+    _malloc _assume_aligned(16) _alloc_size(2)
     void *large_alloc(size_t size, uint32_t heap_id);
     void large_free(heap_hdr_t *hdr, size_t size);
     _noinline
     bool validate_failed() const;
 
+    _assume_aligned(16)
     heap_hdr_t *create_arena(uint8_t log2size, scoped_lock const& lock);
 
     heap_hdr_t *free_chains[HEAP_BUCKET_COUNT];
@@ -329,7 +334,7 @@ void *heap_t::alloc(size_t size)
     heap_hdr_t *first_free;
 
     if (unlikely(bucket >= HEAP_BUCKET_COUNT))
-        return large_alloc(orig_size, id);
+        return large_alloc(size, id);
 
     {
         scoped_lock lock(heap_lock);
@@ -364,7 +369,7 @@ void *heap_t::alloc(size_t size)
         first_free->heap_id = id;
 
 #if HEAP_DEBUG
-        memset(first_free + 1, 0xf0, size - sizeof(*first_free));
+        memset(first_free + 1, 0xa0, size - sizeof(*first_free));
 #endif
 
 #if HEAP_EXCESSIVE_VALIDATION

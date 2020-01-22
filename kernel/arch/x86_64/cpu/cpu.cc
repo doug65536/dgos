@@ -27,10 +27,8 @@
 
 uint32_t default_mxcsr_mask;
 
-__attribute__((__visibility__("hidden")))
-extern uint8_t * const ___rodata_fixup_insn_st[];
-__attribute__((__visibility__("hidden")))
-extern uint8_t * const ___rodata_fixup_insn_en[];
+HIDDEN extern uint8_t * const ___rodata_fixup_insn_st[];
+HIDDEN extern uint8_t * const ___rodata_fixup_insn_en[];
 
 static uint8_t const stac_insn[] = {
     0x0f, 0x01, 0xcb

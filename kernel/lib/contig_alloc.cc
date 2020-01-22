@@ -42,6 +42,8 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
 
     uintptr_t aligned_base;
 
+    bool shared = false;
+
     for (;;) {
         linaddr_t prev_base = *linear_base_ptr;
 
@@ -51,18 +53,13 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
         // Page align
         aligned_base = (aligned_base + PAGE_SIZE - 1) & -PAGE_SIZE;
 
-        // 1GB align
-//        aligned_base += (1 << 30) - 1;
-//        aligned_base &= -(1 << 30);
-
-
-        mm_get_free_page_count();
-
-
         std::pair<tree_t::iterator, bool>
                 ins_by_size = free_addr_by_size.insert({size, aligned_base});
 
-        free_addr_by_addr.share_allocator(free_addr_by_size);
+        if (!shared) {
+            shared = true;
+            free_addr_by_addr.share_allocator(free_addr_by_size);
+        }
 
         std::pair<tree_t::iterator, bool>
                 ins_by_addr = free_addr_by_addr.insert({aligned_base, size});
@@ -415,9 +412,6 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 #if DEBUG_ADDR_ALLOC
     //dump("---- Free %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
     validate_locked(lock);
-
-    if (addr == 0xfffffd0052257000 && size == 0x40000)
-        dump_locked(lock, "before bug");
 #endif
 
     assert(free_addr_by_addr.size() == free_addr_by_size.size());
@@ -428,9 +422,6 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     std::pair<tree_t::iterator, bool>
             ins = free_addr_by_addr.insert(range);
 
-    if (addr == 0xfffffd0052257000 && size == 0x40000)
-        dump_locked(lock, "bug insert");
-
     // Did we luckily free a range that already exactly exists?
     if (unlikely(!ins.second))
         return;
@@ -438,9 +429,8 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     std::pair<tree_t::iterator, bool>
             ins_size = free_addr_by_size.insert({range.second, range.first});
 
-
-    if (addr == 0xfffffd0052257000 && size == 0x40000)
-        assert(ins.second == ins_size.second);
+    // If by addr went in, by size surely will
+    assert(ins_size.second);
 
     tree_t::node_type ins_node;
     tree_t::node_type ins_size_node;
@@ -605,7 +595,7 @@ EXPORT void contiguous_allocator_t::dump_lockedv(
         engineering_t eng(it->second);
 
         if (it != st && prev->first + prev->second < it->first) {
-            printdbg("---  addr=%#zx, size=%#zx (%s)\n",
+            printdbg("---  addr=%#zx, size=%#zx (%sB)\n",
                      prev->first + prev->second, it->first -
                      (prev->first + prev->second),
                      engineering_t(it->first -
@@ -624,6 +614,12 @@ EXPORT void contiguous_allocator_t::dump_lockedv(
     printdbg("\nBy size\n");
     dump_addr_tree(&free_addr_by_size, "size", "addr");
     free_addr_by_size.dump("tree");
+}
+
+bool contiguous_allocator_t::validate() const
+{
+    scoped_lock lock(free_addr_lock);
+    return validate_locked(lock);
 }
 
 

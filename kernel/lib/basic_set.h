@@ -797,6 +797,12 @@ struct __tree_value
     {
         return type{__rhs, mapped_type()};
     }
+
+    _always_inline
+    static constexpr type with_default_value(key_type&& __rhs)
+    {
+        return type{move(__rhs), mapped_type()};
+    }
 };
 
 // Specialization for void value type
@@ -876,12 +882,13 @@ public:
     class node_type_data {
         friend class node_type;
     protected:
-        node_type_data()
+        constexpr node_type_data()
             : __node(nullptr)
         {
         }
 
-        node_type_data(__node_t *__node, __node_allocator_t const& __alloc)
+        constexpr node_type_data(__node_t *__node,
+                                 __node_allocator_t const& __alloc)
             : __node(__node)
             , __alloc(__alloc)
         {
@@ -889,7 +896,7 @@ public:
 
         node_type_data(node_type_data const& __rhs) = delete;
 
-        node_type_data(node_type_data&& __rhs)
+        constexpr node_type_data(node_type_data&& __rhs)
             : __node(__rhs.__node)
             , __alloc(move(__rhs.__alloc))
         {
@@ -928,7 +935,8 @@ public:
     public:
         using value_type = typename __tree_value_t::key_type;
 
-        node_type_set(__node_t *__node, __node_allocator_t const& __alloc)
+        constexpr node_type_set(__node_t *__node,
+                                __node_allocator_t const& __alloc)
             : node_type_data(__node, __alloc)
         {
         }
@@ -946,7 +954,8 @@ public:
                 typename __tree_value_t::key_type>::type;
         using mapped_type = typename __tree_value_t::mapped_type;
 
-        node_type_map(__node_t *__node, __node_allocator_t const& __alloc)
+        constexpr node_type_map(__node_t *__node,
+                                __node_allocator_t const& __alloc)
             : node_type_data(__node, __alloc)
         {
         }
@@ -982,17 +991,18 @@ public:
         }
 
     public:
-        node_type()
+        constexpr node_type()
             : base(nullptr, __node_allocator_t())
         {
         }
 
-        node_type(__node_allocator_t const& __alloc)
+        constexpr node_type(__node_allocator_t const& __alloc)
             : base(nullptr, __alloc)
         {
         }
 
-        node_type(__node_t *__node, __node_allocator_t const& __alloc)
+        constexpr node_type(__node_t *__node,
+                            __node_allocator_t const& __alloc)
             : base(__node, __alloc)
         {
         }
@@ -1075,12 +1085,16 @@ public:
         }
 
     public:
-        __basic_iterator() = default;
-        __basic_iterator(__basic_iterator const& __rhs) = default;
-        __basic_iterator &operator=(__basic_iterator const& __rhs) = default;
+        constexpr __basic_iterator() = default;
+
+        constexpr __basic_iterator(__basic_iterator const& __rhs) = default;
+
+        constexpr __basic_iterator &operator=(
+                __basic_iterator const& __rhs) = default;
 
         template<bool _Rhs_is_const, int _Rhs_Dir>
-        __basic_iterator(__basic_iterator<_Rhs_is_const, _Rhs_Dir> const& __rhs)
+        constexpr __basic_iterator(
+                __basic_iterator<_Rhs_is_const, _Rhs_Dir> const& __rhs)
             : __curr(__rhs.__curr)
             , __owner(__rhs.__owner)
         {
@@ -1166,12 +1180,14 @@ public:
             return __curr->__item_ptr();
         }
 
-        bool operator==(__basic_iterator const& __rhs) const
+        template<bool _R_is_const>
+        bool operator==(__basic_iterator<_R_is_const, _Dir> const& __rhs) const
         {
             return __curr == __rhs.__curr;
         }
 
-        bool operator!=(__basic_iterator const& __rhs) const
+        template<bool _R_is_const>
+        bool operator!=(__basic_iterator<_R_is_const, _Dir> const& __rhs) const
         {
             return __curr != __rhs.__curr;
         }
@@ -1215,7 +1231,7 @@ public:
         owner_ptr_t __owner = nullptr;
     };
 
-    __basic_tree()
+    constexpr __basic_tree()
         : __root(nullptr)
         , __first(nullptr)
         , __last(nullptr)
@@ -1223,7 +1239,7 @@ public:
     {
     }
 
-    explicit __basic_tree(_Alloc const& __alloc)
+    constexpr explicit __basic_tree(_Alloc const& __alloc)
         : __root(nullptr)
         , __first(nullptr)
         , __last(nullptr)
@@ -1232,7 +1248,7 @@ public:
     {
     }
 
-    explicit __basic_tree(__node_allocator_t&& __alloc)
+    constexpr explicit __basic_tree(__node_allocator_t&& __alloc)
         : __root(nullptr)
         , __first(nullptr)
         , __last(nullptr)
@@ -1241,7 +1257,7 @@ public:
     {
     }
 
-    explicit __basic_tree(_Compare const& __cmp,
+    constexpr explicit __basic_tree(_Compare const& __cmp,
                           _Alloc const& __alloc = _Alloc())
         : __root(nullptr)
         , __first(nullptr)
@@ -1273,7 +1289,7 @@ public:
         clear();
     }
 
-    __basic_tree(__basic_tree const& __rhs)
+    constexpr __basic_tree(__basic_tree const& __rhs)
         : __root(nullptr)
         , __first(nullptr)
         , __last(nullptr)
@@ -1284,7 +1300,7 @@ public:
             insert(__item);
     }
 
-    __basic_tree(__basic_tree&& __rhs)
+    constexpr __basic_tree(__basic_tree&& __rhs)
         : __root(__rhs.__root)
         , __first(__rhs.__first)
         , __last(__rhs.__last)
@@ -1331,10 +1347,10 @@ public:
     }
 
     template<typename _K>
-    mapped_type const& operator[](_K const& __key) const
+    mapped_type& operator[](_K&& __key)
     {
         static_assert(!is_same<_V, void>::value, "Not a map");
-        pair<iterator,bool> __ins = insert(__key);
+        pair<iterator,bool> __ins = __insert_key(move(__key));
         if (likely(__ins.first != end()))
             return __tree_value_t::value(*__ins.first);
         throw std::bad_alloc();
@@ -1368,12 +1384,12 @@ public:
         throw std::out_of_range();
     }
 
-    size_type size() const
+    constexpr size_type size() const
     {
         return __current_size;
     }
 
-    bool empty() const
+    constexpr bool empty() const
     {
         return __current_size == 0;
     }
@@ -1393,73 +1409,73 @@ public:
     ///          begin        end
     ///         (first)    (nullptr)
 
-    iterator begin()
+    constexpr iterator begin()
     {
         return iterator(__first, this);
     }
 
-    const_iterator begin() const
+    constexpr const_iterator begin() const
     {
         return const_iterator(__first, this);
     }
 
-    const_iterator cbegin() const
+    constexpr const_iterator cbegin() const
     {
         return const_iterator(__first, this);
     }
 
-    reverse_iterator rbegin()
+    constexpr reverse_iterator rbegin()
     {
         return reverse_iterator(__last, this);
     }
 
-    const_reverse_iterator rbegin() const
+    constexpr const_reverse_iterator rbegin() const
     {
         return const_reverse_iterator(__last, this);
     }
 
-    const_reverse_iterator crbegin() const
+    constexpr const_reverse_iterator crbegin() const
     {
         return const_reverse_iterator(__last, this);
     }
 
     _const
-    iterator end()
+    constexpr iterator end()
     {
         return iterator(nullptr, this);
     }
 
     _const
-    const_iterator end() const
+    constexpr const_iterator end() const
     {
         return const_iterator(nullptr, this);
     }
 
     _const
-    const_iterator cend() const
+    constexpr const_iterator cend() const
     {
         return const_iterator(nullptr, this);
     }
 
     _const
-    reverse_iterator rend()
+    constexpr reverse_iterator rend()
     {
         return reverse_iterator(nullptr, this);
     }
 
     _const
-    const_reverse_iterator rend() const
+    constexpr const_reverse_iterator rend() const
     {
         return const_reverse_iterator(nullptr, this);
     }
 
     _const
-    const_reverse_iterator crend() const
+    constexpr const_reverse_iterator crend() const
     {
         return const_reverse_iterator(nullptr, this);
     }
 
-    size_type max_size()
+    constexpr size_type max_size()
     {
         return std::numeric_limits<size_type>::max() /
                 (sizeof(__node_t) + 32);
@@ -1541,17 +1557,17 @@ public:
         pair<iterator, bool> __result;
 
         bool __found_dup;
-        __node_t *__i = __tree_ins(nullptr, __found_dup,
-                                   __tree_value_t::key(__value));
+        __node_t *__ins = __tree_ins(nullptr, __found_dup,
+                                     __tree_value_t::key(__value));
 
         if (unlikely(__found_dup)) {
-            __result = { iterator(__i, this), false };
-        } else if (likely(__i != nullptr)) {
-            new (__i->__storage.__mem.data)
+            __result = { iterator(__ins, this), false };
+        } else if (likely(__ins != nullptr)) {
+            new (__ins->__storage.__mem.data)
                     __item_type(move(__value));
-            __result = { iterator(__i, this), true };
+            __result = { iterator(__ins, this), true };
 
-            _NodePolicy::__retrace_insert(__root, __i, this);
+            _NodePolicy::__retrace_insert(__root, __ins, this);
         }
 
         return __result;
@@ -1562,16 +1578,37 @@ public:
         pair<iterator, bool> __result;
 
         bool __found_dup;
-        __node_t *__i = __tree_ins(nullptr, __found_dup, __key);
+        __node_t *__ins = __tree_ins(nullptr, __found_dup, __key);
 
         if (unlikely(__found_dup)) {
-            __result = { iterator(__i, this), false };
-        } else if (likely(__i != nullptr)) {
-            new (__i->__storage.__mem.data)
+            __result = { iterator(__ins, this), false };
+        } else if (likely(__ins != nullptr)) {
+            new (__ins->__storage.__mem.data)
                     __item_type(__tree_value_t::with_default_value(__key));
-            __result = { iterator(__i, this), true };
+            __result = { iterator(__ins, this), true };
 
-            _NodePolicy::__retrace_insert(__root, __i, this);
+            _NodePolicy::__retrace_insert(__root, __ins, this);
+        }
+
+        return __result;
+    }
+
+    pair<iterator, bool> __insert_key(key_type&& __key)
+    {
+        pair<iterator, bool> __result;
+
+        bool __found_dup;
+        __node_t *__ins = __tree_ins(nullptr, __found_dup, __key);
+
+        if (unlikely(__found_dup)) {
+            __result = { iterator(__ins, this), false };
+        } else if (likely(__ins != nullptr)) {
+            new (__ins->__storage.__mem.data)
+                    __item_type(__tree_value_t::with_default_value(
+                                    move(__key)));
+            __result = { iterator(__ins, this), true };
+
+            _NodePolicy::__retrace_insert(__root, __ins, this);
         }
 
         return __result;
@@ -1582,17 +1619,17 @@ public:
         pair<iterator, bool> __result;
 
         bool __found_dup;
-        __node_t *__i = __tree_ins(nullptr, __found_dup,
-                                   __tree_value_t::key(__value));
+        __node_t *__ins = __tree_ins(nullptr, __found_dup,
+                                     __tree_value_t::key(__value));
 
         if (unlikely(__found_dup)) {
-            __result = { iterator(__i, this), false };
-        } else if (likely(__i != nullptr)) {
-            new (__i->__storage.__mem.data)
+            __result = { iterator(__ins, this), false };
+        } else if (likely(__ins != nullptr)) {
+            new (__ins->__storage.__mem.data)
                     __item_type(__value);
-            __result = { iterator(__i, this), true };
+            __result = { iterator(__ins, this), true };
 
-            _NodePolicy::__retrace_insert(__root, __i, this);
+            _NodePolicy::__retrace_insert(__root, __ins, this);
         }
 
         return __result;
@@ -1603,15 +1640,14 @@ public:
         pair<iterator, bool> __result;
 
         if (likely(__node_handle)) {
-            //__node_allocator_t src_alloc = __node_handle.get_allocator();
-            // FIXME: make sure same allocator
             __node_t *__node = __node_handle.release();
 
             bool __found_dup;
-            __tree_ins(__node, __found_dup, __node->__item());
+            __node_t *__ins = __tree_ins(__node, __found_dup,
+                                         __node->__item());
 
             if (unlikely(__found_dup)) {
-                __result = { iterator(__node, this), false };
+                __result = { iterator(__ins, this), false };
             } else if (likely(__node != nullptr)) {
                 __result = { iterator(__node, this), true };
 
@@ -1634,23 +1670,25 @@ public:
 
         // ...and can't avoid running constructor,
         // because we need a value to pass to the comparator
-        __item_type const *__ins =
+        __item_type const *__item =
                 new (reinterpret_cast<pointer>(__n->__storage.__mem.data))
-                __item_type(std::forward<Args>(__args)...);
+                __item_type(forward<Args>(__args)...);
 
         bool __found_dup;
-        __node_t *__i = __tree_ins(__n, __found_dup, *__ins);
+        __node_t *__ins = __tree_ins(__n, __found_dup,
+                                     __tree_value_t::key(*__item));
 
         if (likely(!__found_dup)) {
-            _NodePolicy::__retrace_insert(__root, __n);
+            _NodePolicy::__retrace_insert(__root, __n, this);
         } else {
             reinterpret_cast<pointer>(__n->__storage.__mem.data)->
                     ~__item_type();
             __n->~__node_t();
             __alloc.deallocate(__n, 1);
+            __n = nullptr;
         }
 
-        return pair<iterator, bool>(iterator(__i, this), !__found_dup);
+        return pair<iterator, bool>(iterator(__ins, this), !__found_dup);
     }
 
     template<typename _KT>
@@ -2084,6 +2122,7 @@ private:
 
         if (__first == __last) {
             // Deleting only node
+            assert(__node == __first);
             __new_first = nullptr;
             __new_last = nullptr;
         } else if (__first == __node) {

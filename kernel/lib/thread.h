@@ -160,6 +160,7 @@ struct thread_cpu_mask_t
 // Holds 0 if single cpu, otherwise holds -1
 // This allows branchless setting of spincounts to zero
 extern int spincount_mask;
+extern int use_mwait;
 
 // Implemented in arch
 thread_t thread_create(thread_fn_t fn, void *userdata,
@@ -239,5 +240,7 @@ struct __cxa_exception;
 
 struct __cxa_eh_globals;
 __cxa_eh_globals *thread_cxa_get_globals();
+
+void thread_set_timer(uint64_t ns);
 
 __END_DECLS

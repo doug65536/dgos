@@ -49,7 +49,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         0
-#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_READ_STRESS_THREAD   1
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -387,17 +387,19 @@ static int register_check(void *p)
 #if ENABLE_MMAP_STRESS_THREAD > 0
 static int stress_mmap_thread(void *p)
 {
-    (void)p;
-    void *block;
-    uint64_t last_free = mm_memory_remaining();
+    uintptr_t id = uintptr_t(p);
 
-    size_t block_count = 256;
+    void *block;
+    //uint64_t last_free = mm_memory_remaining();
+
+    size_t block_count = 16;
     std::unique_ptr<std::pair<uintptr_t, uintptr_t>[]> blocks(
                 new (std::nothrow)
                 std::pair<uintptr_t, uintptr_t>[block_count]);
     size_t current = 0;
 
     rand_lfs113_t rand;
+    rand.seed(id);
 
     size_t total_sz = 0;
     size_t sz;
@@ -405,7 +407,8 @@ static int stress_mmap_thread(void *p)
     for (;;) {
         uint64_t time_st = time_ns();
         for (unsigned iter = 0; iter < 1; ++iter) {
-            sz = 42 + (rand.lfsr113_rand() >> (32 - 17));
+            sz = rand.lfsr113_rand();
+            sz = 42 + (sz >> (32 - 17));
             total_sz += sz;
 
             std::pair<uintptr_t, uintptr_t> &
@@ -435,13 +438,15 @@ static int stress_mmap_thread(void *p)
 //            }
         }
 
-        uint64_t time_en = time_ns();
+        uint64_t time_el = time_ns() - time_st;
         if (--divisor == 0) {
             divisor = 2000;
-            printk("Ran mmap test iteration, sz: %s"
-                   ", time: %6" PRIu64 " ns (%.3s)\n",
-                   engineering_t(total_sz).ptr(), (time_en - time_st)/1,
-                   engineering_t(sz).ptr());
+            printk("%2zu: Ran mmap test iteration"
+                   ", sz: %4sB"
+                   ", time: %4ss\n",
+                   id,
+                   engineering_t(total_sz).ptr(),
+                   engineering_t(time_el, -3).ptr());
         }
     }
 
@@ -791,96 +796,10 @@ static int init_thread(void *)
     printk("Initializing late devices\n");
     callout_call(callout_type_t::late_dev);
 
-#if 0
-    printk("Initializing 8042 keyboard\n");
-    modload_load("keyb8042.km");
-    //thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
-
-    // Run late initializations
-    printk("Initializing late devices\n");
-    callout_call(callout_type_t::late_dev, true);
-
-    // Register USB interfaces
-    printk("Initializing USB interfaces\n");
-    //callout_call(callout_type_t::usb, true);
-
-    modload_load("usbxhci.km");
-
-    // Register filesystems
-    printk("Initializing filesystems\n");
-    callout_call(callout_type_t::reg_filesys, true);
-
-    modload_load("fat32.km");
-    modload_load("iso9660.km");
-
-    // Storage interfaces
-    printk("Initializing storage devices\n");
-    callout_call(callout_type_t::storage_dev, true);
-
-    modload_load("nvme.km");
-    modload_load("ahci.km");
-    modload_load("ide.km");
-
-    // Register partition schemes
-    printk("Initializing partition probes\n");
-    callout_call(callout_type_t::partition_probe, true);
-
-    modload_load("gpt.km");
-    modload_load("mbr.km");
-
-    // Register network interfaces
-    printk("Initializing network interfaces\n");
-    callout_call(callout_type_t::nic, true);
-
-    modload_load("rtl8139.km");
-
-    // Register network interfaces
-    printk("Initializing network interfaces\n");
-    callout_call(callout_type_t::nics_ready, true);
-
-    modload_load("ide.km");
-#endif
-
-#if 0
-    //    for (int i = 0; i < 10000; ++i) {
-    //        printk("%d=%f\n", i, i / 1000.0);
-    //    }
-
-    printk("Testing floating point formatter\n");
-    printk("Float formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
-    printk("Float formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
-    printk("Float formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
-    printk("Float formatter: %%+17.5f    42.8e-60  -> %+17.5f\n", 42.8e-60);
-    printk("Float formatter: %%17.5f    -42.8      -> %17.5f\n", -42.8);
-    printk("Float formatter: %%17.5f    -42.8e+60  -> %17.5f\n", -42.8e+60);
-    printk("Float formatter: %%17.5f    -42.8e-60  -> %17.5f\n", -42.8e-60);
-    printk("Float formatter: %%017.5f    42.8      -> %017.5f\n", 42.8);
-    printk("Float formatter: %%017.5f   -42.8e+60  -> %017.5f\n", -42.8e+60);
-    printk("Float formatter: %%+017.5f   42.8      -> %+017.5f\n", 42.8);
-    printk("Float formatter: %%+017.5f  -42.8e+60  -> %+017.5f\n", -42.8e+60);
-
-    printk("Float formatter: %%17.5e     42.8      -> %17.5e\n", 42.8);
-    printk("Float formatter: %%17.5e     42.8e+60  -> %17.5e\n", 42.8e+60);
-    printk("Float formatter: %%17.5e     42.8e-60  -> %17.5e\n", 42.8e-60);
-    printk("Float formatter: %%+17.5e    42.8e-60  -> %+17.5e\n", 42.8e-60);
-    printk("Float formatter: %%17.5e    -42.8      -> %17.5e\n", -42.8);
-    printk("Float formatter: %%17.5e    -42.8e+60  -> %17.5e\n", -42.8e+60);
-    printk("Float formatter: %%17.5e    -42.8e-60  -> %17.5e\n", -42.8e-60);
-    printk("Float formatter: %%017.5e    42.8      -> %017.5e\n", 42.8);
-    printk("Float formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
-    printk("Float formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
-    printk("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
-#endif
 
 #if ENABLE_FILESYSTEM_WR_TEST
     test_filesystem_write();
 #endif
-
-    //printk("Running mprotect self test\n");
-    //mprotect_test(nullptr);
-
-    //printk("Running red-black tree self test\n");
-    //rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
     printk("Starting framebuffer stress\n");
@@ -888,16 +807,6 @@ static int init_thread(void *)
     thread_t draw_thread_id = thread_create(draw_test, 0, 0, 0);
     printk("draw thread id=%d\n", draw_thread_id);
 #endif
-
-//    printk("Running module load test\n");
-//    module_entry_fn_t mod_entry = modload_load("hello.km");
-//    if (mod_entry) {
-//        int check = mod_entry();
-//        assert(check == 40);
-//        printk("Module load test %s\n", check == 40 ? "passed" : "failed");
-//    }
-
-    //modload_load("rtl8139.km");
 
 #if ENABLE_FIND_VBE
     thread_create(find_vbe, (void*)0xC0000, 0, false);
@@ -947,7 +856,8 @@ static int init_thread(void *)
     printk("Running mmap stress with %d threads\n",
              ENABLE_MMAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
-        thread_create(stress_mmap_thread, nullptr, 0, false, false);
+        thread_create(stress_mmap_thread, (void*)uintptr_t(i),
+                      0, false, false);
     }
 #endif
 

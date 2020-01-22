@@ -1,22 +1,17 @@
 #include "kmodule.h"
 
-extern "C" char const ___eh_frame_st[];
-extern "C" char const ___eh_frame_en[];
+HIDDEN extern char const ___eh_frame_st[];
+HIDDEN extern char const ___eh_frame_en[];
 
-__attribute__((__visibility__("hidden")))
-extern void *__dso_handle;
+HIDDEN extern void *__dso_handle;
 
-__attribute__((__visibility__("default")))
-extern void const * const * __dso_handle_export;
+EXPORT extern void const * const * __dso_handle_export;
 
-__attribute__((__visibility__("default"),__used__))
-void const * const * __dso_handle_export = &__dso_handle;
+EXPORT void const * const * __dso_handle_export = &__dso_handle;
 
-__attribute__((__visibility__("hidden")))
-extern char const _eh_frame_hdr[];
+HIDDEN extern char const _eh_frame_hdr[];
 
-__attribute__((__visibility__("hidden")))
-extern char const _eh_frame_hdr_end[];
+HIDDEN extern char const _eh_frame_hdr_end[];
 
 struct frame_registration {
     frame_registration()

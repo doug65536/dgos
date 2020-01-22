@@ -4,6 +4,7 @@
 //extern long syscall6(long p0, long p1, long p2, long p3,
 //                     long p4, long p5, int num);
 .balign 16
+.type syscall6,@function
 .global syscall6
 syscall6:
 	.cfi_startproc

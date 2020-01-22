@@ -3,8 +3,50 @@
 #include "mm.h"
 #include "likely.h"
 #include "memory.h"
+#include "vector.h"
 
 #include "contig_alloc.h"
+#include "unique_ptr.h"
+#include "cpu/phys_alloc.h"
+
+UNITTEST(test_physalloc)
+{
+    // Simulate 16GB of RAM
+    ext::unique_mmap<uint32_t> mem;
+    size_t mem_sz = UINT64_C(0x400000);
+    size_t mem_base = 0x100000;
+    size_t page_cnt = (mem_sz - mem_base) >> PAGE_SIZE_BIT;
+    size_t sz = mmu_phys_allocator_t::size_from_highest_page(page_cnt);
+    mem.mmap(sz);
+
+    mmu_phys_allocator_t uut;
+
+    uut.init(mem.get(), mem_base, page_cnt);
+
+    uut.add_free_space(mem_base, mem_sz - mem_base);
+
+    std::vector<uintptr_t> pages;
+    pages.reserve(uut.get_free_page_count());
+
+    for (size_t pass = 0; pass < 2; ++pass){
+        for (;;) {
+            uintptr_t addr = uut.alloc_one();
+            if (!addr)
+                break;
+
+            printdbg("Allocated %#zx\n", addr);
+
+            pages.push_back(addr);
+        }
+
+        for (uintptr_t page: pages) {
+            printdbg("Freed %#zx\n", page);
+            uut.release_one(page);
+        }
+
+        pages.clear();
+    }
+}
 
 UNITTEST(test_contig_init)
 {

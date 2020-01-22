@@ -14,11 +14,11 @@ SECTIONS {
 
 	PROVIDE_HIDDEN(__image_start = .);
 
-	.rodata : {
-		PROVIDE_HIDDEN(__rodata_start = .);
+	.rodata ALIGN(16) : {
+		PROVIDE_HIDDEN(__rodata_st = .);
 		*(.rodata)
 		*(.rodata.*)
-		PROVIDE_HIDDEN(__rodata_end = .);
+		PROVIDE_HIDDEN(__rodata_en = .);
 	} /*:hdr*/ :read
 
 	.tm_clone_table : {
@@ -33,7 +33,7 @@ SECTIONS {
 		*(.eh_frame)
 	} :read
 
-	.rela.got : {
+	.rela.got ALIGN(8) : {
 		*(.rela.got)
 	} :read
 
@@ -98,7 +98,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(__fini_array_end = .);
 	} :data
 
-	.got : {
+	.got ALIGN(8) : {
 		*(.got)
 	} :data
 

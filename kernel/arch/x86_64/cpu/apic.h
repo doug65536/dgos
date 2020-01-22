@@ -42,4 +42,6 @@ int acpi_have8259pic(void);
 _pure
 uint32_t acpi_cpu_count();
 
+uint64_t apic_ns_to_ticks(uint64_t ns);
+
 extern "C" isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx);

@@ -3,6 +3,7 @@
 
 //extern long syscall1(long p0, long num);
 .balign 16
+.type syscall1,@function
 .global syscall1
 syscall1:
 	.cfi_startproc

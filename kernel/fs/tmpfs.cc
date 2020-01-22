@@ -87,7 +87,7 @@ private:
 
         cpio_hdr_t const *next(char const *en) const
         {
-            if (unlikely(namesize == 10 &&
+            if (unlikely(namesize == 11 &&
                          !memcmp(name(), "TRAILER!!!", 10) &&
                          filesize() == 0))
                 return nullptr;
