@@ -33,7 +33,7 @@ void sys_exit(int exitcode)
 #define FUTEX_WAIT          0x00000001
 #define FUTEX_WAKE          0x00000002
 
-static long futex_wait(int *uaddr, int expect, int64_t timeout_time)
+static long futex_wait(int *uaddr, int expect, uint64_t timeout_time)
 {
     scoped_lock lock(futex_lock);
 
@@ -95,9 +95,9 @@ static long futex_wake(int *uaddr, int max_awakened)
     return 0;
 }
 
-static int64_t timeout_from_timespec(struct timespec const *t)
+static uint64_t timeout_from_timespec(struct timespec const *t)
 {
-    return t ? t->tv_sec * 1000000000 + t->tv_nsec : INT64_MAX;
+    return t ? t->tv_sec * 1000000000 + t->tv_nsec : UINT64_MAX;
 }
 
 long sys_futex(int *uaddr, int futex_op, int val,

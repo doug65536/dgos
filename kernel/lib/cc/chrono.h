@@ -361,12 +361,12 @@ private:
     duration __point;
 };
 
-using nanoseconds  = duration<int64_t, nano>;
-using microseconds = duration<int64_t, micro>;
-using milliseconds = duration<int64_t, milli>;
-using seconds      = duration<int64_t>;
-using minutes      = duration<int64_t, ratio<60>>;
-using hours        = duration<int64_t, ratio<3600>>;
+using nanoseconds  = duration<uint64_t, nano>;
+using microseconds = duration<uint64_t, micro>;
+using milliseconds = duration<uint64_t, milli>;
+using seconds      = duration<uint64_t>;
+using minutes      = duration<uint64_t, ratio<60>>;
+using hours        = duration<uint64_t, ratio<3600>>;
 //c++20 using days         = duration<int64_t, ratio<86400>>;
 //c++20 using weeks        = duration<int64_t, ratio<604800>>;
 //c++20 using months       = duration<int64_t, ratio<2629746>>;

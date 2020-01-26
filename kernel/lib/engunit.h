@@ -1,23 +1,24 @@
 #pragma once
 #include "types.h"
+#include "string.h"
 
 template<typename T>
 class engineering_t {
 public:
-    static constexpr char const unit_lookup[] = {
-        'a',    // -60
-        'f',    // -50
-        'p',    // -40
-        'n',    // -30
-        'u',    // -20
-        'm',    // -10
+    static constexpr char32_t const unit_lookup[] = {
+        U'a',    // -60
+        U'f',    // -50
+        U'p',    // -40
+        U'n',    // -30
+        U'μ',    // -20
+        U'm',    // -10
         0,      // <- [unit_base]
-        'k',    //  10
-        'M',    //  20
-        'G',    //  30
-        'T',    //  40
-        'P',    //  50
-        'E'     //  60
+        U'k',    //  10
+        U'M',    //  20
+        U'G',    //  30
+        U'T',    //  40
+        U'P',    //  50
+        U'E'     //  60
     };
 
 //    static constexpr size_t const unit_base = 6;
@@ -61,8 +62,12 @@ public:
             return;
         }
 
-        if (unit_lookup[log1024_unit + 6])
-            *--out = unit_lookup[log1024_unit + 6];
+        if (unit_lookup[log1024_unit + 6]) {
+            char encoded[5];
+            size_t sz = ucs4_to_utf8(encoded, unit_lookup[log1024_unit + 6]);
+            while (sz > 0)
+                *--out = encoded[--sz];
+        }
 
         // Convert into tenths decimal representation
         value *= 10;

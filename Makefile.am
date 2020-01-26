@@ -856,6 +856,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/vga.cc \
 	kernel/device/vt100.cc \
 	kernel/device/vt100.h \
+	kernel/device/vt100_out.cc \
+	kernel/device/vt100_out.h \
 	kernel/arch/x86_64/elf64.cc \
 	kernel/arch/x86_64/elf64_decl.h \
 	kernel/arch/x86_64/elf64.h \
@@ -2455,8 +2457,10 @@ QEMU_RT_tracedbg = -S $(QEMU_RT_trace)
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 
-QEMU_DRV_COMMON = id=bootdrv,if=none,format=raw,werror=report,rerror=report,cache=writeback
-QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
+QEMU_DRV_COMMON = \
+	id=bootdrv,if=none,format=raw,werror=report,rerror=report,cache=none
+QEMU_DRV = \
+	-drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
 QEMU_DISPLAY_SPICE = -spice ipv4,port=14446,disable-ticketing=on
@@ -2470,17 +2474,20 @@ QEMU_DISK_TYPE_mbr = ide-hd
 QEMU_DISK_TYPE_gpt = ide-hd
 
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
-QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
+QEMU_HDCTL_DEV_virtio = \
+	-device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
 #,num-queues=$(QEMU_CPUS)
 
 #-device ich9-ahci,id=bootif
 
-QEMU_HDCTL_DEV_ahci = -device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv
+QEMU_HDCTL_DEV_ahci = \
+	-device $(QEMU_DISK_TYPE_$(1)),$(QEMU_BLKSIZE),bus=ide.0,drive=bootdrv
 
 QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=bootif.0,drive=bootdrv
 
-QEMU_HDCTL_DEV_usb = -device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_usb = \
+	-device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE)
 
 QEMU_HDCTL = $(call QEMU_MACHINE,$(1)) $(call QEMU_HDCTL_DEV_$(1),$(2))
 

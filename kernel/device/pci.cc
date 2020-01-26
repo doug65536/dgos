@@ -9,7 +9,7 @@
 #include "inttypes.h"
 #include "time.h"
 
-#define PCI_DEBUG   1
+#define PCI_DEBUG   0
 #if PCI_DEBUG
 #define PCI_TRACE(...) printk("pci: " __VA_ARGS__)
 #else

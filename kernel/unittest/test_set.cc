@@ -328,7 +328,7 @@ UNITTEST(test_set_int_insert_reverse)
 
     }
 
-    c.dump();
+    //c.dump();
 
     eq(true, c.validate());
 
@@ -443,7 +443,7 @@ UNITTEST(test_set_int_complex_erase)
     eq(true, c.validate());
 }
 
-UNITTEST(test_set_int_every_insert_permutation)
+DISABLED_UNITTEST(test_set_int_every_insert_permutation)
 {
     std::set<int> c;
 
@@ -481,7 +481,7 @@ UNITTEST(test_set_int_every_insert_permutation)
     std::reverse(order.begin(), order.end());
 }
 
-UNITTEST(test_set_int_every_erase_permutation)
+DISABLED_UNITTEST(test_set_int_every_erase_permutation)
 {
     std::vector<int> order;
     std::set<int> c;

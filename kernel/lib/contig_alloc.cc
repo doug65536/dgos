@@ -76,7 +76,7 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
 
     ready = true;
 
-    validate_locked(lock);
+    //validate_locked(lock);
 
     return aligned_base;
 }
@@ -94,7 +94,7 @@ EXPORT void contiguous_allocator_t::init(
         free_addr_by_addr.insert({addr, size});
     }
 
-    validate_locked(lock);
+    //validate_locked(lock);
 
     ready = true;
 }

@@ -265,8 +265,8 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
             int32_t disp32;
             old_sz = 5;
 
-            disp32 = 0;
             next = addr + 5;
+            disp32 = 0;
             memcpy(&disp32, code + 1, sizeof(disp32));
 
             uintptr_t dest_addr;
@@ -275,7 +275,6 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
             if (dest_addr == uintptr_t(protection_barrier)) {
                 // No point calling protection barrier if
                 // the CPU does not have IBPB
-                cpu_scoped_wp_disable wp_dis;
                 if (cpuid_has_ibpb()) {
                     // Call actual ibpb function
                     new_sz = 5;

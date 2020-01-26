@@ -92,6 +92,8 @@ device/virtio-gpu.cc
 device/virtio-gpu.h
 device/vt100.cc
 device/vt100.h
+device/vt100_out.cc
+device/vt100_out.h
 fs/devfs.cc
 fs/devfs.h
 fs/gpt.cc

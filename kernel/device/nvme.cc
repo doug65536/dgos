@@ -1024,8 +1024,7 @@ void nvme_if_t::deferred_irq_handler(int irq_offset)
         queue.process_completions(this, queues);
     } else {
         // Fallback to vector that is not shared across CPUs
-        for (size_t i = irq_offset; i < queue_count; i += irq_range.count)
-        {
+        for (size_t i = irq_offset; i < queue_count; i += irq_range.count) {
             nvme_queue_state_t& queue = queues[i];
             queue.process_completions(this, queues);
         }

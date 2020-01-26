@@ -132,7 +132,17 @@ class symbol_server_t {
         if (top_rows++ > 16)
             return;
 
-        char buf[1024];
+        char edited_name[128];
+        size_t name_len = strlen(name);
+        if (name_len > 96) {
+            // 1st 16 ... last 80
+            memcpy(edited_name, name, 16);
+            memcpy(edited_name + 16, "...", 3);
+            memcpy(edited_name + 19, name + name_len - 77, 78);
+            name = edited_name;
+        }
+
+        char buf[128];
         int sz = snprintf(buf, sizeof(buf),
                           "\x1b" "[%zu;1H"
                           "\x1b" "[K"
@@ -320,7 +330,7 @@ public:
         port = uart_dev_t::open(0x2f8, 3, 115200, 8, 'N', 1, false);
 
         tid = thread_create(&symbol_server_t::thread_entry, this,
-                            0, false, false);
+                            "symbol_server", 0, false, false);
     }
 
     static size_t top_rows;

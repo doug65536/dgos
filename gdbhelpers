@@ -250,3 +250,37 @@ define modulesyms
 		set $midx = $midx + 1
 	end
 end
+
+define dumptree
+	print $arg0.__current_size
+	# Go to first element
+	set $node = $arg0.__first
+
+	while $node != 0
+		if $argc == 2
+			set $item = $node->__storage.__instance
+			eval $arg1
+		else
+			print $node->__storage.__instance
+		end
+
+		if $node->__right != 0
+			set $node = $node->__right
+
+			# Keep going left until there is no left
+			while $node->__left != 0
+				set $node = $node->__left
+			end
+		else
+			# Keep going up until from left
+			while $node != 0
+				if $node->__parent && $node->__parent->__right == $node
+					set $node = $node->__parent
+				else
+					set $node = $node->__parent
+					loop_break
+				end
+			end
+		end
+	end
+end

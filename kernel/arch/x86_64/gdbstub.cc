@@ -2501,7 +2501,7 @@ void gdb_cpu_ctrl_t::start()
 
     cpu_irq_enable();
 
-    stub_tid = thread_create(gdb_thread, nullptr, 0, false, false);
+    stub_tid = thread_create(gdb_thread, nullptr, "gdbstub", 0, false, false);
 
     cpu_wait_value(&stub_running, true);
 

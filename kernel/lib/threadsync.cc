@@ -7,28 +7,14 @@
 #include "export.h"
 #include "cpu/control_regs.h"
 
-#define MUTEX_DEBUG 0
-#if MUTEX_DEBUG
-#define MUTEX_DTRACE(...) printdbg("mutex: " __VA_ARGS__)
-#else
-#define MUTEX_DTRACE(...) ((void)0)
-#endif
-
-#define DEBUG_CONDVAR 0
-#if DEBUG_CONDVAR
-#define CONDVAR_DTRACE(...) printdbg("condvar: " __VA_ARGS__)
-#else
-#define CONDVAR_DTRACE(...) ((void)0)
-#endif
-
 #define SPINCOUNT_MAX   4096
 #define SPINCOUNT_MIN   4
 
 //
 // Wait chain
 
-static void thread_wait_add(thread_wait_link_t *root,
-                            thread_wait_link_t *node)
+EXPORT void thread_wait_add(thread_wait_link_t *root,
+                     thread_wait_link_t *node)
 {
     thread_wait_link_t *insafter = root->prev;
     node->next = root;
@@ -37,7 +23,7 @@ static void thread_wait_add(thread_wait_link_t *root,
     root->prev = node;
 }
 
-static thread_wait_link_t *thread_wait_del(
+EXPORT thread_wait_link_t *thread_wait_del(
         thread_wait_link_t *node)
 {
     thread_wait_link_t *next = node->next;
@@ -85,7 +71,7 @@ EXPORT bool mutex_try_lock(mutex_t *mutex)
 }
 
 _hot
-EXPORT bool mutex_lock(mutex_t *mutex, int64_t timeout_time)
+EXPORT bool mutex_lock(mutex_t *mutex, uint64_t timeout_time)
 {
     bool result = true;
     assert(mutex->owner != thread_get_id());
@@ -237,7 +223,7 @@ EXPORT bool rwlock_ex_try_lock(rwlock_t *rwlock)
     return result;
 }
 
-EXPORT bool rwlock_ex_lock(rwlock_t *rwlock, int64_t timeout_time)
+EXPORT bool rwlock_ex_lock(rwlock_t *rwlock, uint64_t timeout_time)
 {
     bool result = true;
     thread_t tid = thread_get_id();
@@ -290,7 +276,7 @@ EXPORT bool rwlock_ex_lock(rwlock_t *rwlock, int64_t timeout_time)
     return result;
 }
 
-EXPORT bool rwlock_upgrade(rwlock_t *rwlock, int64_t timeout_time)
+EXPORT bool rwlock_upgrade(rwlock_t *rwlock, uint64_t timeout_time)
 {
     bool result = true;
     thread_t tid = thread_get_id();
@@ -381,7 +367,7 @@ EXPORT bool rwlock_sh_try_lock(rwlock_t *rwlock)
     return result;
 }
 
-EXPORT bool rwlock_sh_lock(rwlock_t *rwlock, int64_t timeout_time)
+EXPORT bool rwlock_sh_lock(rwlock_t *rwlock, uint64_t timeout_time)
 {
     bool result = true;
     int spin = 0;
@@ -585,66 +571,15 @@ protected:
     mutex_t *mutex;
 };
 
-template<typename T>
-static bool condvar_wait_ex(condition_var_t *var, T& lock_upd,
-                            uint64_t timeout_time)
-{
-    uintptr_t result;
-
-    // Lock the condition variable
-    spinlock_lock(&var->lock);
-
-    // Uninterruptible code ahead
-    cpu_scoped_irq_disable irq_dis;
-
-    thread_wait_t wait;
-    thread_wait_add(&var->link, &wait.link);
-
-    // Unlock whatever lock is protecting the condition
-    lock_upd.unlock();
-
-    // Atomically unlock the condition variable and suspend
-    // note: returns with var->lock unlocked!
-    CONDVAR_DTRACE("%p: Suspending\n", (void*)&wait);
-    result = thread_sleep_release(&var->lock, &wait.thread, timeout_time);
-    CONDVAR_DTRACE("%p: Awoke\n", (void*)&wait);
-
-    // (do not) Release (not) reacquired condition variable lock
-    //spinlock_unlock(&var->lock);
-
-    // Sanely disconnected nodes will have nulled links
-    if (result) {
-        assert(wait.link.next == nullptr);
-        assert(wait.link.prev == nullptr);
-    } else {
-        // Reacquire condition variable lock to remove this thread from the
-        // notification list
-        spinlock_lock(&var->lock);
-
-        // Possible that condition was notified after timer expiry
-        if (likely(wait.link.next))
-            thread_wait_del(&wait.link);
-        else
-            result = true;
-
-        spinlock_unlock(&var->lock);
-    }
-
-    // Reacquire lock protecting condition before returning
-    lock_upd.lock();
-
-    return result;
-}
-
 EXPORT bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock,
-                                  int64_t timeout_time)
+                                  uint64_t timeout_time)
 {
     condvar_spinlock_t state(lock);
     return condvar_wait_ex(var, state, timeout_time);
 }
 
 EXPORT bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock,
-                                    int64_t timeout_time)
+                                    uint64_t timeout_time)
 {
     condvar_ticketlock_t state(lock);
     return condvar_wait_ex(var, state, timeout_time);
@@ -652,14 +587,14 @@ EXPORT bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock,
 
 EXPORT bool condvar_wait_mcslock(condition_var_t *var,
                                  mcs_queue_ent_t * volatile *root,
-                                 mcs_queue_ent_t *node, int64_t timeout_time)
+                                 mcs_queue_ent_t *node, uint64_t timeout_time)
 {
     condvar_mcslock_t state(root, node);
     return condvar_wait_ex(var, state, timeout_time);
 }
 
 EXPORT bool condvar_wait_mutex(condition_var_t *var, mutex_t *mutex,
-                               int64_t timeout_time)
+                               uint64_t timeout_time)
 {
     assert(mutex->owner == thread_get_id());
     condvar_mutex_t state(mutex);

@@ -347,6 +347,10 @@ public:
     virtual bool reg_readable(uint32_t reg) = 0;
     virtual bool reg_exists(uint32_t reg) = 0;
 
+    virtual void eoi() = 0;
+    virtual void write_timer_dcr(uint32_t dcr) = 0;
+    virtual void write_timer_icr(uint32_t icr) = 0;
+
     // Unavoidable
     virtual bool is_x2() const { return true; }
 
@@ -406,15 +410,16 @@ class lapic_x_t : public lapic_t {
         return apic_ptr[offset << (4 - 2)];
     }
 
+    _always_inline
     void write32(uint32_t offset, uint32_t val) override final
     {
-        apic_ptr[offset << (4 - 2)] = val;
+        cpu_mmio_wr(&apic_ptr[offset << (4 - 2)], val);
     }
 
     _no_instrument
     void write32_noinst(uint32_t offset, uint32_t val) override final
     {
-        apic_ptr[offset << (4 - 2)] = val;
+        cpu_mmio_wr_noinst(&apic_ptr[offset << (4 - 2)], val);
     }
 
     uint64_t read64(uint32_t offset) override final
@@ -428,15 +433,15 @@ class lapic_x_t : public lapic_t {
         return ((uint64_t*)apic_ptr)[offset << (4 - 3)];
     }
 
-    void write64(uint32_t offset, uint64_t val) override final
+    void _always_inline write64(uint32_t offset, uint64_t val) override final
     {
-        ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
+        cpu_mmio_wr(&((uint64_t*)apic_ptr)[offset << (4 - 3)], val);
     }
 
     _no_instrument
     void write64_noinst(uint32_t offset, uint64_t val) override final
     {
-        ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
+        cpu_mmio_wr_noinst(&((uint64_t*)apic_ptr)[offset << (4 - 3)], val);
     }
 
     bool reg_readable(uint32_t reg) override final
@@ -447,6 +452,23 @@ class lapic_x_t : public lapic_t {
     bool reg_exists(uint32_t reg) override final
     {
         return reg_maybe_readable(reg);
+    }
+
+    // lapic_t interface
+public:
+    void eoi() override final
+    {
+        write32(APIC_REG_EOI, 0);
+    }
+
+    void write_timer_dcr(uint32_t dcr) override final
+    {
+        write32(APIC_REG_LVT_DCR, dcr);
+    }
+
+    void write_timer_icr(uint32_t icr) override final
+    {
+        write32(APIC_REG_LVT_ICR, icr);
     }
 };
 
@@ -474,6 +496,7 @@ protected:
         return cpu_msr_get_lo(0x800 + offset);
     }
 
+    _always_inline
     void write32(uint32_t offset, uint32_t val) override
     {
         cpu_msr_set(0x800 + offset, val);
@@ -522,6 +545,23 @@ protected:
                 reg != APIC_REG_APR &&
                 reg_maybe_exists(reg);
     }
+
+    // lapic_t interface
+public:
+    void eoi() override
+    {
+        write32(APIC_REG_EOI, 0);
+    }
+
+    void write_timer_dcr(uint32_t dcr) override final
+    {
+        write32(APIC_REG_LVT_DCR, dcr);
+    }
+
+    void write_timer_icr(uint32_t icr) override final
+    {
+        write32(APIC_REG_LVT_ICR, icr);
+    }
 };
 
 class lapic_kvm_t : public lapic_x2_t {
@@ -552,6 +592,13 @@ private:
 
     std::unique_ptr<cacheline_t[]> cpus;
     size_t cpu_count;
+
+    // lapic_t interface
+public:
+    void eoi() override final
+    {
+        write32(APIC_REG_EOI, 0);
+    }
 };
 
 union lapic_any_t {
@@ -1411,7 +1458,7 @@ static int parse_mp_tables(void)
 _hot
 static isr_context_t *apic_timer_handler(int intr, isr_context_t *ctx)
 {
-    return thread_schedule(ctx);
+    return thread_schedule(ctx, true);
 }
 
 static isr_context_t *apic_spurious_handler(int intr, isr_context_t *ctx)
@@ -1504,7 +1551,7 @@ void apic_send_ipi_noinst(int target_apic_id, uint8_t intr)
 _hot
 void apic_eoi(int intr)
 {
-    apic->write32(APIC_REG_EOI, intr & 0);
+    apic->eoi();
 }
 
 _no_instrument
@@ -1578,18 +1625,22 @@ void apic_dump_regs(int ap)
 
 static void apic_calibrate();
 
-static void apic_configure_timer_hw(
+static void apic_timer_hw_reset(
         uint32_t dcr, uint32_t icr, uint8_t timer_mode,
         uint8_t intr, bool mask = false)
 {
-//    APIC_TRACE("configuring timer,"
-//               " dcr=%#x, icr=%#x, mode=%#x, intr=%#x, mask=%d\n",
-//               dcr, icr, timer_mode, intr, mask);
-    apic->write32(APIC_REG_LVT_DCR, dcr);
+    // "A write of 0 to the initial-count register effectively stops
+    // the local APIC timer, in both one-shot and periodic mode." - Intel
+    apic->write_timer_icr(0);
+
+    apic->write_timer_dcr(dcr);
     apic->write32(APIC_REG_LVT_TR, APIC_LVT_VECTOR_n(intr) |
                   APIC_LVT_TR_MODE_n(timer_mode) |
                   (mask ? APIC_LVT_MASK : 0));
-    apic->write32(APIC_REG_LVT_ICR, icr);
+
+    // "In one-shot mode, the timer is started by programming its
+    // initial-count register." - Intel
+    apic->write_timer_icr(icr);
 }
 
 static const constexpr uint8_t apic_shr_to_dcr[] = {
@@ -1603,6 +1654,24 @@ static const constexpr uint8_t apic_shr_to_dcr[] = {
     APIC_LVT_DCR_BY_128
 };
 
+uint64_t apic_timer_hw_oneshot(uint8_t& dcr_shadow, uint64_t icr)
+{
+    uint8_t m = bit_msb_set(icr);
+    uint8_t shr = (m > 31) ? m - 31 : 0;
+
+    uint8_t new_dcr = apic_shr_to_dcr[shr];
+
+    if (dcr_shadow != new_dcr) {
+        dcr_shadow = uint8_t(new_dcr);
+        apic->write_timer_dcr(new_dcr);
+    }
+
+    uint32_t scaled_icr = icr >> shr;
+    apic->write_timer_icr(0);
+    apic->write_timer_icr(scaled_icr);
+
+    return scaled_icr << shr;
+}
 
 // convert ns=1/1e+9th of a second unit to ticks=1/apic_timer_freq
 //
@@ -1630,10 +1699,10 @@ uint64_t apic_ns_to_ticks(uint64_t ns)
 EXPORT uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask)
 {
     if (ticks <= INT32_MAX) {
-        apic_configure_timer_hw(APIC_LVT_DCR_BY_1, ticks,
-                                one_shot ? APIC_LVT_TR_MODE_ONESHOT
-                                         : APIC_LVT_TR_MODE_PERIODIC,
-                                INTR_APIC_TIMER, mask);
+        apic_timer_hw_reset(APIC_LVT_DCR_BY_1, ticks,
+                            one_shot ? APIC_LVT_TR_MODE_ONESHOT
+                                     : APIC_LVT_TR_MODE_PERIODIC,
+                            INTR_APIC_TIMER, mask);
         return ticks;
     }
 
@@ -1676,10 +1745,10 @@ EXPORT uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask)
 
     uint32_t dcr = apic_shr_to_dcr[shift];
 
-    apic_configure_timer_hw(dcr, ticks,
-                            one_shot ? APIC_LVT_TR_MODE_ONESHOT
-                                     : APIC_LVT_TR_MODE_PERIODIC,
-                            INTR_APIC_TIMER, mask);
+    apic_timer_hw_reset(dcr, ticks,
+                        one_shot ? APIC_LVT_TR_MODE_ONESHOT
+                                 : APIC_LVT_TR_MODE_PERIODIC,
+                        INTR_APIC_TIMER, mask);
 
     return ticks << shift;
 }
@@ -1766,11 +1835,11 @@ int apic_init(int ap)
 
     if (ap) {
         APIC_TRACE("Configuring AP timer\n");
-        apic_configure_timer_hw(APIC_LVT_DCR_BY_1,
-                                ~0U,
-                                APIC_LVT_TR_MODE_PERIODIC |
-                                APIC_LVT_DELIVERY_MASK,
-                                INTR_APIC_TIMER);
+        apic_timer_hw_reset(APIC_LVT_DCR_BY_1,
+                            0,
+                            APIC_LVT_TR_MODE_PERIODIC |
+                            APIC_LVT_DELIVERY_MASK,
+                            INTR_APIC_TIMER);
     }
 
     return 1;
@@ -1901,11 +1970,10 @@ static void apic_detect_topology(void)
 void apic_start_smp(void)
 {
     // Initialize APIC timer
-    apic_configure_timer_hw(APIC_LVT_DCR_BY_1,
-                            ~0U,
-                            APIC_LVT_TR_MODE_ONESHOT |
-                            APIC_LVT_DELIVERY_MASK,
-                            INTR_APIC_TIMER);
+    apic_timer_hw_reset(APIC_LVT_DCR_BY_1,
+                        0,
+                        APIC_LVT_TR_MODE_ONESHOT,
+                        INTR_APIC_TIMER, false);
 
     APIC_TRACE("%d CPUs\n", apic_id_count);
 
@@ -2109,7 +2177,7 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
 static uint64_t apic_rdtsc_time_ns_handler()
 {
     uint64_t now = cpu_rdtsc();
-    return now * clk_to_ns_numer / clk_to_ns_denom;
+    return uint64_t(uint128_t(now) * clk_to_ns_numer / clk_to_ns_denom);
 }
 
 static uint64_t apic_rdtsc_nsleep_handler(uint64_t nanosec)
@@ -2147,15 +2215,16 @@ static void apic_calibrate()
             info.eax >= 0x40000010 && cpuid(&info, 0x40000010, 0)) {
         rdtsc_freq = (info.eax + 500) * 1000;
         apic_timer_freq = info.ebx * UINT64_C(1000);
+        // The max ns where ns * apic_timer_freq <= UINT64_MAX
         apic_ns_limit = UINT64_MAX / apic_timer_freq;
     } else if (acpi_pm_timer_raw() >= 0) {
         //
         // Have PM timer
 
         // Program timer (should be high enough to measure 858ms @ 5GHz)
-        apic_configure_timer_hw(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
-                                APIC_LVT_TR_MODE_ONESHOT,
-                                INTR_APIC_TIMER, false);
+        apic_timer_hw_reset(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
+                            APIC_LVT_TR_MODE_ONESHOT,
+                            INTR_APIC_TIMER, false);
 
         uint32_t tmr_st = acpi_pm_timer_raw();
         uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);
@@ -2187,7 +2256,8 @@ static void apic_calibrate()
         // utilized limit is lower, since we avoid 128 bit operations
         // 184 to 18.4s, assuming probable timer freq range 100MHz-1GHz
         // Real hardware likely being 100MHz, and KVM being 1GHz
-        apic_ns_limit = INT64_MAX / apic_timer_freq;
+        // The max ns where ns * apic_timer_freq <= UINT64_MAX
+        apic_ns_limit = UINT64_MAX / apic_timer_freq;
 
         // Round APIC frequency to nearest multiple of 333kHz
 //        apic_timer_freq += 166666;
@@ -2201,9 +2271,9 @@ static void apic_calibrate()
         rdtsc_freq = cpu_freq;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
-        apic_configure_timer_hw(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
-                                APIC_LVT_TR_MODE_ONESHOT,
-                                INTR_APIC_TIMER, true);
+        apic_timer_hw_reset(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
+                            APIC_LVT_TR_MODE_ONESHOT,
+                            INTR_APIC_TIMER, true);
 
         // Note starting values of both the timer and the timestamp counter
         uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);

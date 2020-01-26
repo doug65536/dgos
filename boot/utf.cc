@@ -100,10 +100,10 @@ int utf16_to_ucs4(char16_t const *in, char16_t const **ret_end)
 // would have wrote to out, not including null terminator
 // Returns 0 for values outside 0 <= in < 0x101000 range
 // Always writes null terminator if out is not null
-int ucs4_to_utf8(char *out, int in)
+int ucs4_to_utf8(char *out, char32_t in)
 {
     int len;
-    if (in >= 0 && in < 0x80) {
+    if (in < 0x80) {
         if (out) {
             *out++ = (char)in;
             *out++ = 0;
@@ -111,11 +111,11 @@ int ucs4_to_utf8(char *out, int in)
         return 1;
     }
 
-    if (in < 0x80) {
+    if (in < 0x800) {
         len = 2;
-    } else if (in < 0x800) {
-        len = 3;
     } else if (in < 0x10000) {
+        len = 3;
+    } else if (in < 0x110000) {
         len = 4;
     } else {
         // Invalid

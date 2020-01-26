@@ -97,7 +97,8 @@ thread_run_data_t::thread_run_data_t(int (*f)(void *), void *a)
 thread_t thread_run_data_t::spawn_thread(thread_run_data_t *p) const
 {
     std::unique_ptr<thread_run_data_t> data(p);
-    thread_t tid = thread_create(thread_run_start, data, 0, false, false);
+    thread_t tid = thread_create(thread_run_start, data,
+                                 "spawn_thread", 0, false, false);
     if (tid >= 0)
         data.release();
     return tid;

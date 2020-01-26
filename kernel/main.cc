@@ -50,7 +50,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 
 #define ENABLE_SHELL_THREAD         0
 #define ENABLE_READ_STRESS_THREAD   1
-#define ENABLE_SLEEP_THREAD         0
+#define ENABLE_SLEEP_THREAD         0 // no affinity or moving across cpus yet
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_MMAP_STRESS_THREAD   1
@@ -116,7 +116,8 @@ public:
         this->devid = devid;
         this->indicator = indicator;
         this->index = index;
-        tid = thread_create(&read_stress_thread_t::worker, this, 0,
+        tid = thread_create(&read_stress_thread_t::worker, this,
+                            "read_stress", 0,
                             false, false);
         return tid;
     }
@@ -244,7 +245,7 @@ private:
     static size_t constexpr queue_depth = 16;
     blocking_iocp_t iocp[queue_depth];
     char *data[queue_depth];
-    char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 64];
+    char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 128];
 
     uint16_t *indicator;
     dev_t devid;
@@ -279,7 +280,7 @@ void test_read_stress()
 #endif
 
 struct test_thread_param_t {
-    uint16_t *p;
+    int v;
     int sleep;
 };
 
@@ -288,28 +289,27 @@ static int other_thread(void *p)
 {
     test_thread_param_t *tp = (test_thread_param_t *)p;
     while (1) {
-        int odd = ++(*tp->p);
+        int odd = ++tp->v;
         if (tp->sleep)
             thread_sleep_for(tp->sleep);
-        //else
 
         thread_set_affinity(thread_get_id(),
-                            (1UL << (odd % thread_get_cpu_count())));
+                            thread_cpu_mask_t(odd % thread_get_cpu_count()));
     }
     return 0;
 }
+
+static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
 
 void test_sleep()
 {
     printk("Running sleep stress with %d threads\n",
              ENABLE_SLEEP_THREAD);
 
-    static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
-
     for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
         ttp[i].sleep = i * 100;
         ttp[i].p = (uint16_t*)0xb8000 + 4 + i;
-        thread_create(other_thread, ttp + i, 0, false);
+        thread_create(other_thread, ttp + i, "test_sleep", 0, false, false);
     }
 }
 #endif
@@ -381,6 +381,7 @@ static int mprotect_test(void *)
 #if ENABLE_REGISTER_THREAD
 static int register_check(void *p)
 {
+    return 0;
 }
 #endif
 
@@ -418,14 +419,14 @@ static int stress_mmap_thread(void *p)
 
             block = mmap(nullptr, sz,
                          PROT_READ | PROT_WRITE,
-                         0, -1, 0);
+                         MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
 
             blocks[current] = {uintptr_t(block), sz};
 
             if (++current == block_count)
                 current = 0;
 
-            memset(block, 0xcc, sz);
+            //memset(block, 0xcc, sz);
 
 //            if (!--divisor) {
 //                divisor = 20;
@@ -817,13 +818,15 @@ static int init_thread(void *)
     printk("Running context switch stress with %d threads\n",
              ENABLE_CTXSW_STRESS_THREAD);
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
-        thread_close(thread_create(ctx_sw_thread, 0, 0, false));
+        thread_close(thread_create(ctx_sw_thread, nullptr,
+                                   "ctxsw_stress", 0, false, false));
     }
 #endif
 
 #if ENABLE_SHELL_THREAD > 0
     printk("Running shell thread\n");
-    thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, false, false);
+    thread_create(shell_thread, (void*)0xfeedbeeffacef00d,
+                  "shell_thread", 0, false, false);
 #endif
 
 #if ENABLE_SLEEP_THREAD
@@ -840,7 +843,9 @@ static int init_thread(void *)
     for (int i = 0; i < ENABLE_REGISTER_THREAD; ++i) {
         thread_create(register_check, (void*)
                       (0xDEADFEEDF00DD00D +
-                       (1<<ENABLE_READ_STRESS_THREAD)), 0, false);
+                       (1<<ENABLE_READ_STRESS_THREAD)),
+                      "register_stress",
+                      0, false, false);
     }
 #endif
 
@@ -848,7 +853,8 @@ static int init_thread(void *)
     printk("Running mutex stress with %d threads\n", ENABLE_MUTEX_THREAD);
     mutex_init(&stress_lock);
     for (int i = 0; i < ENABLE_MUTEX_THREAD; ++i) {
-        thread_create(stress_mutex, 0, 0, false);
+        thread_create(stress_mutex, nullptr,
+                      "mutex_stress", 0, false, false);
     }
 #endif
 
@@ -857,6 +863,7 @@ static int init_thread(void *)
              ENABLE_MMAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
         thread_create(stress_mmap_thread, (void*)uintptr_t(i),
+                      "mmap_stress",
                       0, false, false);
     }
 #endif
@@ -865,7 +872,8 @@ static int init_thread(void *)
     printk("Running heap stress with %d threads\n",
              ENABLE_HEAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_HEAP_STRESS_THREAD; ++i) {
-        thread_create(stress_heap_thread, nullptr, 0, false);
+        thread_create(stress_heap_thread, nullptr,
+                      "heap_stress", 0, false, false);
     }
 #endif
 
@@ -880,7 +888,7 @@ int debugger_thread(void *)
 {
     printk("Starting GDB stub\n");
     gdb_init();
-    thread_create(init_thread, nullptr, 0, false, true);
+    thread_create(init_thread, nullptr, "init_thread", 0, false, true);
 
     return 0;
 }
@@ -1011,9 +1019,11 @@ extern "C" _noreturn int main(void)
 //    assert(caught);
 
     if (!kernel_params->wait_gdb)
-        thread_create(init_thread, nullptr, 0, false, false);
+        thread_create(init_thread, nullptr,
+                      "init_thread", 0, false, false);
     else
-        thread_create(debugger_thread, nullptr, 0, false, false);
+        thread_create(debugger_thread, nullptr,
+                      "debugger_thread", 0, false, false);
 
     thread_idle_set_ready();
 

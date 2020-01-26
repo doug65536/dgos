@@ -770,17 +770,14 @@ void cpu_irq_enable()
 _hot
 static _always_inline void cpu_irq_toggle(bool enable)
 {
-    uint32_t temp;
     __asm__ __volatile__ (
         "pushfq\n\t"
-        "popq %q[temp]\n\t"
-        "andl %[not_eflags_if],%k[temp]\n\t"
-        "orl %k[enable],%k[temp]\n\t"
-        "pushq %q[temp]\n\t"
+        "andq %q[not_eflags_if],(%%rsp)\n\t"
+        "orq %q[enable],(%%rsp)\n\t"
         "popfq\n\t"
-        : [temp] "=&r" (temp)
-        : [enable] "ir" (enable << CPU_EFLAGS_IF_BIT)
-        , [not_eflags_if] "i" (~CPU_EFLAGS_IF)
+        :
+        : [enable] "ir" (uintptr_t(enable) << CPU_EFLAGS_IF_BIT)
+        , [not_eflags_if] "i" (~uint64_t(CPU_EFLAGS_IF))
         : "cc"
     );
 }
@@ -788,15 +785,12 @@ static _always_inline void cpu_irq_toggle(bool enable)
 _hot _no_instrument
 static _always_inline void cpu_irq_toggle_noinst(bool enable)
 {
-    uint32_t temp;
     __asm__ __volatile__ (
         "pushfq\n\t"
-        "popq %q[temp]\n\t"
-        "andl %[not_eflags_if],%k[temp]\n\t"
-        "orl %k[enable],%k[temp]\n\t"
-        "pushq %q[temp]\n\t"
+        "andl %[not_eflags_if],(%%rsp)\n\t"
+        "orl %k[enable],(%%rsp)\n\t"
         "popfq\n\t"
-        : [temp] "=&r" (temp)
+        :
         : [enable] "ir" (enable << CPU_EFLAGS_IF_BIT)
         , [not_eflags_if] "i" (~CPU_EFLAGS_IF)
         : "cc"
@@ -1053,4 +1047,92 @@ static _always_inline void cpu_wait_bit_set(
         T const volatile *value, uint8_t bit)
 {
     return cpu_wait_bit_value(value, bit, true);
+}
+
+static _always_inline void cpu_mmio_wr(
+        void const volatile *mmio, uint8_t value)
+{
+    __asm__ __volatile__ (
+        "movb %b[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "ri" (value)
+    );
+}
+
+static _always_inline void cpu_mmio_wr(
+        void const volatile *mmio, uint16_t value)
+{
+    __asm__ __volatile__ (
+        "movw %w[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "ri" (value)
+    );
+}
+
+static _always_inline void cpu_mmio_wr(
+        void const volatile *mmio, uint32_t value)
+{
+    __asm__ __volatile__ (
+        "movl %k[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "ri" (value)
+    );
+}
+
+static _always_inline void cpu_mmio_wr(
+        void const volatile *mmio, uint64_t value)
+{
+    __asm__ __volatile__ (
+        "movq %q[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "r" (value)
+    );
+}
+
+static _always_inline _no_instrument void cpu_mmio_wr_noinst(
+        void const volatile *mmio, uint8_t value)
+{
+    __asm__ __volatile__ (
+        "movb %b[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "ri" (value)
+    );
+}
+
+static _always_inline _no_instrument void cpu_mmio_wr_noinst(
+        void const volatile *mmio, uint16_t value)
+{
+    __asm__ __volatile__ (
+        "movw %w[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "ri" (value)
+    );
+}
+
+static _always_inline _no_instrument void cpu_mmio_wr_noinst(
+        void const volatile *mmio, uint32_t value)
+{
+    __asm__ __volatile__ (
+        "movl %k[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "ri" (value)
+    );
+}
+
+static _always_inline _no_instrument void cpu_mmio_wr_noinst(
+        void const volatile *mmio, uint64_t value)
+{
+    __asm__ __volatile__ (
+        "movq %q[value],(%[mmio])\n"
+        :
+        : [mmio] "a" (mmio)
+        , [value] "r" (value)
+    );
 }

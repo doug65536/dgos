@@ -191,7 +191,7 @@ void workq_alloc::free_slot(size_t i)
 
 workq_impl::workq_impl()
 {
-    tid = thread_create(worker, this, 0, false, false);
+    tid = thread_create(worker, this, "workq", 0, false, false);
 }
 
 workq_impl::~workq_impl()

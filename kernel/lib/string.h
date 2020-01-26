@@ -38,8 +38,8 @@ size_t strcspn(char const *src, char const *chars);
 char *strncpy(char * restrict dest, char const * restrict src, size_t n);
 char *strncat(char * restrict dest, char const * restrict src, size_t n);
 
-int ucs4_to_utf8(char *out, int in);
-int ucs4_to_utf16(char16_t *out, int in);
+int ucs4_to_utf8(char *out, char32_t in);
+int ucs4_to_utf16(char16_t *out, char32_t in);
 char32_t utf8_to_ucs4(char const *in, char const **ret_end);
 char32_t utf8_to_ucs4_upd(char const *&in);
 
@@ -252,6 +252,8 @@ static _always_inline auto devstore(T*p, T const& val) ->
 extern "C" void __asan_storeN_noabort(uintptr_t addr, size_t size);
 #endif
 
+__BEGIN_DECLS
+
 static _always_inline void memset8(char *&d, uint64_t s, size_t n)
 {
 #ifdef _ASAN_ENABLED
@@ -311,3 +313,5 @@ static _always_inline void memset64(char *&d, uint64_t s, size_t n)
         : "memory"
     );
 }
+
+__END_DECLS

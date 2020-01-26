@@ -535,10 +535,10 @@ EXPORT char *strncat(char *dest, char const *src, size_t n)
 // would have wrote to out, not including null terminator
 // Returns 0 for values outside 0 <= in < 0x101000 range
 // Always writes null terminator if out is not null
-EXPORT int ucs4_to_utf8(char *out, int in)
+EXPORT int ucs4_to_utf8(char *out, char32_t in)
 {
     int len;
-    if (in >= 0 && in < 0x80) {
+    if (in < 0x80) {
         if (out) {
             *out++ = (char)in;
             *out++ = 0;
@@ -546,11 +546,11 @@ EXPORT int ucs4_to_utf8(char *out, int in)
         return 1;
     }
 
-    if (in < 0x80) {
+    if (in < 0x800) {
         len = 2;
-    } else if (in < 0x800) {
-        len = 3;
     } else if (in < 0x10000) {
+        len = 3;
+    } else if (in < 0x110000) {
         len = 4;
     } else {
         // Invalid
@@ -574,7 +574,7 @@ EXPORT int ucs4_to_utf8(char *out, int in)
     return len;
 }
 
-EXPORT int ucs4_to_utf16(char16_t *out, int in)
+EXPORT int ucs4_to_utf16(char16_t *out, char32_t in)
 {
     if ((in > 0 && in < 0xD800) ||
             (in > 0xDFFF && in < 0x10000)) {

@@ -171,7 +171,7 @@ void workq::enqueue_on_all_barrier(T &&functor)
         });
     }
 
-    std::unique_lock<ext::mcslock> lock(wait_lock);
+    workq_impl::scoped_lock lock(wait_lock);
     while (done_count != cpu_count)
         wait_done.wait(lock);
 }

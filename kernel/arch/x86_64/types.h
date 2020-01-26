@@ -45,6 +45,7 @@
 #define _vector_size(n)         __attribute__((__vector_size__(n)))
 #define _noinline               __attribute__((__noinline__))
 #define _printf_format(m,n)     __attribute__((__format__(printf, m, n)))
+#define _printf_format3(m,n,o)  __attribute__((__format__(printf, (m), (n), (o))))
 #define _artificial             __attribute__((__artificial__))
 #define _no_instrument          __attribute__((__no_instrument_function__))
 #define _no_asan                __attribute__((__no_address_safety_analysis__))

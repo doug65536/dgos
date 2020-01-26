@@ -9,6 +9,7 @@
 __BEGIN_DECLS
 
 struct process_t;
+struct cpu_info_t;
 
 // Platform independent thread API
 
@@ -34,6 +35,8 @@ struct thread_create_info_t
 
     uintptr_t tls_base;
     uint64_t affinity;
+
+    char const *name;
 };
 
 // 9 == 512 CPUs max
@@ -163,7 +166,7 @@ extern int spincount_mask;
 extern int use_mwait;
 
 // Implemented in arch
-thread_t thread_create(thread_fn_t fn, void *userdata,
+thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
                        size_t stack_size, bool user, bool is_float);
 
 thread_t thread_create_with_info(thread_create_info_t const* info);
@@ -180,7 +183,7 @@ void thread_set_affinity(int id, thread_cpu_mask_t const& affinity);
 thread_cpu_mask_t const* thread_get_affinity(int id);
 
 size_t thread_get_cpu_count();
-int thread_cpu_number();
+uint32_t thread_cpu_number();
 unsigned thread_cpu_usage_x1k(size_t cpu);
 
 thread_t thread_get_id(void);
@@ -188,9 +191,10 @@ thread_t thread_get_id(void);
 // Suspend the thread, then release the lock,
 // DOES NOT reacquire lock before returning
 uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
-                               int64_t timeout_time);
+                               uint64_t timeout_time);
 
-void thread_resume(thread_t thread, intptr_t exit_code);
+// Returns true if you should reschedule
+bool thread_resume(thread_t thread, intptr_t exit_code);
 
 thread_priority_t thread_get_priority(thread_t thread_id);
 void thread_set_priority(thread_t thread_id, thread_priority_t priority);
@@ -241,6 +245,6 @@ struct __cxa_exception;
 struct __cxa_eh_globals;
 __cxa_eh_globals *thread_cxa_get_globals();
 
-void thread_set_timer(uint64_t ns);
+void thread_set_timer(uint8_t &apic_dcr, uint64_t ns);
 
 __END_DECLS

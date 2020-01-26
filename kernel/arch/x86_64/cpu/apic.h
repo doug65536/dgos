@@ -21,6 +21,7 @@ uint32_t apic_timer_count(void);
 void apic_dump_regs(int ap);
 
 uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask);
+uint64_t apic_timer_hw_oneshot(uint8_t &dcr_shadow, uint64_t icr);
 
 int apic_enable(void);
 bool ioapic_irq_setcpu(int irq, int cpu);

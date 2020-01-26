@@ -135,6 +135,8 @@ DISABLED_UNITTEST(test_thread_context)
     size_t count = thread_get_cpu_count();
     for (size_t i = 0; i < count; ++i)
         thread_create(test_thread_worker, (char*)0xFEEDBEEFFACEF00D +
-                      i * 18446744073709551557U, 0, false, false);
+                      i * 18446744073709551557U, "context_stress",
+                      0,
+                      false, false);
     thread_sleep_for(1000);
 }

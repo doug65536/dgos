@@ -18,7 +18,6 @@ class ticketlock;
 class spinlock;
 class shared_spinlock;
 class mcslock;
-class irq_mutex;
 __END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_EXT
@@ -368,10 +367,21 @@ private:
 __END_NAMESPACE_STD
 
 __BEGIN_NAMESPACE_EXT
-class irq_mutex
+template<typename _L>
+class noirq_lock
 {
 public:
-    using mutex_type = std::mutex::mutex_type;
+    using mutex_type = typename _L::mutex_type;
+
+    noirq_lock()
+        : inner_lock()
+        , inner_hold(inner_lock, std::defer_lock_t())
+    {
+    }
+
+    noirq_lock(noirq_lock const&) = delete;
+    noirq_lock(noirq_lock&&) = delete;
+    noirq_lock &operator=(noirq_lock const&) = delete;
 
     mutex_type& native_handle()
     {
@@ -381,7 +391,7 @@ public:
     void lock()
     {
         irq_was_enabled = cpu_irq_save_disable();
-        inner_lock.lock();
+        inner_hold.lock();
     }
 
     bool try_lock()
@@ -390,18 +400,26 @@ public:
         if (inner_lock.try_lock())
             return true;
         cpu_irq_toggle(irq_was_enabled);
+        return false;
     }
 
     void unlock()
     {
-        inner_lock.unlock();
+        inner_hold.unlock();
         cpu_irq_toggle(irq_was_enabled);
     }
 
 private:
-    std::mutex inner_lock;
+    _L inner_lock;
+    std::unique_lock<_L> inner_hold;
     bool irq_was_enabled = false;
 };
+
+using irq_mutex = noirq_lock<std::mutex>;
+using irq_shared_mutex = noirq_lock<std::shared_mutex>;
+using irq_mcslock = noirq_lock<mcslock>;
+using irq_spinlock = noirq_lock<spinlock>;
+using irq_ticketlock = noirq_lock<ticketlock>;
 __END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_STD
@@ -424,47 +442,16 @@ public:
     // Extension
     void notify_n(size_t n);
 
-    void wait(unique_lock<mutex>& lock);
-    void wait(unique_lock<ext::irq_mutex>& lock);
-    void wait(unique_lock<ext::spinlock>& lock);
-    void wait(unique_lock<ext::ticketlock>& lock);
-    void wait(unique_lock<ext::mcslock>& lock);
-
-    template<typename _Clock, typename _Duration>
-    cv_status wait_until(unique_lock<mutex>& lock,
-                    chrono::time_point<_Clock, _Duration> const& timeout_time)
+    template<typename L>
+    void wait(unique_lock<L>& lock)
     {
-        return wait_until(lock, chrono::steady_clock::time_point(
-                              timeout_time).time_since_epoch().count());
+        assert(lock.is_locked());
+        condvar_wait_ex(&m, lock, uint64_t(-1));
+        assert(lock.is_locked());
     }
 
-    template<typename _Clock, typename _Duration>
-    cv_status wait_until(
-            unique_lock<ext::irq_mutex>& lock,
-            chrono::time_point<_Clock, _Duration> const& timeout_time)
-    {
-        return wait_until(lock, chrono::steady_clock::time_point(
-                              timeout_time).time_since_epoch().count());
-    }
-
-    template<typename _Clock, typename _Duration>
-    cv_status wait_until(unique_lock<ext::spinlock>& lock,
-                    chrono::time_point<_Clock, _Duration> const& timeout_time)
-    {
-        return wait_until(lock, chrono::steady_clock::time_point(
-                              timeout_time).time_since_epoch().count());
-    }
-
-    template<typename _Clock, typename _Duration>
-    cv_status wait_until(unique_lock<ext::ticketlock>& lock,
-                    chrono::time_point<_Clock, _Duration> const& timeout_time)
-    {
-        return wait_until(lock, chrono::steady_clock::time_point(
-                              timeout_time).time_since_epoch().count());
-    }
-
-    template<typename _Clock, typename _Duration>
-    cv_status wait_until(unique_lock<ext::mcslock>& lock,
+    template<typename _Lock, typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<_Lock>& lock,
                     chrono::time_point<_Clock, _Duration> const& timeout_time)
     {
         return wait_until(lock, chrono::steady_clock::time_point(
@@ -475,21 +462,18 @@ private:
     //
     // Underlying implementation uses monotonic time_ns time for timeout
 
-    cv_status wait_until(unique_lock<mutex>& lock,
-                         int64_t timeout_time);
+    template<typename L>
+    cv_status wait_until(unique_lock<L>& lock,
+                         uint64_t timeout_time)
+    {
+        assert(lock.is_locked());
 
-    cv_status wait_until(unique_lock<ext::irq_mutex>& lock,
-                         int64_t timeout_time);
+        bool result = condvar_wait_ex(&m, lock, timeout_time);
 
-    cv_status wait_until(unique_lock<ext::spinlock>& lock,
-                         int64_t timeout_time);
+        assert(lock.is_locked());
 
-    cv_status wait_until(unique_lock<ext::ticketlock>& lock,
-                         int64_t timeout_time);
-
-    cv_status wait_until(unique_lock<ext::mcslock>& lock,
-                         int64_t timeout_time);
-
+        return result ? std::cv_status::no_timeout : std::cv_status::timeout;
+    }
 
     condition_var_t m;
 };
@@ -522,4 +506,13 @@ extern template class std::unique_lock<ext::ticketlock>;
 extern template class std::unique_lock<ext::spinlock>;
 extern template class std::unique_lock<ext::irqlock>;
 extern template class std::unique_lock<ext::mcslock>;
+
+extern template class std::unique_lock<ext::noirq_lock<std::mutex>>;
+extern template class std::unique_lock<ext::noirq_lock<std::shared_mutex>>;
+
+extern template class std::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
+extern template class std::unique_lock<ext::noirq_lock<ext::ticketlock>>;
+extern template class std::unique_lock<ext::noirq_lock<ext::spinlock>>;
+extern template class std::unique_lock<ext::noirq_lock<ext::irqlock>>;
+extern template class std::unique_lock<ext::noirq_lock<ext::mcslock>>;
 

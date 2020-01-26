@@ -35,7 +35,7 @@ static perf_module_lookup_t perf_module_lookup;
 // Incremented before and after updates
 
 struct perf_trace_cpu_t {
-    static constexpr const size_t ring_cnt = 1 << 13;
+    static constexpr const size_t ring_cnt = 1 << 12;
     size_t level = 0;
     uint64_t last_aperf = 0;
     uint64_t last_tsc = 0;
@@ -45,6 +45,7 @@ struct perf_trace_cpu_t {
 
 static uintptr_t *perf_trace_buf;
 static uint64_t *perf_sample_buf;
+static bool perf_zeroing;
 
 struct perf_work_value_t {
     size_t name_token;
@@ -58,7 +59,7 @@ static std::vector<perf_trace_cpu_t> perf_data;
 static std::vector<padded_rand_lfs113_t> perf_rand;
 
 static uint32_t volatile perf_event = 0xC0;
-static uint8_t volatile perf_event_scale = 13;
+static uint8_t volatile perf_event_scale = 19;
 
 using token_map_t = std::map<std::string, size_t>;
 static token_map_t token_map;
@@ -305,7 +306,7 @@ EXPORT uint64_t perf_gather_samples(
 
     size_t cpu_count = thread_get_cpu_count();
 
-    bool zero = true;
+    bool zero = perf_zeroing;
 
     uint64_t grand = 0;
     for (size_t i = 0; i < perf_tokens.size(); ++i) {

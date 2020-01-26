@@ -6,11 +6,21 @@
 #pragma GCC visibility push(default)
 template class std::unique_lock<std::mutex>;
 template class std::unique_lock<std::shared_mutex>;
+
 template class std::unique_lock<ext::shared_spinlock>;
 template class std::unique_lock<ext::ticketlock>;
 template class std::unique_lock<ext::spinlock>;
 template class std::unique_lock<ext::irqlock>;
 template class std::unique_lock<ext::mcslock>;
+
+template class std::unique_lock<ext::noirq_lock<std::mutex>>;
+template class std::unique_lock<ext::noirq_lock<std::shared_mutex>>;
+
+template class std::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
+template class std::unique_lock<ext::noirq_lock<ext::ticketlock>>;
+template class std::unique_lock<ext::noirq_lock<ext::spinlock>>;
+template class std::unique_lock<ext::noirq_lock<ext::irqlock>>;
+template class std::unique_lock<ext::noirq_lock<ext::mcslock>>;
 #pragma GCC visibility pop
 
 EXPORT std::mutex::mutex()
@@ -153,108 +163,6 @@ EXPORT void std::condition_variable::notify_all()
 EXPORT void std::condition_variable::notify_n(size_t n)
 {
     condvar_wake_n(&m, n);
-}
-
-EXPORT void std::condition_variable::wait(std::unique_lock<mutex> &lock)
-{
-    assert(lock.is_locked());
-    condvar_wait_mutex(&m, &lock.native_handle());
-    assert(lock.is_locked());
-}
-
-EXPORT void std::condition_variable::wait(
-        std::unique_lock<ext::irq_mutex> &lock)
-{
-    assert(lock.is_locked());
-    condvar_wait_mutex(&m, &lock.native_handle());
-    assert(lock.is_locked());
-}
-
-EXPORT void std::condition_variable::wait(std::unique_lock<ext::spinlock> &lock)
-{
-    assert(lock.is_locked());
-    condvar_wait_spinlock(&m, &lock.native_handle());
-    assert(lock.is_locked());
-}
-
-EXPORT void std::condition_variable::wait(
-        std::unique_lock<ext::ticketlock> &lock)
-{
-    assert(lock.is_locked());
-    condvar_wait_ticketlock(&m, &lock.native_handle(), uint64_t(-1));
-    assert(lock.is_locked());
-}
-
-EXPORT void std::condition_variable::wait(std::unique_lock<ext::mcslock> &lock)
-{
-    assert(lock.is_locked());
-    condvar_wait_mcslock(&m, &lock.native_handle(), &lock.wait_node());
-    assert(lock.is_locked());
-}
-
-EXPORT std::cv_status std::condition_variable::wait_until(
-        std::unique_lock<std::mutex>& lock, int64_t timeout_time)
-{
-    assert(lock.is_locked());
-
-    bool result = condvar_wait_mutex(
-                &m, &lock.native_handle(), timeout_time);
-
-    assert(lock.is_locked());
-
-    return result ? std::cv_status::no_timeout : std::cv_status::timeout;
-}
-
-EXPORT std::cv_status std::condition_variable::wait_until(
-        std::unique_lock<ext::irq_mutex>& lock, int64_t timeout_time)
-{
-    assert(lock.is_locked());
-
-    bool result = condvar_wait_mutex(
-                &m, &lock.native_handle(), timeout_time);
-
-    assert(lock.is_locked());
-
-    return result ? std::cv_status::no_timeout : std::cv_status::timeout;
-}
-
-EXPORT std::cv_status std::condition_variable::wait_until(
-        std::unique_lock<ext::spinlock>& lock, int64_t timeout_time)
-{
-    assert(lock.is_locked());
-
-    bool result = condvar_wait_spinlock(
-                &m, &lock.native_handle(), timeout_time);
-
-    assert(lock.is_locked());
-
-    return result ? std::cv_status::no_timeout : std::cv_status::timeout;
-}
-
-EXPORT std::cv_status std::condition_variable::wait_until(
-        std::unique_lock<ext::ticketlock>& lock, int64_t timeout_time)
-{
-    assert(lock.is_locked());
-
-    bool result = condvar_wait_ticketlock(
-                &m, &lock.native_handle(), timeout_time);
-
-    assert(lock.is_locked());
-
-    return result ? std::cv_status::no_timeout : std::cv_status::timeout;
-}
-
-EXPORT std::cv_status std::condition_variable::wait_until(
-        std::unique_lock<ext::mcslock>& lock, int64_t timeout_time)
-{
-    assert(lock.is_locked());
-
-    bool result = condvar_wait_mcslock(
-                &m, &lock.native_handle(), &lock.wait_node(), timeout_time);
-
-    assert(lock.is_locked());
-
-    return result ? std::cv_status::no_timeout : std::cv_status::timeout;
 }
 
 EXPORT void ext::spinlock::lock()

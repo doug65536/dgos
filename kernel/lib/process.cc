@@ -112,7 +112,8 @@ int process_t::spawn(pid_t * pid_result,
     *pid_result = process->pid;
 
 
-    thread_t tid = thread_create(&process_t::run, process, 0,
+    thread_t tid = thread_create(&process_t::run, process,
+                                 "user-process", 0,
                                  true, true);
 
     if (unlikely(tid < 0))
@@ -528,6 +529,9 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp)
         isr_sysret64(ip, sp, uint64_t(exit_jmpbuf.rsp) & -16);
         __builtin_trap();
     }
+
+    for (thread_t tid: threads)
+        del_thread(tid);
 
     // exiting program continues here
     return exitcode;

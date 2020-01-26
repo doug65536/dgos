@@ -966,6 +966,7 @@ thread_yield:
 
     // Reschedule directly, bypassing everything to do with interrupts
     movq %rsp,%rdi
+    xorl %esi,%esi
     call thread_schedule
 
     // See if we are restoring a fast context
@@ -977,6 +978,8 @@ thread_yield:
     // Zero constant
     xor %ecx,%ecx
 
+    // Switch to the incoming CFA
+    lea ISR_CTX_OFS_RBP(%rsp),%rbp
     mov %rax,%rsp
 
     // Run cpu-local outgoing cleanup after stack switch (now)
@@ -984,9 +987,8 @@ thread_yield:
     mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
     test %rax,%rax
     jz .Lno_cleanup_call_fast
-    movq %rdi,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
-    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
     mov %rcx,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
     mov %rcx,%gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
     indirect_call rax
 .Lno_cleanup_call_fast:
@@ -1340,6 +1342,23 @@ protection_barrier_ibpb:
     pop_cfi %rdx
     pop_cfi %rax
 
+    ret
+
+    .cfi_endproc
+
+
+.hidden protection_barrier_verw
+.global protection_barrier_verw
+.balign 16
+protection_barrier_verw:
+    .cfi_startproc
+
+    pushfq_cfi
+    push_cfi %rax
+    movl $ GDT_SEL_KERNEL_DATA,%eax
+    verw %ax
+    pop_cfi %rax
+    popfq_cfi
     ret
 
     .cfi_endproc

@@ -912,7 +912,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
 {
     int cpu_count = thread_cpu_count();
 
-    // Skip if too early
+    // Skip if too early or uniprocessor
     if (unlikely(cpu_count <= 1))
         return;
 
@@ -1075,6 +1075,9 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
                              (page & PTE_ADDR) | page_flags) != pte)) {
                 // Another thread beat us to it
                 mmu_free_phys(page);
+                page = 0;
+
+                // Invalidate to make sure we pick up their change
                 cpu_page_invalidate(fault_addr);
 
                 // If not perfect, it'll fault again and we'll start over

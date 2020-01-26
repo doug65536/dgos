@@ -13,7 +13,7 @@ extern uint32_t volatile thread_smp_running;
 struct thread_info_t;
 struct cpu_info_t;
 
-isr_context_t *thread_schedule(isr_context_t *ctx);
+isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer = false);
 isr_context_t *thread_schedule_postirq(isr_context_t *ctx);
 void thread_init(int ap);
 cpu_info_t *thread_set_cpu_gsbase(int ap);

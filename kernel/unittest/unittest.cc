@@ -191,7 +191,8 @@ void unittest::unit::run_all(unit_ctx *ctx)
         if (likely(!it->float_thread())) {
             it->invoke();
         } else {
-            thread_t tid = thread_create(&unit::thread_fn, it, 0, true, true);
+            thread_t tid = thread_create(&unit::thread_fn, it,
+                    "threaded_unit_test", 0, true, true);
             int cpu_nr = thread_current_cpu(tid);
             printdbg("Test thread cpu nr %d\n", cpu_nr);
             thread_wait(tid);

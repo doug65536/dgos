@@ -49,8 +49,8 @@ enum thread_state_t : uint32_t {
     THREAD_IS_READY,
     THREAD_IS_RUNNING,
     THREAD_IS_EXITING,
+    THREAD_IS_DESTRUCTING,
     THREAD_IS_FINISHED,
-    //THREAD_IS_DESTRUCTING,
 
     // Flag keeps other cpus from taking thread
     // until after stack switch
@@ -58,8 +58,8 @@ enum thread_state_t : uint32_t {
     THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
     THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
     THREAD_IS_EXITING_BUSY = THREAD_IS_EXITING | THREAD_BUSY,
+    THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY,
     THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY
-    //THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY,
 };
 
 // When state is equal to one of these:
@@ -146,8 +146,8 @@ struct alignas(256) thread_info_t {
     thread_state_t volatile state;
 
     // Higher numbers are higher priority
-    thread_priority_t volatile priority;
-    thread_priority_t volatile priority_boost;
+    thread_priority_t priority;
+    thread_priority_t priority_reserved;
 
     uint64_t volatile wake_time;
 
@@ -208,7 +208,7 @@ struct alignas(256) thread_info_t {
 
     std::vector<__exception_jmp_buf_t> exit_jmpbuf;
 
-    char *name;
+    char const *name;
 
     bool closed;
 
@@ -216,6 +216,8 @@ struct alignas(256) thread_info_t {
     // ready list, otherwise default constructed
     ready_set_t::const_iterator schedule_node;
 };
+
+static void thread_free_stacks(thread_info_t *thread);
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
 
@@ -276,7 +278,8 @@ struct alignas(256) cpu_info_t {
 
     bool online = false;
     fpu_state_t fpu_state = discarded;
-    uint8_t reserved2[2] = {};
+    uint8_t apic_dcr = {};
+    uint8_t reserved1[1] = {};
 
     // Which thread's context is in the FPU, or -1 if discarded
     thread_t fpu_owner = -1;
@@ -301,18 +304,13 @@ struct alignas(256) cpu_info_t {
     uint32_t busy_percent_x1k = 0;
 
     uint32_t cr0_shadow = 0;
-    unsigned cpu_nr = 0;
+    uint32_t cpu_nr = 0;
 
     uint64_t irq_count = 0;
 
     uint64_t irq_time = 0;
 
-    using lock_type = ext::mcslock;
-    using scoped_lock = std::unique_lock<lock_type>;
-
-    lock_type queue_lock;
-
-    //unsigned reserved3 = 0;
+    uint64_t reserved4 = 0;
 
     // Cleanup to be run after switching stacks on a context switch
     void (*after_csw_fn)(void*) = nullptr;
@@ -366,6 +364,11 @@ struct alignas(256) cpu_info_t {
 
     // --- cache line ---
 
+    using lock_type = ext::irq_mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
+
+    lock_type queue_lock;
+
     // Oldest timeslice first
     // Tree sorted in order of when timestamp was issued.
     // Only threads that are ready to run appear in this tree.
@@ -399,7 +402,8 @@ C_ASSERT((offsetof(cpu_info_t, self) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, apic_id) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, storage) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, resume_ring) & ~-64) == 0);
-C_ASSERT((offsetof(cpu_info_t, ready_list) & ~-64) == 0);
+C_ASSERT((offsetof(cpu_info_t, queue_lock) & ~-64) == 0);
+
 cpu_info_t cpus[MAX_CPUS];
 cpu_info_t *cpus_end = cpus + MAX_CPUS;
 
@@ -422,31 +426,6 @@ uint32_t total_cpus;
 
 void thread_destruct(thread_info_t *thread);
 static void thread_signal_completion(thread_info_t *thread);
-
-///
-
-// Per-CPU scheduling queue
-class cpu_queue_t {
-public:
-    cpu_queue_t();
-    ~cpu_queue_t();
-
-    thread_info_t *choose_next();
-
-private:
-    thread_info_t *current;
-
-    // 32 vectors, one per priority level
-    std::vector<thread_t> priorities[32];
-
-    // Bitmask caches emptiness and allows O(1) selection of highest priority
-    uint32_t empty_flags;
-
-    using lock_type = ext::mcslock;
-    using scoped_lock = std::unique_lock<lock_type>;
-
-    lock_type lock;
-};
 
 // Get executing APIC ID (the slow expensive way, for early initialization)
 static uint32_t get_apic_id()
@@ -489,7 +468,6 @@ static void thread_cleanup()
 
     atomic_barrier();
     thread->priority = 0;
-    thread->priority_boost = 0;
     if (likely(thread->state == THREAD_IS_RUNNING))
         thread->state = THREAD_IS_EXITING_BUSY;
     else
@@ -552,7 +530,7 @@ static char *thread_allocate_stack(
 // Returns threads array index or 0 on error
 // Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
-        thread_fn_t fn, void *userdata, size_t stack_size,
+        thread_fn_t fn, void *userdata, char const *name, size_t stack_size,
         thread_state_t state, thread_cpu_mask_t const &affinity,
         thread_priority_t priority, bool user, bool is_float)
 {
@@ -588,6 +566,8 @@ static thread_t thread_create_with_state(
         pause();
     }
 
+    thread->name = name;
+
     // Pick CPU based on thread id for now
     size_t cpu_nr = i % cpu_count;
 
@@ -597,8 +577,7 @@ static thread_t thread_create_with_state(
 
     thread->thread_flags = 0;
 
-    // 0 = never
-    thread->wake_time = 0;
+    thread->wake_time = UINT64_MAX;
 
     thread->ref_count = 1;
 
@@ -631,9 +610,8 @@ static thread_t thread_create_with_state(
 //    thread_info_t *creator_thread = this_thread();
 
     thread->priority = priority;
-    thread->priority_boost = 0;
     thread->cpu_affinity = affinity;
-    thread->preempt_time = 24000000;
+    thread->preempt_time = 16000000;
     thread->fsbase = nullptr;
     thread->gsbase = nullptr;
 
@@ -708,33 +686,33 @@ static thread_t thread_create_with_state(
         // Idle, always ready
         now = UINT64_MAX;
 
-    if (now > 0U) {
-        cpu_info_t& cpu = cpus[cpu_nr];
-        std::unique_lock<cpu_info_t::lock_type> lock(cpu.queue_lock);
-        printdbg("cpu %zu initially scheduling thread %u\n",
-                 cpu_nr, thread->thread_id);
-        thread->timeslice_timestamp = now;
-        thread->schedule_node = cpu.ready_list
-                .emplace(thread->timeslice_timestamp,
-                         ready_set_t::value_type::second_type(thread))
-                .first;
-        lock.unlock();
+    cpu_info_t& cpu = cpus[cpu_nr];
+    cpu_info_t::scoped_lock lock(cpu.queue_lock);
+    printdbg("cpu %zu initially scheduling thread %u\n",
+             cpu_nr, thread->thread_id);
+    thread->timeslice_timestamp = now;
+    thread->preempt_time = thread->used_time + 64000000;
+    thread->schedule_node = cpu.ready_list
+            .emplace(thread->timeslice_timestamp,
+                     ready_set_t::value_type::second_type(thread))
+            .first;
+    lock.unlock();
 
-        // Kick other cpu if not this cpu
-        if (thread_cpu_number() != cpu_nr)
-            apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
-    }
+    // Kick other cpu if not this cpu
+    if (thread_cpu_number() != cpu_nr)
+        apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
 
     return i;
 }
 
 
-EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
+EXPORT thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
                               size_t stack_size, bool user, bool is_float)
 {
     thread_create_info_t info{};
     info.fn = fn;
     info.userdata = userdata;
+    info.name = name;
     info.stack_size = stack_size;
     info.user = user;
     info.is_float = is_float;
@@ -745,7 +723,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
 EXPORT thread_t thread_create_with_info(thread_create_info_t const* info)
 {
     return thread_create_with_state(
-                info->fn, info->userdata, info->stack_size,
+                info->fn, info->userdata, info->name, info->stack_size,
                 info->suspended ? THREAD_IS_SLEEPING : THREAD_IS_READY,
                 thread_cpu_mask_t(-1), 0, info->user, info->is_float);
 }
@@ -817,12 +795,12 @@ static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
     return thread_schedule(ctx);
 }
 
-void thread_set_timer(uint64_t ns)
+void thread_set_timer(uint8_t& apic_dcr, uint64_t ns)
 {
     uint64_t ticks = apic_ns_to_ticks(ns);
-    uint64_t actual = apic_configure_timer(ticks, true, false);
-    printdbg("Requested oneshot ns=%zu, ticks=%zu, actual=%zu\n",
-             ns, ticks, actual);
+    uint64_t actual = apic_timer_hw_oneshot(apic_dcr, ticks);
+//    printdbg("Requested oneshot ns=%zu, ticks=%zu, actual=%zu\n",
+//             ns, ticks, actual);
 }
 
 _constructor(ctor_thread_init_bsp)
@@ -911,9 +889,9 @@ void thread_init(int ap)
 
         mm_init_process(thread->process);
 
-        thread->sched_timestamp = cpu_rdtsc();
+        thread->sched_timestamp = time_ns();
         thread->used_time = 0;
-        thread->preempt_time = 24000000;
+        thread->preempt_time = 64000000;
         thread->ctx = nullptr;
         thread->priority = -256;
 
@@ -924,6 +902,7 @@ void thread_init(int ap)
         thread->xsave_stack = nullptr;
         thread->xsave_ptr = nullptr;
         thread->cpu_affinity = thread_cpu_mask_t(1);
+        thread->name = "Idle(BSP)";
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
 
@@ -932,11 +911,12 @@ void thread_init(int ap)
         cpu_info_t::scoped_lock cpu_lock(cpu.queue_lock);
         printdbg("cpu %zu initially scheduling idle thread %u\n",
                  cpu_nr, thread->thread_id);
-        thread->timeslice_timestamp = UINTPTR_MAX;
+        thread->preempt_time = UINT64_MAX;
+        thread->timeslice_timestamp = UINT64_MAX;
         thread->schedule_node = cpu.ready_list
                 .emplace(thread->timeslice_timestamp, thread)
                 .first;
-        dump_ready_list(cpu);
+        //dump_ready_list(cpu);
         cpu_lock.unlock();
 
         thread_count = 1;
@@ -944,7 +924,7 @@ void thread_init(int ap)
         cpu_irq_disable();
 
         thread = threads + thread_create_with_state(
-                    smp_idle_thread, nullptr, 0,
+                    smp_idle_thread, nullptr, "Idle(AP)", 0,
                     THREAD_IS_INITIALIZING,
                     thread_cpu_mask_t(cpu_nr),
                     -256, false, false);
@@ -988,7 +968,7 @@ static thread_info_t *thread_choose_next(
         // ...don't even think about context switching
         return outgoing;
 
-    cpu_info_t::scoped_lock lock(cpu->queue_lock);
+    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
 
     // Service the sleep queue
     for (ready_set_t::const_iterator en = cpu->sleep_list.cend(),
@@ -1025,6 +1005,8 @@ static thread_info_t *thread_choose_next(
     assert(!cpu->ready_list.empty());
     ready_set_t::const_iterator it = cpu->ready_list.cbegin();
     thread_info_t *ft = (thread_info_t *)it->second;
+    assert(ft->state == THREAD_IS_READY ||
+           (ft->state == THREAD_IS_READY_BUSY && outgoing == ft));
     return ft;
 
 #if 0
@@ -1157,10 +1139,11 @@ static void thread_clear_busy(void *outgoing)
     thread_info_t *thread = (thread_info_t*)outgoing;
 
     if (unlikely(atomic_and(&thread->state, (thread_state_t)~THREAD_BUSY) ==
-                 THREAD_IS_EXITING_BUSY)) {
+                 THREAD_IS_FINISHED)) {
         // The exiting thread has finished getting off the CPU, immediately
         // delete the thread from the owning process
-        thread_destruct(thread);
+        //thread_destruct(thread);
+        thread_free_stacks(thread);
     }
 }
 
@@ -1169,8 +1152,7 @@ static void thread_free_stacks(thread_info_t *thread)
     char *stk;
     size_t stk_sz;
 
-    assert(thread->state == THREAD_IS_EXITING ||
-           thread->state == THREAD_IS_FINISHED);
+    assert(thread->state == THREAD_IS_FINISHED);
 
     // The thread stack
     if (thread->stack != nullptr && thread->stack_size > 0) {
@@ -1229,28 +1211,39 @@ void thread_destruct(thread_info_t *thread)
 
     // If everybody has closed their handle to this thread,
     // then mark it for recycling immediately
-    if (thread->ref_count == 0) {
-        // New mutex
-        //mutex_destroy(&thread->lock);
+    if (thread->ref_count == 0)
         thread->state = THREAD_IS_UNINITIALIZED;
-    }
 }
 
 EXPORT int thread_close(thread_t tid)
 {
-    thread_info_t& thread = threads[tid];
-    if (thread.closed)
+    thread_info_t* thread = threads + tid;
+    if (thread->closed)
         return 0;
 
-    if (thread.state == THREAD_IS_FINISHED) {
+    thread->closed = true;
+
+    if (thread->state == THREAD_IS_FINISHED) {
         //mutex_destroy(&thread.lock);
-        thread.state = THREAD_IS_UNINITIALIZED;
+        thread_destruct(thread);
         return 1;
     }
     return 0;
 }
 
-_hot isr_context_t *thread_schedule(isr_context_t *ctx)
+isr_context_t *bootstrap_idle_thread(cpu_info_t *cpu, thread_info_t *thread,
+                                     isr_context_t *ctx)
+{
+    thread = cpu->goto_thread;
+    cpu->cur_thread = thread;
+    cpu->goto_thread = nullptr;
+    thread->state = THREAD_IS_RUNNING;
+    ctx = thread->ctx;
+    thread->ctx = nullptr;
+    return ctx;
+}
+
+_hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 {
     //need this if ISRs run with IRQ enabled:
     //cpu_scoped_irq_disable intr_dis;
@@ -1261,15 +1254,9 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
     thread_info_t * const outgoing = thread;
 
-    if (unlikely(cpu->goto_thread)) {
-        thread = cpu->goto_thread;
-        cpu->cur_thread = thread;
-        cpu->goto_thread = nullptr;
-        thread->state = THREAD_IS_RUNNING;
-        ctx = thread->ctx;
-        thread->ctx = nullptr;
-        return ctx;
-    }
+    // Bootstrap AP idle thread
+    if (unlikely(cpu->goto_thread))
+        return bootstrap_idle_thread(cpu, thread, ctx);
 
     // Defer reschedule if locks are held
     if (unlikely(cpu->locks_held)) {
@@ -1281,8 +1268,16 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     assert(thread->ctx == nullptr);
     thread->ctx = ctx;
 
-    uint64_t now = cpu_rdtsc();
+    uint64_t now = time_ns();
     uint64_t elapsed = now - thread->sched_timestamp;
+    thread->sched_timestamp = 0;
+
+//    if (was_timer)
+//        printdbg("Preempted %ss\n", engineering_t(elapsed, -3).ptr());
+
+//    printdbg("\nthread %d %ss elapsed preempt=%#zx, used=%#zx\n",
+//             thread->thread_id, engineering_t(elapsed, -3).ptr(),
+//             thread->preempt_time, thread->used_time);
 
     thread->used_time += elapsed;
 
@@ -1310,6 +1305,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     }
 
     cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
+
     // If a new timeslice is needed
     // and the thread is eligible for timestamp changes
     if ((thread->state != THREAD_IS_RUNNING) ||
@@ -1323,10 +1319,11 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
         if (thread->state == THREAD_IS_RUNNING) {
             // Replenish timeslice and reinsert it into ready queue
-            thread->state = THREAD_IS_READY;
-            thread->preempt_time += 50000000;
+            thread->state = THREAD_IS_READY_BUSY;
+            thread->preempt_time = thread->used_time + 64000000;
             thread->timeslice_timestamp = now;
             sched_node.value().first = thread->timeslice_timestamp;
+            thread->state = THREAD_IS_READY;
             thread->schedule_node = cpu->ready_list
                     .insert(std::move(sched_node)).first;
         } else if (thread->state == THREAD_IS_SLEEPING_BUSY) {
@@ -1334,13 +1331,16 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
             sched_node.value().first = thread->wake_time;
             thread->schedule_node = cpu->sleep_list
                     .insert(std::move(sched_node)).first;
+        } else if (thread->state == THREAD_IS_EXITING_BUSY) {
+            // Let node destruct
+            thread->state = THREAD_IS_FINISHED_BUSY;
+        } else {
+            assert(!"?");
         }
-    } else if (cpu->ready_list.cbegin() == thread->schedule_node) {
-        // Still first
-        thread->ctx = nullptr;
-        return ctx;
     }
     cpu_lock.unlock();
+
+    now = time_ns();
 
     thread_state_t state = thread->state;
 
@@ -1375,42 +1375,40 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
             break;
         }
 
+        cpu_debug_break();
         pause();
     }
+    now = time_ns();
 
     // Program rescheduling interrupt
     uint64_t timeslice = thread->preempt_time > thread->used_time
             ? thread->preempt_time - thread->used_time
-            : 2000000;
+            : 32000000;
 
-    dump_ready_list(*cpu);
+    //dump_ready_list(*cpu);
 
-    // If nothing else running except idle thread,
-    // or one thing is runnable in addition to idle thread and this is
-    // not the idle thread
+    // If only idle thread or only one thread in addition to idle thread
     // then grant infinite timeslice
-    if ((cpu->ready_list.size() == 1) ||
-            (cpu->ready_list.size() == 2 &&
-             thread->timeslice_timestamp != INT64_MAX))
-        timeslice = INT64_MAX;
+    if (cpu->ready_list.size() <= 2)
+        timeslice = UINT64_MAX;
 
     // Infinite if nothing sleeping
-    uint64_t next_sleep_expiry = INT64_MAX;
+    uint64_t next_sleep_expiry = UINT64_MAX;
 
     // See the next sleep expiry in sleep queue
     if (!cpu->sleep_list.empty())
-        next_sleep_expiry = cpu->sleep_list.begin()->first;
+        next_sleep_expiry = cpu->sleep_list.cbegin()->first;
 
     // If the sleep queue requires preempting earlier,
     // then preempt earlier
-    if (next_sleep_expiry != INT64_MAX &&
+    if (next_sleep_expiry < UINT64_MAX &&
             timeslice > next_sleep_expiry - now)
         timeslice = next_sleep_expiry - now;
 
-    if (timeslice < INT64_MAX)
-        thread_set_timer(timeslice);
-    else
-        printdbg("Straightaway on thread %u\n", thread->thread_id);
+    if (timeslice < UINT64_MAX)
+        thread_set_timer(cpu->apic_dcr, timeslice);
+//    else
+//        printdbg("Went tickless on thread %u\n", thread->thread_id);
 
     fpu_state_t& fpu_state = cpu->fpu_state;
 
@@ -1560,9 +1558,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
     thread->sched_timestamp = now;
 
-    // Thread loses its priority boost when it is scheduled
-    thread->priority_boost = 0;
-
     assert(thread->state == THREAD_IS_RUNNING);
 
     ctx = thread->ctx;
@@ -1576,6 +1571,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     assert(ctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
 
     if (thread != outgoing) {
+        cpu_irq_disable();
         cpu->after_csw_fn = thread_clear_busy;
         cpu->after_csw_vp = outgoing;
     } else {
@@ -1620,9 +1616,9 @@ EXPORT uint64_t thread_get_usage(int id)
     return thread->used_time;
 }
 
-// specify 0 in timeout_time for infinite timeout
-uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
-                               int64_t timeout_time)
+// specify UINT64_MAX in timeout_time for infinite timeout
+EXPORT uintptr_t thread_sleep_release(
+        spinlock_t *lock, thread_t *thread_id, uint64_t timeout_time)
 {
     thread_info_t *thread = this_thread();
 
@@ -1650,16 +1646,18 @@ uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
 }
 
 _hot
-EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
+EXPORT bool thread_resume(thread_t tid, intptr_t exit_code)
 {
-    thread_info_t *thread = threads + tid;
+    bool need_resched = false;
+
+    thread_info_t *resumed_thread = threads + tid;
 
     for (;;) {
         //THREAD_TRACE("Resuming %d\n", tid);
 
-        if (thread->state != THREAD_IS_SLEEPING) {
+        if (resumed_thread->state != THREAD_IS_SLEEPING) {
             uint64_t wait_sleeping_st = time_ns();
-            cpu_wait_value(&thread->state, THREAD_IS_SLEEPING);
+            cpu_wait_value(&resumed_thread->state, THREAD_IS_SLEEPING);
             uint64_t wait_sleeping_en = time_ns();
             uint64_t wait_sleeping = wait_sleeping_en - wait_sleeping_st;
             printdbg("Waited %" PRIu64 "ns to wake thread from sleep\n",
@@ -1667,15 +1665,14 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
         }
 
         // Transition it to sleeping+busy so another cpu won't touch it
-        if (thread->state == THREAD_IS_SLEEPING &&
-            atomic_cmpxchg(&thread->state, THREAD_IS_SLEEPING,
+        if (resumed_thread->state == THREAD_IS_SLEEPING &&
+            atomic_cmpxchg(&resumed_thread->state, THREAD_IS_SLEEPING,
                            THREAD_IS_SLEEPING_BUSY) == THREAD_IS_SLEEPING) {
 
             size_t cpu_nr = run_cpu[tid];
             cpu_info_t& cpu = cpus[cpu_nr];
             cpu_info_t::scoped_lock cpu_lock(cpu.queue_lock);
 
-            bool need_resched;
 
             size_t this_cpu_nr = thread_cpu_number();
 
@@ -1696,49 +1693,44 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
                              engineering_t(wait_en - wait_st, -3).ptr(),
                              cpu_nr, this_cpu_nr);
                 }
-                need_resched = true;
+                apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
                 cpu_lock.unlock();
             } else {
                 // Remove node from the sleep queue for reuse in ready queue
                 ready_set_t::node_type node = cpu.sleep_list.extract(
-                            thread->schedule_node);
+                            resumed_thread->schedule_node);
 
-                node.value().first = thread->timeslice_timestamp;
+                node.value().first = resumed_thread->timeslice_timestamp;
 
-                printdbg("Waking sleeping thread %u\n", thread->thread_id);
-                thread->schedule_node = cpu.ready_list
+//                printdbg("Waking sleeping thread %u\n",
+//                         resumed_thread->thread_id);
+                resumed_thread->schedule_node = cpu.ready_list
                         .insert(std::move(node)).first;
 
                 // True if the resumed thread should run immediately
-                need_resched = (thread->schedule_node ==
-                                cpu.ready_list.begin());
-
-                cpu_lock.unlock();
+                need_resched = (resumed_thread->schedule_node ==
+                                cpu.ready_list.cbegin());
 
                 // Should be a fast, voluntarily yielded context
-                assert(ISR_CTX_CTX_FLAGS(thread->ctx) &
+                assert(ISR_CTX_CTX_FLAGS(resumed_thread->ctx) &
                        (1<<ISR_CTX_CTX_FLAGS_FAST_BIT));
 
                 // Set return value
-                ISR_CTX_ERRCODE(thread->ctx) = exit_code;
-
-                // If its home is another CPU
-                auto this_tid = this_thread()->thread_id;
+                ISR_CTX_ERRCODE(resumed_thread->ctx) = exit_code;
 
                 // Done manipulating it, mark it ready
-                thread->state = THREAD_IS_READY;
+                resumed_thread->state = THREAD_IS_READY;
+
+                cpu_lock.unlock();
             }
 
-            if (need_resched)
-                apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
-
-            return;
+            return need_resched;
         }
 
-        if (thread->state == THREAD_IS_SLEEPING_BUSY &&
-                atomic_cmpxchg(&thread->state, THREAD_IS_SLEEPING_BUSY,
+        if (resumed_thread->state == THREAD_IS_SLEEPING_BUSY &&
+                atomic_cmpxchg(&resumed_thread->state, THREAD_IS_SLEEPING_BUSY,
                                THREAD_IS_READY_BUSY)) {
-            return;
+            return need_resched;
         }
 
         THREAD_TRACE("Did not resume %d! Retrying I guess\n", tid);
@@ -1928,7 +1920,7 @@ void thread_send_ipi(int cpu, int intr)
     apic_send_ipi(cpus[cpu].apic_id, intr);
 }
 
-EXPORT int thread_cpu_number()
+EXPORT uint32_t thread_cpu_number()
 {
     cpu_info_t *cpu = this_cpu();
     return cpu->cpu_nr;
