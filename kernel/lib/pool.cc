@@ -23,7 +23,7 @@ EXPORT bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
     size_t size = item_size * capacity;
 
     void *pool_mem = mmap(nullptr, size, PROT_READ | PROT_WRITE,
-                          MAP_UNINITIALIZED, -1, 0);
+                          MAP_UNINITIALIZED);
 
     if (!pool_mem || pool_mem == MAP_FAILED)
         return false;

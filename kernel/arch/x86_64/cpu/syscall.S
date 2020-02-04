@@ -191,7 +191,7 @@ syscall_entry:
 
     // call IBPB or patched with nop if not available
     insn_fixup
-    call protection_barrier
+    call protection_barrier_from_user
 
     // IRQs are okay at this point
     sti
@@ -222,7 +222,7 @@ syscall_entry:
     pop_cfi %r11
 
     insn_fixup
-    call protection_barrier
+    call protection_barrier_to_user
 
     // Restore caller's stack
     pop_cfi %rsp

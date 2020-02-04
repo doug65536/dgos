@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "string.h"
+#include "printk.h"
 
 template<typename T>
 class engineering_t {
@@ -10,7 +11,7 @@ public:
         U'f',    // -50
         U'p',    // -40
         U'n',    // -30
-        U'μ',    // -20
+        U'µ',    // -20
         U'm',    // -10
         0,      // <- [unit_base]
         U'k',    //  10
@@ -21,57 +22,110 @@ public:
         U'E'     //  60
     };
 
-//    static constexpr size_t const unit_base = 6;
+    static constexpr size_t const unit_base = 6;
 
-    engineering_t(T value, int log1024_unit = 0)
+    engineering_t(T value, int log_unit = 0, bool binary = false)
     {
-        set_value(value, log1024_unit);
+        if (!binary)
+            set_value(value, log_unit, 1000);
+        else
+            set_value(value, log_unit, 1024);
     }
 
-    void set_value(T value, int log1024_unit = 0)
+    ~engineering_t()
     {
+        //printdbg("engineering_t destructed\n");
+    }
+
+    void set_value(T value, int logN_unit = 0, int base = 1000)
+    {
+//        printdbg("value=%zx, logN_unit=%d, base=%d\n",
+//                 uintptr_t(value), logN_unit, base);
+
+        uint64_t div = 0;
         int shr = 0;
         out = text + sizeof(text);
         *--out = 0;
 
-        if (value >= (UINT64_C(1) << 60)) {
-            log1024_unit += 6;
-            value >>= 10;
-            shr = 50;
-        } else if (value >= (UINT64_C(1) << 50)) {
-            log1024_unit += 5;
-            shr = 50;
-        } else if (value >= (UINT64_C(1) << 40)) {
-            log1024_unit += 4;
-            shr = 40;
-        } else if (value >= (UINT64_C(1) << 30)) {
-            log1024_unit += 3;
-            shr = 30;
-        } else if (value >= (UINT64_C(1) << 20)) {
-            log1024_unit += 2;
-            shr = 20;
-        } else if (value >= (UINT64_C(1) << 10)) {
-            log1024_unit += 1;
-            shr = 10;
+        if (base == 1000) {
+            if (uint64_t(value) >= UINT64_C(1000000000000000000)) {//1e18
+                logN_unit += 6;
+                value /= 1000;
+                div = UINT64_C(1000000000000000);
+            } else if (uint64_t(value) >= UINT64_C(1000000000000000)) {//1e15
+                logN_unit += 5;
+                div = UINT64_C(1000000000000000);
+            } else if (uint64_t(value) >= UINT64_C(1000000000000)) {//1e12
+                logN_unit += 4;
+                div = UINT64_C(1000000000000);
+            } else if (uint64_t(value) >= UINT64_C(1000000000)) {//1e9
+                logN_unit += 3;
+                div = UINT64_C(1000000000);
+            } else if (uint64_t(value) >= UINT64_C(1000000)) {//1e6
+                logN_unit += 2;
+                div = UINT64_C(1000000);
+            } else if (uint64_t(value) >= UINT64_C(1000)) {//1e3
+                logN_unit += 1;
+                div = UINT64_C(1000);
+            } else {//1e0
+                div = 1;
+            }
+        } else if (base == 1024) {
+            if (uint64_t(value) >= (UINT64_C(1) << 60)) {//Ei
+                logN_unit += 6;
+                value >>= 10;
+                shr = 50;
+            } else if (uint64_t(value) >= (UINT64_C(1) << 50)) {//Pi
+                logN_unit += 5;
+                shr = 50;
+            } else if (uint64_t(value) >= (UINT64_C(1) << 40)) {//Ti
+                logN_unit += 4;
+                shr = 40;
+            } else if (uint64_t(value) >= (UINT64_C(1) << 30)) {//Gi
+                logN_unit += 3;
+                shr = 30;
+            } else if (uint64_t(value) >= (UINT64_C(1) << 20)) {//Mi
+                logN_unit += 2;
+                shr = 20;
+            } else if (uint64_t(value) >= (UINT64_C(1) << 10)) {//Ki
+                logN_unit += 1;
+                shr = 10;
+            } else {
+                shr = 0;
+            }
+
+            if (logN_unit < -6 || logN_unit > 6) {
+                *--out = '*';
+                *--out = '*';
+                *--out = '*';
+                return;
+            }
+        } else {
+            *--out = '?';
+            return;
         }
 
-        if (log1024_unit < -6 || log1024_unit > 6) {
+        if (logN_unit < -6 || logN_unit > 6) {
             *--out = '*';
             *--out = '*';
             *--out = '*';
             return;
         }
 
-        if (unit_lookup[log1024_unit + 6]) {
+        if (unit_lookup[logN_unit + 6]) {
             char encoded[5];
-            size_t sz = ucs4_to_utf8(encoded, unit_lookup[log1024_unit + 6]);
+            size_t sz = ucs4_to_utf8(encoded, unit_lookup[logN_unit + 6]);
             while (sz > 0)
                 *--out = encoded[--sz];
         }
 
         // Convert into tenths decimal representation
         value *= 10;
-        value >>= shr;
+
+        if (base == 1024)
+            value >>= shr;
+        else
+            value /= div;
 
         int whol = value / 10;
         int frac = value % 10;

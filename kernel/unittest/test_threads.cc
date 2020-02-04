@@ -1,10 +1,29 @@
 #include "unittest.h"
 #include "thread.h"
+#include "mutex.h"
 
 struct test_thread_variation_t {
     size_t seed;
     bool volatile stop;
 };
+
+UNITTEST(test_condition_variable_wait_timeout)
+{
+    std::mutex m;
+    std::condition_variable v;
+    std::unique_lock<std::mutex> lock(m);
+    uint64_t st_ns = time_ns();
+    std::chrono::steady_clock::time_point st_tp =
+            std::chrono::steady_clock::now();
+    v.wait_until(lock, st_tp + std::chrono::seconds(1));
+    uint64_t en_ns = time_ns();
+    std::chrono::steady_clock::time_point en_tp =
+            std::chrono::steady_clock::now();
+
+    std::chrono::milliseconds elap = en_tp - st_tp;
+    uint64_t elap_ns = en_ns - st_ns;
+
+}
 
 UNITTEST(test_framebuffer)
 {

@@ -53,7 +53,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 #define ENABLE_SLEEP_THREAD         0 // no affinity or moving across cpus yet
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_MMAP_STRESS_THREAD   1
+#define ENABLE_MMAP_STRESS_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
@@ -148,7 +148,7 @@ private:
 
         for (size_t i = 0; i < queue_depth; ++i) {
             data[i] = (char*)mmap(nullptr, data_size,
-                                  PROT_READ | PROT_WRITE, 0, -1, 0);
+                                  PROT_READ | PROT_WRITE, 0);
             printk("(devid %d) read buffer at %#" PRIx64 "\n",
                    devid, (uint64_t)data[i]);
         }
@@ -349,7 +349,7 @@ static int stress_mutex(void *p)
 #if 0
 static int mprotect_test(void *)
 {
-//    char *mem = (char*)mmap(nullptr, 256 << 20, PROT_NONE, 0, -1, 0);
+//    char *mem = (char*)mmap(nullptr, 256 << 20, PROT_NONE, 0);
 
 //    __try {
 //        *mem = 'H';
@@ -404,7 +404,7 @@ static int stress_mmap_thread(void *p)
 
     size_t total_sz = 0;
     size_t sz;
-    int divisor = 2000;
+    int divisor = 2000000;
     for (;;) {
         uint64_t time_st = time_ns();
         for (unsigned iter = 0; iter < 1; ++iter) {
@@ -419,7 +419,7 @@ static int stress_mmap_thread(void *p)
 
             block = mmap(nullptr, sz,
                          PROT_READ | PROT_WRITE,
-                         MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
+                         MAP_UNINITIALIZED | MAP_NOCOMMIT);
 
             blocks[current] = {uintptr_t(block), sz};
 
@@ -441,12 +441,12 @@ static int stress_mmap_thread(void *p)
 
         uint64_t time_el = time_ns() - time_st;
         if (--divisor == 0) {
-            divisor = 2000;
+            divisor = 2000000;
             printk("%2zu: Ran mmap test iteration"
                    ", sz: %4sB"
                    ", time: %4ss\n",
                    id,
-                   engineering_t(total_sz).ptr(),
+                   engineering_t(total_sz, 0, true).ptr(),
                    engineering_t(time_el, -3).ptr());
         }
     }
@@ -574,7 +574,7 @@ static uint8_t sum_bytes(char *st, size_t len)
 
 static int find_vbe(void *p)
 {
-    char *bios = (char*)mmap(p, 0x10000, PROT_READ, MAP_PHYSICAL, -1, 0);
+    char *bios = (char*)mmap(p, 0x10000, PROT_READ, MAP_PHYSICAL);
 
     int i;
     for (i = 0; i < 0x8000 - 20; ++i) {

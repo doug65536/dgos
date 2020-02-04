@@ -782,8 +782,7 @@ void ide_if_t::ide_chan_t::detect_devices(
             // Allocate page for PRD list
             dma_cur_prd = (bmdma_prd_t*)mmap(
                         nullptr, PAGESIZE, PROT_READ | PROT_WRITE,
-                        MAP_32BIT | MAP_POPULATE |
-                        MAP_UNINITIALIZED, -1, 0);
+                        MAP_32BIT | MAP_POPULATE | MAP_UNINITIALIZED);
 
             IDE_TRACE("Allocated PRD list at %p\n", (void*)dma_cur_prd);
 
@@ -794,7 +793,7 @@ void ide_if_t::ide_chan_t::detect_devices(
             dma_bounce = mmap(nullptr, unit.max_multiple << log2_sector_size,
                               PROT_READ | PROT_WRITE,
                               MAP_32BIT | MAP_POPULATE |
-                              MAP_UNINITIALIZED, -1, 0);
+                              MAP_UNINITIALIZED);
             io_window = mmap_window(unit.max_multiple << log2_sector_size);
 
             // Get list of physical address ranges for io_window
@@ -811,8 +810,7 @@ void ide_if_t::ide_chan_t::detect_devices(
 
             dma_full_prd = (bmdma_prd_t*)mmap(
                         nullptr, sizeof(*dma_full_prd) * dma_range_count,
-                        PROT_READ | PROT_WRITE,
-                        MAP_32BIT | MAP_POPULATE, -1, 0);
+                        PROT_READ | PROT_WRITE, MAP_32BIT | MAP_POPULATE);
             dma_prd_physaddr = mphysaddr(dma_full_prd);
 
             // Populate PRD list with bounce buffer addresses

@@ -531,17 +531,14 @@ void vga_display_t::remap()
     video_mem = (uint16_t*)
             mmap((void*)0xB8000, 0x8000,
                  PROT_READ | PROT_WRITE,
-                 MAP_PHYSICAL | MAP_WRITETHRU, -1, 0);
+                 MAP_PHYSICAL | MAP_WRITETHRU);
 
     // Start using system RAM shadow buffer
 
     uint16_t *old_shadow = shadow;
 
-    shadow = (uint16_t*)mmap(nullptr,
-                        width * height *
-                        sizeof(*shadow),
-                        PROT_READ | PROT_WRITE,
-                        MAP_POPULATE, -1, 0);
+    shadow = (uint16_t*)mmap(nullptr, width * height * sizeof(*shadow),
+                             PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     if (old_shadow) {
         memcpy(shadow, old_shadow,

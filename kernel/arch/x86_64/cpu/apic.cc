@@ -12,13 +12,13 @@
 #include "isr.h"
 #include "thread_impl.h"
 #include "mm.h"
-#include "cpuid.h"
+#include "cpu/cpuid.h"
 #include "string.h"
 #include "atomic.h"
 #include "printk.h"
 #include "likely.h"
 #include "time.h"
-#include "cpuid.h"
+#include "cpu/cpuid.h"
 #include "assert.h"
 #include "bitsearch.h"
 #include "callout.h"
@@ -822,7 +822,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                         (void*)(uintptr_t)ent->ioapic.addr, 12,
                         PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL | MAP_NOCACHE |
-                        MAP_WRITETHRU, -1, 0);
+                        MAP_WRITETHRU);
             if (unlikely(ioapic->ptr == MAP_FAILED))
                 panic_oom();
 
@@ -957,7 +957,7 @@ static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
         acpi_mappings.erase(it);
         munmap(ptr, guess);
         ptr = (T*)mmap((void*)physaddr, actual_len,
-                       PROT_READ, MAP_PHYSICAL, -1, 0);
+                       PROT_READ, MAP_PHYSICAL);
         if (unlikely(ptr == MAP_FAILED))
             panic_oom();
         acpi_mappings.push_back({uint64_t(ptr), uint64_t(actual_len)});
@@ -974,7 +974,7 @@ static void acpi_parse_rsdt()
     size_t len = acpi_rsdt_len ? acpi_rsdt_len : sizeof(acpi_sdt_hdr_t);
     acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
                 (void*)acpi_rsdt_addr, len,
-                PROT_READ, MAP_PHYSICAL, -1, 0);
+                PROT_READ, MAP_PHYSICAL);
     if (unlikely(rsdt_hdr == MAP_FAILED))
         panic_oom();
     acpi_mappings.push_back({uint64_t(rsdt_hdr), len});
@@ -1010,7 +1010,7 @@ static void acpi_parse_rsdt()
 
         acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
                 mmap((void*)hdr_addr,
-                      64 << 10, PROT_READ, MAP_PHYSICAL, -1, 0);
+                      64 << 10, PROT_READ, MAP_PHYSICAL);
         if (unlikely(hdr == MAP_FAILED))
             panic_oom();
         acpi_sdt_hdr_t aligned_sdt_hdr{};
@@ -1194,7 +1194,7 @@ static void mp_parse_fps()
 {
     mp_cfg_tbl_hdr_t *cth = (mp_cfg_tbl_hdr_t *)
             mmap((void*)mp_tables, 0x10000,
-                 PROT_READ, MAP_PHYSICAL, -1, 0);
+                 PROT_READ, MAP_PHYSICAL);
     if (unlikely(cth == MAP_FAILED))
         panic_oom();
     acpi_mappings.push_back({uint64_t(cth), 0x10000});
@@ -1293,7 +1293,7 @@ static void mp_parse_fps()
                 uint32_t volatile *ioapic_ptr = (uint32_t *)mmap(
                             (void*)(uintptr_t)entry_ioapic->addr,
                             12, PROT_READ | PROT_WRITE,
-                            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
                 if (unlikely(ioapic_ptr == MAP_FAILED))
                     panic_oom();
 
@@ -1661,13 +1661,12 @@ uint64_t apic_timer_hw_oneshot(uint8_t& dcr_shadow, uint64_t icr)
 
     uint8_t new_dcr = apic_shr_to_dcr[shr];
 
-    if (dcr_shadow != new_dcr) {
+    if (unlikely(dcr_shadow != new_dcr)) {
         dcr_shadow = uint8_t(new_dcr);
         apic->write_timer_dcr(new_dcr);
     }
 
     uint32_t scaled_icr = icr >> shr;
-    apic->write_timer_icr(0);
     apic->write_timer_icr(scaled_icr);
 
     return scaled_icr << shr;
@@ -1787,7 +1786,7 @@ int apic_init(int ap)
             apic_ptr = (uint32_t *)mmap(
                         (void*)(apic_base),
                         4096, PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
             if (unlikely(apic_ptr == MAP_FAILED))
                 panic_oom();
 
@@ -1837,8 +1836,7 @@ int apic_init(int ap)
         APIC_TRACE("Configuring AP timer\n");
         apic_timer_hw_reset(APIC_LVT_DCR_BY_1,
                             0,
-                            APIC_LVT_TR_MODE_PERIODIC |
-                            APIC_LVT_DELIVERY_MASK,
+                            APIC_LVT_TR_MODE_PERIODIC,
                             INTR_APIC_TIMER);
     }
 
@@ -1973,7 +1971,7 @@ void apic_start_smp(void)
     apic_timer_hw_reset(APIC_LVT_DCR_BY_1,
                         0,
                         APIC_LVT_TR_MODE_ONESHOT,
-                        INTR_APIC_TIMER, false);
+                        INTR_APIC_TIMER);
 
     APIC_TRACE("%d CPUs\n", apic_id_count);
 
@@ -2177,7 +2175,7 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
 static uint64_t apic_rdtsc_time_ns_handler()
 {
     uint64_t now = cpu_rdtsc();
-    return uint64_t(uint128_t(now) * clk_to_ns_numer / clk_to_ns_denom);
+    return uint64_t(now * clk_to_ns_numer / clk_to_ns_denom);
 }
 
 static uint64_t apic_rdtsc_nsleep_handler(uint64_t nanosec)
@@ -2224,7 +2222,7 @@ static void apic_calibrate()
         // Program timer (should be high enough to measure 858ms @ 5GHz)
         apic_timer_hw_reset(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
                             APIC_LVT_TR_MODE_ONESHOT,
-                            INTR_APIC_TIMER, false);
+                            INTR_APIC_TIMER);
 
         uint32_t tmr_st = acpi_pm_timer_raw();
         uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);

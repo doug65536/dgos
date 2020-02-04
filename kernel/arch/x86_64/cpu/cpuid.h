@@ -80,6 +80,7 @@ struct cpuid_cache_t {
     bool has_stibp      :1;
     bool has_ssbd       :1;
     bool has_l1df       :1;
+    bool has_md_clear   :1;
 
     bool bug_meltdown   :1;
 
@@ -87,8 +88,10 @@ struct cpuid_cache_t {
 
     uint16_t min_monitor_line;
     uint16_t max_monitor_line;
-    uint8_t laddr_bits;
     uint8_t paddr_bits;
+    uint8_t laddr_bits;
+
+    char brand[48];
 };
 
 #ifdef CPUID_CC
@@ -96,7 +99,7 @@ struct cpuid_cache_t {
     extern "C" _const
 #else
 #define CPUID_CONST_INLINE \
-    static _always_inline _const
+    static _always_inline _generic_target _const
 #endif
 
 extern cpuid_cache_t cpuid_cache;
@@ -335,6 +338,11 @@ CPUID_CONST_INLINE bool cpuid_has_l1d_flush()
     return cpuid_cache.has_l1df;
 }
 
+CPUID_CONST_INLINE bool cpuid_has_md_clear()
+{
+    return cpuid_cache.has_md_clear;
+}
+
 CPUID_CONST_INLINE bool cpuid_is_kvm()
 {
     return cpuid_cache.hv_type == hv_type_t::KVM;
@@ -343,4 +351,9 @@ CPUID_CONST_INLINE bool cpuid_is_kvm()
 CPUID_CONST_INLINE bool cpuid_is_tcg()
 {
     return cpuid_cache.hv_type == hv_type_t::TCG;
+}
+
+CPUID_CONST_INLINE char const *cpuid_brand()
+{
+    return cpuid_cache.brand;
 }

@@ -3,6 +3,7 @@
 #include "printk.h"
 #include "vector.h"
 #include "cxxstring.h"
+#include "debug.h"
 
 __thread int test_tls;
 __thread int test_tls_2;
@@ -119,6 +120,7 @@ void unittest::unit_ctx::fail(
     (void)file;
     (void)line;
     ++failures;
+    cpu_debug_break();
 }
 
 void unittest::unit_ctx::skip(unittest::unit *test)

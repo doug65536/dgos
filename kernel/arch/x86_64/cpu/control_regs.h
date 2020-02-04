@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types.h"
-#include "cpuid.h"
+#include "cpu/cpuid.h"
 #include "atomic.h"
 #include "thread.h"
 #include "control_regs_constants.h"

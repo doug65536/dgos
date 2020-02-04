@@ -118,8 +118,7 @@ static void gdt_set_tss_base(tss_t *base)
 void gdt_init_tss(size_t cpu_count)
 {
     //tss_list = (tss_t*)mmap(nullptr, sizeof(*tss_list) * cpu_count,
-    //                       PROT_READ | PROT_WRITE,
-    //                       MAP_POPULATE, -1, 0);
+    //                       PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     size_t constexpr stack_count_per_cpu = 5;
 
@@ -129,7 +128,7 @@ void gdt_init_tss(size_t cpu_count)
     // Map space for all the stacks
     char *stacks_base = (char*)mmap(
                 nullptr, stacks_sz, PROT_NONE,
-                MAP_NOCOMMIT, -1, 0);
+                MAP_NOCOMMIT);
     if (unlikely(stacks_base == MAP_FAILED))
         panic_oom();
     char *stacks_alloc = stacks_base;

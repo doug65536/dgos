@@ -1,5 +1,6 @@
 #include "serial-uart.h"
 #include "cpu/ioport.h"
+#include "cpu/thread_impl.h"
 #include "callout.h"
 #include "vector.h"
 #include "irq.h"
@@ -586,7 +587,8 @@ isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
             //});
         }
     }
-    return ctx;
+
+    return thread_schedule(ctx);
 }
 
 void uart_t::port_irq_handler()
@@ -631,8 +633,8 @@ private:
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     void port_irq_handler() override final;
 
-    bool wait_tx_not_full(scoped_lock &lock_, clock::time_point timeout);
-    bool wait_rx_not_empty(scoped_lock& lock_, clock::time_point timeout);
+    bool wait_tx_not_full_until(scoped_lock &lock_, clock::time_point timeout);
+    bool wait_rx_not_empty_until(scoped_lock& lock_, clock::time_point timeout);
 
     void rx_enqueue(uint16_t value);
 
@@ -718,7 +720,7 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write,
                 if (!sending_data)
                     send_some(lock_);
 
-                if (!wait_tx_not_full(lock_, timeout))
+                if (!wait_tx_not_full_until(lock_, timeout))
                     return i;
             } while (is_tx_full());
         }
@@ -752,7 +754,7 @@ ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read,
             if (i >= min_read)
                 break;
 
-            if (!wait_rx_not_empty(lock_, timeout))
+            if (!wait_rx_not_empty_until(lock_, timeout))
                 return i;
         }
 
@@ -926,7 +928,7 @@ void uart_async_t::port_irq_handler()
     }
 }
 
-bool uart_async_t::wait_tx_not_full(
+bool uart_async_t::wait_tx_not_full_until(
         scoped_lock& lock_, clock::time_point timeout)
 {
     UART_TRACE("Blocking on tx\n");
@@ -937,7 +939,7 @@ bool uart_async_t::wait_tx_not_full(
     return result;
 }
 
-bool uart_async_t::wait_rx_not_empty(
+bool uart_async_t::wait_rx_not_empty_until(
         scoped_lock& lock_, clock::time_point timeout)
 {
     bool result;

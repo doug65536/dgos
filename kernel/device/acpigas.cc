@@ -39,8 +39,7 @@ public:
     acpi_gas_accessor_sysmem_t(uint64_t mem_addr, int bitofs, int bitwidth)
         : acpi_gas_mask_t<size>(bitofs, bitwidth)
         , mem((value_type*)mmap((void*)mem_addr, size,
-                                PROT_READ | PROT_WRITE,
-                                MAP_PHYSICAL, -1, 0))
+                                PROT_READ | PROT_WRITE, MAP_PHYSICAL))
     {
     }
 

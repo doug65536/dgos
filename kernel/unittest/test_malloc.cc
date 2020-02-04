@@ -34,13 +34,13 @@ UNITTEST(test_physalloc)
             if (!addr)
                 break;
 
-            printdbg("Allocated %#zx\n", addr);
+            //printdbg("Allocated %#zx\n", addr);
 
             pages.push_back(addr);
         }
 
         for (uintptr_t page: pages) {
-            printdbg("Freed %#zx\n", page);
+            //printdbg("Freed %#zx\n", page);
             uut.release_one(page);
         }
 
@@ -442,7 +442,7 @@ DISABLED_UNITTEST(test_mmap_oom)
 
             size_t *mem = (size_t*)mmap(nullptr, chunk_sz,
                                         PROT_READ | PROT_WRITE,
-                                        MAP_POPULATE, -1, 0);
+                                        MAP_POPULATE);
 
             items[item_count].addr = mem;
             items[item_count].sz = chunk_sz;

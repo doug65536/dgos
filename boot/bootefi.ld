@@ -69,7 +69,6 @@ SECTIONS {
 
 		*(.rodata)
 		*(.rodata.*)
-		*(.comment)
 	}
 
 	.smp ALIGN(4K) : {
@@ -162,4 +161,6 @@ SECTIONS {
 		. += 8;
 		___bss_en = .;
 	}
+
+	/DISCARD/       : { *(.comment)       }
 }

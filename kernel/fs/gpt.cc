@@ -86,36 +86,45 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     if (unlikely(sector_size < 128))
         return list;
 
-    std::unique_ptr<uint8_t[]> sector(new (std::nothrow)
+    // Create sector-sized buffer to look at partition header
+    std::unique_ptr<uint8_t[]> buffer(new (std::nothrow)
                                       uint8_t[sector_size]());
+
+    if (unlikely(!buffer))
+        panic_oom();
 
     GPT_TRACE("Reading 1 %lu byte block at LBA 1 from %s\n",
               sector_size, drive_name);
 
-    gpt_hdr_t hdr;
-
-    if (unlikely(drive->read_blocks(sector, 1, 1) < 0))
+    if (unlikely(drive->read_blocks(buffer, 1, 1) < 0))
         return list;
 
-    memcpy(&hdr, sector, sizeof(hdr));
+    gpt_hdr_t hdr;
+    memcpy(&hdr, buffer, sizeof(hdr));
 
     if (unlikely(hdr.sig != hdr.sig_expected))
         return list;
 
     gpt_part_tbl_ent_t ptent;
 
+    buffer.reset();
+    buffer.reset(new (std::nothrow) uint8_t[sector_size * hdr.part_ent_count]);
+
+    if (unlikely(!buffer))
+        panic_oom();
+
+    GPT_TRACE("Reading %u %ld byte blocks at LBA %" PRIu64 " from %s\n",
+              hdr.part_ent_count, sector_size, hdr.part_ent_lba, drive_name);
+
+    if (unlikely(drive->read_blocks(buffer, hdr.part_ent_count,
+                                    hdr.part_ent_lba)) < 0)
+        return list;
+
     for (uint32_t i = 0; i < hdr.part_ent_count; ++i) {
         std::unique_ptr<part_dev_t> part;
 
-        uint64_t lba = hdr.part_ent_lba + i;
-
-        GPT_TRACE("Reading 1 %lu byte block at LBA %" PRIu64 " from %s\n",
-                  sector_size, lba, drive_name);
-
-        if (unlikely(drive->read_blocks(sector, 1, lba) < 0))
-            return list;
-
-        memcpy(&ptent, sector, sizeof(ptent));
+        // Copy into aligned object
+        memcpy(&ptent, &buffer.get()[i * sector_size], sizeof(ptent));
 
         if (ptent.type_guid == efi_part) {
             part.reset(new (std::nothrow) part_dev_t{});
@@ -126,9 +135,13 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
             GPT_TRACE("Found %" PRIu64 " block partition at LBA"
                       " %" PRIu64, part->lba_len, part->lba_st);
 
-            partitions.push_back(part);
+            if (unlikely(!partitions.push_back(part)))
+                panic_oom();
+
             if (likely(list.push_back(part.get())))
                 part.release();
+            else
+                panic_oom();
         }
     }
 

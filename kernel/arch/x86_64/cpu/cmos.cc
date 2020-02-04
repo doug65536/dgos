@@ -151,7 +151,7 @@
 // JMP DWORD with INT init
 #define CMOS_SHUTDOWN_STATUS_AP     0xB
 
-using cmos_lock_type = ext::mcslock;
+using cmos_lock_type = ext::spinlock;
 using cmos_scoped_lock = std::unique_lock<cmos_lock_type>;
 static cmos_lock_type cmos_lock;
 static time_of_day_t time_of_day;

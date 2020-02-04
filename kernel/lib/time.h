@@ -28,6 +28,8 @@ uint64_t time_ns(void);
 uint64_t nsleep(uint64_t nanosec);
 void sleep(int ms);
 
+// Returns counter at unknown rate. Use following helpers to translate to
+// actual time duration and back.
 uint64_t nano_time(void);
 
 _const

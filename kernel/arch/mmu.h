@@ -50,6 +50,7 @@ extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
 #define PTE_EX_LOCKED_BIT   (PTE_AVAIL1_BIT+1)
 #define PTE_EX_DEVICE_BIT   (PTE_AVAIL1_BIT+2)
 #define PTE_EX_WAIT_BIT     (PTE_AVAIL2_BIT+0)
+#define PTE_EX_FILEMAP_BIT  (PTE_AVAIL2_BIT+1)
 
 // Size of multi-bit fields
 #define PTE_PK_BITS         4
@@ -94,6 +95,7 @@ extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
 #define PTE_EX_LOCKED       (1UL << PTE_EX_LOCKED_BIT)
 #define PTE_EX_DEVICE       (1UL << PTE_EX_DEVICE_BIT)
 #define PTE_EX_WAIT         (1UL << PTE_EX_WAIT_BIT)
+#define PTE_EX_FILEMAP      (1UL << PTE_EX_FILEMAP_BIT)
 
 // PAT configuration
 #define PAT_IDX_WB  0

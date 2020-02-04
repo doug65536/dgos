@@ -571,35 +571,35 @@ protected:
     mutex_t *mutex;
 };
 
-EXPORT bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock,
-                                  uint64_t timeout_time)
-{
-    condvar_spinlock_t state(lock);
-    return condvar_wait_ex(var, state, timeout_time);
-}
+//EXPORT bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock,
+//                                  uint64_t timeout_time)
+//{
+//    condvar_spinlock_t state(lock);
+//    return condvar_wait_ex(var, state, timeout_time);
+//}
 
-EXPORT bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock,
-                                    uint64_t timeout_time)
-{
-    condvar_ticketlock_t state(lock);
-    return condvar_wait_ex(var, state, timeout_time);
-}
+//EXPORT bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock,
+//                                    uint64_t timeout_time)
+//{
+//    condvar_ticketlock_t state(lock);
+//    return condvar_wait_ex(var, state, timeout_time);
+//}
 
-EXPORT bool condvar_wait_mcslock(condition_var_t *var,
-                                 mcs_queue_ent_t * volatile *root,
-                                 mcs_queue_ent_t *node, uint64_t timeout_time)
-{
-    condvar_mcslock_t state(root, node);
-    return condvar_wait_ex(var, state, timeout_time);
-}
+//EXPORT bool condvar_wait_mcslock(condition_var_t *var,
+//                                 mcs_queue_ent_t * volatile *root,
+//                                 mcs_queue_ent_t *node, uint64_t timeout_time)
+//{
+//    condvar_mcslock_t state(root, node);
+//    return condvar_wait_ex(var, state, timeout_time);
+//}
 
-EXPORT bool condvar_wait_mutex(condition_var_t *var, mutex_t *mutex,
-                               uint64_t timeout_time)
-{
-    assert(mutex->owner == thread_get_id());
-    condvar_mutex_t state(mutex);
-    return condvar_wait_ex(var, state, timeout_time);
-}
+//EXPORT bool condvar_wait_mutex(condition_var_t *var, mutex_t *mutex,
+//                               uint64_t timeout_time)
+//{
+//    assert(mutex->owner == thread_get_id());
+//    condvar_mutex_t state(mutex);
+//    return condvar_wait_ex(var, state, timeout_time);
+//}
 
 EXPORT void condvar_wake_one(condition_var_t *var)
 {

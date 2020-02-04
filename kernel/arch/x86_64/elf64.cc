@@ -551,8 +551,7 @@ errno_t module_t::map_sections()
             continue;
 
         void *addr = mmap((void*)(phdr.p_vaddr + base_adj),
-                          phdr.p_memsz, PROT_READ | PROT_WRITE,
-                          MAP_NOCOMMIT, -1, 0);
+                          phdr.p_memsz, PROT_READ | PROT_WRITE, MAP_NOCOMMIT);
         if (unlikely(addr == MAP_FAILED)) {
             printdbg("Failed to map section\n");
             return load_failed(errno_t::ENOMEM);

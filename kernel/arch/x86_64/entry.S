@@ -155,7 +155,7 @@ bsp_init:
     subq %rdi,%rsi
     call __asan_storeN_noabort
 
-    // Mark .rodata initialized
+    // Mark .bspstk initialized
     leaq __bspstk_st(%rip),%rdi
     leaq __bspstk_en(%rip),%rsi
     subq %rdi,%rsi
@@ -174,9 +174,9 @@ bsp_init:
     call __asan_storeN_noabort
 
     // Mark VGA initialized
-    movl $ 0xb8000,%edi
-    movl $ 0x08000,%esi
-    call __asan_storeN_noabort
+//    movl $ 0xb8000,%edi
+//    movl $ 0x08000,%esi
+//    call __asan_storeN_noabort
 
     movb $1,asan_ready(%rip)
 #endif
@@ -197,10 +197,9 @@ bsp_init:
 
 .balign 16
     // TSS layout is completely misaligned without nudging it up 4 bytes
-    //  uint32_t dummy_align;
+.global early_tss
 early_tss:
     .space 4
-    .global early_tss
     // TSS structure
     //  uint32_t reserved0;
     .int 0

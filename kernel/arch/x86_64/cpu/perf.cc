@@ -59,7 +59,7 @@ static std::vector<perf_trace_cpu_t> perf_data;
 static std::vector<padded_rand_lfs113_t> perf_rand;
 
 static uint32_t volatile perf_event = 0xC0;
-static uint8_t volatile perf_event_scale = 19;
+static uint8_t volatile perf_event_scale = 20;
 
 using token_map_t = std::map<std::string, size_t>;
 static token_map_t token_map;
@@ -205,9 +205,6 @@ void setup_sample(size_t cpu_nr)
 
     // Lower result = higher rate
     // higher shift = higher rage
-
-    if (rate_adj > 6)
-        rate_adj = 6;
 
     // Random value in (0, 1<<10] range (1024)
     //int8_t shift = 32 - (13 - (rate_adj >> 3));
@@ -388,7 +385,7 @@ EXPORT void perf_init()
                 nullptr, sizeof(*perf_trace_buf) *
                 cpu_count *
                 perf_trace_cpu_t::ring_cnt,
-                PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     if (unlikely(perf_trace_buf == MAP_FAILED))
         panic_oom();
@@ -397,7 +394,7 @@ EXPORT void perf_init()
                 nullptr, sizeof(*perf_sample_buf) *
                 (cpu_count + 2) *
                 perf_tokens.size(),
-                PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     if (unlikely(perf_sample_buf == MAP_FAILED))
         panic_oom();

@@ -154,7 +154,7 @@ struct less
     using result_type = bool;
     using first_argument = _T;
     using second_argument = _T;
-    using is_transparent = true_type;
+    using is_transparent = false_type;
 
     bool constexpr operator()(_T const& __lhs, _T const& __rhs) const
     {

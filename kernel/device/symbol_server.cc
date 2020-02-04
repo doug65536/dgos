@@ -10,9 +10,12 @@ class symbol_server_t {
     uart_dev_t *port = nullptr;
     thread_t tid = -1;
 
+    unsigned scroll_left = 0;
+
     static int thread_entry(void *arg)
     {
-        return reinterpret_cast<symbol_server_t*>(arg)->worker();
+        symbol_server_t *self = reinterpret_cast<symbol_server_t*>(arg);
+        return self->worker();
     }
 
     std::string base_name(char const *filename)
@@ -108,7 +111,7 @@ class symbol_server_t {
                 port->write(']');
             }
 
-            port->write('\n');
+            port->write("\r\n", 2);
         }
 
         return true;
@@ -129,17 +132,27 @@ class symbol_server_t {
                                   char const *name, void *arg)
     {
         symbol_server_t *self = (symbol_server_t*)arg;
+        unsigned &scroll_left = self->scroll_left;
         if (top_rows++ > 16)
             return;
 
         char edited_name[128];
         size_t name_len = strlen(name);
-        if (name_len > 96) {
-            // 1st 16 ... last 80
-            memcpy(edited_name, name, 16);
-            memcpy(edited_name + 16, "...", 3);
-            memcpy(edited_name + 19, name + name_len - 77, 78);
-            name = edited_name;
+        if (name_len < 96) {
+            // Do nothing
+        } else {
+            ssize_t offset = std::min(ssize_t(name_len - 96),
+                                      ssize_t(scroll_left));
+
+            name = strncpy(edited_name,
+                   name + offset,
+                   96);
+
+            if (offset > 0)
+                memcpy(edited_name, "...", 3);
+
+            if (offset == scroll_left)
+                memcpy(edited_name + 96 - 3, "...", 3);
         }
 
         char buf[128];
@@ -153,14 +166,96 @@ class symbol_server_t {
             self->port->write(buf, size_t(sz));
     }
 
+    void modal_top(uint64_t total_samples, char command)
+    {
+        port->write(std::string(16, '\n'));
+
+        for (bool done = false ; !done;) {
+            // up 16 lines
+            port->wrstr("\x1b" "[16A");
+
+            top_rows = 0;
+            total_samples = perf_gather_samples(
+                        perf_top_callback, this);
+
+            while (top_rows < 16) {
+                port->wrstr("\x1b" "[");
+                port->write(std::to_string(top_rows++));
+                port->wrstr(";1H"
+                            "\x1b" "[K");
+            }
+
+            port->wrstr("\r" "\x1b" "[K");
+            port->write(std::to_string(total_samples));
+            port->wrstr(" samples\r\n");
+
+            size_t cpu_count;
+            cpu_count = thread_get_cpu_count();
+            unsigned usage_1k_total = 0;
+            for (size_t cpu_nr = 0; cpu_nr < cpu_count; ++cpu_nr) {
+                unsigned usage_1k = thread_cpu_usage_x1k(cpu_nr);
+                usage_1k_total += usage_1k;
+            }
+            usage_1k_total /= cpu_count;
+            port->wrstr("\x1b" "[K");
+            port->wrstr("CPU usage: ");
+
+            unsigned usage_fixed = usage_1k_total / 1000;
+            unsigned usage_frac = usage_1k_total % 1000;
+
+            std::string fixed = std::to_string(usage_fixed);
+            std::string frac = std::to_string(usage_frac);
+            port->write(std::move(fixed));
+            port->wrstr(".");
+            port->write(std::move(frac));
+            port->wrstr("%\r\n");
+
+            char input = 0;
+            uart_dev_t::clock::time_point now =
+                    uart_dev_t::clock::now();
+            uart_dev_t::clock::time_point timeout =
+                    now + std::chrono::seconds(1);
+
+            ssize_t read_sz = port->read(&input, 1, 1, timeout);
+
+            if (read_sz == 1) {
+                switch (input) {
+                case 'q':
+                    done = true;
+                    port->wrstr("\r\x1b" "[K" "(symsrv) ");
+                    break;
+
+                case '\x1b':
+                    read_sz = port->read(&command, 1, 1);
+                    if (-(read_sz > 0) & (command != '['))
+                        break;
+                    read_sz = port->read(&command, 1, 1);
+                    switch (-(read_sz > 0) & command) {
+                    case 'D':
+                        scroll_left -= scroll_left > 0;
+                        break;
+                    case 'C':
+                        ++scroll_left;
+                        break;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     int worker()
     {
+        printdbg("symsrv: started\n");
+
         for (;;) {
             char command = 0;
             int did_read = port->read(&command, 1, 1);
 
             if (did_read != 1)
                 continue;
+
+            printdbg("symsrv: got input\n");
 
             size_t mod_count = modload_get_count();
 
@@ -259,62 +354,7 @@ class symbol_server_t {
                 break;
 
             case 't':
-                port->write(std::string(16, '\n'));
-
-                for (bool done = false ; !done;) {
-                    // up 16 lines
-                    port->wrstr("\x1b" "[16A");
-
-                    top_rows = 0;
-                    total_samples = perf_gather_samples(
-                                perf_top_callback, this);
-
-                    while (top_rows < 16) {
-                        port->wrstr("\x1b" "[");
-                        port->write(std::to_string(top_rows++));
-                        port->wrstr(";1H"
-                                    "\x1b" "[K");
-                    }
-
-                    port->wrstr("\r" "\x1b" "[K");
-                    port->write(std::to_string(total_samples));
-                    port->wrstr(" samples\r\n");
-
-                    size_t cpu_count;
-                    cpu_count = thread_get_cpu_count();
-                    unsigned usage_1k_total = 0;
-                    for (size_t cpu_nr = 0; cpu_nr < cpu_count; ++cpu_nr) {
-                        unsigned usage_1k = thread_cpu_usage_x1k(cpu_nr);
-                        usage_1k_total += usage_1k;
-                    }
-                    usage_1k_total /= cpu_count;
-                    port->wrstr("\x1b" "[K");
-                    port->wrstr("CPU usage: ");
-
-                    unsigned usage_fixed = usage_1k_total / 1000;
-                    unsigned usage_frac = usage_1k_total % 1000;
-
-                    std::string fixed = std::to_string(usage_fixed);
-                    std::string frac = std::to_string(usage_frac);
-                    port->write(std::move(fixed));
-                    port->wrstr(".");
-                    port->write(std::move(frac));
-                    port->wrstr("%\r\n");
-
-                    char input = 0;
-                    ssize_t read_sz = port->read(
-                                &input, 1, 1, uart_dev_t::clock::now() +
-                                std::chrono::milliseconds(1000));
-
-                    if (read_sz == 1) {
-                        switch (input) {
-                        case 'q':
-                            done = true;
-                            port->wrstr("\r\x1b" "[K" "(symsrv) ");
-                            break;
-                        }
-                    }
-                }
+                modal_top(total_samples, command);
 
                 break;
 

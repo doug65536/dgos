@@ -17,10 +17,13 @@ class vt100_out_t : public text_dev_base_t {
     }
 
     ssize_t recv_csi(char *buf, size_t sz, int *params, size_t param_cnt);
+
     ssize_t send(char const *str, size_t sz);
     ssize_t send(char const *str);
+
     _printf_format(2, 0)
     ssize_t vsendf(char const *format, va_list ap);
+
     _printf_format(2, 3)
     ssize_t sendf(char const *format, ...);
 

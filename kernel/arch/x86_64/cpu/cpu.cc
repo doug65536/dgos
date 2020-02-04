@@ -10,7 +10,7 @@
 #include "thread_impl.h"
 #include "cmos.h"
 #include "apic.h"
-#include "cpuid.h"
+#include "cpu/cpuid.h"
 #include "callout.h"
 #include "printk.h"
 #include "idt.h"
@@ -272,13 +272,25 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
             uintptr_t dest_addr;
             dest_addr = next + disp32;
 
-            if (dest_addr == uintptr_t(protection_barrier)) {
-                // No point calling protection barrier if
-                // the CPU does not have IBPB
+            if (dest_addr == uintptr_t(protection_barrier_from_user)) {
+                // Prevent user code influencing anything
                 if (cpuid_has_ibpb()) {
-                    // Call actual ibpb function
+                    // Call ibpb function
                     new_sz = 5;
                     dist = uintptr_t(protection_barrier_ibpb) - next;
+                } else {
+                    // nop it out
+                    new_sz = 0;
+                }
+
+                break;
+            } else if (dest_addr == uintptr_t(protection_barrier_to_user)) {
+                // Prevent any information leaking back to user mode
+                // Clear microarchitectural data (intel)
+                if (cpuid_has_md_clear()) {
+                    // Call verw function
+                    new_sz = 5;
+                    dist = uintptr_t(protection_barrier_verw) - next;
                 } else {
                     // nop it out
                     new_sz = 0;
@@ -529,7 +541,7 @@ static void cpu_init_bsp()
     cpu_init(0);
 }
 
-static isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
+extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
 {
     // Handle nofault functions
     if (nofault_ip_in_range(uintptr_t(ISR_CTX_REG_RIP(ctx)))) {

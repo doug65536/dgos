@@ -13,7 +13,7 @@
 #include "bios_data.h"
 #include "callout.h"
 #include "likely.h"
-#include "cpuid.h"
+#include "cpu/cpuid.h"
 #include "thread_impl.h"
 #include "threadsync.h"
 #include "idt.h"
@@ -1091,6 +1091,7 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 
             linaddr_t rounded_addr = fault_addr & -(intptr_t)PAGE_SIZE;
 
+
             // Lookup the device mapping
             intptr_t device = mmu_device_from_addr(rounded_addr);
             if (unlikely(device < 0))
@@ -1389,7 +1390,7 @@ void mmu_init()
 
     void *phys_alloc = mmap(nullptr, physalloc_size,
                             PROT_READ | PROT_WRITE,
-                            MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+                            MAP_POPULATE | MAP_UNINITIALIZED);
 
     printdbg("Building physical memory free list\n");
 
@@ -1446,7 +1447,7 @@ void mmu_init()
     // Alias master page directory to be accessible
     // from all process contexts
     master_pagedir = (pte_t*)mmap((void*)root_physaddr, PAGE_SIZE,
-                                  PROT_READ, MAP_PHYSICAL, -1, 0);
+                                  PROT_READ, MAP_PHYSICAL);
 
     if (unlikely(master_pagedir == MAP_FAILED))
         panic("Insufficient memory to initialize memory allocator!");
@@ -1506,13 +1507,13 @@ void mmu_init()
     size_t blocks_cap = 5<<(30-12);
     size_t blocks_sz = sizeof(void*) * blocks_cap;
     void **blocks = (void**)mmap(nullptr, blocks_sz, PROT_READ | PROT_WRITE,
-                                 MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+                                 MAP_POPULATE | MAP_UNINITIALIZED);
     size_t blocks_cnt = 0;
     memset(blocks, 0xFA, blocks_sz);
 
     for (;;) {
         void *block = mmap(nullptr, 4096, PROT_READ | PROT_WRITE,
-                           MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+                           MAP_POPULATE | MAP_UNINITIALIZED);
         if (block == MAP_FAILED)
             break;
 
@@ -1774,7 +1775,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
 
     // Must pass MAP_DEVICE if passing a device registration index
-    assert((flags & MAP_DEVICE) || (fd < 0));
+    //assert((flags & MAP_DEVICE) || (fd < 0));
 
 #if DEBUG_PAGE_TABLES
     printdbg("Mapping len=%#zx prot=%#x flags=%#x addr=%#" PRIx64 "\n",
@@ -1793,6 +1794,12 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     // Set physical and present flag on physical memory mapping
     page_flags |= zero_if_false(flags & MAP_PHYSICAL,
                                 PTE_EX_PHYSICAL | PTE_PRESENT);
+
+    page_flags |= zero_if_false(fd >= 0 && !(flags & MAP_DEVICE),
+                                PTE_EX_FILEMAP | PTE_EX_DEVICE);
+
+    // Force nocommit if filemapping
+    flags |= zero_if_false(page_flags & PTE_EX_FILEMAP, MAP_NOCOMMIT);
 
     if (likely(!(flags & MAP_WEAKORDER))) {
         page_flags |= zero_if_false(flags & MAP_NOCACHE, PTE_PCD);
@@ -2129,11 +2136,8 @@ EXPORT int munmap(void *addr, size_t size)
                 if (pte_is_sysmem(pte)) {
                     physaddr_t physaddr = pte & PTE_ADDR;
 
-                    if (physaddr && (((physaddr >> 1) & PTE_ADDR) !=
-                                     (PTE_ADDR >> 1))) {
-                        free_batch.free(physaddr);
-                        ++freed;
-                    }
+                    free_batch.free(physaddr);
+                    ++freed;
                 }
 
                 distance = PAGE_SIZE;
@@ -2921,8 +2925,7 @@ uintptr_t mm_new_process(process_t *process)
 {
     // Allocate a page directory
     pte_t *dir = (pte_t*)mmap(nullptr, PAGE_SIZE,
-                              PROT_READ | PROT_WRITE,
-                              MAP_POPULATE, -1, 0);
+                              PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     // Copy upper memory mappings into new page directory
     std::copy(master_pagedir + 256, master_pagedir + 512, dir + 256);
@@ -2937,7 +2940,7 @@ uintptr_t mm_new_process(process_t *process)
     // Switch to new page directory
     cpu_page_directory_set(dir_physaddr);
 
-    cpu_tlb_flush();
+    //cpu_tlb_flush();
 
     mm_init_process(process);
 

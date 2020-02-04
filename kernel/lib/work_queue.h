@@ -118,7 +118,7 @@ public:
 
 private:
     friend class workq;
-    using lock_type = ext::mcslock;
+    using lock_type = ext::spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     struct work {
@@ -155,7 +155,7 @@ template<typename T>
 void workq::enqueue_on_all_barrier(T &&functor)
 {
     size_t cpu_count = thread_get_cpu_count();
-    ext::mcslock wait_lock;
+    workq_impl::lock_type wait_lock;
     std::condition_variable wait_done;
     size_t done_count = 0;
 

@@ -183,5 +183,7 @@ SECTIONS {
 	.debug_line		0 : { *(.debug_line)    } /*:NONE*/
 	.debug_str		0 : { *(.debug_str)     } /*:NONE*/
 	.debug_loc		0 : { *(.debug_loc)     } /*:NONE*/
-	.comment        0 : { *(.comment)       } /*:NONE*/
+	/*.comment        0 : { *(.comment)       } / *:NONE*/
+
+	/DISCARD/       : { *(.comment)       }
 }

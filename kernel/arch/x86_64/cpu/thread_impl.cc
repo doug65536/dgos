@@ -97,13 +97,13 @@ struct link_t {
 // Backed by bump allocator backed by page allocator with very large block
 using timestamp_t = uint64_t;
 // second here should be uintptr_t
-#ifndef NDEBUG
-// debugger displays thread nicely
-using ready_set_t = ext::fast_set<std::pair<uintptr_t, thread_info_t*>>;
-#else
+//#ifndef NDEBUG
+//// debugger displays thread nicely
+//using ready_set_t = ext::fast_set<std::pair<uintptr_t, thread_info_t*>>;
+//#else
 // might as well use the exact same one as contig_alloc
-using ready_map_t = ext::fast_set<std::pair<uintptr_t, uintptr_t>>;
-#endif
+using ready_set_t = ext::fast_set<std::pair<uintptr_t, uintptr_t>>;
+//#endif
 
 struct alignas(256) thread_info_t {
     // Exclusive line, frequently modified items, rarely shared
@@ -364,7 +364,7 @@ struct alignas(256) cpu_info_t {
 
     // --- cache line ---
 
-    using lock_type = ext::irq_mcslock;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type queue_lock;
@@ -493,7 +493,7 @@ static char *thread_allocate_stack(
     char *stack;
     stack = (char*)mmap(nullptr, stack_guard_size +
                         stack_size + stack_guard_size, PROT_NONE,
-                        MAP_UNINITIALIZED, -1, 0);
+                        MAP_UNINITIALIZED);
 
     if (unlikely(stack == MAP_FAILED))
         return nullptr;
@@ -770,17 +770,14 @@ void thread_idle()
 // Hardware interrupt handler (an IPI) to provoke other CPUs to reschedule
 static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
 {
-    // service the resume ring
-    size_t cpu_nr = thread_cpu_number();
-
     cpu_info_t::resume_ent_t resumed_data[4];
     size_t resumed_count = 0;
 
-    cpu_info_t& cpu = cpus[cpu_nr];
-    cpu_info_t::scoped_lock cpu_lock(cpu.queue_lock);
-    while (cpu.resume_tail != cpu.resume_head) {
-        resumed_data[resumed_count++] = cpu.resume_ring[cpu.resume_tail];
-        cpu.resume_tail = cpu_info_t::resume_next(cpu.resume_tail);
+    cpu_info_t *cpu = this_cpu();
+    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
+    while (cpu->resume_tail != cpu->resume_head) {
+        resumed_data[resumed_count++] = cpu->resume_ring[cpu->resume_tail];
+        cpu->resume_tail = cpu_info_t::resume_next(cpu->resume_tail);
     }
     cpu_lock.unlock();
 
@@ -825,9 +822,12 @@ void dump_ready_list(cpu_info_t& cpu)
             strcpy(ready_list_debug + ready_used, "...");
             break;
         }
+
+        thread_info_t *thread = (thread_info_t*)item.second;
+
         ready_used += snprintf(ready_list_debug + ready_used,
                                sizeof(ready_list_debug) - ready_used,
-                               " %u", item.second->thread_id);
+                               " %u", thread->thread_id);
     }
 
     printdbg("Ready list:%s\n", ready_list_debug);
@@ -914,7 +914,8 @@ void thread_init(int ap)
         thread->preempt_time = UINT64_MAX;
         thread->timeslice_timestamp = UINT64_MAX;
         thread->schedule_node = cpu.ready_list
-                .emplace(thread->timeslice_timestamp, thread)
+                .emplace(thread->timeslice_timestamp,
+                         ready_set_t::value_type::second_type(thread))
                 .first;
         //dump_ready_list(cpu);
         cpu_lock.unlock();
@@ -941,23 +942,6 @@ void thread_init(int ap)
     }
 }
 
-///
-/// struct sched_entry_t {
-///     // Timestamp when this thread should run again, in nanoseconds
-///     uint64_t run_ns;
-///     size_t thread_id;
-/// }
-///
-/// When a thread's timeslice expires, calculate
-///  now + (timeslice_duration * running_threads)
-/// and reinsert it into the scheduling set
-///
-/// When a thread voluntarily blocks, it is removed from the scheduling
-/// set, but when it unblocks, it regains the run_ns value it had when
-/// it blocked, making threads which have blocked longest get serviced first.
-///
-/// set<sched_entry_t>
-
 static thread_info_t *thread_choose_next(
         cpu_info_t *cpu,
         thread_info_t * const outgoing,
@@ -976,6 +960,8 @@ static thread_info_t *thread_choose_next(
          sleeping != en && sleeping->first <= now;
          sleeping = next) {
         thread_info_t *sleeping_thread = (thread_info_t*)sleeping->second;
+
+        printdbg("Sleep ended for tid=%d\n", sleeping_thread->thread_id);
 
         thread_state_t expect_state = (outgoing != sleeping_thread)
                 ? THREAD_IS_SLEEPING
@@ -1008,130 +994,6 @@ static thread_info_t *thread_choose_next(
     assert(ft->state == THREAD_IS_READY ||
            (ft->state == THREAD_IS_READY_BUSY && outgoing == ft));
     return ft;
-
-#if 0
-
-    size_t cpu_nr = cpu->cpu_nr;
-    size_t i = outgoing->thread_id;
-    thread_info_t *incoming = nullptr;
-    thread_info_t *candidate;
-    uint64_t now = 0;
-
-    assert(i < countof(threads));
-
-    thread_info_t &slih_thread = threads[cpu_count + cpu_nr];
-
-    // If the SLIH thread is ready, instantly choose that thread
-    if (unlikely(slih_thread.state == THREAD_IS_READY)) {
-        return threads + (cpu_count + cpu_nr);
-    }
-
-    // If the current thread is SLIH, and it is not ready, return to the
-    // interrupted thread
-    if (outgoing->thread_id >= thread_t(cpu_count) &&
-            outgoing->thread_id < thread_t(cpu_count * 2) &&
-            slih_thread.state != THREAD_IS_RUNNING) {
-        thread_info_t &return_thread = threads[cpu->slih_return];
-        if (return_thread.state == THREAD_IS_READY)
-            return &return_thread;
-    }
-
-    // Consider each thread, excluding idle threads
-    size_t count = thread_count - cpu_count;
-
-    for (size_t checked = 0; ++i, checked < count; ++checked) {
-        // Skip idle threads, or wrap to the first non-idle, non-SLIH thread
-        if (i < cpu_count || i >= thread_count)
-            i = cpu_count * 2;
-
-        // Ignore threads not currently running on this CPU
-        if (run_cpu[i] != cpu_nr)
-            continue;
-
-        candidate = threads + i;
-
-        // Quickly ignore running and suspended threads
-        if (candidate->state == THREAD_IS_RUNNING ||
-                candidate->state == THREAD_IS_UNINITIALIZED ||
-                candidate->state == THREAD_IS_EXITING)
-            continue;
-
-        // If this thread is not allowed to run on this CPU
-        // then skip it
-        if (unlikely(!(candidate->cpu_affinity[cpu_nr])))
-            continue;
-
-        // Garbage collect destructing threads
-        if (unlikely(candidate->state == THREAD_IS_DESTRUCTING)) {
-            if (atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
-                               THREAD_IS_EXITING) == THREAD_IS_DESTRUCTING) {
-                if (candidate->process->del_thread(candidate->thread_id))
-                    thread_signal_completion(candidate);
-            }
-            continue;
-        }
-
-        //
-        // Expect states to have busy bit set if it is the outgoing thread
-
-        thread_state_t expected_sleep = (outgoing == candidate)
-                ? THREAD_IS_SLEEPING_BUSY
-                : THREAD_IS_SLEEPING;
-
-        thread_state_t expected_ready = (outgoing == candidate)
-                ? THREAD_IS_READY_BUSY
-                : THREAD_IS_READY;
-
-        if (likely(candidate->state == expected_sleep)) {
-            // The thread is sleeping, see if it should wake up yet
-
-            // Infinite timeout?
-            if (likely(!candidate->wake_time))
-                continue;
-
-            // If we didn't get current time yet, get it
-            if (unlikely(now == 0))
-                now = time_ns();
-
-            // Not yet?
-            if (likely(now < candidate->wake_time))
-                continue;
-
-            // Race to transition it to ready
-            if (unlikely(atomic_cmpxchg(&candidate->state, expected_sleep,
-                                        expected_ready) != expected_sleep)) {
-                // Another CPU beat us to it
-                continue;
-            }
-        } else if (unlikely(candidate->state != expected_ready))
-            continue;
-
-        if (likely(incoming)) {
-            // Must be better than best
-            if (likely(candidate->priority + candidate->priority_boost >
-                       incoming->priority + incoming->priority_boost))
-                incoming = candidate;
-        } else if (likely(outgoing->state == THREAD_IS_READY_BUSY)) {
-            // Must be at least the same priority as outgoing
-            if (likely(candidate->priority + candidate->priority_boost >=
-                       outgoing->priority + outgoing->priority_boost))
-                incoming = candidate;
-        } else {
-            // Outgoing thread is not ready, any thread is better
-            incoming = candidate;
-        }
-    }
-
-    // Did not find any ready thread, choose idle thread
-    if (unlikely(!incoming))
-        incoming = threads + cpu_nr;
-
-    assert(incoming
-           ? incoming >= threads && incoming <= threads + countof(threads)
-           : outgoing >= threads && outgoing <= threads + countof(threads));
-
-    return incoming;
-#endif
 }
 
 static void thread_clear_busy(void *outgoing)
@@ -1378,9 +1240,8 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         cpu_debug_break();
         pause();
     }
-    now = time_ns();
 
-    // Program rescheduling interrupt
+    // Program rescheduling interrupt for remainder of timeslice
     uint64_t timeslice = thread->preempt_time > thread->used_time
             ? thread->preempt_time - thread->used_time
             : 32000000;
@@ -1401,13 +1262,19 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 
     // If the sleep queue requires preempting earlier,
     // then preempt earlier
-    if (next_sleep_expiry < UINT64_MAX &&
-            timeslice > next_sleep_expiry - now)
-        timeslice = next_sleep_expiry - now;
+    if (next_sleep_expiry < UINT64_MAX) {
+        assert(next_sleep_expiry > now);
+        if (timeslice > next_sleep_expiry - now)
+            timeslice = next_sleep_expiry - now;
+    }
 
-    if (timeslice < UINT64_MAX)
+    if (timeslice < UINT64_MAX) {
+//        printdbg("Setting timeslice to %" PRIx64 "\n", timeslice);
         thread_set_timer(cpu->apic_dcr, timeslice);
-//    else
+//    } else {
+//        printdbg("Setting infinite timeslice\n");
+    }
+    //    else
 //        printdbg("Went tickless on thread %u\n", thread->thread_id);
 
     fpu_state_t& fpu_state = cpu->fpu_state;
@@ -1922,8 +1789,7 @@ void thread_send_ipi(int cpu, int intr)
 
 EXPORT uint32_t thread_cpu_number()
 {
-    cpu_info_t *cpu = this_cpu();
-    return cpu->cpu_nr;
+    return cpu_gs_read<uint32_t, offsetof(cpu_info_t, cpu_nr)>();
 }
 
 _hot
@@ -1990,10 +1856,10 @@ void *thread_get_gsbase(int thread)
     return nullptr;
 }
 
-void thread_set_process(int thread, process_t *process)
+void thread_set_process(int tid, process_t *process)
 {
-    thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
-    info->process = process;
+    thread_info_t *thread = tid >= 0 ? threads + tid : this_thread();
+    thread->process = process;
 }
 
 void thread_tss_ready(void*)
@@ -2098,38 +1964,6 @@ void thread_add_cpu_irq_time(uint64_t tsc_ticks)
     atomic_add((cpu_gs_ptr<uint64_t, offsetof(cpu_info_t, irq_time)>()),
                tsc_ticks);
 }
-
-//void thread_info_t::awaken(cpu_info_t *cpu, uint64_t now)
-//{
-//    // If thread has nothing, then replenish timeslice
-//    if (timeslice_remaining == 0) {
-//        timeslice_timestamp = now;
-//        timeslice_remaining = 16666666;
-//    }
-
-//    // If enough time has elapsed for the thread to have gotten another
-//    // timeslice by now, and the thread doesn't have a full timeslice,
-//    // then add a full timeslice on top of what they had
-//    // This gives enough to catch up if they slept less than one timeslice
-//    if (now >= timeslice_timestamp + 16666666 &&
-//            timeslice_remaining < 16666666) {
-//        timeslice_remaining += 16666666;
-//    }
-
-//    // Find insertion point
-//    link_t *ins;
-//    for (ins = cpu->ready_list.next; ins != &cpu->ready_list;
-//         ins = ins->next) {
-//        auto thread = ins->container<thread_info_t>(ins);
-//        if (thread->timeslice_timestamp > timeslice_timestamp)
-//            break;
-//    }
-
-//    link.prev = ins->prev;
-//    link.next = ins;
-//    link.prev->next = &link;
-//    link.next->prev = &link;
-//}
 
 void thread_cls_init_early(int ap)
 {

@@ -34,6 +34,7 @@ SECTIONS {
 	.debug_line		0 : { *(.debug_line)    }
 	.debug_str		0 : { *(.debug_str)     }
 	.debug_loc		0 : { *(.debug_loc)     }
-	.comment        0 : { *(.comment)       }
+	/*.comment        0 : { *(.comment)       }*/
 
+	/DISCARD/       : { *(.comment)       }
 }

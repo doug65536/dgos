@@ -17,8 +17,6 @@ define startupbreakpoints
 		#UD
 		b isr_entry_6
 		b vpanic
-		b unittest::unit::fail
-		b unittest::unit::failed
 		b validate_failed
 	end
 
@@ -27,6 +25,7 @@ define startupbreakpoints
 		printf "Loading %s at 0x%lx",$rdi,$rsi
 		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
 	end
+	set may-call-functions off
 end
 
 define walkstack
@@ -228,7 +227,7 @@ define walkunwind
 		set $ctx = threads[$tid].ctx
 		if $ctx
 			printf "\n"
-			printf "Unwinding thread %d state=0x%x -----------------------------------------------\n", $tid, threads[$tid].state
+			printf "Unwinding thread %d runcpu=%d state=0x%x -----------------------------------------------\n", $tid, threads[$tid].state, run_cpu[$tid]
 			python
 try:
 	gdb.execute("walkunwind_ctx $ctx.gpr")

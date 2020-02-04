@@ -2,7 +2,6 @@
 
 #include "kmodule.h"
 #include "pci.h"
-
 PCI_DRIVER_BY_CLASS(
         ahci,
         PCI_DEV_CLASS_STORAGE, PCI_SUBCLASS_STORAGE_SATA,
@@ -25,6 +24,7 @@ PCI_DRIVER_BY_CLASS(
 #include "unique_ptr.h"
 #include "inttypes.h"
 #include "work_queue.h"
+#include "engunit.h"
 
 #define AHCI_DEBUG  1
 #if AHCI_DEBUG
@@ -1215,9 +1215,15 @@ isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
     return ctx;
 }
 
+// Measured KVM 3950X 3.2µs with dips to 2.7µs
 uint32_t ahci_if_t::mmio_read_intr_status()
 {
-    return mmio_base->intr_status;
+//    uint64_t st = time_ns();
+    uint32_t intr_status = mmio_base->intr_status;
+//    uint64_t en = time_ns();
+//    uint64_t el = en - st;
+//    printdbg("AHCI read intr status %ss\n", engineering_t(el, -3).ptr());
+    return intr_status;
 }
 
 void ahci_if_t::mmio_irq_acknowledge_port(unsigned port_num)
@@ -1354,7 +1360,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
     mmio_base = (hba_host_ctl_t*)
             mmap((void*)pci_dev.config.get_bar(5),
             0x1100, PROT_READ | PROT_WRITE,
-            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
 
     // 10.1.2 System Software Specific Initialization
 
@@ -1741,16 +1747,26 @@ void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
     mmio_write_command_issue(port, slot);
 }
 
+// Measured in KVM 3950X about 2.5µs, with spikes up to 17µs
 void ahci_if_t::mmio_write_sata_act(
         hba_port_t volatile *port, unsigned slot)
 {
+//    uint64_t st = time_ns();
     atomic_st_rel(&port->sata_act, (UINT32_C(1) << slot));
+//    uint64_t en = time_ns();
+//    uint64_t el = en - st;
+//    printdbg("Write sata-act %ss\n", engineering_t(el, -3).ptr());
 }
 
+// Measured KVM 3950X 6µs-11µs
 void ahci_if_t::mmio_write_command_issue(
         hba_port_t volatile *port, unsigned slot)
 {
+//    uint64_t st = time_ns();
     atomic_st_rel(&port->cmd_issue, (UINT32_C(1) << slot));
+//    uint64_t en = time_ns();
+//    uint64_t el = en - st;
+//    printdbg("AHCI write command issue %ss\n", engineering_t(el, -3).ptr());
 }
 
 // The command engine must be stopped before calling port_reset
@@ -1850,7 +1866,7 @@ void ahci_if_t::rebase()
 
         buffers = mmap(nullptr, port_buffer_size,
                              PROT_READ | PROT_WRITE,
-                             addr_type, -1, 0);
+                             addr_type);
         memset(buffers, 0, port_buffer_size);
 
         hba_cmd_hdr_t *cmd_hdr = (hba_cmd_hdr_t *)buffers;

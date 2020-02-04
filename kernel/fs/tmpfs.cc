@@ -122,15 +122,23 @@ private:
         file.nlink = hdr->nlink;
 
         char const *name = hdr->name();
+        if (hdr->namesize == 11 &&
+                name[0] == 'T' &&
+                name[10] == '!' &&
+                !memcmp(name, "TRAILER!!!", hdr->namesize))
+            return nullptr;
+
         for (size_t i = 0, e = hdr->namesize; i < e; ++i) {
             if (unlikely(!names.push_back(name[i])))
                 return nullptr;
         }
 
+
         if (unlikely(!files.push_back(file)))
             return nullptr;
 
         TMPFS_TRACE("added %s\n", hdr->name());
+
         return hdr->next(en);
     }
 

@@ -57,7 +57,7 @@ __BEGIN_DECLS
 #define MAP_ANONYMOUS       0x00000200
 
 // Undefined flag mask
-#define MAP_INVALID_MASK    0x001FFC00
+#define MAP_INVALID_MASK    0x001FF800
 
 // Allowed in user mode
 #define MAP_USER_MASK       0x000003FF
@@ -113,8 +113,8 @@ void *mmap(void *__addr,
         size_t __len,
         int __prot,
         int __flags,
-        int __fd,
-        off_t __offset);
+        int __fd = -1,
+        off_t __offset = 0);
 
 /// Unmap a range of address space
 /// Unmap the range from __addr to __len

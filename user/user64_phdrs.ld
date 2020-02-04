@@ -147,4 +147,6 @@ SECTIONS {
 	.debug_loc		0 : { *(.debug_loc)     } :NONE
 	.comment        0 : { *(.comment)       } :NONE
 */
+
+	/DISCARD/       : { *(.comment)       }
 }

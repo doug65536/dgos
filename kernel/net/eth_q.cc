@@ -43,7 +43,7 @@ EXPORT int ethq_init(void)
 
     ethq_pkts = (ethq_pkt2K_t*)mmap(nullptr, ethq_pool_size,
                           PROT_READ | PROT_WRITE,
-                          MAP_POPULATE | MAP_32BIT, -1, 0);
+                          MAP_POPULATE | MAP_32BIT);
     if (!ethq_pkts || ethq_pkts == MAP_FAILED)
         return 0;
 

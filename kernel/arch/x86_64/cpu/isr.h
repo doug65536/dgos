@@ -296,8 +296,10 @@ void isr_restore_fpu_ctx64(thread_info_t *incoming_ctx);
 isr_fxsave_context_t *isr_save_fpu_ctx32(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx32(thread_info_t *incoming_ctx);
 
-void protection_barrier();
+void protection_barrier_from_user();
+void protection_barrier_to_user();
 void protection_barrier_ibpb();
+void protection_barrier_verw();
 
 void cpu_clear_fpu();
 

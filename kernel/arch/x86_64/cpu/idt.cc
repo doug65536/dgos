@@ -5,7 +5,7 @@
 #include "irq.h"
 #include "gdt.h"
 #include "cpu.h"
-#include "cpuid.h"
+#include "cpu/cpuid.h"
 #include "conio.h"
 #include "printk.h"
 #include "cpu/halt.h"
@@ -26,6 +26,8 @@ C_ASSERT(SYSCALL_RFLAGS == (CPU_EFLAGS_IF | 2));
 // Enforce that we don't try to set any flags bits that
 // will be cleared anyway on sysret
 C_ASSERT((SYSCALL_RFLAGS & ~uintptr_t(0x3C7FD7)) == 0);
+
+intr_handler_t isr_lookup[256];
 
 idt_entry_64_t idt[256];
 
@@ -169,6 +171,37 @@ static void idtr_load(table_register_64_t *table_reg)
 }
 #endif
 
+extern "C" isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx);
+extern "C" isr_context_t *pic8259_dispatcher(int intr, isr_context_t *ctx);
+extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
+extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx);
+
+_constructor(ctor_ctors_ran)
+static void isr_lookup_init()
+{
+    // Interrupt dispatch
+    // 0x00-0x1F -> exception_isr_handler
+    // 0x20-0x2F -> intr_invoke
+    // 0x30-0xEF -> apic_dispatcher
+    // 0xF0-0xFF -> pic_dispatcher
+
+    for (size_t i = 0; i < 0x20; ++i)
+        isr_lookup[i] = exception_isr_handler;
+
+    // Couple of special cases
+    isr_lookup[INTR_EX_GPF] = cpu_gpf_handler;
+    isr_lookup[INTR_EX_PAGE] = mmu_page_fault_handler;
+
+    for (size_t i = 0x20; i < INTR_APIC_DSP_BASE; ++i)
+        isr_lookup[i] = intr_invoke;
+
+    for (size_t i = INTR_APIC_DSP_BASE; i < 0xF0; ++i)
+        isr_lookup[i] = apic_dispatcher;
+
+    for (size_t i = 0xF0; i < 0xF0 + 16; ++i)
+        isr_lookup[i] = pic8259_dispatcher;
+}
+
 // Assume the worst
 xsave_support_t xsave_support = xsave_support_t::FXSAVE;
 
@@ -288,17 +321,17 @@ void idt_ist_adjust(int cpu, size_t ist, ptrdiff_t adj)
         tss_list[cpu].ist[ist] += adj;
 }
 
-isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx)
-{
-    assert(intr == INTR_EX_DEBUG);
-    //printdbg("Ignored debug exception\n");
-    return ctx;
-}
+//isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx)
+//{
+//    assert(intr == INTR_EX_DEBUG);
+//    //printdbg("Ignored debug exception\n");
+//    return ctx;
+//}
 
-isr_context_t *opcode_exception_handler(int intr, isr_context_t *ctx)
-{
-    return nullptr;
-}
+//isr_context_t *opcode_exception_handler(int intr, isr_context_t *ctx)
+//{
+//    return nullptr;
+//}
 
 extern char ___isr_st[];
 
@@ -364,11 +397,11 @@ int idt_init(int ap)
         //idt[INTR_EX_GPF].ist = 4;
         //idt[INTR_EX_PAGE].ist = 5;
 
-        intr_hook(INTR_EX_DEBUG, debug_exception_handler,
-                  "debug", eoi_none);
+//        intr_hook(INTR_EX_DEBUG, debug_exception_handler,
+//                  "debug", eoi_none);
 
-        intr_hook(INTR_EX_OPCODE, opcode_exception_handler,
-                  "#UD", eoi_none);
+//        intr_hook(INTR_EX_OPCODE, opcode_exception_handler,
+//                  "#UD", eoi_none);
     }
 
     table_register_64_t idtr;
@@ -829,7 +862,7 @@ void idt_clone_debug_exception_dispatcher(void)
 
     char *clone = (char*)mmap(nullptr, isr_size,
                               PROT_READ | PROT_WRITE | PROT_EXEC,
-                              MAP_POPULATE, -1, 0);
+                              MAP_POPULATE);
     if (unlikely(clone == MAP_FAILED))
         panic_oom();
 

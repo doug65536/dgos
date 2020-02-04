@@ -626,7 +626,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
 
     pt = (iso9660_pt_rec_t *)mmap(
                 nullptr, pt_alloc_size, PROT_READ | PROT_WRITE,
-                MAP_POPULATE, -1, 0);
+                MAP_POPULATE);
     if (pt == MAP_FAILED)
         return false;
 
@@ -640,7 +640,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
     // Allocate path table entry pointer array
     pt_ptrs = (iso9660_pt_rec_t **)mmap(
                 nullptr, sizeof(*pt_ptrs) * pt_count,
-                PROT_READ | PROT_WRITE, 0, -1, 0);
+                PROT_READ | PROT_WRITE, 0);
     if (pt_ptrs == MAP_FAILED)
         return false;
 

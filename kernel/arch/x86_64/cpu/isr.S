@@ -169,24 +169,22 @@ isr_entry 0 29
 isr_entry 0 30
 isr_entry 0 31
 
-// Critical priority interrupts
-isr_entry 0 INTR_APIC_SPURIOUS
-isr_entry 0 INTR_APIC_ERROR
-isr_entry 0 INTR_APIC_THERMAL
+// Software interrupts
+isr_entry 0 INTR_THREAD_YIELD
 
-// Reserved for future critical priority interrupts
+isr_entry 0 33
+isr_entry 0 34
 isr_entry 0 35
 isr_entry 0 36
 isr_entry 0 37
 isr_entry 0 38
 isr_entry 0 39
 
-// Very high priority interrupts
 isr_entry 0 40
-isr_entry 0 41
-isr_entry 0 42
-isr_entry 0 43
-// Hitching ride on EOI logic by being adjacent to IOAPIC/MSI vector range
+// Very high priority interrupts
+isr_entry 0 INTR_APIC_SPURIOUS
+isr_entry 0 INTR_APIC_ERROR
+isr_entry 0 INTR_APIC_THERMAL
 isr_entry 0 INTR_APIC_TIMER
 isr_entry 0 INTR_IPI_TLB_SHTDN
 isr_entry 0 INTR_IPI_RESCHED
@@ -590,9 +588,9 @@ isr_common:
 
     // Flush indirect branch prediction data because the cpu
     // is tainted by user mode process
-    // This could be patched to a long nop
+    // This could be patched to a long nop or call to something else
     insn_fixup
-    call protection_barrier
+    call protection_barrier_from_user
 
     mov %gs:CPU_INFO_CURTHREAD_OFS(%rdi),%r12
 
@@ -618,42 +616,10 @@ isr_common:
     movq %rsp,%r12
     movzbl frame_intr(%rbp),%ebx
 
-    // Interrupt dispatch
-    // 0x00-0x1F -> exception_isr_handler
-    // 0x20-0x2F -> intr_invoke
-    // 0x30-0xEF -> apic_dispatcher
-    // 0xF0-0xFF -> pic_dispatcher
-
-    // 0x00-0x1F -> exception_isr_handler
-    leaq exception_isr_handler(%rip),%rax
-
-    // Fast path page fault
-    leaq mmu_page_fault_handler(%rip),%rcx
-    cmpl $ INTR_EX_PAGE,%ebx
-    cmoveq %rcx,%rax
-
-    // 0x20-0x2F -> intr_invoke
-    leaq intr_invoke(%rip),%rcx
-    cmpl $ INTR_SOFT_BASE,%ebx
-    cmovaeq %rcx,%rax
-
-    // 0x30-0xEF -> apic_dispatcher
-    leaq apic_dispatcher(%rip),%rcx
-    cmpl $ INTR_APIC_DSP_BASE,%ebx
-    cmovaeq %rcx,%rax
-
-    // 0xF0-0xFF -> pic_dispatcher
-    leaq pic8259_dispatcher(%rip),%rcx
-    cmpl $ INTR_PIC1_IRQ_BASE,%ebx
-    cmovaeq %rcx,%rax
-
-    // Pass intr, 1st parameter
-    // Pass context pointer, 2nd parameter
+    leaq isr_lookup(%rip),%rax
     movl %ebx,%edi
     movq %r12,%rsi
-
-    // Call handler
-    indirect_call rax
+    callq *(%rax,%rbx,8)
 
     // If context pointer is null, invoke the exception handler for this thread
     test %rax,%rax
@@ -814,10 +780,14 @@ isr_common:
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
 
+    testb $ 3,frame_cs(%rsp)
+    jz .Lnot_iret_to_user
+
     // This could be patched to a long nop
     insn_fixup
-    call protection_barrier
+    call protection_barrier_to_user
 
+.Lnot_iret_to_user:
     adj_rsp 16
 
     fn_trace isr_common,exit
@@ -1314,11 +1284,19 @@ isr_restore_fpu_ctx32:
     xrstor_ctx fxrstor
 
 .balign 16
-.hidden protection_barrier
-.global protection_barrier
-protection_barrier:
+.hidden protection_barrier_from_user
+.global protection_barrier_from_user
+protection_barrier_from_user:
     // Might be called early, but later, calls to this are NOP'd out
     // Just return if it is getting called before patching to IBPB version
+    ret
+
+.balign 16
+.hidden protection_barrier_to_user
+.global protection_barrier_to_user
+protection_barrier_to_user:
+    // Might be called early, but later, calls to this are NOP'd out
+    // Just return if it is getting called before patching to MDS clear version
     ret
 
 .hidden protection_barrier_ibpb
@@ -1354,17 +1332,29 @@ protection_barrier_verw:
     .cfi_startproc
 
     pushfq_cfi
-    push_cfi %rax
-    movl $ GDT_SEL_KERNEL_DATA,%eax
-    verw %ax
-    pop_cfi %rax
+
+    // Must be memory operand
+    push_cfi $GDT_SEL_KERNEL_DATA
+
+    // Don't start flushing until everything before completes
+    lfence
+
+    verw (%rsp)
+    addq $ 8,%rsp
+
     popfq_cfi
+
+    // Stall issue until verw completes flushing
+    lfence
+
     ret
 
     .cfi_endproc
 
 // on entry, rbp=frame, ebx=intr, r12=ctx
 .balign 16
+.hidden exception_isr_handler
+.global exception_isr_handler
 exception_isr_handler:
     .cfi_startproc
     .cfi_signal_frame
@@ -1547,6 +1537,7 @@ isr_sysret64:
     .cfi_undefined r14
     .cfi_undefined r15
     // goto user mode with rip=rcx and load rflags=r11, cs and ss from STAR MSR
+    // interrupts will be reenabled due to restoring their flags
 
     sysretq
 

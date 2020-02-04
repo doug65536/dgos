@@ -214,7 +214,7 @@ int keybd_event(keyboard_event_t event)
 }
 
 keyboard_event_t keybd_waitevent(
-        std::chrono::high_resolution_clock::time_point const& timeout_time)
+        std::chrono::steady_clock::time_point const& timeout_time)
 {
     keyboard_event_t event{};
 
@@ -235,7 +235,7 @@ keyboard_event_t keybd_waitevent(
 
 keyboard_event_t keybd_waitevent()
 {
-    return keybd_waitevent(std::chrono::high_resolution_clock::
+    return keybd_waitevent(std::chrono::steady_clock::
                            time_point::max());
 }
 

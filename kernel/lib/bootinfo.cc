@@ -20,7 +20,7 @@ static void bootinfo_remap(void*)
 {
     kernel_params = (kernel_params_t*)mmap(
                 kernel_params, sizeof(*kernel_params),
-                PROT_READ | PROT_WRITE, MAP_PHYSICAL, -1, 0);
+                PROT_READ | PROT_WRITE, MAP_PHYSICAL);
     if (unlikely(kernel_params == MAP_FAILED))
         panic_oom();
 }

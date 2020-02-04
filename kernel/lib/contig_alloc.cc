@@ -475,8 +475,6 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
                                                 pred.first});
             assert(n == 1);
 
-            //free_addr_by_addr.dump("after erasing interfering node");
-
             // Extract the new node
             ins_node = free_addr_by_addr.extract(ins.first);
             assert(bool(ins_node));
@@ -592,14 +590,15 @@ EXPORT void contiguous_allocator_t::dump_lockedv(
     printdbg("\nBy addr\n");
     for (tree_t::const_iterator st = free_addr_by_addr.begin(),
          en = free_addr_by_addr.end(), it = st, prev; it != en; ++it) {
-        engineering_t eng(it->second);
+        engineering_t eng(it->second, 0, 1024);
 
         if (it != st && prev->first + prev->second < it->first) {
             printdbg("---  addr=%#zx, size=%#zx (%sB)\n",
                      prev->first + prev->second, it->first -
                      (prev->first + prev->second),
                      engineering_t(it->first -
-                                   (prev->first + prev->second)).ptr());
+                                   (prev->first + prev->second),
+                                   0, 1024).ptr());
         }
 
 

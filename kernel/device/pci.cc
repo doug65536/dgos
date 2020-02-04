@@ -1015,11 +1015,11 @@ EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
 
         pci_msix64_t volatile *tbl = (pci_msix64_t*)
                 mmap((void*)(tbl_base & -16), tbl_sz, PROT_READ | PROT_WRITE,
-                     MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                     MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
 
         uint32_t volatile *pba = (uint32_t*)
                 mmap((void*)(pba_base & -16), pba_sz, PROT_READ | PROT_WRITE,
-                     MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                     MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
 
         pcix_tables.emplace_back(addr, pci_msix_mappings{
                                      tbl, pba, tbl_sz, pba_sz });
@@ -1241,7 +1241,7 @@ void pci_init_ecam_entry(uint64_t base, uint16_t seg,
 {
     char *mapping = (char*)mmap((void*)base, uint64_t(en_bus - st_bus) << 20,
                          PROT_READ | PROT_WRITE,
-                         MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                         MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
     assert(mapping != MAP_FAILED);
     pci_ecam_list.push_back(pci_ecam_t{base, mapping, seg, st_bus, en_bus});
 }

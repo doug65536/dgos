@@ -95,8 +95,8 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 return false;
 
             common_cfg = (virtio_pci_common_cfg_t*)mmap(
-                        (void*)bar, cap_rec.length, PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL, -1, 0);
+                        (void*)bar, cap_rec.length,
+                        PROT_READ | PROT_WRITE, MAP_PHYSICAL);
 
             // 4.1.4.3 Reset the device
             common_cfg->device_status = 0;
@@ -248,7 +248,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             notify_cap = (virtio_pci_notify_cap_t *)mmap(
                         (void*)notify_paddr, cap_rec.length,
                         PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
             if (unlikely(notify_cap == MAP_FAILED)) {
                 notify_cap = nullptr;
                 notify_cap_size = 0;
@@ -264,7 +264,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             // no, qemu broke virtio almost entirely, broken all the way
             // to always using pin interrupts
             isr_status = (uint32_t*)mmap((void*)bar, sizeof(uint32_t),
-                                         PROT_READ, MAP_PHYSICAL, -1, 0);
+                                         PROT_READ, MAP_PHYSICAL);
             break;
 
         case VIRTIO_PCI_CAP_DEVICE_CFG:
@@ -272,7 +272,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
             device_cfg = (virtio_pci_common_cfg_t*)mmap(
                         (void*)bar, cap_rec.length, PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL, -1, 0);
+                        MAP_PHYSICAL);
 
             break;
 
@@ -340,7 +340,7 @@ bool virtio_virtqueue_t::init(
 
     if (single_page) {
         char *buffer = (char*)mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
-                                   MAP_POPULATE, -1, 0);
+                                   MAP_POPULATE);
         if (buffer == MAP_FAILED)
             return false;
 
@@ -355,7 +355,7 @@ bool virtio_virtqueue_t::init(
     } else {
         desc_tab = (desc_t*)mmap(
                     nullptr, sizeof(desc_t) << log2_queue_size,
-                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                    PROT_READ | PROT_WRITE, MAP_POPULATE);
         if (desc_tab == MAP_FAILED)
             return false;
 
@@ -363,7 +363,7 @@ bool virtio_virtqueue_t::init(
                     nullptr, sizeof(ring_hdr_t) +
                     (sizeof(avail_t) << log2_queue_size) +
                     sizeof(ring_ftr_t),
-                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                    PROT_READ | PROT_WRITE, MAP_POPULATE);
         if (avail_hdr == MAP_FAILED)
             return false;
 
@@ -371,7 +371,7 @@ bool virtio_virtqueue_t::init(
                     nullptr, sizeof(ring_hdr_t) +
                     (sizeof(used_t) << log2_queue_size) +
                     sizeof(ring_ftr_t),
-                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                    PROT_READ | PROT_WRITE, MAP_POPULATE);
         if (used_hdr == MAP_FAILED)
             return false;
 

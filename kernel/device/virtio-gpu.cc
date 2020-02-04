@@ -989,7 +989,7 @@ bool virtio_gpu_dev_t::resize_backing(uint32_t new_w, uint32_t new_h,
         } else {
             new_backbuf = (uint32_t*)mmap(nullptr, new_sz,
                                           PROT_READ | PROT_WRITE,
-                                          MAP_POPULATE, -1, 0);
+                                          MAP_POPULATE);
         }
         if (unlikely(new_backbuf == MAP_FAILED))
             return false;

@@ -23,7 +23,7 @@ int sys_init_module(char const *module, ptrdiff_t module_sz,
 
     if (unlikely(!mem.mmap(nullptr, module_sz,
                            PROT_READ | PROT_WRITE,
-                           MAP_POPULATE, -1, 0)))
+                           MAP_POPULATE)))
         return -int(errno_t::ENOMEM);
 
     if (unlikely(!mm_copy_user(mem, module, module_sz)))

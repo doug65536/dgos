@@ -51,7 +51,7 @@ public:
     using rep = _Rep;
     using period = _Period;
 
-    duration(rep __tick_count);
+    inline duration(rep __tick_count);
 
     duration(duration const& rhs);
 
@@ -157,7 +157,7 @@ duration<_Rep,_Period>::duration(duration const& rhs)
 }
 
 template<typename _Rep, typename _Period>
-duration<_Rep,_Period>::duration(rep __tick_count)
+inline duration<_Rep,_Period>::duration(rep __tick_count)
     : __tick_count(__tick_count)
 {
 }
@@ -425,8 +425,12 @@ using sys_seconds = sys_time<seconds>;
 // System time time_point in days since epoch
 //using sys_days = sys_time<days>;
 
+// Inline because it is frequently used to construct infinite timeout timepoint
+// This entire function becomes movq $-1,%reg in an instruction
+// sending a parameter
 template<typename _Clock, typename _Duration>
-constexpr time_point<_Clock, _Duration> time_point<_Clock, _Duration>::max()
+inline constexpr time_point<_Clock, _Duration>
+time_point<_Clock, _Duration>::max()
 {
     return time_point(std::numeric_limits<std::chrono::
                       high_resolution_clock::duration::rep>::max());

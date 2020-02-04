@@ -254,7 +254,7 @@ int process_t::run()
 
         if (unlikely(last_region_sz &&
                      mmap((void*)last_region_st, last_region_sz, page_prot,
-                          MAP_USER | MAP_NOCOMMIT, -1, 0) == MAP_FAILED)) {
+                          MAP_USER | MAP_NOCOMMIT) == MAP_FAILED)) {
             printdbg("Failed to reserve %#" PRIx64
                      " bytes of address space"
                      " with protection %d"
@@ -325,7 +325,7 @@ int process_t::run()
     size_t stack_size = 65536;
     char *stack_memory = (char*)mmap(
                 nullptr, stack_size, PROT_NONE,
-                MAP_STACK | MAP_NOCOMMIT | MAP_USER, -1, 0);
+                MAP_STACK | MAP_NOCOMMIT | MAP_USER);
 
     if (unlikely(stack_memory == MAP_FAILED)) {
         printdbg("Failed to allocate user stack\n");
@@ -356,7 +356,7 @@ int process_t::run()
     static_assert(sizeof(uintptr_t) == sizeof(void*), "Unexpected size");
     // The space for the uintptr_t is for the pointer to itself at TLS offset 0
     size_t tls_vsize = PAGE_SIZE + sizeof(uintptr_t) + tls_msize + PAGE_SIZE;
-    void *tls = mmap(nullptr, tls_vsize, PROT_NONE, MAP_USER, -1, 0);
+    void *tls = mmap(nullptr, tls_vsize, PROT_NONE, MAP_USER);
     if (tls == MAP_FAILED)
         return -1;
 

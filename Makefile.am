@@ -1708,11 +1708,11 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
 	$(OPTIMIZE_SPEED_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(SANITIZE_UNDEFINED_FLAGS) \
-	$(WARN_STACK_USAGE_FLAGS) \
-	-ftls-model=global-dynamic
+	$(WARN_STACK_USAGE_FLAGS)
 
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_RTTI_FLAGS)

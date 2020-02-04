@@ -195,12 +195,12 @@ SECTIONS {
 	/* . = ALIGN(4K); */
 
 	/* Initialized data */
-	.data ALIGN(8) : {
+	.data : {
 		*(.data)
 		*(SORT(.data.*))
 	} :data
 
-	.bss ALIGN(8) : {
+	.bss : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(.dynbss)

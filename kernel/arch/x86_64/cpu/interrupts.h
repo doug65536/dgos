@@ -55,20 +55,20 @@
 
 // Vectors >= 32 go through generic intr_invoke codepath
 #define INTR_SOFT_BASE      32
+#define INTR_THREAD_YIELD   32
 
-// Spurious vector must be aligned to 8 on really old processors
-#define INTR_APIC_SPURIOUS  32
-#define INTR_APIC_ERROR     33
-#define INTR_APIC_THERMAL   34
-// 35-39 reserved
+// 33-40 reserved
 
+// Everything below here needs LAPIC EOI
+#define INTR_APIC_DSP_BASE  40
 // Not really used, but yielded context is written using this interrupt number
-#define INTR_THREAD_YIELD   40
-// 41-43 reserved
+// Spurious vector must be aligned to 8 on really old processors
+#define INTR_APIC_SPURIOUS  41
+#define INTR_APIC_ERROR     42
+#define INTR_APIC_THERMAL   43
 
 // Vectors >= 44 go through apic_dispatcher codepath
 // Relatively hot area of the IDT, cache line aligned
-#define INTR_APIC_DSP_BASE  44
 #define INTR_APIC_TIMER     44
 #define INTR_IPI_TLB_SHTDN  45
 #define INTR_IPI_RESCHED    46
@@ -78,8 +78,11 @@
 #define INTR_APIC_IRQ_BASE  48
 #define INTR_APIC_IRQ_END   239
 #define INTR_APIC_IRQ_COUNT (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1)
+// Everything above here needs LAPIC EOI
 
+// Everything below here needs PIC EOI
 // Vectors >= 240 go through pic_dispatcher codepath
 // PIC IRQs 0xF0-0xFF
 #define INTR_PIC1_IRQ_BASE  240
 #define INTR_PIC2_IRQ_BASE  248
+// Everything above here needs PIC EOI

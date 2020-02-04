@@ -6,7 +6,7 @@ DISABLED_UNITTEST(test_mm_copy_user_from_null)
 {
     uint8_t *m = (uint8_t*)mm_alloc_space(PAGE_SIZE * 3);
     mmap(m + PAGE_SIZE, PAGE_SIZE,
-         PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+         PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     for (size_t st = 0; st < PAGE_SIZE; ++st) {
         if (st > 256 && st < PAGE_SIZE - 256)
@@ -40,11 +40,11 @@ UNITTEST(test_mm_copy_user)
 {
     uint8_t *m = (uint8_t*)mm_alloc_space(PAGE_SIZE * 3);
     mmap(m + PAGE_SIZE, PAGE_SIZE,
-         PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+         PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     uint8_t *s = (uint8_t*)mmap(nullptr, PAGE_SIZE,
                                 PROT_READ | PROT_WRITE,
-                                MAP_POPULATE, -1, 0);
+                                MAP_POPULATE);
 
     for (size_t st = 0; st < 256; ++st)
         s[st] = st + (st >> 8);

@@ -368,7 +368,7 @@ public:
             panic("Insufficient contiguous memory!\n");
 
         identify_data = mmap((void*)identify_data_physaddr, 4096,
-                             PROT_READ, MAP_PHYSICAL, -1, 0);
+                             PROT_READ, MAP_PHYSICAL);
 
         NVME_TRACE("namespace identify data at vaddr=%p\n", identify_data);
 
@@ -669,7 +669,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     mmio_base = (nvme_mmio_t*)mmap(
                 (void*)(addr & -8),
                 0x2000, PROT_READ | PROT_WRITE,
-                MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
 
     // 7.6.1 Initialization
 
@@ -738,8 +738,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
 
     queue_memory = mmap(
                 (void*)queue_memory_physaddr, queue_bytes,
-                PROT_READ | PROT_WRITE,
-                MAP_PHYSICAL, -1, 0);
+                PROT_READ | PROT_WRITE, MAP_PHYSICAL);
 
     memset(queue_memory, 0, queue_bytes);
 
@@ -841,8 +840,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     uintptr_t identify_physaddr = mm_alloc_contiguous(4096);
 
     void* identify = mmap((void*)identify_physaddr, 4096,
-                          PROT_READ | PROT_WRITE,
-                          MAP_PHYSICAL, -1, 0);
+                          PROT_READ | PROT_WRITE, MAP_PHYSICAL);
 
     // 5.11 Execute identify controller command
     admin_queue.submit_cmd(nvme_cmd_t::create_identify(identify, 1, 0),
@@ -1236,7 +1234,7 @@ void nvme_queue_state_t::init(
     // Allocate enough memory for 16 PRP list entries per slot
     prp_lists = (uint64_t*)mmap(
                 nullptr, count * sizeof(*prp_lists) * 16,
-                PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                PROT_READ | PROT_WRITE, MAP_POPULATE);
 }
 
 void nvme_queue_state_t::submit_cmd(

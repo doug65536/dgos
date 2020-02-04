@@ -55,7 +55,7 @@ static _always_inline process_t *fast_cur_process()
     return *(process_t**)((char*)thread_info + THREAD_PROCESS_PTR_OFS);
 }
 
-void thread_set_process(int thread, process_t *process);
+void thread_set_process(int tid, process_t *process);
 
 extern uint32_t cpu_count;
 

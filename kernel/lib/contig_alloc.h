@@ -25,7 +25,11 @@ public:
     void release_linear(uintptr_t addr, size_t size);
     void dump(char const *format, ...) const;
     void dumpv(char const *format, va_list ap) const;
+
+    _printf_format(3, 4)
     void dump_locked(scoped_lock& lock, char const *format, ...) const;
+
+    _printf_format(3, 0)
     void dump_lockedv(scoped_lock& lock, char const *format, va_list ap) const;
 
     bool validate() const;

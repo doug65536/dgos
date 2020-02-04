@@ -1370,7 +1370,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     mmio_base = (char*)mmap(
                 (void*)mmio_addr, 64<<10, PROT_READ | PROT_WRITE,
-                MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+                MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
 
     mmio_cap = (usbxhci_capreg_t*)mmio_base;
     mmio_op = (usbxhci_opreg_t*)(mmio_base + mmio_cap->caplength);
@@ -1511,12 +1511,11 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     // Program device context address array pointer
     dev_ctx_ptrs = (uint64_t*)
             mmap(nullptr, sizeof(*dev_ctx_ptrs) * maxslots,
-                 PROT_READ | PROT_WRITE,
-                 MAP_POPULATE, -1, 0);
+                 PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     dev_ctx.any = mmap(nullptr, dev_ctx_size * maxslots,
                         PROT_READ | PROT_WRITE,
-                        MAP_POPULATE, -1, 0);
+                        MAP_POPULATE);
 
     // Device Context Base Address Array (idx 0 reserved for scratchpad array)
     for (size_t i = 1; i < maxslots; ++i)
@@ -1537,11 +1536,11 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
         // Array of scratch buffer pointers
         uint64_t *scratchbufarr = (uint64_t*)mmap(
                     nullptr, maxscratchpad * sizeof(uint64_t),
-                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                    PROT_READ | PROT_WRITE, MAP_POPULATE);
 
         for (int i = 0; i < maxscratchpad; ++i) {
-            void *scratch_buffer = mmap(nullptr, PAGESIZE, PROT_READ,
-                                        MAP_POPULATE, -1, 0);
+            void *scratch_buffer = mmap(nullptr, PAGESIZE,
+                                        PROT_READ, MAP_POPULATE);
             scratchbufarr[i] = mphysaddr(scratch_buffer);
         }
 
@@ -1569,7 +1568,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     // Event segments
     dev_evt_segs = (usbxhci_evtring_seg_t*)mmap(
                 nullptr, sizeof(*dev_evt_segs) * maxintr * 4,
-                PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     interrupters = (usbxhci_interrupter_info_t*)
             malloc(sizeof(*interrupters) * maxintr);
@@ -1690,13 +1689,13 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
 
     if (!dev_ctx_large) {
         inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_small_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                   PROT_READ | PROT_WRITE, MAP_POPULATE);
         ctlctx = &inp.small->inpctl;
         inpslotctx = &inp.small->slotctx;
         inpepctx = inp.small->epctx;
     } else {
         inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_large_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                   PROT_READ | PROT_WRITE, MAP_POPULATE);
         ctlctx = &inp.large->inpctl;
         inpslotctx = &inp.large->slotctx;
         inpepctx = inp.large->epctx;
@@ -2006,13 +2005,13 @@ usb_cc_t usbxhci::fetch_inp_ctx(
 
     if (!dev_ctx_large) {
         inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_small_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                   PROT_READ | PROT_WRITE, MAP_POPULATE);
         ctlctx = &inp.small->inpctl;
         inpslotctx = &inp.small->slotctx;
         inpepctx = inp.small->epctx;
     } else {
         inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_large_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                   PROT_READ | PROT_WRITE, MAP_POPULATE);
         ctlctx = &inp.large->inpctl;
         inpslotctx = &inp.large->slotctx;
         inpepctx = inp.large->epctx;
@@ -2517,10 +2516,10 @@ bool usbxhci_ring_data_t<T>::alloc(uint32_t trb_count)
 {
     pending = (usbxhci_pending_cmd_t*)
                  mmap(nullptr, sizeof(*pending) * trb_count,
-                      PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                      PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     ptr = (T *)mmap(nullptr, sizeof(*ptr) * trb_count,
-                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                    PROT_READ | PROT_WRITE, MAP_POPULATE);
     physaddr = mphysaddr(ptr);
 
     next = 0;

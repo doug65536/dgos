@@ -192,7 +192,7 @@ void *heap_t::operator new(size_t) noexcept
 {
     void *mem = mmap(nullptr, PAGE_SIZE,
                      PROT_READ | PROT_WRITE,
-                     MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
+                     MAP_UNINITIALIZED | MAP_POPULATE);
     if (unlikely(mem == MAP_FAILED))
         return nullptr;
 
@@ -233,7 +233,7 @@ heap_hdr_t *heap_t::create_arena(uint8_t log2size, scoped_lock const& lock)
 
         new_list = (heap_ext_arena_t*)mmap(
                     nullptr, PAGESIZE, PROT_READ | PROT_WRITE,
-                    MAP_UNINITIALIZED, -1, 0);
+                    MAP_UNINITIALIZED);
         if (!new_list || new_list == MAP_FAILED)
             return nullptr;
 
@@ -249,7 +249,7 @@ heap_hdr_t *heap_t::create_arena(uint8_t log2size, scoped_lock const& lock)
 
     char *arena = (char*)mmap(nullptr, HEAP_BUCKET_SIZE,
                               PROT_READ | PROT_WRITE,
-                              MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+                              MAP_POPULATE | MAP_UNINITIALIZED);
     if (unlikely(arena == MAP_FAILED))
         panic_oom();
     char *arena_end = arena + HEAP_BUCKET_SIZE;
@@ -288,7 +288,7 @@ void *heap_t::large_alloc(size_t size, uint32_t heap_id)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)mmap(nullptr, size,
                            PROT_READ | PROT_WRITE,
-                           MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+                           MAP_POPULATE | MAP_UNINITIALIZED);
 
     assert(hdr != MAP_FAILED);
 
@@ -589,7 +589,7 @@ heap_t *pageheap_create()
 {
     heap_t *heap = (heap_t*)mmap(nullptr, sizeof(heap_t),
                                  PROT_READ | PROT_WRITE,
-                                 MAP_POPULATE, -1, 0);
+                                 MAP_POPULATE);
     if (unlikely(heap == MAP_FAILED))
         return nullptr;
     heap->id = atomic_xadd(&next_heap_id, 1);
@@ -641,7 +641,7 @@ void *pageheap_alloc(heap_t *heap, size_t size)
 
     // Reserve virtual address space
     char *blk = (char*)mmap(nullptr, alloc,
-                            PROT_READ | PROT_WRITE, MAP_NOCOMMIT, -1, 0);
+                            PROT_READ | PROT_WRITE, MAP_NOCOMMIT);
 
     heap_hdr_t *hdr = (heap_hdr_t*)(blk + (end_guard - size));
 

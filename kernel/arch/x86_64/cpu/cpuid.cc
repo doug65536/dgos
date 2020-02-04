@@ -1,5 +1,5 @@
 #define CPUID_CC
-#include "cpuid.h"
+#include "./cpuid.h"
 #include "string.h"
 #include "likely.h"
 #include "control_regs_constants.h"
@@ -32,11 +32,36 @@ void cpuid_init()
     }
 
     if (cpuid(&info, CPUID_INFO_FEATURES, 0)) {
-        cpuid_cache.family          = ((info.eax >> 8) & 0xF) +
-                                        ((info.eax >> 20) & 0xFF);
+        uint8_t family_id = ((info.eax >> 8) & 0xF);
+        uint8_t ext_family_id = ((info.eax >> 20) & 0xFF);
 
-        cpuid_cache.model           = ((info.eax >> 4) & 0xF) |
-                                        (((info.eax >> 16) & 0xFF) << 4);
+        /// "The actual processor family is derived from the Family ID
+        /// and Extended Family ID fields. If the Family ID field is
+        /// equal to 15, the family is equal to the sum of the
+        /// Extended Family ID and the Family ID fields.
+        /// Otherwise, the family is equal to value of the
+        /// Family ID field." - Wikipedia CPUID page
+        if (family_id == 0xF) {
+            cpuid_cache.family = family_id + ext_family_id;
+        } else {
+            cpuid_cache.family = family_id;
+        }
+
+//        cpuid_cache.family          = ((info.eax >> 8) & 0xF) +
+//                                        ((info.eax >> 20) & 0xFF);
+
+        /// "If the Family ID field is either 6 or 15, the model is
+        /// equal to the sum of the Extended Model ID field
+        /// shifted left by 4 bits and the Model field.
+        /// Otherwise, the model is equal to the value of the
+        /// Model field." - Wikipedia CPUID page
+        uint8_t model_id = ((info.eax >> 4) & 0xF);
+        uint8_t ext_model_id = (((info.eax >> 16) & 0xFF) << 4);
+
+        if (model_id == 0x6 || model_id == 0xF)
+            cpuid_cache.model = ext_model_id + model_id;
+        else
+            cpuid_cache.model = model_id;
 
         cpuid_cache.has_de          = info.edx & (1U << 2);
         cpuid_cache.has_pge         = info.edx & (1U << 13);
@@ -65,18 +90,20 @@ void cpuid_init()
     }
 
     if (cpuid(&info, CPUID_INFO_EXT_FEATURES, 0)) {
-        cpuid_cache.has_fsgsbase= info.ebx & (1U << 0);
-        cpuid_cache.has_umip    = info.ecx & (1U << 2);
-        cpuid_cache.has_smep    = info.ebx & (1U << 7);
-        cpuid_cache.has_erms    = info.ebx & (1U << 9);
-        cpuid_cache.has_invpcid = info.ebx & (1U << 10);
-        cpuid_cache.has_avx512f = info.ebx & (1U << 16);
-        cpuid_cache.has_smap    = info.ebx & (1U << 20);
+        cpuid_cache.has_umip     = info.ecx & (1U << 2);
 
-        cpuid_cache.has_ibrs    = info.edx & (1U << 26);
-        cpuid_cache.has_stibp   = info.edx & (1U << 27);
-        cpuid_cache.has_ssbd    = info.edx & (1U << 31);
-        cpuid_cache.has_l1df    = info.edx & (1U << 28);
+        cpuid_cache.has_fsgsbase = info.ebx & (1U << 0);
+        cpuid_cache.has_smep     = info.ebx & (1U << 7);
+        cpuid_cache.has_erms     = info.ebx & (1U << 9);
+        cpuid_cache.has_invpcid  = info.ebx & (1U << 10);
+        cpuid_cache.has_avx512f  = info.ebx & (1U << 16);
+        cpuid_cache.has_smap     = info.ebx & (1U << 20);
+
+        cpuid_cache.has_md_clear = info.edx & (1U << 10);
+        cpuid_cache.has_ibrs     = info.edx & (1U << 26);
+        cpuid_cache.has_stibp    = info.edx & (1U << 27);
+        cpuid_cache.has_ssbd     = info.edx & (1U << 31);
+        cpuid_cache.has_l1df     = info.edx & (1U << 28);
     }
 
     if (cpuid(&info, CPUID_APM, 0)) {
@@ -91,12 +118,12 @@ void cpuid_init()
     }
 
     if (cpuid(&info, CPUID_ADDRSIZES, 0)) {
-        cpuid_cache.laddr_bits = info.eax & 0xFF;
-        cpuid_cache.paddr_bits = (info.eax >> 8) & 0xFF;
+        cpuid_cache.paddr_bits = info.eax & 0xFF;
+        cpuid_cache.laddr_bits = (info.eax >> 8) & 0xFF;
     } else {
         // Make reasonable guess
-        cpuid_cache.laddr_bits = 48;
         cpuid_cache.paddr_bits = 52;
+        cpuid_cache.laddr_bits = 48;
     }
 
     if (cpuid_cache.is_intel)
@@ -120,6 +147,20 @@ void cpuid_init()
     } else {
         cpuid_cache.hv_type = hv_type_t::NONE;
     }
+
+    char *brand = cpuid_cache.brand;
+    for (size_t i = CPUID_BRANDSTR1; i <= CPUID_BRANDSTR3; ++i) {
+        if (cpuid(&info, i, 0)) {
+            memcpy(brand + sizeof(uint32_t) * 0, &info.eax, sizeof(info.eax));
+            memcpy(brand + sizeof(uint32_t) * 1, &info.ebx, sizeof(info.ebx));
+            memcpy(brand + sizeof(uint32_t) * 2, &info.ecx, sizeof(info.ecx));
+            memcpy(brand + sizeof(uint32_t) * 3, &info.edx, sizeof(info.edx));
+            brand += sizeof(uint32_t) * 4;
+        }
+    }
+
+    if (brand != cpuid_cache.brand + sizeof(cpuid_cache.brand))
+        memset(cpuid_cache.brand, 0, sizeof(cpuid_cache.brand));
 }
 
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)

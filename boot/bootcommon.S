@@ -353,5 +353,6 @@ cpu_a20_chk: .space 1
 .section .early, "wx", @progbits
 
 .global __dso_handle
+.hidden __dso_handle
 __dso_handle:
     .int __dso_handle

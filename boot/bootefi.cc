@@ -16,6 +16,7 @@
 EFI_HANDLE efi_image_handle;
 EFI_SYSTEM_TABLE *efi_systab;
 
+__attribute__((__visibility__("hidden")))
 void * __dso_handle = &__dso_handle;
 
 extern "C" void __cxa_atexit()

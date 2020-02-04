@@ -106,15 +106,15 @@ void condvar_wake_one(condition_var_t *var);
 void condvar_wake_all(condition_var_t *var);
 void condvar_wake_n(condition_var_t *var, size_t n);
 
-bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *spinlock,
-                           uint64_t timeout_time = UINT64_MAX);
-bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *spinlock,
-                             uint64_t timeout_time = UINT64_MAX);
+//bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *spinlock,
+//                           uint64_t timeout_time = UINT64_MAX);
+//bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *spinlock,
+//                             uint64_t timeout_time = UINT64_MAX);
 
-bool condvar_wait_mcslock(condition_var_t *var,
-                          mcs_queue_ent_t * volatile *root,
-                          mcs_queue_ent_t * node,
-                          uint64_t timeout_time = UINT64_MAX);
+//bool condvar_wait_mcslock(condition_var_t *var,
+//                          mcs_queue_ent_t * volatile *root,
+//                          mcs_queue_ent_t * node,
+//                          uint64_t timeout_time = UINT64_MAX);
 
 __END_DECLS
 
@@ -137,7 +137,7 @@ bool condvar_wait_ex(condition_var_t *var, T& lock_upd,
     thread_wait_add(&var->link, &wait.link);
 
     // Unlock whatever lock is protecting the condition
-    lock_upd.unlock();
+    lock_upd.unlock_noirq();
 
     // Atomically unlock the condition variable and suspend
     // note: returns with var->lock unlocked!
@@ -167,7 +167,7 @@ bool condvar_wait_ex(condition_var_t *var, T& lock_upd,
     }
 
     // Reacquire lock protecting condition before returning
-    lock_upd.lock();
+    lock_upd.lock_noirq();
 
     return result;
 }

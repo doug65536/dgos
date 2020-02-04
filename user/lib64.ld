@@ -220,4 +220,5 @@ SECTIONS {
 	.debug_loc		: { *(.debug_loc)     }
 	.comment        : { *(.comment)       }
 */
+	/DISCARD/       : { *(.comment)       }
 }

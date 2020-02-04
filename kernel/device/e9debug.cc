@@ -8,6 +8,8 @@
 #include "cpu/spinlock.h"
 #include "bootinfo.h"
 
+#include "cpu/cpuid.h"
+
 static spinlock_t e9debug_lock;
 
 static uart_dev_t *uart;
@@ -65,6 +67,8 @@ void e9debug_init(void)
     printdbg("----------------------------------------------------\n"
              "DebugLog Started...\n"
              "----------------------------------------------------\n");
+
+    printdbg("Booting on %s\n", cpuid_brand());
 }
 
 //REGISTER_CALLOUT(e9debug_serial_ready, nullptr,
