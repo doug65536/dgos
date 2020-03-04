@@ -604,8 +604,9 @@ void pageheap_destroy(heap_t *heap)
 _assume_aligned(16)
 void *pageheap_calloc(heap_t *heap, size_t num, size_t size)
 {
-    void *blk = pageheap_alloc(heap, num * size);
-    return memset(blk, 0, size);
+    num *= size;
+    void *blk = pageheap_alloc(heap, num);
+    return memset(blk, 0, num);
 }
 
 // |      ...     |
