@@ -611,6 +611,8 @@ KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/lib/cc/cxxexception.h \
 	kernel/lib/cc/cxxexception.cc \
 	kernel/lib/cxxexcept.h \
+	kernel/lib/engunit.h \
+	kernel/lib/engunit.cc \
 	kernel/lib/cxxexcept.cc \
 	kernel/lib/mutex.cc \
 	kernel/lib/dev_storage.cc \
@@ -739,8 +741,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/user_mem.h \
 	kernel/lib/uleb.cc \
 	kernel/lib/uleb.h \
-	kernel/lib/engunit.cc \
-	kernel/lib/engunit.h \
 	kernel/fs/ext4.cc \
 	kernel/fs/devfs.cc \
 	kernel/fs/tmpfs.cc \
