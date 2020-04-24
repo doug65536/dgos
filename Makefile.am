@@ -2378,7 +2378,7 @@ QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = host,migratable=false,host-cache-info=true,fsgsbase
 
-QEMU_RAM = 160M
+QEMU_RAM = 4G
 
 QEMU_MEMFILL =
 #QEMU_MEMFILL = \
