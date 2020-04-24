@@ -851,6 +851,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/dev_usb_ctl.cc \
 	kernel/device/usb_hid.h \
 	kernel/device/usb_hid.cc \
+	kernel/device/usb_audio.h \
+	kernel/device/usb_audio.cc \
 	kernel/device/usb_hub.h \
 	kernel/device/usb_hub.cc \
 	kernel/device/vga.cc \
@@ -2303,6 +2305,7 @@ distclean-local:
 BITFIELD_FILES = \
 	$(top_srcdir)/kernel/device/nvme.bits \
 	$(top_srcdir)/kernel/device/usb_hid.bits \
+	$(top_srcdir)/kernel/device/usb_audio.bits \
 	$(top_srcdir)/kernel/device/pci.bits \
 	$(top_srcdir)/kernel/device/rtl8139.bits \
 	$(top_srcdir)/kernel/device/i350.bits \
@@ -2383,13 +2386,19 @@ QEMU_MEMFILL =
 
 QEMU_USB_ROOT_PORTS ?= 16
 
+# Puts keyboard, mouse, tablet on usb 2 root hub and audio on usb 3 root hub
 QEMU_USB = \
 	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
-	-device usb-kbd,bus=xhci.0 \
-	-device usb-tablet,bus=xhci.0 \
+	-device usb-kbd,id=hidkbd,bus=xhci.0 \
+	-device usb-tablet,id=hidtab,bus=xhci.0 \
+	-device usb-mouse,id=hidmse,bus=xhci.0 \
+	-device usb-audio,id=hidaud,bus=xhci.0 \
 	$(QEMU_USB_EXTRA)
 
-#-device usb-mouse,bus=xhci.0
+#-device usb-hub,id=hidhub,bus=xhci.0,ports=4,port=1
+#-device usb-kbd,bus=hidhub.0 \
+#-device usb-tablet,bus=hidhub.0 \
+#-device usb-mouse,bus=hidhub.0
 
 #-device usb-storage,bus=xhci.0,drive=stick
 #-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none
