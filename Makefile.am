@@ -2273,6 +2273,7 @@ clean-local:
 	rm -f $(top_builddir)/bootfat-bin
 	rm -f $(top_builddir)/bootiso-bin
 	rm -f $(top_builddir)/bootpxe-bios-bin
+	rm -f $(top_builddir)/bootpxe-bios-elf
 	rm -f $(top_builddir)/trace-tool
 
 	rm -f $(top_builddir)/bootefi-pe
