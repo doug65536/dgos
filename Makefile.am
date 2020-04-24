@@ -2475,8 +2475,11 @@ QEMU_DRV = \
 
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
 QEMU_DISPLAY_SPICE = -spice ipv4,port=14446,disable-ticketing=on
-QEMU_DISPLAY =
-QEMU_MACHINE = -machine q35 $(QEMU_DISPLAY)
+QEMU_DISPLAY_vga = -display sdl
+QEMU_DISPLAY_gl = -display sdl,gl=on
+QEMU_DISPLAY = $(QEMU_DISPLAY_$(1))
+QEMU_MACHINE = -machine q35
+#$(QEMU_DISPLAY_$(1))
 
 QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 
@@ -2541,7 +2544,9 @@ QEMU_BOOTMEDIA_pxe_bios = -boot n \
 QEMU_BOOTMEDIA_pxe_efi = \
 	-boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
 
-QEMU_VIDEO = $(QEMU_VIDEO_$(1))
+	-boot n -net user,tftp=$(top_builddir)/,bootfile=bootx64.efi
+#$(top_builddir)/
+QEMU_VIDEO = $(QEMU_VIDEO_$(1)) $(QEMU_DISPLAY_$(1))
 QEMU_VIDEO_vga = -vga std
 QEMU_VIDEO_gl = \
 	-global driver=virtio-vga,property=disable-legacy,value=on \
@@ -2570,7 +2575,7 @@ QL_SC = ahci ide nvme usb virtio
 QL_VO = vga gl
 QL_EM = kvm tcg mttcg
 
-# 1=rt, 2=np, 3=bt, 4=bm, 5=fs, 6=sc, 7=em
+# 1=rt, 2=np, 3=bt, 4=bm, 5=fs, 6=sc, 7=vo, 8=em
 define qemu_launcher =
 $(1)-$(2)-$(3)-$(4)-$(5)-$(6)-$(7)-$(8): \
 		$$(call QEMU_IMAGE,$(5)) $$(QEMU_EXTRA_DEPS)
@@ -2685,15 +2690,15 @@ $(foreach media,$(BOCHS_MEDIA), \
 	) \
 )
 
-debug: debug-up-bios-hd-gpt-ahci-vga-tcg
+debug: debug-up-efi-hd-iso-ahci-vga-tcg
 
 .PHONY: debug
 
-debug-kvm: debug-up-bios-hd-gpt-ahci-vga-kvm
+debug-kvm: debug-up-bios-hd-iso-ahci-vga-kvm
 
 .PHONY: debug-kvm
 
-run-kvm: run-up-bios-hd-gpt-ahci-vga-kvm
+run-kvm: run-up-bios-hd-iso-ahci-vga-kvm
 
 .PHONY: run-kvm
 
