@@ -2468,7 +2468,8 @@ QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 
 QEMU_DRV_COMMON = \
-	id=bootdrv,if=none,format=raw,werror=report,rerror=report,cache=none
+	id=bootdrv,if=none,format=raw,werror=report,rerror=report
+#,cache=none
 QEMU_DRV = \
 	-drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
