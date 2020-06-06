@@ -13,9 +13,6 @@
 #include "../kernel/lib/bswap.h"
 #include "halt.h"
 
-EFI_HANDLE efi_image_handle;
-EFI_SYSTEM_TABLE *efi_systab;
-
 __attribute__((__visibility__("hidden")))
 void * __dso_handle = &__dso_handle;
 
@@ -161,6 +158,8 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
     }
 };
 
+//static void register_efi_fs();
+
 class efi_pxe_file_handle_t : public file_handle_base_t {
 public:
     efi_pxe_file_handle_t()
@@ -175,8 +174,6 @@ public:
             efi_systab->BootServices->FreePool(data);
     }
 
-private:
-    friend void register_efi_fs();
     static void initialize()
     {
 
@@ -251,6 +248,7 @@ private:
         }
     }
 
+private:
     bool open_impl(tchar const *filename) override final
     {
         EFI_STATUS status;
@@ -313,7 +311,7 @@ private:
 
     bool pread_impl(void *buf, size_t bytes, off_t ofs) override final
     {
-        if (bytes + ofs > file_size)
+        if (unlikely(bytes + ofs > file_size))
             return false;
 
         memcpy(buf, (char*)data + ofs, bytes);
@@ -337,11 +335,13 @@ extern "C" void halt(tchar const *s)
 }
 
 // Register EFI filesystem shim
-_constructor(ctor_fs) void register_efi_fs()
+static _constructor(104) void register_efi_fs()
 {
     EFI_STATUS status;
 
     EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image = nullptr;
+
+    tchar const *name = TSTR "unknown";
 
     status = efi_systab->BootServices->HandleProtocol(
                 efi_image_handle,
@@ -360,6 +360,7 @@ _constructor(ctor_fs) void register_efi_fs()
     // If we were unable to get an EFI_SIMPLE_FILE_SYSTEM_PROTOCOL for the
     // image, fall back to PXE TFTP
     if (!EFI_ERROR(status)) {
+        // Not PXE
         // Open the root directory of the volume containing this executable
         status = efi_simple_filesystem->OpenVolume(
                     efi_simple_filesystem, &efi_root_dir);
@@ -374,7 +375,10 @@ _constructor(ctor_fs) void register_efi_fs()
 
         if (unlikely(EFI_ERROR(status)))
             PANIC(TSTR "HandleProtocol for block_io_protocol failed");
+
+        name = TSTR "EFI_boot_partition";
     } else {
+        // PXE
         status = efi_systab->BootServices->HandleProtocol(
                     efi_loaded_image->DeviceHandle,
                     &efi_pxe_base_code_protocol,
@@ -385,15 +389,18 @@ _constructor(ctor_fs) void register_efi_fs()
 
         efi_pxe_file_handle_t::initialize();
         PRINT("EFI PXE API initialized");
+
+        name = TSTR "EFI_pxe_fs";
     }
 
+    fs_api.name = name;
     fs_api.boot_open = file_handle_base_t::open;
     fs_api.boot_filesize = file_handle_base_t::filesize;
     fs_api.boot_pread = file_handle_base_t::pread;
     fs_api.boot_close = file_handle_base_t::close;
     fs_api.boot_drv_serial = file_handle_base_t::boot_drv_serial;
 
-    PRINT("EFI FS API initialized");
+    PRINT("EFI FS API initialized: %s", name);
 }
 #endif
 
@@ -401,7 +408,7 @@ int file_handle_base_t::open(tchar const *filename)
 {
     int fd = find_unused_handle();
 
-    if (fd < 0)
+    if (unlikely(fd < 0))
         return fd;
 
     if (!efi_pxe) {
@@ -410,7 +417,7 @@ int file_handle_base_t::open(tchar const *filename)
         file_handles[fd] = new (std::nothrow) efi_pxe_file_handle_t();
     }
 
-    if (!file_handles[fd]->open_impl(filename)) {
+    if (unlikely(!file_handles[fd]->open_impl(filename))) {
         delete file_handles[fd];
         file_handles[fd] = nullptr;
         return -1;
@@ -428,7 +435,7 @@ static bool check_fd(int fd)
 
 off_t file_handle_base_t::filesize(int fd)
 {
-    if (!check_fd(fd))
+    if (unlikely(!check_fd(fd)))
         return -1;
 
     off_t result = file_handles[fd]->filesize_impl();
@@ -438,7 +445,7 @@ off_t file_handle_base_t::filesize(int fd)
 
 int file_handle_base_t::close(int fd)
 {
-    if (!check_fd(fd))
+    if (unlikely(!check_fd(fd)))
         return -1;
 
     bool result = file_handles[fd]->close_impl();
@@ -449,10 +456,10 @@ int file_handle_base_t::close(int fd)
 
 ssize_t file_handle_base_t::pread(int fd, void *buf, size_t bytes, off_t ofs)
 {
-    if (!check_fd(fd))
+    if (unlikely(!check_fd(fd)))
         return -1;
 
-    if (!file_handles[fd]->pread_impl(buf, bytes, ofs))
+    if (unlikely(!file_handles[fd]->pread_impl(buf, bytes, ofs)))
         return -1;
 
     return bytes;
@@ -460,7 +467,7 @@ ssize_t file_handle_base_t::pread(int fd, void *buf, size_t bytes, off_t ofs)
 
 uint64_t file_handle_base_t::boot_drv_serial()
 {
-    if (!efi_blk_io)
+    if (unlikely(!efi_blk_io))
         return -1;
 
     EFI_STATUS status;
@@ -513,6 +520,8 @@ EFI_STATUS efi_main()
 {
     //PRINT("choosing kernel");
     tchar const *kernel_name = cpu_choose_kernel();
+
+    PRINT("Boot device: %s", boot_name());
 
     PRINT("running kernel: %s", kernel_name);
     elf64_run(kernel_name);

@@ -3,9 +3,10 @@ define startupbreakpoints
 	set architecture i386:x86-64
 	#set architecture i386
 	set osabi none
-	#set scheduler-locking off
-	set scheduler-locking step
+	set scheduler-locking off
+	#set scheduler-locking step
 	set range-stepping off
+	#set may-call-functions off
 	thbreak entry
 	commands
 		#b isr_entry_13
@@ -227,7 +228,7 @@ define walkunwind
 		set $ctx = threads[$tid].ctx
 		if $ctx
 			printf "\n"
-			printf "Unwinding thread %d runcpu=%d state=0x%x -----------------------------------------------\n", $tid, threads[$tid].state, run_cpu[$tid]
+			printf "Unwinding thread %d runcpu=%d state=0x%x -----------------------------------------------\n", $tid, run_cpu[$tid], threads[$tid].state
 			python
 try:
 	gdb.execute("walkunwind_ctx $ctx.gpr")
@@ -247,6 +248,33 @@ define modulesyms
 		printf "Loading %s at 0x%lx",$mname,$maddr
 		eval "add-symbol-file %s 0x%lx",$mname,$maddr
 		set $midx = $midx + 1
+	end
+end
+
+define modulelist
+	set $midx = 0
+	set $mcount = loaded_modules.__sz
+	while $midx < $mcount
+		set $mname = loaded_modules.__m[$midx].__ptr->module_name.__str.__m
+		set $maddr = loaded_modules.__m[$midx].__ptr->first_exec
+		printf "0x%lx %s",$maddr,$mname
+		set $midx = $midx + 1
+	end
+end
+
+define stkusage
+	set $tidx = 0
+	while $tidx < thread_count
+		if threads[$tidx].ctx != 0
+			set $stkst = threads[$tidx].stack
+			set $stsz = threads[$tidx].stack_size
+			set $stken = (unsigned long)$stkst + $stksz
+			set $tsp = threads[$tidx].ctx->gpr.iret.rsp
+			set $tsused = $stken - (unsigned long)$tsp
+			set $tsusage = 100 * $tsused / $tssz
+			printf "tid %d: %u/%uKB (%u%%)", $tidx, $tsused >> 10, $tssz >> 10, $tsusage
+		end
+		set $tidx = $tidx + 1
 	end
 end
 

@@ -3,32 +3,103 @@
 
 // https://uclibc.org/docs/elf-64-gen.pdf
 
-// Type names used in documentation
-typedef uint64_t Elf64_Addr;
-typedef uint64_t Elf64_Off;
-typedef uint16_t Elf64_Half;
-typedef uint32_t Elf64_Word;
-typedef int32_t Elf64_Sword;
-typedef uint64_t Elf64_Xword;
-typedef int64_t Elf64_Sxword;
+// e_machine
+#define EM_NO_SPEC 0x00
+#define EM_SPARC   0x02
+#define EM_X86     0x03
+#define EM_MIPS    0x08
+#define EM_POWERPC 0x14
+#define EM_S390    0x16
+#define EM_ARM     0x28
+#define EM_SUPERH  0x2A
+#define EM_IA_64   0x32
+#define EM_AMD64   0x3E
+#define EM_AARCH64 0xB7
+#define EM_RISC_V  0xF3
 
-// File header
-struct Elf64_Ehdr {
-    unsigned char e_ident[16]; /* ELF identification */
-    Elf64_Half e_type; /* Object file type */
-    Elf64_Half e_machine; /* Machine type */
-    Elf64_Word e_version; /* Object file version */
-    Elf64_Addr e_entry; /* Entry point address */
-    Elf64_Off e_phoff; /* Program header offset */
-    Elf64_Off e_shoff; /* Section header offset */
-    Elf64_Word e_flags; /* Processor-specific flags */
-    Elf64_Half e_ehsize; /* ELF header size */
-    Elf64_Half e_phentsize; /* Size of program header entry */
-    Elf64_Half e_phnum; /* Number of program header entries */
-    Elf64_Half e_shentsize; /* Size of section header entry */
-    Elf64_Half e_shnum; /* Number of section header entries */
-    Elf64_Half e_shstrndx; /* Section name string table index */
-} _packed;
+// Type names used in documentation
+struct Elf64_Policy {
+    using Addr = uint64_t;
+    using Off = uint64_t;
+    using Half = uint16_t;
+    using Word = uint32_t;
+    using Sword = int32_t;
+    using Xword = uint64_t;
+    using Sxword = int64_t;
+    static constexpr Half e_machine = EM_AMD64;
+
+    // Program header
+    struct Phdr {
+        Word p_type; /* Type of segment */
+        Word p_flags; /* Segment attributes */
+        Off p_offset; /* Offset in file */
+        Addr p_vaddr; /* Virtual address in memory */
+        Addr p_paddr; /* Reserved */
+        Xword p_filesz; /* Size of segment in file */
+        Xword p_memsz; /* Size of segment in memory */
+        Xword p_align; /* Alignment of segment */
+    };
+
+    // File header
+    struct Ehdr {
+        unsigned char e_ident[16]; /* ELF identification */
+        Half e_type; /* Object file type */
+        Half e_machine; /* Machine type */
+        Word e_version; /* Object file version */
+        Addr e_entry; /* Entry point address */
+        Off e_phoff; /* Program header offset */
+        Off e_shoff; /* Section header offset */
+        Word e_flags; /* Processor-specific flags */
+        Half e_ehsize; /* ELF header size */
+        Half e_phentsize; /* Size of program header entry */
+        Half e_phnum; /* Number of program header entries */
+        Half e_shentsize; /* Size of section header entry */
+        Half e_shnum; /* Number of section header entries */
+        Half e_shstrndx; /* Section name string table index */
+    };
+
+};
+
+struct Elf32_Policy {
+    using Addr = uint32_t;
+    using Off = uint32_t;
+    using Half = uint16_t;
+    using Word = uint32_t;
+    using Sword = int32_t;
+    using Xword = uint32_t;
+    using Sxword = int32_t;
+    static constexpr Half e_machine = EM_X86;
+
+    // File header
+    struct Ehdr {
+        unsigned char e_ident[16]; /* ELF identification */
+        Half e_type; /* Object file type */
+        Half e_machine; /* Machine type */
+        Word e_version; /* Object file version */
+        Addr e_entry; /* Entry point address */
+        Off e_phoff; /* Program header offset */
+        Off e_shoff; /* Section header offset */
+        Word e_flags; /* Processor-specific flags */
+        Half e_ehsize; /* ELF header size */
+        Half e_phentsize; /* Size of program header entry */
+        Half e_phnum; /* Number of program header entries */
+        Half e_shentsize; /* Size of section header entry */
+        Half e_shnum; /* Number of section header entries */
+        Half e_shstrndx; /* Section name string table index */
+    } _packed;
+
+    // Program header
+    struct Phdr {
+        Word p_type; /* Type of segment */
+        Off p_offset; /* Offset in file */
+        Addr p_vaddr; /* Virtual address in memory */
+        Addr p_paddr; /* Reserved */
+        Xword p_filesz; /* Size of segment in file */
+        Xword p_memsz; /* Size of segment in memory */
+        Word p_flags; /* Segment attributes */
+        Xword p_align; /* Alignment of segment */
+    };
+};
 
 #define EI_MAG0 0 // File identification
 #define EI_MAG1 1
@@ -42,7 +113,7 @@ struct Elf64_Ehdr {
 #define EI_PAD 9 // Start of padding bytes
 #define EI_NIDENT 16 // Size of e_ident[]
 
-char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
+static constexpr char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
 
 #define ELFCLASS32 1 // 32-bit objects
 #define ELFCLASS64 2 // 64-bit objects
@@ -81,17 +152,18 @@ char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
 // Indicates a symbol that has been declared as a common block
 #define SHN_COMMON 0xFFF2
 
-struct Elf64_Shdr {
-    Elf64_Word sh_name; /* Section name */
-    Elf64_Word sh_type; /* Section type */
-    Elf64_Xword sh_flags; /* Section attributes */
-    Elf64_Addr sh_addr; /* Virtual address in memory */
-    Elf64_Off sh_offset; /* Offset in file */
-    Elf64_Xword sh_size; /* Size of section */
-    Elf64_Word sh_link; /* Link to other section */
-    Elf64_Word sh_info; /* Miscellaneous information */
-    Elf64_Xword sh_addralign; /* Address alignment boundary */
-    Elf64_Xword sh_entsize; /* Size of entries, if section has table */
+template<typename P>
+struct Elf_Shdr {
+    typename P::Word sh_name; /* Section name */
+    typename P::Word sh_type; /* Section type */
+    typename P::Xword sh_flags; /* Section attributes */
+    typename P::Addr sh_addr; /* Virtual address in memory */
+    typename P::Off sh_offset; /* Offset in file */
+    typename P::Xword sh_size; /* Size of section */
+    typename P::Word sh_link; /* Link to other section */
+    typename P::Word sh_info; /* Miscellaneous information */
+    typename P::Xword sh_addralign; /* Address alignment boundary */
+    typename P::Xword sh_entsize; /* Size of entries, if section has table */
 } _packed;
 
 //
@@ -176,13 +248,14 @@ struct Elf64_Shdr {
 //SHT_SYMTAB // Index of first non-local symbol (i.e., number of local symbols
 //SHT_DYNSYM // Index of first non-local symbol (i.e., number of local symbols
 
-struct Elf64_Sym {
-    Elf64_Word st_name; /* Symbol name */
+template<typename P>
+struct Elf_Sym {
+    typename P::Word st_name; /* Symbol name */
     unsigned char st_info; /* Type and Binding attributes */
     unsigned char st_other; /* Reserved */
-    Elf64_Half st_shndx; /* Section table index */
-    Elf64_Addr st_value; /* Symbol value */
-    Elf64_Xword st_size; /* Size of object (e.g., common) */
+    typename P::Half st_shndx; /* Section table index */
+    typename P::Addr st_value; /* Symbol value */
+    typename P::Xword st_size; /* Size of object (e.g., common) */
 } _packed;
 
 #define ELF64_ST_BIND(i) ((i) >> 4)
@@ -210,32 +283,22 @@ struct Elf64_Sym {
 #define STT_HIPROC 15
 
 // Relocation
-struct Elf64_Rel {
-    Elf64_Addr r_offset; /* Address of reference */
-    Elf64_Xword r_info; /* Symbol index and type of relocation */
+template<typename P>
+struct Elf_Rel {
+    typename P::Addr r_offset; /* Address of reference */
+    typename P::Xword r_info; /* Symbol index and type of relocation */
 } _packed;
 
-struct Elf64_Rela {
-    Elf64_Addr r_offset; /* Address of reference */
-    Elf64_Xword r_info; /* Symbol index and type of relocation */
-    Elf64_Sxword r_addend; /* Constant part of expression */
+template<typename P>
+struct Elf_Rela {
+    typename P::Addr r_offset; /* Address of reference */
+    typename P::Xword r_info; /* Symbol index and type of relocation */
+    typename P::Sxword r_addend; /* Constant part of expression */
 } _packed;
 
 #define ELF64_R_SYM(i)      ((i) >> 32)
 #define ELF64_R_TYPE(i)     ((i) & 0xFFFFFFFFL)
 #define ELF64_R_INFO(s, t)  (((s) << 32) + ((t) & 0xFFFFFFFFL))
-
-// Program header
-struct Elf64_Phdr {
-    Elf64_Word p_type; /* Type of segment */
-    Elf64_Word p_flags; /* Segment attributes */
-    Elf64_Off p_offset; /* Offset in file */
-    Elf64_Addr p_vaddr; /* Virtual address in memory */
-    Elf64_Addr p_paddr; /* Reserved */
-    Elf64_Xword p_filesz; /* Size of segment in file */
-    Elf64_Xword p_memsz; /* Size of segment in memory */
-    Elf64_Xword p_align; /* Alignment of segment */
-} _packed;
 
 #define PT_NULL 0 // Unused entry
 #define PT_LOAD 1 // Loadable segment
@@ -268,11 +331,12 @@ struct Elf64_Phdr {
 #define PF_MASKPROC 0xFF000000
 
 // Dynamic table
-struct Elf64_Dyn {
-    Elf64_Sxword d_tag;
+template<typename P>
+struct Elf_Dyn {
+    typename P::Sxword d_tag;
     union {
-        Elf64_Xword d_val;
-        Elf64_Addr d_ptr;
+        typename P::Xword d_val;
+        typename P::Addr d_ptr;
     } d_un;
 } _packed;
 
@@ -373,6 +437,12 @@ struct Elf64_Dyn {
 // d_val Size, in bytes, of the array of termination functions.
 #define DT_FINI_ARRAYSZ 28
 
+// d_val
+#define DT_FLAGS_1 0x6ffffffb
+
+// d_val
+#define DT_RELACOUNT 0x6ffffff9
+
 // Defines a range of dynamic table tags that are reserved
 // for environment-specific use.
 #define DT_LOOS 0x60000000
@@ -457,3 +527,39 @@ static _always_inline unsigned long elf64_hash(unsigned char const *name)
     }
     return h;
 }
+
+// Primitive declarations
+
+using Elf64_Addr   = Elf64_Policy::Addr;
+using Elf64_Off    = Elf64_Policy::Off;
+using Elf64_Half   = Elf64_Policy::Half;
+using Elf64_Word   = Elf64_Policy::Word;
+using Elf64_Sword  = Elf64_Policy::Sword;
+using Elf64_Xword  = Elf64_Policy::Xword;
+using Elf64_Sxword = Elf64_Policy::Sxword;
+
+using Elf32_Addr   = Elf32_Policy::Addr;
+using Elf32_Off    = Elf32_Policy::Off;
+using Elf32_Half   = Elf32_Policy::Half;
+using Elf32_Word   = Elf32_Policy::Word;
+using Elf32_Sword  = Elf32_Policy::Sword;
+using Elf32_Xword  = Elf32_Policy::Xword;
+using Elf32_Sxword = Elf32_Policy::Sxword;
+
+// Structure declarations
+
+using Elf64_Ehdr   = Elf64_Policy::Ehdr;
+using Elf64_Phdr   = Elf64_Policy::Phdr;
+using Elf64_Shdr   = Elf_Shdr<Elf64_Policy>;
+using Elf64_Sym    = Elf_Sym<Elf64_Policy>;
+using Elf64_Dyn    = Elf_Dyn<Elf64_Policy>;
+using Elf64_Rel    = Elf_Rel<Elf64_Policy>;
+using Elf64_Rela   = Elf_Rela<Elf64_Policy>;
+
+using Elf32_Ehdr   = Elf32_Policy::Ehdr;
+using Elf32_Phdr   = Elf32_Policy::Phdr;
+using Elf32_Shdr   = Elf_Shdr<Elf32_Policy>;
+using Elf32_Sym    = Elf_Sym<Elf32_Policy>;
+using Elf32_Dyn    = Elf_Dyn<Elf32_Policy>;
+using Elf32_Rel    = Elf_Rel<Elf32_Policy>;
+using Elf32_Rela   = Elf_Rela<Elf32_Policy>;

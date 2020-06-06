@@ -6,7 +6,7 @@
 
 int fexecve(int fd, char **argv, char **envp)
 {
-    long status = syscall3(fd, long(argv), long(envp), SYS_fexecve);
+    long status = syscall3(fd, uintptr_t(argv), uintptr_t(envp), SYS_fexecve);
 
     if (status >= 0)
         return status;

@@ -5,7 +5,7 @@
 
 int munmap(void *addr, size_t size)
 {
-    int status = syscall2(long(addr), size, SYS_munmap);
+    int status = syscall2(uintptr_t(addr), size, SYS_munmap);
 
     if (status >= 0)
         return status;

@@ -94,7 +94,7 @@ static int fat32_sector_iterator_begin(
     int cluster_count = 0;
     for (int walk = cluster; walk; ++cluster_count) {
         walk = next_cluster(walk, nullptr, &iter->ok);
-        if (!iter->ok)
+        if (unlikely(!iter->ok))
             return -1;
     }
 
@@ -108,7 +108,7 @@ static int fat32_sector_iterator_begin(
     for (int walk = cluster; walk; ++cluster_count) {
         iter->clusters[cluster_count] = walk;
         walk = next_cluster(walk, nullptr, &iter->ok);
-        if (!iter->ok)
+        if (unlikely(!iter->ok))
             return -1;
     }
 
@@ -117,7 +117,7 @@ static int fat32_sector_iterator_begin(
 
         iter->ok = disk_read_lba(uint64_t(sector), lba, log2_sector_sz, 1);
 
-        if (iter->ok)
+        if (likely(iter->ok))
             return 1;
 
         return -1;
@@ -143,7 +143,7 @@ static uint32_t next_cluster(
         ok = disk_read_lba(uint64_t(fat_buffer), lba, log2_sector_sz, 1);
         if (ok_ptr)
             *ok_ptr = ok;
-        if (!ok)
+        if (unlikely(!ok))
             return 0xFFFFFFFF;
         fat_buffer_lba = lba;
     }
@@ -210,7 +210,7 @@ static int sector_iterator_next(
 
         iter->ok = disk_read_lba(uint64_t(sector), lba, log2_sector_sz, 1);
 
-        if (!iter->ok)
+        if (unlikely(!iter->ok))
             return -1;
     }
 
@@ -441,7 +441,7 @@ static uint16_t const *encode_lfn_name_fragment(
         uint8_t *lfn_fragment,
         size_t fragment_size,
         uint16_t const *encoded_src,
-        uint16_t *done_name)
+        uint_fast16_t *done_name)
 {
     for (size_t i = 0; i < fragment_size; ++i) {
         if (*done_name) {
@@ -468,8 +468,8 @@ static uint16_t const *encode_lfn_name_fragment(
 static bool dir_entry_match(fat32_dir_union_t const *entry,
                           fat32_dir_union_t const *match)
 {
-    uint16_t long_entry = (entry->long_entry.attr == FAT_LONGNAME);
-    uint16_t long_match = (match->long_entry.attr == FAT_LONGNAME);
+    uint_fast16_t long_entry = (entry->long_entry.attr == FAT_LONGNAME);
+    uint_fast16_t long_match = (match->long_entry.attr == FAT_LONGNAME);
 
     if (long_entry != long_match)
         return false;
@@ -543,12 +543,12 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
     if (info.lowercase_flags == 0xFF)
         return 0;
 
-    uint16_t lfn_entries = 0;
+    uint_fast16_t lfn_entries = 0;
 
     if (info.lowercase_flags == 0) {
         // Needs long filename
         uint16_t encoded_name[255];
-        uint16_t encoded_len = utf8_to_utf16(
+        uint_fast16_t encoded_len = utf8_to_utf16(
                     encoded_name, 255, filename);
         uint16_t const *encoded_src;
 
@@ -563,7 +563,7 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
         // Fill in reverse order
         fat32_dir_union_t *match_fill = match + (lfn_entries - 1);
 
-        uint16_t done_name = 0;
+        uint_fast16_t done_name = 0;
         encoded_src = encoded_name;
         do {
             encoded_src = encode_lfn_name_fragment(
@@ -700,7 +700,7 @@ static bool check_fd(int file)
 
 static off_t fat32_boot_filesize(int file)
 {
-    if (!check_fd(file))
+    if (unlikely(!check_fd(file)))
         return -1;
 
     return file_handles[file].file_size;
@@ -708,7 +708,7 @@ static off_t fat32_boot_filesize(int file)
 
 static int fat32_boot_close(int file)
 {
-    if (!check_fd(file))
+    if (unlikely(!check_fd(file)))
         return -1;
 
     return file_handles[file].close();
@@ -719,7 +719,7 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     assert(file >= 0 && file < MAX_HANDLES);
     assert(buf != nullptr);
 
-    if (!check_fd(file))
+    if (unlikely(!check_fd(file)))
         return -1;
 
     auto& desc = file_handles[file];
@@ -744,8 +744,8 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         uint32_t cluster_ofs = sector_offset >> log2_sec_per_cluster;
         uint32_t cluster_idx = sector_offset & (bpb.sec_per_cluster-1);
 
-        if (!plan.add(lba_from_cluster(desc.clusters[cluster_ofs]) +
-                      cluster_idx, 1, byte_offset, sector_read))
+        if (unlikely(!plan.add(lba_from_cluster(desc.clusters[cluster_ofs]) +
+                      cluster_idx, 1, byte_offset, sector_read)))
             return false;
 
         ofs += sector_read;
@@ -758,13 +758,13 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         disk_vec_t const &item = plan.vec[i];
         if (item.sector_ofs == 0 && item.byte_count == sector_sz) {
             // Direct read
-            if (!disk_read_lba(uint64_t(plan.dest), item.lba,
-                               log2_sector_sz, item.count))
+            if (unlikely(!disk_read_lba(uint64_t(plan.dest), item.lba,
+                                        log2_sector_sz, item.count)))
                 return false;
         } else {
             // Read sector into buffer
-            if (!disk_read_lba(uint64_t(sector_buffer), item.lba,
-                               log2_sector_sz, 1))
+            if (unlikely(!disk_read_lba(uint64_t(sector_buffer), item.lba,
+                                        log2_sector_sz, 1)))
                 return false;
             memcpy(plan.dest, sector_buffer + item.sector_ofs, item.byte_count);
         }
@@ -783,7 +783,7 @@ void fat32_boot_partition(uint64_t partition_lba)
 
     PRINT("Booting partition at LBA %llu", partition_lba);
 
-    if (!read_bpb(partition_lba)) {
+    if (unlikely(!read_bpb(partition_lba))) {
         PRINT("Error reading BPB!");
         return;
     }
@@ -813,6 +813,7 @@ void fat32_boot_partition(uint64_t partition_lba)
     PRINT("number_of_fats:	  %d", bpb.number_of_fats);
 #endif
 
+    fs_api.name = "direct_fat32";
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_filesize = fat32_boot_filesize;
     fs_api.boot_close = fat32_boot_close;

@@ -371,11 +371,6 @@
 // ES1370_UARTDATA
 #define ES1370_UARTDATA 0x08
 
-
-
-
-
-
 //
 // ES1370_UARTSTATUS: R/O: UART status register
 #define ES1370_UARTSTATUS                   0x09
@@ -525,34 +520,14 @@
 // ES1370_PAGE_DAC
 #define ES1370_PAGE_DAC 0x0c
 
-
-
-
-
-
 // ES1370_PAGE_ADC
 #define ES1370_PAGE_ADC 0x0d
-
-
-
-
-
 
 // ES1370_PAGE_UART
 #define ES1370_PAGE_UART 0x0e
 
-
-
-
-
-
 // ES1370_PAGE_UART1
 #define ES1370_PAGE_UART1 0x0f
-
-
-
-
-
 
 //
 // ES1370_CODEC: W/O: Codec write register address
@@ -843,18 +818,8 @@
 // ES1370_PB1FC
 #define ES1370_PB1FC 0x24
 
-
-
-
-
-
 // ES1370_PB2FC
 #define ES1370_PB2FC 0x28
-
-
-
-
-
 
 // ES1370_RECFC
 #define ES1370_RECFC                      0x2C
@@ -888,152 +853,57 @@
 // ES1370_PGC_PB1ADDR
 #define ES1370_PGC_PB1ADDR 0x30
 
-
-
-
-
-
 // ES1370_PGC_PB1DEF
 #define ES1370_PGC_PB1DEF 0x34
-
-
-
-
-
 
 // ES1370_PGC_PB2ADDR
 #define ES1370_PGC_PB2ADDR 0x38
 
-
-
-
-
-
 // ES1370_PGC_PB2DEF
 #define ES1370_PGC_PB2DEF 0x3C
-
-
-
-
-
 
 // ES1370_PGD_RECADDR
 #define ES1370_PGD_RECADDR 0x30
 
-
-
-
-
-
 // ES1370_PGD_RECDEF
 #define ES1370_PGD_RECDEF 0x34
-
-
-
-
-
 
 // ES1370_PGE_UARTDATA
 #define ES1370_PGE_UARTDATA 0x30
 
-
-
-
-
-
 // ES1370_PGE_PHANTOM_ADDR
 #define ES1370_PGE_PHANTOM_ADDR 0x38
-
-
-
-
-
 
 // ES1370_PGE_PHANTOM_SIZE
 #define ES1370_PGE_PHANTOM_SIZE 0x3c
 
-
-
-
-
-
 // ES1370_SMPREG_DAC1
 #define ES1370_SMPREG_DAC1 0x70
-
-
-
-
-
 
 // ES1370_SMPREG_DAC2
 #define ES1370_SMPREG_DAC2 0x74
 
-
-
-
-
-
 // ES1370_SMPREG_ADC
 #define ES1370_SMPREG_ADC 0x78
-
-
-
-
-
 
 // ES1370_SMPREG_VOL_ADC
 #define ES1370_SMPREG_VOL_ADC 0x6c
 
-
-
-
-
-
 // ES1370_SMPREG_VOL_DAC1
 #define ES1370_SMPREG_VOL_DAC1 0x7c
-
-
-
-
-
 
 // ES1370_SMPREG_VOL_DAC2
 #define ES1370_SMPREG_VOL_DAC2 0x7e
 
-
-
-
-
-
 // ES1370_SMPREG_TRUNC_N
 #define ES1370_SMPREG_TRUNC_N 0x00
-
-
-
-
-
 
 // ES1370_SMPREG_INT_REGS
 #define ES1370_SMPREG_INT_REGS 0x01
 
-
-
-
-
-
 // ES1370_SMPREG_ACCUM_FRAC
 #define ES1370_SMPREG_ACCUM_FRAC 0x02
 
-
-
-
-
-
 // ES1370_SMPREG_VFREQ_FRAC
 #define ES1370_SMPREG_VFREQ_FRAC 0x03
-
-
-
-
-
 

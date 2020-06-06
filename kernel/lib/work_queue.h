@@ -106,7 +106,8 @@ void workq::workq_wrapper<T>::invoke()
 
 class workq_impl : public workq {
 public:
-    workq_impl();
+    workq_impl() = delete;
+    workq_impl(uint32_t cpu_nr);
 
     ~workq_impl();
 
@@ -180,7 +181,7 @@ template<typename T>
 void workq::enqueue(T&& functor)
 {
     cpu_scoped_irq_disable irq_dis;
-    size_t cpu_nr = thread_cpu_number();
+    uint32_t cpu_nr = thread_cpu_number();
     enqueue_on_cpu(cpu_nr, std::forward<T>(functor));
 }
 

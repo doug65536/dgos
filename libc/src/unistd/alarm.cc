@@ -6,7 +6,7 @@
 
 unsigned alarm(unsigned seconds)
 {
-    long status = syscall1(long(seconds), SYS_alarm);
+    long status = syscall1(seconds, SYS_alarm);
 
     if (status >= 0)
         return status;

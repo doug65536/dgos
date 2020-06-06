@@ -10,6 +10,9 @@ class mutex;
 class shared_mutex;
 template<typename T> class unique_lock;
 template<typename T> class shared_lock;
+
+struct defer_lock_t {
+};
 __END_NAMESPACE_STD
 
 __BEGIN_NAMESPACE_EXT
@@ -18,7 +21,6 @@ class ticketlock;
 class spinlock;
 class shared_spinlock;
 class mcslock;
-__END_NAMESPACE_EXT
 
 template<typename _L>
 class base_lock {
@@ -34,7 +36,6 @@ public:
     }
 };
 
-__BEGIN_NAMESPACE_EXT
 // Not a "real" lock, just saves and disables IRQs when locked,
 // and restores saved IRQ mask when unlocked
 class irqlock {
@@ -46,7 +47,14 @@ public:
     irqlock(irqlock const&) = delete;
 
     void lock();
-    _always_inline bool try_lock() { lock(); return true; }
+
+    _always_inline bool try_lock()
+    {
+        // Failure is not possible
+        lock();
+        return true;
+    }
+
     void unlock();
 
     // Do nothing
@@ -61,7 +69,8 @@ private:
 };
 
 // Meets BasicLockable requirements
-class spinlock : public base_lock<spinlock> {
+class spinlock : public base_lock<spinlock>
+{
 public:
     typedef spinlock_t mutex_type;
 
@@ -97,7 +106,7 @@ public:
     bool try_lock();
     void unlock();
     void lock_shared();
-    void try_lock_shared();
+    bool try_lock_shared();
     void unlock_shared();
     void upgrade_lock();
     mutex_type& native_handle();
@@ -105,9 +114,7 @@ public:
 private:
     rwspinlock_t m;
 };
-__END_NAMESPACE_STD
 
-__BEGIN_NAMESPACE_EXT
 // The size of this thing is two unsigned ints
 class ticketlock : public base_lock<ticketlock> {
 public:
@@ -134,7 +141,11 @@ private:
 // The size of this thing is the size of one pointer
 class mcslock : public base_lock<mcslock> {
 public:
-    mcslock();
+    constexpr mcslock()
+        : m(nullptr)
+    {
+    }
+
     ~mcslock();
 
     using mutex_type = mcs_queue_ent_t * volatile;
@@ -151,12 +162,118 @@ public:
 private:
     mcs_queue_ent_t * volatile m;
 };
+
+template<typename _L>
+class noirq_lock
+{
+public:
+    using mutex_type = typename _L::mutex_type;
+
+    noirq_lock()
+        : inner_lock()
+    {
+    }
+
+    noirq_lock(noirq_lock const&) = delete;
+    noirq_lock(noirq_lock&&) = delete;
+    noirq_lock &operator=(noirq_lock const&) = delete;
+
+    mutex_type& native_handle()
+    {
+        return inner_lock.native_handle();
+    }
+
+    void lock()
+    {
+        irq_was_enabled = cpu_irq_save_disable();
+        inner_lock.lock();
+    }
+
+    bool try_lock()
+    {
+        irq_was_enabled = cpu_irq_save_disable();
+        if (inner_lock.try_lock())
+            return true;
+        cpu_irq_toggle(irq_was_enabled);
+        return false;
+    }
+
+    void unlock()
+    {
+        inner_lock.unlock();
+        cpu_irq_toggle(irq_was_enabled);
+    }
+
+    void lock_noirq() {
+        inner_lock.lock();
+    }
+
+    void unlock_noirq() {
+        inner_lock.unlock();
+    }
+
+private:
+    _L inner_lock;
+    bool irq_was_enabled = false;
+};
+
+//template<>
+//class noirq_lock<mcslock>
+//{
+//public:
+//    using mutex_type = typename mcslock::mutex_type;
+
+//    noirq_lock()
+//        : inner_lock()
+//    {
+//    }
+
+//    noirq_lock(noirq_lock const&) = delete;
+//    noirq_lock(noirq_lock&&) = delete;
+//    noirq_lock &operator=(noirq_lock const&) = delete;
+
+//    mutex_type& native_handle()
+//    {
+//        return inner_lock.native_handle();
+//    }
+
+//    void lock(mcs_queue_ent_t *node)
+//    {
+//        irq_was_enabled = cpu_irq_save_disable();
+//        inner_lock.lock(node);
+//    }
+
+//    bool try_lock(mcs_queue_ent_t *node)
+//    {
+//        irq_was_enabled = cpu_irq_save_disable();
+//        bool ok = inner_lock.try_lock(node);
+//        if (!ok)
+//            cpu_irq_toggle(irq_was_enabled);
+//        return ok;
+//    }
+
+//    void unlock(mcs_queue_ent_t *node)
+//    {
+//        inner_lock.unlock(node);
+//        cpu_irq_toggle(irq_was_enabled);
+//    }
+
+//private:
+//    mcslock inner_lock;
+//    bool irq_was_enabled = false;
+//};
+
+using irq_mutex = noirq_lock<std::mutex>;
+using irq_shared_mutex = noirq_lock<std::shared_mutex>;
+using irq_mcslock = noirq_lock<mcslock>;
+using irq_spinlock = noirq_lock<spinlock>;
+using irq_ticketlock = noirq_lock<ticketlock>;
 __END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_STD
 
 // Meets BasicLockable requirements
-class mutex : public base_lock<mutex> {
+class mutex : public ext::base_lock<mutex> {
 public:
     typedef mutex_t mutex_type;
 
@@ -179,7 +296,7 @@ private:
 };
 
 // Meets SharedMutex requirements
-class shared_mutex : public base_lock<shared_mutex> {
+class shared_mutex : public ext::base_lock<shared_mutex> {
 public:
     typedef rwlock_t mutex_type;
 
@@ -203,9 +320,6 @@ public:
 
 private:
     mutex_type m;
-};
-
-struct defer_lock_t {
 };
 
 template<typename T>
@@ -289,9 +403,110 @@ private:
     bool locked;
 };
 
+//template<typename _L>
+//class EXPORT unique_lock<ext::noirq_lock<_L>>
+//        : public ext::base_lock<unique_lock<ext::noirq_lock<_L>>>
+//{
+//public:
+//    _hot
+//    explicit unique_lock(ext::noirq_lock<_L>& attached_lock);
+
+//    explicit unique_lock(ext::noirq_lock<_L>& lock, defer_lock_t) noexcept;
+
+//    unique_lock(unique_lock const&) = delete;
+//    unique_lock(unique_lock&&) = delete;
+//    unique_lock& operator=(unique_lock) = delete;
+
+//    _hot
+//    ~unique_lock() noexcept;
+
+//    _hot
+//    void lock() noexcept;
+
+//    _hot
+//    void unlock() noexcept;
+
+//    void release() noexcept;
+
+//    void swap(unique_lock& rhs) noexcept;
+
+//    _always_inline typename ext::noirq_lock<_L>::mutex_type&
+//    native_handle() noexcept
+//    {
+//        return m->native_handle();
+//    }
+
+//    _always_inline bool is_locked() const noexcept
+//    {
+//        return locked;
+//    }
+
+//private:
+//    ext::noirq_lock<_L> *m;
+//    bool irq_was_enabled;
+//    bool locked;
+//};
+
+//template<typename _T>
+//EXPORT unique_lock<ext::noirq_lock<_T>>::unique_lock(
+//        ext::noirq_lock<_T> &attached_lock)
+//    : m(&attached_lock)
+//    , locked(false)
+//{
+//    lock();
+//}
+
+//template<typename _T>
+//EXPORT unique_lock<ext::noirq_lock<_T>>::unique_lock(
+//        ext::noirq_lock<_T> &lock, std::defer_lock_t) noexcept
+//    : m(&lock)
+//    , locked(false)
+//{
+//}
+
+//template<typename _T>
+//EXPORT unique_lock<ext::noirq_lock<_T>>::~unique_lock() noexcept
+//{
+//    unlock();
+//}
+
+//template<typename _T>
+//EXPORT void unique_lock<ext::noirq_lock<_T>>::lock() noexcept
+//{
+//    assert(!locked);
+//    irq_was_enabled = cpu_irq_save_disable();
+//    m->lock();
+//    locked = true;
+//}
+
+//template<typename _T>
+//EXPORT void unique_lock<ext::noirq_lock<_T>>::unlock() noexcept
+//{
+//    if (locked) {
+//        locked = false;
+//        m->unlock();
+//        cpu_irq_toggle(irq_was_enabled);
+//    }
+//}
+
+//template<typename _T>
+//EXPORT void unique_lock<ext::noirq_lock<_T>>::release() noexcept
+//{
+//    locked = false;
+//    m = nullptr;
+//}
+
+//template<typename _T>
+//EXPORT void unique_lock<ext::noirq_lock<_T>>::swap(
+//        unique_lock<ext::noirq_lock<_T>> &rhs) noexcept
+//{
+//    std::swap(rhs.m, m);
+//    std::swap(rhs.locked, locked);
+//}
+
 template<>
 class EXPORT unique_lock<ext::mcslock>
-        : public base_lock<unique_lock<ext::mcslock>>
+        : public ext::base_lock<unique_lock<ext::mcslock>>
 {
 public:
     _hot
@@ -400,70 +615,6 @@ private:
 
 __END_NAMESPACE_STD
 
-__BEGIN_NAMESPACE_EXT
-template<typename _L>
-class noirq_lock
-{
-public:
-    using mutex_type = typename _L::mutex_type;
-
-    noirq_lock()
-        : inner_lock()
-        , inner_hold(inner_lock, std::defer_lock_t())
-    {
-    }
-
-    noirq_lock(noirq_lock const&) = delete;
-    noirq_lock(noirq_lock&&) = delete;
-    noirq_lock &operator=(noirq_lock const&) = delete;
-
-    mutex_type& native_handle()
-    {
-        return inner_lock.native_handle();
-    }
-
-    void lock()
-    {
-        irq_was_enabled = cpu_irq_save_disable();
-        inner_hold.lock();
-    }
-
-    bool try_lock()
-    {
-        irq_was_enabled = cpu_irq_save_disable();
-        if (inner_lock.try_lock())
-            return true;
-        cpu_irq_toggle(irq_was_enabled);
-        return false;
-    }
-
-    void unlock()
-    {
-        inner_hold.unlock();
-        cpu_irq_toggle(irq_was_enabled);
-    }
-
-    void lock_noirq() {
-        inner_hold.lock();
-    }
-
-    void unlock_noirq() {
-        inner_hold.unlock();
-    }
-
-private:
-    _L inner_lock;
-    std::unique_lock<_L> inner_hold;
-    bool irq_was_enabled = false;
-};
-
-using irq_mutex = noirq_lock<std::mutex>;
-using irq_shared_mutex = noirq_lock<std::shared_mutex>;
-using irq_mcslock = noirq_lock<mcslock>;
-using irq_spinlock = noirq_lock<spinlock>;
-using irq_ticketlock = noirq_lock<ticketlock>;
-__END_NAMESPACE_EXT
-
 __BEGIN_NAMESPACE_STD
 
 enum class cv_status
@@ -494,10 +645,12 @@ public:
 
     template<typename _Lock, typename _Clock, typename _Duration>
     cv_status wait_until(unique_lock<_Lock>& lock,
-                    chrono::time_point<_Clock, _Duration> const& timeout_time)
+                         chrono::time_point<_Clock, _Duration> const&
+                         timeout_time)
     {
-        return wait_until(lock, chrono::steady_clock::time_point(
-                              timeout_time).time_since_epoch().count());
+        return wait_until_impl(lock,
+                          chrono::steady_clock::time_point(timeout_time).
+                          time_since_epoch().count());
     }
 
 private:
@@ -505,8 +658,7 @@ private:
     // Underlying implementation uses monotonic time_ns time for timeout
 
     template<typename _Lock>
-    cv_status wait_until(unique_lock<_Lock>& lock,
-                         uint64_t timeout_time)
+    cv_status wait_until_impl(unique_lock<_Lock>& lock, uint64_t timeout_time)
     {
         assert(lock.is_locked());
 

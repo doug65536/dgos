@@ -7,7 +7,8 @@
 ssize_t readlinkat(int dirfd, char const *restrict path,
                    char *restrict buf, size_t sz)
 {
-    long status = syscall4(dirfd, long(path), long(buf), sz, SYS_readlinkat);
+    long status = syscall4(dirfd, uintptr_t(path), uintptr_t(buf),
+                           sz, SYS_readlinkat);
 
     if (status >= 0)
         return status;

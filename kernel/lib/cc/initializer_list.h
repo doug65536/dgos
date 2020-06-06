@@ -6,6 +6,9 @@
 #include <stdint.h>
 #endif
 
+#if 0
+#include <initializer_list>
+#else
 __BEGIN_NAMESPACE_STD
 
 template<typename _T>
@@ -69,3 +72,4 @@ end(initializer_list<_T> __ils) noexcept
 }
 
 __END_NAMESPACE_STD
+#endif

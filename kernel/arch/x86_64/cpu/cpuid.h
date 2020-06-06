@@ -59,6 +59,9 @@ struct cpuid_cache_t {
     bool has_x2apic     :1;
     bool has_aes        :1;
     bool has_xsave      :1;
+    bool has_xsaves     :1;
+    bool has_xsaveopt   :1;
+    bool has_xsavec     :1;
     bool has_avx        :1;
     bool has_rdrand     :1;
     bool is_hypervisor  :1;
@@ -215,6 +218,24 @@ CPUID_CONST_INLINE bool cpuid_has_aes()
 CPUID_CONST_INLINE bool cpuid_has_xsave()
 {
     return cpuid_cache.has_xsave;
+}
+
+// xsaves instruction (supervisor)
+CPUID_CONST_INLINE bool cpuid_has_xsaves()
+{
+    return cpuid_cache.has_xsaves;
+}
+
+// xsaveopt instruction (optimized)
+CPUID_CONST_INLINE bool cpuid_has_xsaveopt()
+{
+    return cpuid_cache.has_xsave;
+}
+
+// xsavec instruction (compact)
+CPUID_CONST_INLINE bool cpuid_has_xsavec()
+{
+    return cpuid_cache.has_xsavec;
 }
 
 // Advanced Vector Extensions instructions

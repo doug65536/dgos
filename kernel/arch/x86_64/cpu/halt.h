@@ -1,10 +1,11 @@
 #pragma once
 #include "types.h"
+#include "control_regs.h"
 
 _always_inline
 static void halt(void)
 {
-    __asm__ __volatile__ ( "hlt" );
+    cpu_halt();
 }
 
 extern "C" _noreturn void halt_forever(void);

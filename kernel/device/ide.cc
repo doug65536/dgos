@@ -163,6 +163,8 @@ struct ide_if_t final : public storage_if_base_t, public zero_init_t {
         void pio_read_data(unit_data_t &unit, void *buf, size_t bytes);
         void pio_write_data(unit_data_t &unit, void const *buf, size_t bytes);
 
+        errno_t cancel_io(iocp_t *iocp);
+
         errno_t io(void *data, int64_t count, uint64_t lba,
                    int slave, int is_atapi, io_op_t op, bool fua, iocp_t *iocp);
 
@@ -196,8 +198,8 @@ struct ide_if_t final : public storage_if_base_t, public zero_init_t {
 
     // Handle simplex DMA controllers
     // (which can only work for one channel at one time)
-    int simplex_dma;
-    int dma_inuse;
+    bool simplex_dma;
+    bool dma_inuse;
     lock_type dma_lock;
     std::condition_variable dma_available;
 };
@@ -461,6 +463,11 @@ void ide_if_t::ide_chan_t::pio_write_data(unit_data_t &unit,
             bytes -= 2;
         }
     }
+}
+
+errno_t ide_if_t::ide_chan_t::cancel_io(iocp_t *iocp)
+{
+    return errno_t::ENOSYS;
 }
 
 void ide_if_t::ide_chan_t::set_drv(int slave)
@@ -923,15 +930,15 @@ void ide_if_t::bmdma_acquire()
         scoped_lock hold(dma_lock);
         while (dma_inuse)
             dma_available.wait(hold);
-        dma_inuse = 1;
+        dma_inuse = true;
     }
 }
 
 void ide_if_t::bmdma_release()
 {
-    if (simplex_dma) {
+    if (unlikely(simplex_dma)) {
         scoped_lock hold(dma_lock);
-        dma_inuse = 0;
+        dma_inuse = false;
         hold.unlock();
         dma_available.notify_one();
     }
@@ -1154,8 +1161,6 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
             }
         }
 
-        //hex_dump(data, sub_size);
-
         IDE_TRACE("lba = %" PRId64 "\n", lba + count_base);
 
         data = (char*)data + sub_size;
@@ -1218,9 +1223,9 @@ std::vector<storage_dev_base_t*> ide_if_t::detect_devices()
     if (bmdma_base) {
         simplex_dma = (bmdma_inb(ATA_BMDMA_REG_STATUS_n(0)) & 0x80) != 0;
 
-        if (simplex_dma) {
+        if (unlikely(simplex_dma)) {
             scoped_lock hold(dma_lock);
-            dma_inuse = 0;
+            dma_inuse = false;
         }
     }
 
@@ -1232,6 +1237,11 @@ std::vector<storage_dev_base_t*> ide_if_t::detect_devices()
 
 void ide_dev_t::cleanup_dev()
 {
+}
+
+errno_t ide_dev_t::cancel_io(iocp_t *iocp)
+{
+    return chan->cancel_io(iocp);
 }
 
 errno_t ide_dev_t::read_async(

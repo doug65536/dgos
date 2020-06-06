@@ -19,7 +19,7 @@ void *boottbl_ebda_ptr()
 
 uint8_t boottbl_checksum(char const *bytes, size_t len)
 {
-    uint8_t sum = 0;
+    uint_fast8_t sum = 0;
     for (size_t i = 0; i < len; ++i)
         sum += uint8_t(bytes[i]);
     return sum;
@@ -129,11 +129,12 @@ static bool boottbl_mptable_search(
         boottbl_mptables_info_t &result, void const *start, size_t len)
 {
     for (size_t offset = 0; offset < len; offset += 16) {
-        mp_table_hdr_t *sig_srch = (mp_table_hdr_t*)
+        mp_table_hdr_t const *sig_srch = (mp_table_hdr_t*)
                 ((uintptr_t)start + offset);
 
         // Check for MP tables signature
-        if (!memcmp(sig_srch->sig, "_MP_", 4)) {
+        if (sig_srch->sig[1] == 'M' &&
+                !memcmp(sig_srch->sig, "_MP_", 4)) {
             // Check checksum
             if (boottbl_checksum((char*)sig_srch, sizeof(*sig_srch)) == 0) {
                 result.mp_addr = sig_srch->phys_addr;
@@ -155,7 +156,7 @@ boottbl_mptables_info_t boottbl_find_mptables()
 
     void *p_ebda = boottbl_ebda_ptr();
     void *p_9FC00 = (void*)0x9FC00;
-    void *p_F0000 = (void*)0xE0000;
+    void *p_F0000 = (void*)0xF0000;
 
     struct range {
         void *start;

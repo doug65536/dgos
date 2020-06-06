@@ -4,6 +4,7 @@
 #include "asm_constants.h"
 #include "control_regs.h"
 #include "control_regs_constants.h"
+#include "mmu.h"
 
 struct gdt_entry_t {
     constexpr gdt_entry_t()
@@ -212,7 +213,7 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
 // Task State Segment (64-bit)
-struct tss_t {
+struct alignas(sizeof(uint32_t)) tss_t {
     // EVERYTHING is misaligned without dummy_align
     uint32_t dummy_align;
 
@@ -240,7 +241,7 @@ struct tss_t {
 C_ASSERT((sizeof(tss_t) & 63) == 0);
 
 // Ensure no spanning page boundaries
-C_ASSERT(4096 % sizeof(tss_t) == 0);
+C_ASSERT(sizeof(tss_t) <= PAGE_SIZE);
 
 C_ASSERT(offsetof(tss_t, rsp) == TSS_RSP0_OFS);
 

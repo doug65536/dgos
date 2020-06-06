@@ -24,7 +24,8 @@ EXPORT void mmu_phys_allocator_t::init(
     std::fill_n(entries, highest_usable_, next_free);
 }
 
-EXPORT void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
+EXPORT void mmu_phys_allocator_t::add_free_space(
+        physaddr_t base, size_t size)
 {
 #if DEBUG_PHYS_ALLOC
     printdbg("Adding free space, base=%#zx, length=%#zx\n",

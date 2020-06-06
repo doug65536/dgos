@@ -200,21 +200,28 @@ SECTIONS {
 	/* rw- begins */
 	. = ALIGN(4K);
 
-	.init_array : {
-		PROVIDE_HIDDEN(__init_array_start = .);
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		*(.ctors)
-		*(SORT_BY_INIT_PRIORITY(.ctors.*))
-		PROVIDE_HIDDEN(__init_array_end = .);
+	.cpus : {
+		*(.data.cpus)
 	} :data
 
-	.fini_array : {
+	.init_array ALIGN(8) : {
+		PROVIDE_HIDDEN(__init_array_start = .);
+		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
+		PROVIDE_HIDDEN(__init_array_end = .);
+
+		PROVIDE_HIDDEN(__init_array_early_start = .);
+		KEEP(*(.init_array))
+		KEEP(*(.ctors))
+		PROVIDE_HIDDEN(__init_array_early_end = .);
+	} :data
+
+	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(___dtors_st = .);
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
-		*(.dtors)
-		*(SORT_BY_INIT_PRIORITY(.dtors.*))
+		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
+		KEEP(*(.dtors))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.dtors.*)))
 		PROVIDE_HIDDEN(___dtors_en = .);
 	} :data
 
@@ -234,13 +241,13 @@ SECTIONS {
 		*(.plt.bnd)
 	} :data
 
-	.got : {
-		PROVIDE_HIDDEN(___got = .);
-		*(.got)
-	} :data
-
 	.got.plt : {
 		*(.got.plt)
+	} :data
+
+	.got : {
+		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
+		*(.got)
 	} :data
 
 	/* Initialized data */
@@ -276,13 +283,13 @@ SECTIONS {
 		/* emergency stack for early bootstrap */
 		. = . + 65536;
 		/* bootstrap CPU stack */
-		*(.bspstk)
+		KEEP(*(.bspstk))
 		PROVIDE_HIDDEN(__bspstk_en = .);
 	} :stacks
 
 	/* Separate so it won't cause excessive asan pool pages to be allocated */
 	.asanbss (NOLOAD) : {
-		*(.asanbss)
+		KEEP(*(.asanbss))
 	} :asan
 
 	. = ALIGN(4K);

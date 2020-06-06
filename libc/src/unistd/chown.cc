@@ -6,7 +6,7 @@
 
 int chown(char const *path, uid_t uid, gid_t gid)
 {
-    long status = syscall3(long(path), long(uid), long(gid), SYS_chown);
+    long status = syscall3(uintptr_t(path), uid, gid, SYS_chown);
 
     if (status >= 0)
         return status;

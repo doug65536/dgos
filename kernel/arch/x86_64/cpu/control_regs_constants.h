@@ -2,7 +2,8 @@
 
 // This is included in assembly
 
-#define MAX_CPUS    64
+#define MAX_CPUS    512
+#define MAX_NODES   16
 
 #define CPU_MSR_FSBASE          0xC0000100U
 #define CPU_MSR_GSBASE          0xC0000101U
@@ -58,6 +59,8 @@
 //                           kernelcode64
 //                            kerneldata
 #define CPU_MSR_STAR            0xC0000081U
+
+#define CPU_MSR_IA32_XSS        0xDA0
 
 #define CPU_MSR_SPEC_CTRL       0x48
 
@@ -401,7 +404,8 @@
 #define CPU_EFLAGS_ID       (1U << CPU_EFLAGS_ID_BIT)
 
 // Always set
-#define CPU_EFLAGS_ALWAYS   2
+#define CPU_EFLAGS_ALWAYS_BIT   1
+#define CPU_EFLAGS_ALWAYS   (1U << CPU_EFLAGS_ALWAYS_BIT)
 
 // Never set (only for debugging)
 
@@ -459,6 +463,19 @@
 #define CPU_MXCSR_ELF_INIT \
     (CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL)
 
+#define CPU_XCOMPBV_COMPACT_BIT 63
+#define CPU_XCOMPBV_COMPACT     (1ULL << CPU_XCOMPBV_COMPACT_BIT)
+#define CPU_XCOMPBV_X87         XCR0_X87
+#define CPU_XCOMPBV_SSE         XCR0_SSE
+#define CPU_XCOMPBV_AVX         XCR0_AVX
+#define CPU_XCOMPBV_BNDREG      XCR0_MPX_BNDREG
+#define CPU_XCOMPBV_BNDCSR      XCR0_MPX_BNDCSR
+#define CPU_XCOMPBV_512OPMASK   XCR0_AVX512_OPMASK
+#define CPU_XCOMPBV_512UPPER    XCR0_AVX512_UPPER
+#define CPU_XCOMPBV_512XREGS    XCR0_AVX512_XREGS
+#define CPU_XCOMPBV_PT          XCR0_PT
+#define CPU_XCOMPBV_PKRU        XCR0_PKRU
+
 //
 // Floating point control word
 
@@ -468,6 +485,10 @@
 #define CPU_FPUCW_OM_BIT        3
 #define CPU_FPUCW_UM_BIT        4
 #define CPU_FPUCW_PM_BIT        5
+
+// What the? Initial config 0x37F has this bit set
+#define CPU_FPUCW_ALWAYS_BIT    6
+
 #define CPU_FPUCW_PC_BIT        8
 #define CPU_FPUCW_RC_BIT        10
 
@@ -483,6 +504,7 @@
 #define CPU_FPUCW_OM            (1U<<CPU_FPUCW_OM_BIT)
 #define CPU_FPUCW_UM            (1U<<CPU_FPUCW_UM_BIT)
 #define CPU_FPUCW_PM            (1U<<CPU_FPUCW_PM_BIT)
+#define CPU_FPUCW_ALWAYS        (1U<<CPU_FPUCW_ALWAYS_BIT)
 #define CPU_FPUCW_PC_n(n)       ((n)<<CPU_FPUCW_PC_BIT)
 #define CPU_FPUCW_RC_n(n)       ((n)<<CPU_FPUCW_RC_BIT)
 
@@ -496,8 +518,9 @@
 #define CPU_FPUCW_RC_TRUNCATE   CPU_MXCSR_RC_TRUNCATE
 
 #define CPU_FPUCW_ELF_INIT \
-    (CPU_FPUCW_RC_n(CPU_FPUCW_RC_NEAREST) | \
-    CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | \
+    (CPU_FPUCW_ALWAYS | \
+    CPU_FPUCW_RC_n(CPU_FPUCW_RC_NEAREST) | \
+    CPU_FPUCW_PC_n(CPU_FPUCW_PC_64) | \
     CPU_FPUCW_IM | CPU_FPUCW_DM | CPU_FPUCW_ZM | \
     CPU_FPUCW_OM | CPU_FPUCW_UM | CPU_FPUCW_PM)
 

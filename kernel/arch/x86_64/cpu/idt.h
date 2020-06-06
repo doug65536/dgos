@@ -2,6 +2,7 @@
 #include "types.h"
 #include "assert.h"
 #include "isr.h"
+#include "utility.h"
 
 struct idt_entry_t {
     uint16_t offset_lo; // offset bits 0..15
@@ -87,3 +88,7 @@ void idt_ist_adjust(int cpu, size_t ist, ptrdiff_t adj);
 #define IDT_IST_SLOT_DBLFAULT       2
 #define IDT_IST_SLOT_FLUSH_TRACE    3
 #define IDT_IST_SLOT_NMI            4
+#define IDT_IST_SLOT_COUNT          5
+
+void idt_set_ist_stack(size_t cpu_nr, size_t ist_slot, void *st, void *en);
+std::pair<void *, void *> idt_get_ist_stack(size_t cpu_nr, size_t ist_slot);

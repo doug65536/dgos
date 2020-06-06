@@ -6,21 +6,7 @@
 template<typename T>
 class engineering_t {
 public:
-    static constexpr char32_t const unit_lookup[] = {
-        U'a',    // -60
-        U'f',    // -50
-        U'p',    // -40
-        U'n',    // -30
-        U'µ',    // -20
-        U'm',    // -10
-        0,      // <- [unit_base]
-        U'k',    //  10
-        U'M',    //  20
-        U'G',    //  30
-        U'T',    //  40
-        U'P',    //  50
-        U'E'     //  60
-    };
+    static char32_t const unit_lookup[];
 
     static constexpr size_t const unit_base = 6;
 
@@ -112,9 +98,10 @@ public:
             return;
         }
 
-        if (unit_lookup[logN_unit + 6]) {
+        if (engineering_t<uint64_t>::unit_lookup[logN_unit + 6]) {
             char encoded[5];
-            size_t sz = ucs4_to_utf8(encoded, unit_lookup[logN_unit + 6]);
+            size_t sz = ucs4_to_utf8(encoded, engineering_t<uint64_t>::
+                                     unit_lookup[logN_unit + 6]);
             while (sz > 0)
                 *--out = encoded[--sz];
         }
@@ -158,4 +145,21 @@ private:
     char *out;
 };
 
-extern template class engineering_t<uintptr_t>;
+template<typename T>
+char32_t const engineering_t<T>::unit_lookup[] = {
+    U'a',    // -60
+    U'f',    // -50
+    U'p',    // -40
+    U'n',    // -30
+    U'µ',    // -20
+    U'm',    // -10
+    0,      // <- [unit_base]
+    U'k',    //  10
+    U'M',    //  20
+    U'G',    //  30
+    U'T',    //  40
+    U'P',    //  50
+    U'E'     //  60
+};
+
+extern template class engineering_t<uint64_t>;

@@ -10,9 +10,11 @@ int init_module(void const *module, ptrdiff_t module_sz,
                 char const *module_name, struct module *mod_user,
                 char const *parameters, char *ret_needed)
 {
-    long status = syscall6(long(module), module_sz,
-                           long(module_name), long(mod_user),
-                           long(parameters), long(ret_needed),
+    long status = syscall6(uintptr_t(module), module_sz,
+                           uintptr_t(module_name),
+                           uintptr_t(mod_user),
+                           uintptr_t(parameters),
+                           uintptr_t(ret_needed),
                            SYS_init_module);
 
     if (likely(status >= 0))

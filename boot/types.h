@@ -48,10 +48,16 @@ typedef int64_t off_t;
 #define _assume_aligned(n)     __attribute__((__assume_aligned__(n)))
 #define _printf_format(m,n)    __attribute__((__format__(__printf__, m, n)))
 
-#define _constructor(prio)     __attribute__((__constructor__ (prio)))
-#define _destructor(prio)      __attribute__((__destructor__ (prio)))
+#define _constructor(prio)     __attribute__((__constructor__(prio)))
+#define _destructor(prio)      __attribute__((__destructor__(prio)))
 
 #define _section(name)         __attribute__((__section__(name)))
+
+#define _assume(expr) \
+    do { \
+        if (!(expr)) \
+            __builtin_unreachable(); \
+    } while (0)
 
 #define CONCATENATE4(a, b) a##b
 #define CONCATENATE3(a, b) CONCATENATE4(a, b)
@@ -63,7 +69,7 @@ typedef char16_t tchar;
 #define TSTR u""
 #else
 typedef char tchar;
-#define TSTR u8""
+#define TSTR ""
 #endif
 
 #define countof(arr) (sizeof((arr))/sizeof(*(arr)))

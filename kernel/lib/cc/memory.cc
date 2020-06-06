@@ -5,7 +5,8 @@
 
 void *ext::page_allocator_base::allocate_impl(size_t n)
 {
-    return mmap(nullptr, n, PROT_READ | PROT_WRITE, MAP_POPULATE);
+    return mmap(nullptr, n, PROT_READ | PROT_WRITE,
+                MAP_POPULATE | MAP_UNINITIALIZED);
 }
 
 void ext::page_allocator_base::deallocate_impl(void *p, size_t n)

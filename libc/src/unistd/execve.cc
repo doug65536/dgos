@@ -6,7 +6,8 @@
 
 int execve(char const *path, char **argv, char **envp)
 {
-    long status = syscall3(long(path), long(argv), long(envp), SYS_execve);
+    long status = syscall3(uintptr_t(path), uintptr_t(argv),
+                           uintptr_t(envp), SYS_execve);
 
     if (status >= 0)
         return status;

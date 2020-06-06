@@ -20,7 +20,7 @@ template class std::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
 template class std::unique_lock<ext::noirq_lock<ext::ticketlock>>;
 template class std::unique_lock<ext::noirq_lock<ext::spinlock>>;
 template class std::unique_lock<ext::noirq_lock<ext::irqlock>>;
-template class std::unique_lock<ext::noirq_lock<ext::mcslock>>;
+//template class std::unique_lock<ext::noirq_lock<ext::mcslock>>;
 #pragma GCC visibility pop
 
 EXPORT std::mutex::mutex()
@@ -93,6 +93,8 @@ EXPORT void std::shared_mutex::upgrade_lock()
     rwlock_upgrade(&m);
 }
 
+// ---
+
 EXPORT std::unique_lock<ext::mcslock>::unique_lock(ext::mcslock &attached_lock)
     : m(&attached_lock)
     , locked(false)
@@ -101,7 +103,7 @@ EXPORT std::unique_lock<ext::mcslock>::unique_lock(ext::mcslock &attached_lock)
 }
 
 EXPORT std::unique_lock<ext::mcslock>::unique_lock(
-        ext::mcslock &lock, defer_lock_t) noexcept
+        ext::mcslock &lock, std::defer_lock_t) noexcept
     : m(&lock)
     , locked(false)
 {
@@ -139,6 +141,9 @@ EXPORT void std::unique_lock<ext::mcslock>::swap(
     std::swap(rhs.m, m);
     std::swap(rhs.locked, locked);
 }
+
+
+// ---
 
 EXPORT std::condition_variable::condition_variable()
 {
@@ -205,9 +210,9 @@ EXPORT void ext::shared_spinlock::lock_shared()
     rwspinlock_sh_lock(&m);
 }
 
-EXPORT void ext::shared_spinlock::try_lock_shared()
+EXPORT bool ext::shared_spinlock::try_lock_shared()
 {
-    rwspinlock_sh_try_lock(&m);
+    return rwspinlock_sh_try_lock(&m);
 }
 
 EXPORT void ext::shared_spinlock::unlock_shared()
@@ -250,10 +255,8 @@ EXPORT ticketlock_t &ext::ticketlock::native_handle()
     return m;
 }
 
-EXPORT ext::mcslock::mcslock()
-    : m(nullptr)
-{
-}
+EXPORT
+
 
 EXPORT ext::mcslock::~mcslock()
 {

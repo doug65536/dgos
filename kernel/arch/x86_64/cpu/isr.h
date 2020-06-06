@@ -13,6 +13,7 @@
 
 #include "types.h"
 #include "initializer_list.h"
+#include "assert.h"
 
 __BEGIN_DECLS
 
@@ -57,29 +58,29 @@ struct thread_info_t;
 
 #define ISR_CTX_FPU(ctx)                ((ctx)->fpr)
 
-#define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->fcw)
-#define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->fop)
-#define ISR_CTX_FPU_FIP(ctx)            ((ctx)->fpr->fpu_ip)
-#define ISR_CTX_FPU_FIS(ctx)            ((ctx)->fpr->cs_or_hi_ip)
-#define ISR_CTX_FPU_FDP(ctx)            ((ctx)->fpr->fpu_dp_31_0)
-#define ISR_CTX_FPU_FDS(ctx)            ((ctx)->fpr->ds_or_dp_47_32)
-#define ISR_CTX_FPU_FSW(ctx)            ((ctx)->fpr->fsw)
-#define ISR_CTX_FPU_FTW(ctx)            ((ctx)->fpr->ftw)
-#define ISR_CTX_FPU_STn_31_0(ctx, n)    ((ctx)->fpr->st[(n)].st_mm_31_0)
-#define ISR_CTX_FPU_STn_63_32(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_63_32)
-#define ISR_CTX_FPU_STn_79_64(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_79_64)
+#define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->legacy_area.fcw)
+#define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->legacy_area.fop)
+#define ISR_CTX_FPU_FIP(ctx)            ((ctx)->fpr->legacy_area.fip)
+#define ISR_CTX_FPU_FIS(ctx)            ((ctx)->fpr->legacy_area.cs_or_hi_ip)
+#define ISR_CTX_FPU_FDP(ctx)            ((ctx)->fpr->legacy_area.fpu_dp_31_0)
+#define ISR_CTX_FPU_FDS(ctx)            ((ctx)->fpr->legacy_area.ds_or_dp_47_32)
+#define ISR_CTX_FPU_FSW(ctx)            ((ctx)->fpr->legacy_area.fsw)
+#define ISR_CTX_FPU_FTW(ctx)            ((ctx)->fpr->legacy_area.ftw)
+#define ISR_CTX_FPU_STn_31_0(ctx, n)    ((ctx)->fpr->legacy_area.st[(n)].st_mm_31_0)
+#define ISR_CTX_FPU_STn_63_32(ctx, n)   ((ctx)->fpr->legacy_area.st[(n)].st_mm_63_32)
+#define ISR_CTX_FPU_STn_79_64(ctx, n)   ((ctx)->fpr->legacy_area.st[(n)].st_mm_79_64)
 
-#define ISR_CTX_SSE_XMMn_b_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].byte)
-#define ISR_CTX_SSE_XMMn_w_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].word)
-#define ISR_CTX_SSE_XMMn_d_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].dword)
-#define ISR_CTX_SSE_XMMn_q_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].qword)
+#define ISR_CTX_SSE_XMMn_b_ptr(ctx, n)  ((ctx)->fpr->legacy_area.xmm[(n)].byte)
+#define ISR_CTX_SSE_XMMn_w_ptr(ctx, n)  ((ctx)->fpr->legacy_area.xmm[(n)].word)
+#define ISR_CTX_SSE_XMMn_d_ptr(ctx, n)  ((ctx)->fpr->legacy_area.xmm[(n)].dword)
+#define ISR_CTX_SSE_XMMn_q_ptr(ctx, n)  ((ctx)->fpr->legacy_area.xmm[(n)].qword)
 
-#define ISR_CTX_SSE_XMMn_b(ctx, n, i)   ((ctx)->fpr->xmm[(n)].byte[(i)])
-#define ISR_CTX_SSE_XMMn_w(ctx, n, i)   ((ctx)->fpr->xmm[(n)].word[(i)])
-#define ISR_CTX_SSE_XMMn_d(ctx, n, i)   ((ctx)->fpr->xmm[(n)].dword[(i)])
-#define ISR_CTX_SSE_XMMn_q(ctx, n, i)   ((ctx)->fpr->xmm[(n)].qword[(i)])
-#define ISR_CTX_SSE_MXCSR(ctx)          ((ctx)->fpr->mxcsr)
-#define ISR_CTX_SSE_MXCSR_MASK(ctx)     ((ctx)->fpr->mxcsr_mask)
+#define ISR_CTX_SSE_XMMn_b(ctx, n, i)   ((ctx)->fpr->legacy_area.xmm[(n)].byte[(i)])
+#define ISR_CTX_SSE_XMMn_w(ctx, n, i)   ((ctx)->fpr->legacy_area.xmm[(n)].word[(i)])
+#define ISR_CTX_SSE_XMMn_d(ctx, n, i)   ((ctx)->fpr->legacy_area.xmm[(n)].dword[(i)])
+#define ISR_CTX_SSE_XMMn_q(ctx, n, i)   ((ctx)->fpr->legacy_area.xmm[(n)].qword[(i)])
+#define ISR_CTX_SSE_MXCSR(ctx)          ((ctx)->fpr->legacy_area.mxcsr)
+#define ISR_CTX_SSE_MXCSR_MASK(ctx)     ((ctx)->fpr->legacy_area.mxcsr_mask)
 
 // Passed by ISR handler
 struct interrupt_info_t {
@@ -154,25 +155,31 @@ struct isr_fxsave_context_t {
     uint16_t fcw;
     // FPU status word
     uint16_t fsw;
+
     // FPU tag word (bitmap of non-empty mm/st regs)
     uint8_t ftw;
     uint8_t reserved_1;
     // FPU opcode
     uint16_t fop;
+
     // FPU IP
-    uint32_t fpu_ip;
+    uint32_t fip;
+
     uint16_t cs_or_hi_ip;
     uint16_t reserved_2;
 
     // FPU data pointer
     uint32_t fpu_dp_31_0;
+
     uint16_t ds_or_dp_47_32;
     uint16_t reserved_3;
+
     // SSE status register
     uint32_t mxcsr;
+
     uint32_t mxcsr_mask;
 
-    // FPU/MMX registers
+    // FPU/MMX registers (128 bytes)
     struct fpu_reg_t {
         uint32_t st_mm_31_0;
         uint32_t st_mm_63_32;
@@ -181,7 +188,7 @@ struct isr_fxsave_context_t {
         uint32_t st_mm_reserved_127_96;
     } st[8];
 
-    // XMM registers
+    // XMM registers (256 bytes)
     union xmm_reg_t {
         uint8_t byte[16];
         uint16_t word[8];
@@ -190,9 +197,22 @@ struct isr_fxsave_context_t {
     } xmm[16];
 };
 
+C_ASSERT(sizeof(isr_fxsave_context_t) == 416);
+
+struct isr_xsave_context_t {
+    isr_fxsave_context_t legacy_area;
+    char unused[96];
+    uint64_t xstate_bv;
+    uint64_t xcomp_bv;
+    uint64_t reserved[6];
+};
+
+C_ASSERT(sizeof(isr_xsave_context_t) == 576);
+
 // Exception handler C call parameter
 struct isr_context_t {
-    isr_fxsave_context_t * fpr;
+    // If it is really an fxsave context, use the legacy_header member
+    isr_xsave_context_t * fpr;
     isr_gpr_context_t gpr;
 };
 
@@ -289,17 +309,19 @@ void isr_save_fxsave(void);
 void isr_restore_fxrstor(void);
 
 _noreturn
-void isr_sysret64(uintptr_t rip, uintptr_t rsp, uintptr_t kernel_rsp);
+void isr_sysret(uintptr_t rip, uintptr_t rsp,
+                uintptr_t kernel_rsp, bool use64,
+                uintptr_t tid, uintptr_t rsi);
 
-isr_fxsave_context_t *isr_save_fpu_ctx64(thread_info_t *outgoing_ctx);
+isr_xsave_context_t *isr_save_fpu_ctx64(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx64(thread_info_t *incoming_ctx);
-isr_fxsave_context_t *isr_save_fpu_ctx32(thread_info_t *outgoing_ctx);
+isr_xsave_context_t *isr_save_fpu_ctx32(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx32(thread_info_t *incoming_ctx);
 
 void protection_barrier_from_user();
 void protection_barrier_to_user();
-void protection_barrier_ibpb();
-void protection_barrier_verw();
+void protection_barrier_from_user_ibpb();
+void protection_barrier_to_user_verw();
 
 void cpu_clear_fpu();
 

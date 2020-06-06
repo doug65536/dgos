@@ -48,7 +48,7 @@ class symbol_server_t {
     {
         file_t syms_fid;
 
-        syms_fid = file_open(filename, O_RDONLY);
+        syms_fid = file_openat(AT_FDCWD, filename, O_RDONLY);
         if (syms_fid < 0)
             return false;
 

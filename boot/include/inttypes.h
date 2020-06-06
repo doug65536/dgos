@@ -23,6 +23,7 @@
 #define __FMT64     "ll"
 #define __FMTMX     "j"
 #define __FMTPT     "t"
+#define __FMTIP     __FMT32
 #elif __SIZEOF_LONG__ == 8 && __SIZEOF_LONG_LONG__ == 8
 // 64 bit code
 #define __FMT8      "hh"
@@ -31,6 +32,7 @@
 #define __FMT64     "l"
 #define __FMTMX     "j"
 #define __FMTPT     "t"
+#define __FMTIP     __FMT64
 #else
 #error Unknown architecture
 #endif
@@ -44,9 +46,9 @@
 #define PRIdLEAST32     __FMT32 "d"
 #define PRIdLEAST64     __FMT64 "d"
 #define PRIdFAST8       __FMT8  "d"
-#define PRIdFAST16      __FMT16 "d"
-#define PRIdFAST32      __FMT32 "d"
-#define PRIdFAST64      __FMT64 "d"
+#define PRIdFAST16      __FMTIP "d"
+#define PRIdFAST32              "d"
+#define PRIdFAST64      __FMTIP "d"
 #define PRIdMAX         __FMTMX "d"
 #define PRIdPTR         __FMTPT "d"
 

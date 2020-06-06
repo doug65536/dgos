@@ -6,7 +6,7 @@
 
 ssize_t read(int fd, void *buf, size_t n)
 {
-    long status = syscall3(long(fd), long(buf), long(n), SYS_read);
+    long status = syscall3(fd, uintptr_t(buf), n, SYS_read);
 
     if (status >= 0)
         return status;

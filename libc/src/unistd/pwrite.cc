@@ -6,7 +6,7 @@
 
 ssize_t pwrite(int fd, void const *buf, size_t sz, off_t ofs)
 {
-    long status = syscall4(fd, long(buf), sz, ofs, SYS_pwrite64);
+    long status = syscall4(fd, uintptr_t(buf), sz, ofs, SYS_pwrite64);
 
     if (status >= 0)
         return status;

@@ -594,10 +594,15 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     } else if (match.iface->iface_proto == 2) {
         dev = new (std::nothrow)
                 usb_hid_mouse_t(control, in, out, match.iface_idx);
+    } else {
+        USBHID_TRACE("Unhandled interface protocol: 0x%02x\n",
+                     match.iface->iface_proto);
     }
 
-    if (dev)
-        hid_devs.push_back(dev);
+    if (dev) {
+        if (unlikely(!hid_devs.push_back(dev)))
+            panic_oom();
+    }
 
     return dev != nullptr;
 }

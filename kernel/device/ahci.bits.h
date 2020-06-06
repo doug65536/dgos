@@ -1057,106 +1057,41 @@
 // AHCI_HP_SS_DET_NODEV
 #define AHCI_HP_SS_DET_NODEV 0
 
-
-
-
-
-
 // AHCI_HP_SS_DET_NOPHY
 #define AHCI_HP_SS_DET_NOPHY 1
-
-
-
-
-
 
 // AHCI_HP_SS_DET_ONLINE
 #define AHCI_HP_SS_DET_ONLINE 3
 
-
-
-
-
-
 // AHCI_HP_SS_DET_OFFLINE
 #define AHCI_HP_SS_DET_OFFLINE 4
-
-
-
-
-
 
 // AHCI_HP_SS_SPD_NODEV
 #define AHCI_HP_SS_SPD_NODEV 0
 
-
-
-
-
-
 // AHCI_HP_SS_SPD_GEN1
 #define AHCI_HP_SS_SPD_GEN1 1
-
-
-
-
-
 
 // AHCI_HP_SS_SPD_GEN2
 #define AHCI_HP_SS_SPD_GEN2 2
 
-
-
-
-
-
 // AHCI_HP_SS_SPD_GEN3
 #define AHCI_HP_SS_SPD_GEN3 3
-
-
-
-
-
 
 // AHCI_HP_SS_IPM_NODEV
 #define AHCI_HP_SS_IPM_NODEV 0
 
-
-
-
-
-
 // AHCI_HP_SS_IPM_ACTIVE
 #define AHCI_HP_SS_IPM_ACTIVE 1
-
-
-
-
-
 
 // AHCI_HP_SS_IPM_PARTIAL
 #define AHCI_HP_SS_IPM_PARTIAL 2
 
-
-
-
-
-
 // AHCI_HP_SS_IPM_SLUMBER
 #define AHCI_HP_SS_IPM_SLUMBER 6
 
-
-
-
-
-
 // AHCI_HP_SS_IPM_DEVSLEEP
 #define AHCI_HP_SS_IPM_DEVSLEEP 8
-
-
-
-
-
 
 //
 // AHCI_HP_SC: 3.3.11 Port ATA Control (SControl)

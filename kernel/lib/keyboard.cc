@@ -328,8 +328,16 @@ EXPORT void keybd_fsa_t::deliver_vk(int vk)
         }
     }
 
-    if (shift_state & KEYB_CTRL_DOWN)
-        codepoint &= 0x1F;
+    if (shift_state & KEYB_CTRL_DOWN) {
+        // The entire uppercase A (0x41) to _ (0x5E)
+        // maps to 0x01 <SOH> thru 0x1F <US>
+        if (codepoint >= 'A' && codepoint <= '^') {
+            codepoint &= 0x1F;
+        } else if (codepoint == '?') {
+            // ctrl-? maps to 0x7F <DEL>
+            codepoint = 127;
+        }
+    }
 
     keyboard_event_t event;
 

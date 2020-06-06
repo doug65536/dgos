@@ -8,7 +8,7 @@
 
 int _opendir(char const *__pathname)
 {
-    return (int)syscall1(long(__pathname), SYS_opendir);
+    return (int)syscall2(AT_FDCWD, uintptr_t(__pathname), SYS_opendir);
 }
 
 DIR *opendir(char const *__pathname)

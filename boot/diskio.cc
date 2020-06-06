@@ -8,7 +8,7 @@
 
 extern uint8_t boot_drive;
 
-static int disk_64bit;
+static bool disk_64bit;
 
 static bool disk_support_64bit_addr_bioscall()
 {
@@ -98,7 +98,7 @@ struct disk_address_packet_64_t {
 
 static bool disk_read_lba_bouncebuffer(
         uint64_t addr, uint64_t lba,
-        uint8_t log2_sector_size, unsigned count)
+        uint8_t log2_sector_size, size_t count)
 {
     // Guarantee that reading one sector will never cross a 64KB boundary
     size_t alignment = size_t(1) << log2_sector_size;
@@ -123,18 +123,18 @@ static bool disk_read_lba_bouncebuffer(
             return false;
     } while (unlikely(!buffer));
 
-    int buf_sectors = buf_size >> log2_sector_size;
+    size_t buf_sectors = buf_size >> log2_sector_size;
 
     while (likely(count)) {
         // Try to read the rest
-        int read_count = count;
+        size_t read_count = count;
 
         // Cap read count to buffer size
         if (read_count > buf_sectors)
             read_count = buf_sectors;
 
-        if (!disk_read_lba(uint64_t(buffer), lba,
-                           log2_sector_size, read_count))
+        if (unlikely(!disk_read_lba(uint64_t(buffer), lba,
+                                    log2_sector_size, read_count)))
             break;
 
         size_t read_size = read_count << log2_sector_size;

@@ -206,6 +206,7 @@ private:
     // or specified cpu (cpu_nr > 0)
     gdb_cpu_t *cpu_from_nr(int cpu_nr);
 
+    static void halt();
     static void wait(gdb_cpu_t const *cpu);
 
     static isr_context_t *exception_handler(int, isr_context_t *ctx);
@@ -907,7 +908,8 @@ void gdbstub_t::run()
 
     port = uart_dev_t::open(0x3f8, 4, 115200, 8, 'N', 1, false);
 
-    port->route_irq(gdb_cpu_ctrl_t::get_gdb_cpu());
+    if (unlikely(!port->route_irq(gdb_cpu_ctrl_t::get_gdb_cpu())))
+        GDBSTUB_TRACE("Unable to route serial IRQ to stub CPU, good luck!\n");
 
     c_cpu = 1;
     g_cpu = 1;
@@ -955,19 +957,12 @@ void gdbstub_t::run()
             sig = gdb_cpu_ctrl_t::signal_from_intr(ISR_CTX_INTR(ctx));
 
             if (ISR_CTX_INTR(ctx) == INTR_EX_BREAKPOINT) {
-                // If we planted the breakpoint, adjust RIP
-//                if (gdb_cpu_ctrl_t::breakpoint_get_byte(
-//                            (uint8_t*)ISR_CTX_REG_RIP(ctx) - 1,
-//                            ctx->gpr.cr3) >= 0) {
-                    ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
-                            ((uint8_t*)ISR_CTX_REG_RIP(ctx) - 1);
-//                }
-
-                //replyf("T%02xswbreak:;", sig);
+                // GDB expects us to have nudged RIP back to the breakpoint
+                ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
+                        ((uint8_t*)ISR_CTX_REG_RIP(ctx) - 1);
             }
-            //else {
-                replyf("T%02xthread:%x;", unsigned(sig), cpu_nr);
-            //}
+
+            replyf("T%02xthread:%x;", unsigned(sig), cpu_nr);
         }
     }
 }
@@ -1901,11 +1896,21 @@ size_t gdbstub_t::get_context(char *reply, isr_context_t const *ctx)
 
     for (size_t xmm = 0; xmm < 16; ++xmm) {
         for (size_t i = 0; i < 2; ++i) {
-            append_ctx_reply(reply, ofs, &ISR_CTX_SSE_XMMn_q(ctx, xmm, i));
+            if (ISR_CTX_FPU(ctx))
+                append_ctx_reply(reply, ofs, &ISR_CTX_SSE_XMMn_q(ctx, xmm, i));
+            else {
+                memset(reply + ofs, 'x', 16);
+                ofs += 16;
+            }
         }
     }
 
-    append_ctx_reply(reply, ofs, &ISR_CTX_SSE_MXCSR(ctx));
+    if (ISR_CTX_FPU(ctx))
+        append_ctx_reply(reply, ofs, &ISR_CTX_SSE_MXCSR(ctx));
+    else {
+        memset(reply + ofs, 'x', 8);
+        ofs += 8;
+    }
 
     // fsbase
     memset(reply + ofs, 'x', 16);
@@ -2415,12 +2420,12 @@ void gdb_cpu_ctrl_t::hook_exceptions()
     intr_hook(INTR_EX_DEBUG, &gdb_cpu_ctrl_t::exception_handler,
               "sw_debug", eoi_none);
     intr_hook(INTR_EX_NMI, &gdb_cpu_ctrl_t::exception_handler,
-              "sw_nmi", eoi_none);
+              "gdbstub_nmi", eoi_none);
     intr_hook(INTR_EX_BREAKPOINT, &gdb_cpu_ctrl_t::exception_handler,
               "sw_bp", eoi_none);
     idt_set_unhandled_exception_handler(&gdb_cpu_ctrl_t::exception_handler);
 
-    idt_clone_debug_exception_dispatcher();
+    //idt_clone_debug_exception_dispatcher();
 }
 
 void gdb_cpu_ctrl_t::start_stub()
@@ -2489,6 +2494,9 @@ void gdb_cpu_ctrl_t::start()
 
     int cpu_count = thread_cpu_count();
 
+    if (unlikely(cpu_count < 2))
+        panic("Kernel debugger requires SMP\n");
+
     if (unlikely(!cpus.reserve(cpu_count - 1)))
         panic_oom();
 
@@ -2501,14 +2509,10 @@ void gdb_cpu_ctrl_t::start()
 
     cpu_irq_enable();
 
-    stub_tid = thread_create(gdb_thread, nullptr, "gdbstub", 0, false, false);
+    stub_tid = thread_create(gdb_thread, nullptr, "gdbstub", 0, false, false,
+                             thread_cpu_mask_t(thread_cpu_count() - 1));
 
     cpu_wait_value(&stub_running, true);
-
-    cpu_irq_disable();
-    bool volatile wait = true;
-    while (wait)
-        thread_yield();
 }
 
 void gdb_cpu_ctrl_t::freeze_one(gdb_cpu_t& cpu)
@@ -2534,8 +2538,6 @@ void gdb_cpu_ctrl_t::gdb_thread()
 
     gdb_cpu = cpus.size();
 
-    thread_set_affinity(stub_tid, thread_cpu_mask_t(gdb_cpu));
-
     // Set GDB stub to time critical priority
     thread_set_priority(stub_tid, 32767);
 
@@ -2553,11 +2555,16 @@ gdb_cpu_t *gdb_cpu_ctrl_t::cpu_from_nr(int cpu_nr)
     if (cpu_nr <= 0)
         cpu_nr = thread_cpu_number() + 1;
 
-    auto it = find_if(cpus.begin(), cpus.end(), [&](gdb_cpu_t const& cpu) {
+    auto it = find_if(cpus.cbegin(), cpus.cend(), [&](gdb_cpu_t const& cpu) {
         return cpu.cpu_nr == cpu_nr;
     });
 
     return likely(it != cpus.end()) ? &*it : nullptr;
+}
+
+void gdb_cpu_ctrl_t::halt()
+{
+    cpu_halt();
 }
 
 void gdb_cpu_ctrl_t::wait(gdb_cpu_t const *cpu)
@@ -2589,6 +2596,7 @@ static inline void cpu_unmask_nmi()
         , [iretq_rsp] "=&r" (iretq_rsp)
         : [ss] "i" (GDT_SEL_KERNEL_DATA)
         , [cs] "i" (GDT_SEL_KERNEL_CODE64)
+        : "memory"
     );
 }
 
@@ -2599,14 +2607,16 @@ static inline void cpu_unmask_nmi()
 // and sends a second NMI, nesting the first. The nested NMI returns without
 // doing much and it returns to the wait loop in the first NMI
 
+// Note that this runs on all CPUs in various contexts
 isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 {
     gdb_cpu_t *cpu = cpu_from_nr(0);
 
     if (!cpu) {
+        // This is the GDB stub
+
         static uintptr_t bp_workaround_addr;
 
-        // This is the GDB stub
         if ((ISR_CTX_REG_RFLAGS(ctx) & CPU_EFLAGS_TF) && bp_workaround_addr) {
             // We are in a single step breakpoint workaround
 
@@ -2639,16 +2649,16 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             // Find the breakpoint
             bp_list::iterator it = breakpoint_find(
                         bp_sw, uintptr_t(ISR_CTX_REG_RIP(ctx)), 0, 0);
-            if (it == bp_sw.end())
-                return nullptr;
+            if (it != bp_sw.end()){
 
-            // Disable it
-            breakpoint_toggle(*it, false);
+                // Disable it
+                breakpoint_toggle(*it, false);
 
-            // Single step the instruction
-            ISR_CTX_REG_RFLAGS(ctx) |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
+                // Single step the instruction
+                ISR_CTX_REG_RFLAGS(ctx) |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
 
-            return ctx;
+                return ctx;
+            }
         }
 
         return nullptr;
@@ -2670,18 +2680,33 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
         return ctx;
     }
 
+    switch (ISR_CTX_INTR(ctx)) {
+    case INTR_EX_GPF:
+    case INTR_EX_DBLFAULT:
+    case INTR_EX_DIV:
+    case INTR_EX_OPCODE:
+    case INTR_EX_DEV_NOT_AV:
+    case INTR_EX_SEGMENT:
+    case INTR_EX_MATH:
+    case INTR_EX_SIMD:
+    case INTR_EX_STACK:
+    case INTR_EX_TSS:
+        cpu->state = gdb_cpu_state_t::FREEZING;
+        break;
+    }
+
     cpu->ctx = ctx;
 
     if (cpu->state == gdb_cpu_state_t::FREEZING) {
         if (ISR_CTX_INTR(ctx) == INTR_EX_NMI) {
             // Prepare to nest NMI
             GDBSTUB_TRACE("Preparing for nested NMI on cpu %d\n", cpu->cpu_nr);
-            idt_ist_adjust(cpu->cpu_nr - 1, IDT_IST_SLOT_NMI, -(4 << 10));
+            idt_ist_adjust(cpu->cpu_nr - 1, IDT_IST_SLOT_NMI, -(2 << 10));
             cpu_unmask_nmi();
         }
 
         // GDB thread waits for the state to transition to FROZEN
-        // Must be prepared to receive another NMI after setting
+        // Must be already prepared to receive another NMI before setting
         // state to frozen
         cpu->state = gdb_cpu_state_t::FROZEN;
 
@@ -2707,7 +2732,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
         // Un-nest NMI
         if (ISR_CTX_INTR(ctx) == INTR_EX_NMI) {
             GDBSTUB_TRACE("Un-nested NMI stack on cpu %d\n", cpu->cpu_nr);
-            idt_ist_adjust(cpu->cpu_nr - 1, IDT_IST_SLOT_NMI, (4 << 10));
+            idt_ist_adjust(cpu->cpu_nr - 1, IDT_IST_SLOT_NMI, (2 << 10));
         }
     }
 

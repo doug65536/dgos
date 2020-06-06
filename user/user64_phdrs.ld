@@ -85,9 +85,14 @@ SECTIONS {
 	/* 64-bit align */
 	.init_array ALIGN(8) : {
 		PROVIDE_HIDDEN(__init_array_start = .);
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
 		PROVIDE_HIDDEN(__init_array_end = .);
+
+		PROVIDE_HIDDEN(__init_array_early_start = .);
+		KEEP(*(.init_array))
+		KEEP(*(.ctors))
+		PROVIDE_HIDDEN(__init_array_early_end = .);
 	} :data
 
 	/* 64-bit align */
@@ -99,6 +104,7 @@ SECTIONS {
 	} :data
 
 	.got ALIGN(8) : {
+		_GLOBAL_OFFSET_TABLE_ = .;
 		*(.got)
 	} :data
 

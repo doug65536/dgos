@@ -56,12 +56,12 @@ UNITTEST(test_chrono_conversion)
     std::chrono::microseconds ius = one_day;
     std::chrono::nanoseconds ins = one_day;
 
-    eq(24, one_day.count());
-    eq(1440, imin.count());
-    eq(86400, isec.count());
-    eq(86400000, ims.count());
-    eq(86400000000, ius.count());
-    eq(86400000000000, ins.count());
+    eq(24U, one_day.count());
+    eq(1440U, imin.count());
+    eq(86400U, isec.count());
+    eq(86400000U, ims.count());
+    eq(86400000000U, ius.count());
+    eq(86400000000000U, ins.count());
 
     // Conversions that give a reduced count
     std::chrono::nanoseconds day_ns(86400000000000);
@@ -76,10 +76,10 @@ UNITTEST(test_chrono_conversion)
     std::chrono::hours dhrs =
             std::chrono::duration_cast<std::chrono::hours>(day_ns);
 
-    eq(86400000000000, day_ns.count());
-    eq(86400000000, dus.count());
-    eq(86400000, dms.count());
-    eq(86400, dsec.count());
-    eq(1440, dmin.count());
-    eq(24, dhrs.count());
+    eq(86400000000000U, day_ns.count());
+    eq(86400000000U, dus.count());
+    eq(86400000U, dms.count());
+    eq(86400U, dsec.count());
+    eq(1440U, dmin.count());
+    eq(24U, dhrs.count());
 }

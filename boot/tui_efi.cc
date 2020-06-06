@@ -6,8 +6,8 @@
 #include "debug.h"
 #include "halt.h"
 
-static EFI_GUID efi_simple_text_input_protocol_guid =
-        EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
+//static EFI_GUID efi_simple_text_input_protocol_guid =
+//        EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
 
 static EFI_GUID efi_simple_pointer_protocol_guid =
         EFI_SIMPLE_POINTER_PROTOCOL_GUID;
@@ -129,30 +129,32 @@ static EFIAPI VOID efi_timer_callback(EFI_EVENT Event, VOID *Context)
     systime_counter.pre_inc();
 }
 
-_constructor(ctor_console) void conin_init()
+_constructor(ctor_console) static void conin_init()
 {
+    efi_simple_text_input = efi_systab->ConIn;
+
     EFI_STATUS status;
 
-    EFI_HANDLE *efi_text_input_handles = nullptr;
-    UINTN efi_num_text_input_handles = 0;
+//    EFI_HANDLE *efi_text_input_handles = nullptr;
+//    UINTN efi_num_text_input_handles = 0;
 
-    status = efi_systab->BootServices->LocateHandleBuffer(
-                ByProtocol,
-                &efi_simple_text_input_protocol_guid,
-                nullptr,
-                &efi_num_text_input_handles,
-                &efi_text_input_handles);
+//    status = efi_systab->BootServices->LocateHandleBuffer(
+//                ByProtocol,
+//                &efi_simple_text_input_protocol_guid,
+//                nullptr,
+//                &efi_num_text_input_handles,
+//                &efi_text_input_handles);
 
-    if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Unable to query text input handle");
+//    if (unlikely(EFI_ERROR(status)))
+//        PANIC(TSTR "Unable to query text input handle");
 
-    status = efi_systab->BootServices->HandleProtocol(
-                efi_text_input_handles[0],
-            &efi_simple_text_input_protocol_guid,
-            (VOID**)&efi_simple_text_input);
+//    status = efi_systab->BootServices->HandleProtocol(
+//                efi_text_input_handles[0],
+//            &efi_simple_text_input_protocol_guid,
+//            (VOID**)&efi_simple_text_input);
 
-    if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Unable to query text output interface");
+//    if (unlikely(EFI_ERROR(status)))
+//        PANIC(TSTR "Unable to query text input interface");
 
     EFI_HANDLE *efi_pointer_handles = nullptr;
     UINTN efi_num_pointer_handles = 0;

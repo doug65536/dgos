@@ -2,12 +2,14 @@
 #include <sys/syscall.h>
 #include <sys/syscall_num.h>
 #include <errno.h>
+#include <sys/likely.h>
 
 int socket(int __domain, int __type, int __protocol)
 {
-     int status = syscall3(__domain, __type, __protocol, SYS_socket);
+     int status = syscall3(unsigned(__domain), unsigned(__type),
+                           unsigned(__protocol), SYS_socket);
 
-     if (status >= 0)
+     if (likely(status >= 0))
          return status;
 
      errno = -status;

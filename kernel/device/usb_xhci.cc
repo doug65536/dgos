@@ -66,7 +66,7 @@ struct usbxhci_capreg_t {
 
     // 5.3.9 1Ch Capability Parameters 2
     uint32_t hccparams2;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_capreg_t) == 0x20);
 
@@ -104,7 +104,7 @@ struct usbxhci_rtreg_t  {
 
     // 5.5.2 Interrupter Register Set
     usbxhci_intr_t ir[1023];
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_rtreg_t) == 0x8000);
 
@@ -122,7 +122,7 @@ struct usbxhci_portreg_t {
 
     // 5.4.11 Ch Port Hardware LPM Control
     uint32_t porthlpmc;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_portreg_t) == 0x10);
 
@@ -160,7 +160,7 @@ struct usbxhci_opreg_t {
     // 5.4.8 0x400 0x13FF Port Register Set 1-MaxPorts
     // The actual number of ports is in HCSPARAMS1
     usbxhci_portreg_t ports[256];
-} _packed;
+};
 
 C_ASSERT(offsetof(usbxhci_opreg_t, ports) == 0x400);
 C_ASSERT(sizeof(usbxhci_opreg_t) == 0x1400);
@@ -206,7 +206,7 @@ struct usbxhci_slotctx_t {
     uint32_t rsvd2[4];
 
     // If the HCCPARAMS1 CSZ field is 1, then this structure is 32 bytes larger
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_slotctx_t) == 0x20);
 
@@ -286,7 +286,7 @@ struct usbxhci_ep_ctx_t {
     uint16_t max_eist_pl_lo;
 
     uint32_t rsvd[3];
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_ep_ctx_t) == 0x20);
 
@@ -304,14 +304,18 @@ C_ASSERT(sizeof(usbxhci_ep_ctx_t) == 0x20);
 struct usbxhci_devctx_small_t {
     usbxhci_slotctx_t slotctx;
     usbxhci_ep_ctx_t epctx[16];
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_devctx_small_t) == 544);
 
 struct usbxhci_devctx_large_t {
     usbxhci_slotctx_t slotctx;
     uint8_t rsvd[32];
 
     usbxhci_ep_ctx_t epctx[16];
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_devctx_large_t) == 576);
 
 union usbxhci_devctx_t {
     void *any;
@@ -329,7 +333,9 @@ struct usbxhci_inpctlctx_t {
     uint8_t iface_num;
     uint8_t alternate;
     uint8_t rsvd2;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_inpctlctx_t) == 32);
 
 // 6.2.5 Input Context
 
@@ -686,10 +692,11 @@ struct usbxhci_ring_data_t {
     uint32_t count;
     uint8_t cycle;
 
-    void insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src, usb_iocp_t *iocp,
-                bool ins_pending);
+    usbxhci_pending_cmd_t *insert(usbxhci *ctrl,
+                                  usbxhci_cmd_trb_t * restrict src,
+                                  usb_iocp_t *iocp, bool ins_pending);
 
-    bool alloc(uint32_t trb_count);
+    bool alloc(size_t trb_count);
 
     void reserve_link();
 };
@@ -713,12 +720,20 @@ struct usbxhci_endpoint_data_t {
     usbxhci_trb_ring_data_t ring;
 };
 
+struct usbxhci_evt_handler_t {
+    virtual void handle(uint_least16_t type, usbxhci_evt_t *evt) = 0;
+};
+
 struct usbxhci_pending_cmd_t {
     uint64_t cmd_physaddr;
     usb_iocp_t *iocp;
+    usbxhci_evt_handler_t *handler;
+    uintptr_t reserved;
 
     size_t hash() const;
 };
+
+C_ASSERT_ISPO2(sizeof(usbxhci_pending_cmd_t));
 
 struct usbxhci_slot_data_t {
     usbxhci_slot_data_t();
@@ -742,13 +757,15 @@ public:
 
     void dump_config_desc(usb_config_helper const& cfg_hlp);
 
-    bool add_device(int parent_slot, int port, int route);
+    bool add_device(int parent_slot, size_t port, int route);
 
     template<typename T>
     friend class usbxhci_ring_data_t;
 
     void *operator new(size_t sz, std::nothrow_t const&) noexcept;
     void operator delete(void *p) noexcept;
+
+    void legacy_handoff(const volatile uint32_t *cap);
 
 protected:
     //
@@ -759,10 +776,12 @@ protected:
         return maxports;
     }
 
-    bool port_device_present(int port) override final
+    bool port_device_present(size_t port) override final
     {
-        if (likely(port >= 0 && port < maxports))
-            return mmio_op->ports[port].portsc & USBXHCI_PORTSC_CCS;
+        if (likely(port < maxports)) {
+            uint32_t portsc = mm_rd(mmio_op->ports[port].portsc);
+            return portsc & USBXHCI_PORTSC_CCS;
+        }
         return false;
     }
 
@@ -806,7 +825,7 @@ protected:
                             usb_hub_desc const &hub_desc) override final;
 
 private:
-    using lock_type = ext::mcslock;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     errno_t cc_to_errno(usb_cc_t cc);
@@ -818,17 +837,20 @@ private:
     void ring_doorbell(uint32_t doorbell, uint8_t value,
                        uint16_t stream_id);
 
-    void issue_cmd(usbxhci_cmd_trb_t *cmd, usb_iocp_t *iocp);
+    usbxhci_pending_cmd_t *issue_cmd(usbxhci_cmd_trb_t *cmd, usb_iocp_t *iocp);
 
     void add_xfer_trbs(uint8_t slotid, uint8_t epid,
                        uint16_t stream_id, size_t count, int dir,
                        void *trbs, usb_iocp_t *iocp);
 
     void insert_pending_command(usbxhci_pending_cmd_t *pc,
-                                uint64_t cmd_physaddr, usb_iocp_t *iocp);
+                                uint64_t cmd_physaddr,
+                                usbxhci_evt_handler_t *handler,
+                                usb_iocp_t *iocp);
 
     int make_data_trbs(usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
-                       void *data, uint32_t length, int dir, bool intr);
+                       void *data, uint32_t length, int dir,
+                       bool intr, bool isp);
 
     int make_setup_trbs(usbxhci_ctl_trb_t *trbs, int trb_capacity,
                         void *data, uint16_t length, int dir,
@@ -858,7 +880,7 @@ private:
     usb_cc_t commit_inp_ctx(int slotid, int epid,
                             usbxhci_inpctx_t &inp, uint32_t trb_type);
 
-    int update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc);
+    usb_cc_t update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc);
 
     void get_config(uint8_t slotid, usb_desc_config *desc, uint8_t desc_size,
                     usb_iocp_t *iocp);
@@ -872,7 +894,8 @@ private:
     bool remove_endpoint(uint8_t slotid, uint8_t epid);
 
     void evt_handler(usbxhci_interrupter_info_t *ir_info,
-                     usbxhci_intr_t *ir, usbxhci_evt_t *evt, size_t ii);
+                     usbxhci_intr_t volatile *ir,
+                     usbxhci_evt_t *evt, size_t ii);
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     void irq_handler(int irq_ofs);
@@ -898,7 +921,7 @@ private:
 
     usbxhci_evtring_seg_t volatile *dev_evt_segs;
 
-    usbxhci_interrupter_info_t *interrupters;
+    std::unique_ptr<usbxhci_interrupter_info_t[]> interrupters;
 
     size_t busid;
 
@@ -914,7 +937,7 @@ private:
     // Maximums
     uint32_t maxslots;
     uint32_t maxintr;
-    int maxports;
+    size_t maxports;
 
     usbxhci_portinfo_t *ports;
     unsigned port_count;
@@ -961,29 +984,34 @@ usbxhci_ep_ctx_t *usbxhci::dev_ctx_ent_ep(size_t slot, size_t i)
 void usbxhci::ring_doorbell(uint32_t doorbell, uint8_t value,
                             uint16_t stream_id)
 {
-    atomic_barrier();
-    mmio_db[doorbell] = value | (stream_id << 16);
-    atomic_barrier();
+    mm_wr(mmio_db[doorbell], value | (stream_id << 16));
 }
 
 void usbxhci::insert_pending_command(usbxhci_pending_cmd_t *pc,
-                                     uint64_t cmd_physaddr, usb_iocp_t *iocp)
+                                     uint64_t cmd_physaddr,
+                                     usbxhci_evt_handler_t *handler,
+                                     usb_iocp_t *iocp)
 {
     pc->cmd_physaddr = cmd_physaddr;
     pc->iocp = iocp;
+    pc->handler = handler;
     usbxhci_pending_ht.insert(pc);
 }
 
-void usbxhci::issue_cmd(usbxhci_cmd_trb_t *cmd, usb_iocp_t *iocp)
+usbxhci_pending_cmd_t *usbxhci::issue_cmd(
+        usbxhci_cmd_trb_t *cmd, usb_iocp_t *iocp)
 {
     scoped_lock hold_cmd_lock(lock_cmd);
 
     USBXHCI_TRACE("Writing command to command ring at %u\n", cmd_ring.next);
 
-    cmd_ring.insert(this, cmd, iocp, true);
+    usbxhci_pending_cmd_t *pending_cmd;
+    pending_cmd = cmd_ring.insert(this, cmd, iocp, true);
 
     // Ring controller command doorbell
     ring_doorbell(0, 0, 0);
+
+    return pending_cmd;
 }
 
 void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
@@ -998,7 +1026,9 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
         // Get pointer to source TRB
         auto src = (usbxhci_cmd_trb_t *)trbs + i;
 
-        epd->ring.insert(this, src, iocp, iocp && (i + 1) == count);
+        usbxhci_pending_cmd_t *pending_cmd;
+        pending_cmd = epd->ring.insert(
+                    this, src, iocp, iocp && (i + 1) == count);
     }
 
     ring_doorbell(slotid, (dir || !epid)
@@ -1072,8 +1102,9 @@ void usbxhci::cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp)
 
 usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 {
-    usbxhci_endpoint_data_t *newepd =
-            new (std::nothrow) usbxhci_endpoint_data_t;
+    std::unique_ptr<usbxhci_endpoint_data_t> newepd(
+            new (std::nothrow) usbxhci_endpoint_data_t);
+
     if (!newepd)
         return nullptr;
 
@@ -1082,7 +1113,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 
     scoped_lock hold_endpoints_lock(endpoints_lock);
 
-    if (!endpoints.emplace_back(newepd))
+    if (!endpoints.emplace_back(newepd.get()))
         return nullptr;
 
     if (unlikely(!newepd->ring.alloc(PAGESIZE / sizeof(*newepd->ring.ptr)))) {
@@ -1091,10 +1122,12 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
     }
     newepd->ring.reserve_link();
 
-    if (!endpoint_lookup.insert(newepd))
+    if (!endpoint_lookup.insert(newepd)) {
+        endpoints.pop_back();
         return nullptr;
+    }
 
-    return newepd;
+    return newepd.release();
 }
 
 usbxhci_endpoint_data_t *usbxhci::lookup_endpoint(uint8_t slotid, uint8_t epid)
@@ -1139,23 +1172,26 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
     usb_desc_iface const *iface;
     usb_desc_ep const *ep;
 
-    for (int cfg_idx = 0;
+    for (size_t cfg_idx = 0;
          (cfg = cfg_hlp.find_config(cfg_idx)) != nullptr;
          ++cfg_idx) {
 
-        USBXHCI_TRACE("cfg #%#x max_power=%umA {\n",
-                      cfg_idx, cfg->max_power * 2);
+        USBXHCI_TRACE("cfg #%#zx max_power=%umA cfg=%#x val=%#x {\n",
+                      cfg_idx, cfg->max_power * 2,
+                      cfg->cfg, cfg->cfg_value);
 
-        for (int iface_idx = 0;
+        for (size_t iface_idx = 0;
              (iface = cfg_hlp.find_iface(cfg, iface_idx)) != nullptr;
              ++iface_idx) {
             USBXHCI_TRACE("  iface #%#x: class=%#x (%s)"
-                          " subclass=%#x, proto=%#x {\n",
+                          " subclass=%s%#x, proto=%#x {\n",
                           iface->iface_num, iface->iface_class,
                           cfg_hlp.class_code_text(iface->iface_class),
+                          iface->iface_class & uint8_t(usb_desctype_t::CS)
+                          ? "CS_" : "",
                           iface->iface_subclass, iface->iface_proto);
 
-            for (int ep_idx = 0;
+            for (size_t ep_idx = 0;
                  (ep = cfg_hlp.find_ep(iface, ep_idx)) != nullptr;
                  ++ep_idx) {
                 USBXHCI_TRACE("    ep %#x: dir=%s attr=%s,"
@@ -1175,49 +1211,57 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
     USBXHCI_TRACE("Done configuration descriptors\n");
 }
 
-bool usbxhci::add_device(int parent_slot, int port, int route)
+bool usbxhci::add_device(int parent_slot, size_t port, int route)
 {
-    USBXHCI_TRACE("Adding device, port=%d, route=%#x\n", port, route);
+    USBXHCI_TRACE("Adding device, port=%zu, route=%#x\n", port, route);
 
     int slotid = enable_slot(port);
+
+    if (unlikely(slotid < 0))
+        return false;
 
     // Remember the parent hub slot
     slot_data.at(parent_slot).parent_slot = slotid;
 
     int err = set_address(slotid, port, route);
-    if (err < 0)
+    if (unlikely(err < 0))
         return false;
 
     usb_desc_device dev_desc{};
 
-    err = get_descriptor(slotid, 0, &dev_desc, 8, usb_req_type::STD,
+    // Get the first 8 bytes of the device descriptor,
+    // staying within bare minimums until we can see max packet size
+    err = get_descriptor(slotid, 0, &dev_desc, 8,
+                         usb_req_type::STD,
                          usb_req_recip_t::DEVICE,
                          usb_desctype_t::DEVICE, 0);
-    if (err < 0)
+    if (unlikely(err < 0))
         return false;
 
     if (dev_desc.maxpktsz != 8) {
-        err = update_slot_ctx(slotid, &dev_desc);
-        if (err < 0)
+        // Update the slot context with a new maximum packet size
+        usb_cc_t upd_status = update_slot_ctx(slotid, &dev_desc);
+        if (unlikely(upd_status != usb_cc_t::success))
             return false;
     }
 
+    // Now read a decent amount of data
     err = get_descriptor(slotid, 0, &dev_desc, sizeof(dev_desc),
-                         usb_req_type::STD, usb_req_recip_t::DEVICE,
+                         usb_req_type::STD,
+                         usb_req_recip_t::DEVICE,
                          usb_desctype_t::DEVICE, 0);
-    if (err < 0)
+    if (unlikely(err < 0))
         return false;
 
-    // Get first 8 bytes of device descriptor to get max packet size
-    union {
-        usb_desc_config cfg_buf[1];
-        char filler[128];
-    };
+    size_t cfg_buf_sz = 4096;
+    ext::unique_ptr_free<usb_desc_config> cfg_buf(
+                (usb_desc_config*)calloc(1, cfg_buf_sz));
 
-    err = get_descriptor(slotid, 0, cfg_buf, 128, usb_req_type::STD,
+    err = get_descriptor(slotid, 0, cfg_buf.get(), cfg_buf_sz,
+                         usb_req_type::STD,
                          usb_req_recip_t::DEVICE,
                          usb_desctype_t::CONFIGURATION, 0);
-    if (err < 0)
+    if (unlikely(err < 0))
         return false;
 
     // 9.2.6.6 - Speed Dependent Descriptors
@@ -1229,26 +1273,27 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
     do {
         if (dev_desc.usb_spec >= 0x210) {
             err = get_descriptor(slotid, 0, &bos_hdr, sizeof(bos_hdr),
-                                 usb_req_type::STD, usb_req_recip_t::DEVICE,
+                                 usb_req_type::STD,
+                                 usb_req_recip_t::DEVICE,
                                  usb_desctype_t::BOS, 0);
 
-            if (err < 0)
+            if (unlikely(err < 0))
                 break;
 
-            void *bos_mem = malloc(bos_hdr.total_len);
+            bos.reset(new (std::nothrow) usb_desc_bos{});
 
-            if (unlikely(!bos_mem))
+            if (unlikely(!bos))
                 break;
-
-            bos.reset(new (bos_mem) usb_desc_bos{});
 
             err = get_descriptor(slotid, 0, bos.get(), bos_hdr.total_len,
-                                 usb_req_type::STD, usb_req_recip_t::DEVICE,
+                                 usb_req_type::STD,
+                                 usb_req_recip_t::DEVICE,
                                  usb_desctype_t::BOS, 0);
         }
     } while (false);
 
-    usb_config_helper cfg_hlp(slotid, dev_desc, bos, cfg_buf, 128);
+    usb_config_helper cfg_hlp(slotid, dev_desc, bos,
+                              cfg_buf, cfg_buf_sz);
 
     USBXHCI_TRACE("Searching for driver for %#04x:%#04x\n",
                   cfg_hlp.device().vendor_id, cfg_hlp.device().product_id);
@@ -1284,41 +1329,46 @@ void usbxhci::operator delete(void *p) noexcept
 #define USBXHCI_EXTCAPID_DEBUG  10
 #define USBXHCI_EXTCAPID_XMI    17
 
+void usbxhci::legacy_handoff(uint32_t const volatile *cap)
+{
+    uint8_t volatile *bios_owned;
+    uint8_t volatile *os_owned;
+    bios_owned = (uint8_t volatile *)cap + 2;
+    os_owned = (uint8_t volatile *)cap + 3;
+
+    mm_wr(*os_owned, mm_rd(*os_owned) | 1);
+
+    std::chrono::steady_clock::time_point now, st, timeout;
+    st = std::chrono::steady_clock::now();
+    timeout = now + std::chrono::seconds(5);
+    now = st;
+
+    while ((atomic_ld_acq(bios_owned) & 1) &&
+           (now = std::chrono::steady_clock::now()) < timeout)
+        pause();
+
+    if (now < timeout) {
+        USBXHCI_TRACE("Legacy handoff completed in %" PRId64 "ms\n",
+                      std::chrono::duration_cast<
+                        std::chrono::milliseconds>(
+                          timeout - now).count());
+    } else {
+        USBXHCI_TRACE("Legacy handoff timed out!\n");
+    }
+}
+
 void usbxhci::walk_caps(char const volatile *caps)
 {
-    for (uint32_t const *cap = (uint32_t const*)caps;
-         USBXHCI_EXTCAP_CAPID_GET(*cap);
-         cap += USBXHCI_EXTCAP_NEXT_GET(*cap)) {
-        unsigned capid = USBXHCI_EXTCAP_CAPID_GET(*cap);
-
+    uint32_t capid, next;
+    for (uint32_t const volatile *cap = (uint32_t*)caps;
+         (capid = USBXHCI_EXTCAP_CAPID_GET(mm_rd(*cap))) != 0;
+         cap += next) {
         switch (capid) {
         case USBXHCI_EXTCAPID_LEGACY:
             // Perform BIOS->OS handoff
             USBXHCI_TRACE("Performing legacy handoff\n");
 
-            uint8_t volatile *bios_owned;
-            uint8_t volatile *os_owned;
-            bios_owned = (uint8_t volatile *)caps + 2;
-            os_owned = (uint8_t volatile *)caps + 3;
-
-            atomic_st_rel(os_owned, atomic_ld_acq(os_owned) | 1);
-
-            uint64_t now;
-            uint64_t timeout_ns;
-            now = time_ns();
-            timeout_ns = now + 1000000000;
-
-            while (atomic_ld_acq(bios_owned) & 1) {
-                now = time_ns();
-                if (now < timeout_ns) {
-                    pause();
-                } else {
-                    USBXHCI_TRACE("Legacy handoff timed out!\n");
-                }
-            }
-
-            USBXHCI_TRACE("Legacy handoff completed in %" PRId64 "ms\n",
-                          (1000000000 - (timeout_ns - now)) / 1000000);
+            legacy_handoff(cap);
 
             break;
 
@@ -1352,15 +1402,15 @@ void usbxhci::walk_caps(char const volatile *caps)
 
         }
 
-        if (!USBXHCI_EXTCAP_NEXT_GET(*cap))
+        next = USBXHCI_EXTCAP_NEXT_GET(*cap);
+
+        if (!next)
             break;
     }
 }
 
 bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 {
-    uint64_t timeout;
-
     this->busid = busid;
 
     // Bus master enable, memory space enable, I/O space disable
@@ -1373,20 +1423,20 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
                 MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
 
     mmio_cap = (usbxhci_capreg_t*)mmio_base;
-    mmio_op = (usbxhci_opreg_t*)(mmio_base + mmio_cap->caplength);
-    mmio_rt = (usbxhci_rtreg_t*)(mmio_base + (mmio_cap->rtsoff & -32));
-    mmio_db = (usbxhci_dbreg_t*)(mmio_base + (mmio_cap->dboff & -4));
+    mmio_op = (usbxhci_opreg_t*)(mmio_base + mm_rd(mmio_cap->caplength));
+    mmio_rt = (usbxhci_rtreg_t*)(mmio_base + (mm_rd(mmio_cap->rtsoff) & -32));
+    mmio_db = (usbxhci_dbreg_t*)(mmio_base + (mm_rd(mmio_cap->dboff) & -4));
 
     USBXHCI_TRACE("Waiting for controller not ready == zero\n");
 
-    // 20 seconds is the point where no working controller is that slow
-    uint64_t now = time_ns();
-    uint64_t time_st = now;
-    timeout = time_st + 20000000000;
+    // 5 seconds is the point where no working controller is that slow
+    auto now = std::chrono::steady_clock::now();
+    auto time_st = now;
+    auto timeout = time_st + std::chrono::seconds(5);
 
     // Wait for CNR (controller not ready) to be zero
-    while ((mmio_op->usbsts & USBXHCI_USBSTS_CNR) &&
-           ((now = time_ns()) < timeout))
+    while ((mm_rd(mmio_op->usbsts) & USBXHCI_USBSTS_CNR) &&
+           ((now = std::chrono::steady_clock::now()) < timeout))
         pause();
 
     if (unlikely(now >= timeout)) {
@@ -1397,7 +1447,8 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     USBXHCI_TRACE("Controller is ready\n");
 
     // Perform BIOS handoff
-    size_t xecp = USBXHCI_CAPREG_HCCPARAMS1_XECP_GET(mmio_cap->hccparams1);
+    size_t xecp = USBXHCI_CAPREG_HCCPARAMS1_XECP_GET(
+                mm_rd(mmio_cap->hccparams1));
 
     walk_caps(mmio_base + (xecp * 4));
 
@@ -1406,16 +1457,18 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     USBXHCI_TRACE("Stopping controller\n");
 
     // 2 seconds is the point where no working controller is that slow
-    now = time_ns();
+    now = std::chrono::steady_clock::now();
     time_st = now;
-    timeout = time_st + 2000000000;
+    timeout = time_st + std::chrono::seconds(2);
 
     // Stop the controller
-    mmio_op->usbcmd &= ~USBXHCI_USBCMD_RUNSTOP;
+    uint32_t usbcmd = mm_rd(mmio_op->usbcmd);
+    usbcmd &= ~USBXHCI_USBCMD_RUNSTOP;
+    mm_wr(mmio_op->usbcmd, usbcmd);
 
     // Wait for controller to stop
-    while ((!(mmio_op->usbsts & USBXHCI_USBSTS_HCH)) &&
-           ((now = time_ns()) < timeout))
+    while ((!(mm_rd(mmio_op->usbsts) & USBXHCI_USBSTS_HCH)) &&
+           ((now = std::chrono::steady_clock::now()) < timeout))
         pause();
 
     if (unlikely(now >= timeout)) {
@@ -1424,21 +1477,23 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     }
 
     USBXHCI_TRACE("Stop completed in %" PRIu64 "ms\n",
-                  (now - time_st) / 1000000);
+                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                      now - time_st).count());
 
     USBXHCI_TRACE("Resetting controller\n");
 
-    // 20 seconds is the point where no working controller is that slow
-    now = time_ns();
+    // 5 seconds is the point where no working controller is that slow
+    now = std::chrono::steady_clock::now();
     time_st = now;
-    timeout = time_st + 200000000000;
+    timeout = time_st + std::chrono::seconds(5);
 
     // Reset the controller
-    mmio_op->usbcmd |= USBXHCI_USBCMD_HCRST;
+    usbcmd |= USBXHCI_USBCMD_HCRST;
+    mm_wr(mmio_op->usbcmd, usbcmd);
 
     // Wait for reset to complete
-    while ((mmio_op->usbcmd & USBXHCI_USBCMD_HCRST) &&
-           ((now = time_ns()) < timeout))
+    while (((usbcmd = mm_rd(mmio_op->usbcmd) & USBXHCI_USBCMD_HCRST)) &&
+           ((now = std::chrono::steady_clock::now()) < timeout))
         pause();
 
     if (unlikely(now >= timeout)) {
@@ -1447,21 +1502,26 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     }
 
     USBXHCI_TRACE("Reset completed in %" PRIu64 "ms\n",
-                  (time_ns() - time_st) / 1000000);
+                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                      now - time_st).count());
 
-    uint32_t hcsparams1 = mmio_cap->hcsparams1;
+    uint32_t hcsparams1 = mm_rd(mmio_cap->hcsparams1);
     maxslots = USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_GET(hcsparams1);
     maxintr = USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_GET(hcsparams1);
     maxports = USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_GET(hcsparams1);
 
-    dev_ctx_large = USBXHCI_CAPREG_HCCPARAMS1_CSZ_GET(mmio_cap->hccparams1);
+    dev_ctx_large = USBXHCI_CAPREG_HCCPARAMS1_CSZ_GET(
+                mm_rd(mmio_cap->hccparams1));
 
-    USBXHCI_CONFIG_MAXSLOTSEN_SET(mmio_op->config, maxslots);
+    uint32_t config = mm_rd(mmio_op->config);
+    USBXHCI_CONFIG_MAXSLOTSEN_SET(config, maxslots);
+    mm_wr(mmio_op->config, config);
 
-    USBXHCI_TRACE("devslots=%d, maxintr=%d, maxports=%d\n",
+    USBXHCI_TRACE("devslots=%d, maxintr=%d, maxports=%zu\n",
                   maxslots, maxintr, maxports);
 
-    slot_data.resize(maxslots);
+    if (unlikely(!slot_data.resize(maxslots)))
+        panic_oom();
 
     size_t cpu_count = thread_get_cpu_count();
 
@@ -1474,10 +1534,14 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
         maxintr = cpu_count;
 
         // One MSI-X vector per CPU, all using same interrupt vector
-        target_cpus.resize(cpu_count);
+        if (unlikely(!target_cpus.resize(cpu_count)))
+            panic_oom();
+
         for (size_t i = 0; i < cpu_count; ++i)
             target_cpus[i] = i;
-        vector_offsets.resize(cpu_count, 0);
+
+        if (unlikely(!vector_offsets.resize(cpu_count, 0)))
+            panic_oom();
     } else {
         USBXHCI_TRACE("Device cannot support per-CPU IRQs, using one IRQ\n");
         maxintr = 1;
@@ -1521,14 +1585,15 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     for (size_t i = 1; i < maxslots; ++i)
         dev_ctx_ptrs[i] = mphysaddr(dev_ctx_ent_slot(i));
 
+    uint32_t hcsparams2 = mm_rd(mmio_cap->hcsparams2);
+
     // Allocate scratchpad buffers for controller if required
-    int maxscratchpad =
-            USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_GET(mmio_cap->hcsparams2) |
-            (USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_GET(
-                 mmio_cap->hcsparams2) << 5);
+    size_t maxscratchpad =
+            USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_GET(hcsparams2) |
+            (USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_GET(hcsparams2) << 5);
 
     if (maxscratchpad > 0) {
-        USBXHCI_TRACE("device requests %d scratchpad pages (%dKB)\n",
+        USBXHCI_TRACE("device requests %zu scratchpad pages (%zuKB)\n",
                       maxscratchpad, (maxscratchpad << PAGE_SCALE) >> 10);
         // Not doing contiguous allocation - can only handle 512 pages
         assert(maxscratchpad <= int(PAGESIZE / sizeof(uint64_t)));
@@ -1538,7 +1603,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
                     nullptr, maxscratchpad * sizeof(uint64_t),
                     PROT_READ | PROT_WRITE, MAP_POPULATE);
 
-        for (int i = 0; i < maxscratchpad; ++i) {
+        for (size_t i = 0; i < maxscratchpad; ++i) {
             void *scratch_buffer = mmap(nullptr, PAGESIZE,
                                         PROT_READ, MAP_POPULATE);
             scratchbufarr[i] = mphysaddr(scratch_buffer);
@@ -1556,25 +1621,30 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     }
 
     // Device Context Base Address Array Pointer
-    mmio_op->dcbaap = mphysaddr(dev_ctx_ptrs);
+    mm_wr(mmio_op->dcbaap, mphysaddr(dev_ctx_ptrs));
 
     // Command ring size in entries
-    cmd_ring.alloc(PAGESIZE / sizeof(usbxhci_cmd_trb_t));
+    if (!cmd_ring.alloc(PAGESIZE / sizeof(usbxhci_cmd_trb_t)))
+        panic_oom();
+
     cmd_ring.reserve_link();
 
     // Command Ring Control Register
-    mmio_op->crcr = cmd_ring.physaddr;
+    mm_wr(mmio_op->crcr, cmd_ring.physaddr);
 
     // Event segments
     dev_evt_segs = (usbxhci_evtring_seg_t*)mmap(
                 nullptr, sizeof(*dev_evt_segs) * maxintr * 4,
                 PROT_READ | PROT_WRITE, MAP_POPULATE);
 
-    interrupters = (usbxhci_interrupter_info_t*)
-            malloc(sizeof(*interrupters) * maxintr);
+    if (unlikely(!interrupters.reset(new (std::nothrow)
+                                     usbxhci_interrupter_info_t[maxintr])))
+        panic_oom();
 
     for (size_t i = 0; i < maxintr; ++i) {
-        interrupters[i].alloc(PAGESIZE / sizeof(*interrupters[i].ptr));
+        if (unlikely(!interrupters[i].alloc(
+                         PAGESIZE / sizeof(*interrupters[i].ptr))))
+            panic_oom();
 
         dev_evt_segs[i*4].base = interrupters[i].physaddr;
 
@@ -1582,61 +1652,76 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
                 PAGESIZE / sizeof(*interrupters[i].ptr);
 
         // Event ring segment table size
-        USBXHCI_ERSTSZ_SZ_SET(mmio_rt->ir[i].erstsz, 1);
+        uint32_t erstsz = mm_rd(mmio_rt->ir[i].erstsz);
+        USBXHCI_ERSTSZ_SZ_SET(erstsz, 1);
+        mm_wr(mmio_rt->ir[i].erstsz, erstsz);
 
         // Event ring dequeue pointer
-        mmio_rt->ir[i].erdp = dev_evt_segs[i*4].base;
+        mm_wr(mmio_rt->ir[i].erdp, dev_evt_segs[i*4].base);
 
         // Event ring segment table base address
-        mmio_rt->ir[i].erstba = mphysaddr((void*)(dev_evt_segs + i*4));
+        mm_wr(mmio_rt->ir[i].erstba, mphysaddr((void*)(dev_evt_segs + i*4)));
 
         // Set interrupt moderation rate (1000 * 250ns = 250us = 4000/sec)
-        USBXHCI_INTR_IMOD_IMODI_SET(mmio_rt->ir[i].imod, 1000);
+        uint32_t imod = mm_rd(mmio_rt->ir[i].imod);
+        USBXHCI_INTR_IMOD_IMODI_SET(imod, 1000);
+        mm_wr(mmio_rt->ir[i].imod, imod);
 
         // Enable interrupt
-        USBXHCI_INTR_IMAN_IE_SET(mmio_rt->ir[i].iman, 1);
+        uint32_t iman = mm_rd(mmio_rt->ir[i].iman);
+        USBXHCI_INTR_IMAN_IE_SET(iman, 1);
+        mm_wr(mmio_rt->ir[i].iman, iman);
 
         //// Acknowldge possible pending interrupt
-        //mmio_rt->ir[i].iman |= USBXHCI_INTR_IMAN_IP;
+        if (USBXHCI_INTR_IMAN_IP_GET(iman))
+            mm_wr(mmio_rt->ir[i].iman, iman | USBXHCI_INTR_IMAN_IP);
     }
 
     // Acknowledge possible pending interrupt
-    mmio_op->usbsts = USBXHCI_USBSTS_EINT;
+    mm_wr(mmio_op->usbsts, USBXHCI_USBSTS_EINT);
 
-    mmio_op->usbcmd |= USBXHCI_USBCMD_INTE;
+    usbcmd |= USBXHCI_USBCMD_INTE;
+    mm_wr(mmio_op->usbcmd, usbcmd);
 
     // Enable PCI IRQ
     pci_set_irq_unmask(pci_iter, true);
 
-    mmio_op->usbcmd |= USBXHCI_USBCMD_RUNSTOP;
+    usbcmd |= USBXHCI_USBCMD_RUNSTOP;
+    mm_wr(mmio_op->usbcmd, usbcmd);
 
-    while (mmio_op->usbsts & USBXHCI_USBSTS_HCH)
+    while (mm_rd(mmio_op->usbsts) & USBXHCI_USBSTS_HCH)
         pause();
 
-    for (int port = 0; port < maxports; ++port) {
-        if (mmio_op->ports[port].portsc & USBXHCI_PORTSC_CCS) {
-            USBXHCI_TRACE("Device is connected to port %d\n", port);
+    for (size_t port = 0; port < maxports; ++port) {
+        if (mm_rd(mmio_op->ports[port].portsc) & USBXHCI_PORTSC_CCS) {
+            USBXHCI_TRACE("Device is connected to port %zu\n", port);
 
             // Reset the port
-            mmio_op->ports[port].portsc |= USBXHCI_PORTSC_PR;
+            uint32_t portsc = mm_rd(mmio_op->ports[port].portsc);
+            portsc |= USBXHCI_PORTSC_PR;
+            mm_wr(mmio_op->ports[port].portsc, portsc);
 
-            USBXHCI_TRACE("Waiting for reset on port %d\n", port);
+            USBXHCI_TRACE("Waiting for reset on port %zu\n", port);
 
-            while (mmio_op->ports[port].portsc & USBXHCI_PORTSC_PR)
+            while (mm_rd(mmio_op->ports[port].portsc) & USBXHCI_PORTSC_PR)
                 pause();
 
-            USBXHCI_TRACE("Reset finished on port %d\n", port);
+            USBXHCI_TRACE("Reset finished on port %zu\n", port);
         }
     }
 
     port_count = 0;
 
-    for (int port = 0; port < maxports; ++port) {
-        if (USBXHCI_PORTSC_CCS_GET(mmio_op->ports[port].portsc)) {
-            USBXHCI_TRACE("Adding device on port %d\n", port);
-            add_device(0, port, 0);
+    for (size_t port = 0; port < maxports; ++port) {
+        uint32_t portsc = mm_rd(mmio_op->ports[port].portsc);
+        if (USBXHCI_PORTSC_CCS_GET(portsc)) {
+            if (add_device(0, port, 0)) {
+                USBXHCI_TRACE("Added device on port %zu successfully\n", port);
+            } else {
+                USBXHCI_TRACE("Add device failed on port %zu\n", port);
+            }
         } else {
-            USBXHCI_TRACE("No device on port %d\n", port);
+            USBXHCI_TRACE("No device on port %zu\n", port);
         }
     }
 
@@ -1655,7 +1740,10 @@ int usbxhci::enable_slot(int port)
     issue_cmd((usbxhci_cmd_trb_t*)&cmd, &block);
     block.set_expect(1);
 
-    block.wait();
+    if (unlikely(!block.wait_until(std::chrono::steady_clock::now() +
+                                   std::chrono::seconds(5)))) {
+        return -int(usb_cc_t::undefined_err);
+    }
 
     USBXHCI_TRACE("enableslot completed: completion code=%#x, "
                   "parameter=%#x, slotid=%d\n",
@@ -1715,16 +1803,16 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
             USBXHCI_SLOTCTX_RSMHC_CTXENT_n(1);
 
     // Max wakeup latency
-    inpslotctx->max_exit_lat = 0;
+    //inpslotctx->max_exit_lat = 0;
 
     // Number of ports on hub (0 = not a hub)
-    inpslotctx->num_ports = 0;
+    //inpslotctx->num_ports = 0;
 
     // Root hub port number
     inpslotctx->root_hub_port_num = root_port + 1;
 
     // Device address
-    inpslotctx->usbdevaddr = 0;
+    //inpslotctx->usbdevaddr = 0;
 
     // Default max packet size is 8
     inpepctx->max_packet = 8;
@@ -1747,7 +1835,10 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     issue_cmd((usbxhci_cmd_trb_t*)&setaddr, &block);
     block.set_expect(1);
 
-    block.wait();
+    if (unlikely(!block.wait_until(std::chrono::steady_clock::now() +
+                                   std::chrono::seconds(5)))) {
+        return -int(usb_cc_t::undefined_err);
+    }
 
     USBXHCI_TRACE("setaddr completed: completion code=%#x, "
                   "parameter=%#x, slotid=%d\n",
@@ -1904,7 +1995,7 @@ int usbxhci::xfer_async(int slotid, uint8_t epid, uint16_t stream_id,
     usbxhci_ctl_trb_data_t trbs[64/4] = {};
 
     int data_trb_count = make_data_trbs(trbs, countof(trbs),
-                                        data, length, dir, true);
+                                        data, length, dir, true, false);
 
     add_xfer_trbs(slotid, epid, stream_id, data_trb_count, dir, trbs, iocp);
 
@@ -2017,7 +2108,7 @@ usb_cc_t usbxhci::fetch_inp_ctx(
         inpepctx = inp.large->epctx;
     }
 
-    if (inp.any == MAP_FAILED)
+    if (unlikely(inp.any == MAP_FAILED))
         return usb_cc_t::resource_err;
 
     *inpslotctx = *ctx;
@@ -2032,7 +2123,7 @@ usb_cc_t usbxhci::fetch_inp_ctx(
     if (p_inpepctx)
         *p_inpepctx = inpepctx;
 
-    return (usb_cc_t::success);
+    return usb_cc_t::success;
 }
 
 usb_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
@@ -2061,7 +2152,7 @@ usb_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
     return block.get_result().cc;
 }
 
-int usbxhci::update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc)
+usb_cc_t usbxhci::update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc)
 {
     USBXHCI_TRACE("Device descriptor: class=%u, sub_class=%u, protocol=%u\n",
                   dev_desc->dev_class, dev_desc->dev_subclass,
@@ -2082,19 +2173,21 @@ int usbxhci::update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc)
     // Set A0 and A1
     ctlctx->add_bits = (1 << 0) | (1 << 1);
 
-    commit_inp_ctx(slotid, 0, inp, USBXHCI_TRB_TYPE_EVALCTXCMD);
+    usb_cc_t status = commit_inp_ctx(slotid, 0, inp,
+                                     USBXHCI_TRB_TYPE_EVALCTXCMD);
 
-    return 0;
+    return status;
 }
 
 void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
-                          usbxhci_intr_t *ir, usbxhci_evt_t *evt, size_t ii)
+                          usbxhci_intr_t volatile *ir,
+                          usbxhci_evt_t *evt, size_t ii)
 {
     (void)ir_info;
     (void)ir;
     (void)ii;
 
-    uint16_t type = ((evt->flags & USBXHCI_EVT_FLAGS_TYPE) >>
+    uint_least16_t type = ((evt->flags & USBXHCI_EVT_FLAGS_TYPE) >>
                      USBXHCI_EVT_FLAGS_TYPE_BIT);
 
     usbxhci_evt_cmdcomp_t *cmdcomp;
@@ -2231,7 +2324,7 @@ void usbxhci::irq_handler(int irq_ofs)
                   event_intr, host_err_intr, port_chg_intr, save_err_intr);
 
     if (port_chg_intr) {
-        for (int port = 0; port < maxports; ++port) {
+        for (size_t port = 0; port < maxports; ++port) {
             auto volatile& p = mmio_op->ports[port];
 
             uint32_t portsc = p.portsc;
@@ -2246,7 +2339,7 @@ void usbxhci::irq_handler(int irq_ofs)
             bool cerr_chg = USBXHCI_PORTSC_CEC_GET(portsc);
 #endif
 
-            USBXHCI_TRACE("pchg: port=%u, conn=%u, enab=%u wrst=%u"
+            USBXHCI_TRACE("pchg: port=%zu, conn=%u, enab=%u wrst=%u"
                           ", curr=%u, rset=%u, link=%u, cerr=%u\n",
                           port, conn_chg, enab_chg, wrst_chg,
                           curr_chg, rset_chg, link_chg, cerr_chg);
@@ -2267,7 +2360,7 @@ void usbxhci::irq_handler(int irq_ofs)
 
     // Acknowledge pending IRQs
     if (ack)
-        atomic_st_rel(&mmio_op->usbsts, ack);
+        mm_wr(mmio_op->usbsts, ack);
 
     // Skip if interrupt is not pending
     if (!event_intr)
@@ -2276,7 +2369,7 @@ void usbxhci::irq_handler(int irq_ofs)
     // The IRQ is the interrupter index % the number of IRQs
     for (size_t ii = irq_ofs; ii < maxintr; ii += irq_range.count) {
         usbxhci_interrupter_info_t *ir_info = interrupters + ii;
-        usbxhci_intr_t *ir = (usbxhci_intr_t*)(mmio_rt->ir + ii);
+        usbxhci_intr_t volatile *ir = (usbxhci_intr_t*)(mmio_rt->ir + ii);
 
         if (USBXHCI_INTR_IMAN_IP_GET(atomic_ld_acq(&ir->iman))) {
             // Interrupt is pending
@@ -2286,7 +2379,7 @@ void usbxhci::irq_handler(int irq_ofs)
             //  4.17.5: "If MSI or MSI-X interrupts are enabled, IP shall be
             //  cleared to ‘0’ automatically when the PCI Dword write
             //  generated by the Interrupt assertion is complete."
-            if (!use_msi)
+            if (unlikely(!use_msi))
                 ir->iman |= USBXHCI_INTR_IMAN_IP;
 
             bool any_consumed = false;
@@ -2375,7 +2468,7 @@ int usbxhci::make_setup_trbs(
 
 int usbxhci::make_data_trbs(
         usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
-        void *data, uint32_t length, int dir, bool intr)
+        void *data, uint32_t length, int dir, bool intr, bool isp)
 {
     // Worst case is 64KB
     mmphysrange_t ranges[64/4];
@@ -2393,7 +2486,7 @@ int usbxhci::make_data_trbs(
     usbxhci_ctl_trb_data_t *trb = trbs;
 
     // Route the completions to this CPU if we are using multiple interrupters
-    unsigned interrupter = maxintr > 1 ? thread_cpu_number() : 0;
+    uint32_t interrupter = maxintr > 1 ? thread_cpu_number() % maxintr : 0;
 
     for (size_t i = 0; i < range_count; ++i) {
         trb->data_physaddr = ranges[i].physaddr;
@@ -2406,7 +2499,7 @@ int usbxhci::make_data_trbs(
         trb->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA) |
                 USBXHCI_CTL_TRB_FLAGS_CH_n(i + 1 < range_count) |
                 USBXHCI_CTL_TRB_FLAGS_IOC_n(intr && i + 1 >= range_count) |
-                USBXHCI_CTL_TRB_FLAGS_ISP_n(intr);
+                USBXHCI_CTL_TRB_FLAGS_ISP_n(intr && i + 1 >= range_count);
         trb->dir = dir;
         ++trb;
     }
@@ -2424,7 +2517,7 @@ int usbxhci::make_setup_trbs(
         return false;
 
     int data_trb_count = make_data_trbs(&trbs[1].data, trb_capacity - 1,
-                                        data, length, dir, false);
+                                        data, length, dir, false, false);
 
     if (unlikely(trb_capacity < data_trb_count + 2))
         return false;
@@ -2458,11 +2551,20 @@ int usbxhci::make_setup_trbs(
 }
 
 template<typename T>
-void usbxhci_ring_data_t<T>::insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src,
-                                    usb_iocp_t *iocp, bool ins_pending)
+usbxhci_pending_cmd_t *usbxhci_ring_data_t<T>::insert(
+        usbxhci *ctrl, usbxhci_cmd_trb_t * restrict src,
+        usb_iocp_t *iocp, bool ins_pending)
 {
+    usbxhci_pending_cmd_t * restrict pending_cmd = nullptr;
+
+    if (ins_pending) {
+        pending_cmd = pending + next;
+        ctrl->insert_pending_command(pending_cmd, physaddr +
+                                     next * sizeof(*ptr), nullptr, iocp);
+    }
+
     USBXHCI_CTL_TRB_FLAGS_C_SET(src->data[3], !cycle);
-    usbxhci_cmd_trb_t volatile *dst = &ptr[next];
+    usbxhci_cmd_trb_t volatile * restrict dst = &ptr[next];
 
     // Copy the TRB carefully, ensuring cycle bit is set last
     dst->data[0] = src->data[0];
@@ -2473,19 +2575,12 @@ void usbxhci_ring_data_t<T>::insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src,
     assert(USBXHCI_CTL_TRB_FLAGS_C_GET(dst->data[3]) != (cycle != 0));
 
     // Initially set the cycle bit to the value that prevents TRB execution
-    dst->data[3] = (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
-            USBXHCI_CTL_TRB_FLAGS_C_n(!cycle);
+    atomic_st_rel(&dst->data[3], (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
+            USBXHCI_CTL_TRB_FLAGS_C_n(!cycle));
 
     // Guarantee ordering and set cycle bit last
-    atomic_st_rel(&dst->data[3],
-            (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
+    atomic_st_rel(&dst->data[3], (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
             USBXHCI_CTL_TRB_FLAGS_C_n(cycle));
-
-    if (ins_pending) {
-        usbxhci_pending_cmd_t *pending_cmd = pending + next;
-        ctrl->insert_pending_command(pending_cmd, physaddr +
-                                     next * sizeof(*ptr), iocp);
-    }
 
     if (++next >= count) {
         USBXHCI_TRACE("Wrapping ring\n");
@@ -2509,10 +2604,12 @@ void usbxhci_ring_data_t<T>::insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src,
         cycle = !cycle;
         next = 0;
     }
+
+    return pending_cmd;
 }
 
 template<typename T>
-bool usbxhci_ring_data_t<T>::alloc(uint32_t trb_count)
+bool usbxhci_ring_data_t<T>::alloc(size_t trb_count)
 {
     pending = (usbxhci_pending_cmd_t*)
                  mmap(nullptr, sizeof(*pending) * trb_count,
@@ -2545,7 +2642,7 @@ void usbxhci_ring_data_t<T>::reserve_link()
 
 size_t usbxhci_pending_cmd_t::hash() const
 {
-    return cmd_physaddr;
+    return cmd_physaddr >> bit_log2(sizeof(usbxhci_pending_cmd_t));
 }
 
 usbxhci_slot_data_t::usbxhci_slot_data_t()

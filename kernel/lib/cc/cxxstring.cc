@@ -1,14 +1,14 @@
 #include "cxxstring.h"
 
 // Explicit instantiations
-template class std::char_traits<char>;
-template class std::char_traits<wchar_t>;
-template class std::char_traits<char16_t>;
-template class std::char_traits<char32_t>;
-template class std::basic_string<char>;
-template class std::basic_string<wchar_t>;
-template class std::basic_string<char16_t>;
-template class std::basic_string<char32_t>;
+//template class std::char_traits<char>;
+//template class std::char_traits<wchar_t>;
+//template class std::char_traits<char16_t>;
+//template class std::char_traits<char32_t>;
+//template class std::basic_string<char>;
+//template class std::basic_string<wchar_t>;
+//template class std::basic_string<char16_t>;
+//template class std::basic_string<char32_t>;
 
 std::string std::to_string(int value)
 {

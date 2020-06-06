@@ -8,7 +8,7 @@ int fcntl(int fd, int cmd, ...)
 {
     va_list ap;
     va_start(ap, cmd);
-    long status = syscall3(fd, cmd, long(ap), SYS_fcntl);
+    long status = syscall3(fd, cmd, uintptr_t(ap), SYS_fcntl);
     va_end(ap);
 
     if (status >= 0)

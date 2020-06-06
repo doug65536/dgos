@@ -33,10 +33,15 @@ if [[ ! -f sysroot/libc/libc.a ]]; then
 		"$(join_by ' ' ${configureflags[@]})" "$@" && \
 		nice make --trace -j $(nproc) \
 			sysroot/lib/crt0.o \
+			sysroot/lib/32/crt0.o \
 			sysroot/lib/crt0pc32.o \
+			sysroot/lib/32/crt0pc32.o \
 			sysroot/lib/crt0pc64.o \
+			sysroot/lib/32/crt0pc64.o \
 			sysroot/lib/crt0pc80.o \
+			sysroot/lib/32/crt0pc80.o \
 			sysroot/lib/libc.a \
+			sysroot/lib/32/libc.a \
 			startupcode
 
 fi

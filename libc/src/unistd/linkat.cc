@@ -7,8 +7,8 @@
 int linkat(int targetdirfd, char const *target,
            int linkdirfd, char const *link, int flags)
 {
-    long status = syscall5(targetdirfd, long(target), linkdirfd,
-                           long(link), flags, SYS_linkat);
+    long status = syscall5(targetdirfd, uintptr_t(target), linkdirfd,
+                           uintptr_t(link), flags, SYS_linkat);
 
     if (status >= 0)
         return status;

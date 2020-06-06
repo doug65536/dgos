@@ -10,6 +10,8 @@ public:
     static null_text_dev instance;
 
 protected:
+    constexpr null_text_dev() = default;
+
     // text_dev_base_t interface
     bool init() override final
     {

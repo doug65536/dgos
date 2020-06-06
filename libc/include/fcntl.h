@@ -179,7 +179,7 @@ __BEGIN_DECLS
 
 // Use the current working directory to determine the target of relative
 // file paths.
-#define AT_FDCWD
+#define AT_FDCWD -1
 
 // The <fcntl.h> header shall define the following symbolic constant as a
 // value for the flag used by faccessat():

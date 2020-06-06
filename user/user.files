@@ -8,6 +8,7 @@ user64.ld
 bin/dhcpclient/main.cc
 bin/ls/ls.cc
 crt0/crt0.S
+crt0/crt032.S
 shell/parser.cc
 shell/parser.h
 test/test.S

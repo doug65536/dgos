@@ -3,6 +3,11 @@
 #include <sys/types.h>
 
 struct _FILE {
+    // File handle
+    int fd = -1;
+
+    int error = 0;
+
     // Pointer to the read/write buffer
     char *buffer = nullptr;
 
@@ -13,7 +18,7 @@ struct _FILE {
     // Index into buffer will be seek_pos - buf_pos
     off_t seek_pos = 0;
 
-    // Track fd seek position to attempt to elide seeks
+    // Track fd seek position to attempt to elide seek syscalls
     off_t fd_seek_pos = 0;
 
     // Amount of data in the buffer
@@ -26,13 +31,16 @@ struct _FILE {
     int64_t dirty_pos = 0;
     int64_t dirty_end_pos = 0;
 
-    int error = 0;
+    static constexpr int unget_size = 14;
 
-    // File handle (down here because it is a smaller type)
-    int fd = -1;
+    // Holds the ungetch values
+    unsigned char unget_data[unget_size];
 
-    // Holds the ungetch value, or -1 if empty
-    int unget = -1;
+    // unget_data is a push down stack, this index points to the
+    // most recently pushed/ungotten byte. When empty, holds unget_size.
+    // This lays out the unget data in order that allows it to be used
+    // as a block.
+    size_t unget_pos = unget_size;
 
     // Whether the buffer is owned (and subsequently freed) by the libc
     bool buf_owned = false;

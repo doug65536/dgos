@@ -9,7 +9,7 @@ static __thread dirent_t current_dirent;
 
 int readdir_r(int dirfd, dirent_t *buf, dirent_t **result)
 {
-    long err = syscall2(long(dirfd), long(buf), SYS_readdir_r);
+    long err = syscall2(dirfd, uintptr_t(buf), SYS_readdir_r);
 
     if (unlikely(err < 0)) {
         errno = -err;

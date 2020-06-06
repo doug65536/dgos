@@ -31,7 +31,7 @@ union process_ptr_t {
 
 static std::vector<process_ptr_t> processes;
 static size_t process_count;
-using processes_lock_type = ext::mcslock;
+using processes_lock_type = process_t::lock_type;
 using processes_scoped_lock = std::unique_lock<processes_lock_type>;
 static processes_lock_type processes_lock;
 static pid_t process_first_free;
@@ -96,9 +96,9 @@ process_t *process_t::add()
 }
 
 int process_t::spawn(pid_t * pid_result,
-                  std::string path,
-                  std::vector<std::string> argv,
-                  std::vector<std::string> env)
+                     std::string path,
+                     std::vector<std::string> argv,
+                     std::vector<std::string> env)
 {
     *pid_result = -1;
 
@@ -111,16 +111,15 @@ int process_t::spawn(pid_t * pid_result,
     // Return the assigned PID
     *pid_result = process->pid;
 
-
     thread_t tid = thread_create(&process_t::run, process,
                                  "user-process", 0,
                                  true, true);
 
     if (unlikely(tid < 0))
-        return int(errno_t::ENOMEM);
+        return -int(errno_t::ENOMEM);
 
     if (unlikely(!process->add_thread(tid)))
-        return int(errno_t::ENOMEM);
+        return -int(errno_t::ENOMEM);
 
     // Wait for it to finish starting
     processes_scoped_lock lock(process->process_lock);
@@ -130,7 +129,7 @@ int process_t::spawn(pid_t * pid_result,
     return (process->state == process_t::state_t::running ||
             process->state == process_t::state_t::exited)
             ? 0
-            : int(errno_t::EFAULT);
+            : -int(errno_t::EFAULT);
 }
 
 int process_t::run(void *process_arg)
@@ -138,62 +137,93 @@ int process_t::run(void *process_arg)
     return ((process_t*)process_arg)->run();
 }
 
+// Runs in the context of a new thread
+int process_t::start_clone_thunk(void *clone_data)
+{
+    clone_data_t *cdp = (clone_data_t*)clone_data;
+
+    // Copy it to the stack
+    clone_data_t data = *cdp;
+
+    // run_clone doesn't return, have to do this first
+    delete cdp;
+
+    // goto the usermode entry
+    return data.process->start_clone(data);
+}
+
+// Runs in the context of a new thread
+int process_t::start_clone(clone_data_t data)
+{
+    uintptr_t tid = thread_get_id();
+    thread_set_fsbase(tid, tls_addr);
+    if (!__setjmp(process_get_exit_jmpbuf(tid))) {
+        isr_sysret(uintptr_t((void*)data.fn), uintptr_t(data.arg),
+                   uintptr_t(data.sp), use64, tid, data.rsi);
+    }
+
+    return 0;
+}
+
+int process_t::clone(int (*fn)(void *), void *child_stack,
+                     int flags, void *arg)
+{
+    clone_data_t *kernel_thread_arg = new (std::nothrow) clone_data_t();
+
+    if (unlikely(!kernel_thread_arg))
+        return -int(errno_t::ENOMEM);
+
+#ifdef __x86_64__
+    // Intel throws #GP in kernel mode with user's stack if user rip is not
+    // canonical. Check.
+    if (unlikely((intptr_t(uintptr_t(kernel_thread_arg->fn) << 16) >> 16) !=
+                 intptr_t(kernel_thread_arg->fn)))
+        return -int(errno_t::EFAULT);
+#endif
+
+    thread_t new_tid = thread_create(&process_t::start_clone_thunk,
+                                     kernel_thread_arg, "user_thread", 0,
+                                     true, true);
+
+    return new_tid;
+}
+
 // Hack to reuse module loader symbol auto-load hook for processes too
 extern void modload_load_symbols(char const *path, uintptr_t text_addr,
                                  uintptr_t base_addr);
 
-// Returns when program exits
-int process_t::run()
+template<typename P>
+intptr_t process_t::load_elf_with_policy(int fd)
 {
-    // Attach this kernel thread to this process
-    thread_set_process(-1, this);
+    using Ehdr = typename P::Ehdr;
+    using Phdr = typename P::Phdr;
 
-    // Switch to user address space
-    mmu_context = mm_new_process(this);
-
-    // Simply load it for now
-    Elf64_Ehdr hdr;
-
-    // Open a stdin, stdout, and stderr
-    int fd_i = file_open("/dev/conin", 0, 0);
-    //int fd_o = file_open("/dev/conout", 0, 0);
-    //int fd_e = file_open("/dev/conerr", 0, 0);
-
-    assert(fd_i == 0);
-    //assert(fd_o == 1);
-    //assert(fd_e == 2);
-
-    file_t fd{file_open(path.c_str(), O_RDONLY)};
-
-    if (unlikely(!fd)) {
-        printdbg("Failed to open executable %s\n", path.c_str());
-        return -1;
-    }
+    Ehdr hdr;
 
     ssize_t read_size;
 
-    read_size = file_read(fd, &hdr, sizeof(hdr));
+    read_size = file_pread(fd, &hdr, sizeof(hdr), 0);
     if (unlikely(read_size != sizeof(hdr))) {
         printdbg("Failed to read ELF header\n");
-        return -1;
+        return int(errno_t(int(read_size)));
     }
 
     // Allocate memory for program headers
-    std::vector<Elf64_Phdr> program_hdrs;
+    std::vector<Phdr> program_hdrs;
     if (unlikely(!program_hdrs.resize(hdr.e_phnum))) {
         printdbg("Failed to allocate memory for program headers\n");
-        return -1;
+        return -int(errno_t::ENOMEM);
     }
 
     // Read program headers
-    read_size = sizeof(Elf64_Phdr) * hdr.e_phnum;
+    read_size = sizeof(Phdr) * hdr.e_phnum;
     if (unlikely(read_size != file_pread(
                      fd,
                      program_hdrs.data(),
                      read_size,
                      hdr.e_phoff))) {
         printdbg("Failed to read program headers\n");
-        return -1;
+        return int(errno_t(int(read_size)));
     }
 
     size_t last_region_st = ~size_t(0);
@@ -203,7 +233,7 @@ int process_t::run()
     uintptr_t first_exec = UINTPTR_MAX;
 
     // Map every section, just in case any pages overlap
-    for (Elf64_Phdr& ph : program_hdrs) {
+    for (Phdr const& ph : program_hdrs) {
         // If it is not loaded, ignore
         if (ph.p_type != PT_LOAD)
             continue;
@@ -217,15 +247,15 @@ int process_t::run()
             continue;
 
         // See if it begins in reserved space
-        if (intptr_t(ph.p_vaddr) < 0x400000) {
+        if (unlikely(intptr_t(ph.p_vaddr) < 0x400000)) {
             printdbg("The virtual address is not in user address space\n");
-            return -1;
+            return -int(errno_t::EFAULT);
         }
 
         // See if it overflows into kernel space
-        if (intptr_t(ph.p_vaddr + ph.p_memsz) < 0) {
+        if (unlikely(intptr_t(ph.p_vaddr + ph.p_memsz) < 0)) {
             printdbg("The section overflows into user space\n");
-            return -1;
+            return -int(errno_t::EFAULT);
         }
 
         int page_prot = 0;
@@ -259,13 +289,14 @@ int process_t::run()
                      " bytes of address space"
                      " with protection %d"
                      " at %#" PRIx64 "! \n",
-                     ph.p_memsz, page_prot, ph.p_vaddr);
-            return -1;
+                     uint64_t(ph.p_memsz),
+                     page_prot, uint64_t(ph.p_vaddr));
+            return -int(errno_t::ENOMEM);
         }
     }
 
     // Read everything after mapping the memory
-    for (Elf64_Phdr& ph : program_hdrs) {
+    for (Phdr const& ph : program_hdrs) {
         // If it is not loaded, ignore
         if (ph.p_type != PT_LOAD)
             continue;
@@ -273,16 +304,16 @@ int process_t::run()
         read_size = ph.p_filesz;
         if (likely(ph.p_filesz > 0)) {
             if (unlikely(read_size != file_pread(
-                             fd, (void*)ph.p_vaddr,
+                             fd, (void*)uintptr_t(ph.p_vaddr),
                              read_size, ph.p_offset))) {
                 printdbg("Failed to read program headers!\n");
-                return -1;
+                return int(errno_t(read_size));
             }
         }
     }
 
     // Make read only pages read only
-    for (Elf64_Phdr& ph : program_hdrs) {
+    for (Phdr const& ph : program_hdrs) {
         // If it is not loaded, ignore
         if (ph.p_type != PT_LOAD)
             continue;
@@ -302,14 +333,15 @@ int process_t::run()
         if (ph.p_flags & PF_X)
             page_prot |= PROT_EXEC;
 
-        if (unlikely(mprotect((void*)ph.p_vaddr, ph.p_memsz, page_prot) < 0)) {
+        if (unlikely(mprotect((void*)uintptr_t(ph.p_vaddr),
+                              ph.p_memsz, page_prot) < 0)) {
             printdbg("Failed to set page protection\n");
             return -1;
         }
     }
 
     // Find TLS
-    for (Elf64_Phdr& ph : program_hdrs) {
+    for (Phdr const& ph : program_hdrs) {
         // If it is a TLS header, remember the range
         if (unlikely(ph.p_type == PT_TLS)) {
             tls_addr = ph.p_vaddr;
@@ -318,13 +350,72 @@ int process_t::run()
         }
     }
 
+    return first_exec;
+}
+
+// Returns when program exits
+int process_t::run()
+{
+    // Attach this kernel thread to this process
+    thread_set_process(-1, this);
+
+    // Simply load it for now
+    Elf64_Ehdr hdr;
+
+    // Open a stdin, stdout, and stderr
+    int fd_i = file_openat(AT_FDCWD, "/dev/conin", 0, 0);
+    int fd_o = file_openat(AT_FDCWD, "/dev/conout", 0, 0);
+    int fd_e = file_openat(AT_FDCWD, "/dev/conerr", 0, 0);
+
+    ids.desc_alloc.take({0, 1, 2});
+    ids.ids[0].set(fd_i, 0);
+    ids.ids[1].set(fd_o, 0);
+    ids.ids[2].set(fd_e, 0);
+
+//    assert(fd_i == 0);
+//    assert(fd_o == 1);
+//    assert(fd_e == 2);
+
+    file_t fd{file_openat(AT_FDCWD, path.c_str(), O_RDONLY)};
+
+    if (unlikely(fd < 0)) {
+        printdbg("Failed to open executable %s\n", path.c_str());
+        return int(errno_t(int(fd)));
+    }
+
+    ssize_t read_size;
+
+    read_size = file_read(fd, &hdr, sizeof(hdr));
+    if (unlikely(read_size != sizeof(hdr))) {
+        printdbg("Failed to read ELF header\n");
+        return int(errno_t(int(read_size)));
+    }
+
+    intptr_t first_exec;
+
+    use64 = (hdr.e_machine == EM_AMD64);
+
+    // Switch to user address space
+    mmu_context = mm_new_process(this, use64);
+    if (unlikely(!mmu_context))
+        return -int(errno_t::ENOMEM);
+
+    if (use64)
+        first_exec = load_elf_with_policy<Elf64_Policy>(fd);
+    else
+        first_exec = load_elf_with_policy<Elf32_Policy>(fd);
+
+    if (unlikely(first_exec < 0))
+        return first_exec;
+
     modload_load_symbols(path.c_str(), first_exec, 0);
 
     // Initialize the stack
 
-    size_t stack_size = 65536;
+    // 8MB
+    size_t stack_size = 8 << 20;
     char *stack_memory = (char*)mmap(
-                nullptr, stack_size, PROT_NONE,
+                nullptr, stack_size, PROT_READ | PROT_WRITE,
                 MAP_STACK | MAP_NOCOMMIT | MAP_USER);
 
     if (unlikely(stack_memory == MAP_FAILED)) {
@@ -405,7 +496,10 @@ int process_t::run()
         return -1;
 
     // Point fs at it
-    thread_set_fsbase(thread_get_id(), tls_ptr);
+    if (use64)
+        thread_set_fsbase(thread_get_id(), tls_ptr);
+    else
+        thread_set_gsbase(thread_get_id(), tls_ptr);
 
     // Initialize the stack according to the ELF ABI
     //
@@ -514,21 +608,37 @@ int process_t::run()
         panic_oom();
 
     processes_scoped_lock lock(processes_lock);
+
+    // Add new jmpbuf to find kernel stack
+
+    jmpbuf_list_t::value_type ptr{new  (std::nothrow) __exception_jmp_buf_t()};
+    if (unlikely(!ptr))
+        return -1;
+
+    __exception_jmp_buf_t *buf = ptr;
+
+    if (unlikely(!exit_jmpbufs.push_back(std::move(ptr))))
+        return -1;
+
     state = state_t::running;
     lock.unlock();
     cond.notify_all();
 
-    return enter_user(hdr.e_entry, uintptr_t(stack_ptr));
+    return enter_user(hdr.e_entry, uintptr_t(stack_ptr), use64, buf);
 }
 
-int process_t::enter_user(uintptr_t ip, uintptr_t sp)
+int process_t::enter_user(uintptr_t ip, uintptr_t sp, bool use64,
+                          __exception_jmp_buf_t *buf)
 {
-    //
-    if (!__setjmp(&exit_jmpbuf)) {
+    // _Exit syscall will longjmp here
+    if (!__setjmp(buf)) {
         // When interrupts occur, use the stack space we have here
-        isr_sysret64(ip, sp, uint64_t(exit_jmpbuf.rsp) & -16);
-        __builtin_trap();
+        // isr_sysret does not return
+        isr_sysret(ip, sp, uint64_t(buf->rsp) & -16, use64,
+                   thread_get_id(), 0);
     }
+
+    // Execution reaches here when a thread of the process calls exit
 
     for (thread_t tid: threads)
         del_thread(tid);
@@ -590,9 +700,12 @@ void process_t::exit(pid_t pid, int exitcode)
     lock.unlock();
     process_ptr->cond.notify_all();
 
-    __longjmp(&process_ptr->exit_jmpbuf, 1);
+    size_t index = process_ptr->thread_index(current_thread_id);
 
-    //thread_exit(exitcode);
+    if (likely(index != ~0U))
+        __longjmp(process_ptr->exit_jmpbufs[index], 1);
+
+    panic("Thread has no exit jmpbuf!");
 }
 
 bool process_t::add_thread(thread_t tid)
@@ -648,4 +761,20 @@ process_t *process_t::init(uintptr_t mmu_context)
     process_t *process = process_t::add();
     process->mmu_context = mmu_context;
     return process;
+}
+
+__exception_jmp_buf_t *process_get_exit_jmpbuf(int tid)
+{
+    process_t *process = thread_current_process();
+
+    size_t i = 0;
+    size_t e = process->threads.size();
+    for ( ; i != e; ++i) {
+        if (process->threads[i] == tid)
+            break;
+    }
+    if (unlikely(i == e))
+        return nullptr;
+
+    return process->exit_jmpbufs[i];
 }

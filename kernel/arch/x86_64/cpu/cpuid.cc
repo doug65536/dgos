@@ -82,6 +82,12 @@ void cpuid_init()
         cpuid_cache.is_hypervisor   = info.ecx & (1U << 31);
     }
 
+    if (cpuid_cache.has_xsave && cpuid(&info, CPUID_INFO_XSAVE, 1)) {
+        cpuid_cache.has_xsaves      = info.eax & (1U << 3);
+        cpuid_cache.has_xsaveopt    = info.eax & (1U << 0);
+        cpuid_cache.has_xsavec      = info.eax & (1U << 1);
+    }
+
     if (cpuid(&info, CPUID_EXTINFO_FEATURES, 0)) {
         cpuid_cache.has_2mpage  = info.edx & (1U << 3);
         cpuid_cache.has_1gpage  = info.edx & (1U << 26);

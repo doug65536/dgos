@@ -674,11 +674,17 @@ bool iso9660_fs_t::is_boot() const
                              "ea870ef2-2483-11e8-9bba-3f1a71a07f83");
 }
 
+int iso9660_fs_t::resolve(fs_file_info_t *dirfi, fs_cpath_t path,
+                          size_t &consumed)
+{
+    return -1;
+}
+
 //
 // Read directory entry information
 
-int iso9660_fs_t::getattr(
-        fs_cpath_t path,
+int iso9660_fs_t::getattrat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         fs_stat_t* stbuf)
 {
     iso9660_dir_ent_t *de = lookup_dirent(path);
@@ -727,8 +733,8 @@ int iso9660_fs_t::getattr(
     return 0;
 }
 
-int iso9660_fs_t::access(
-        fs_cpath_t path,
+int iso9660_fs_t::accessat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         int mask)
 {
     (void)path;
@@ -736,8 +742,8 @@ int iso9660_fs_t::access(
     return 0;
 }
 
-int iso9660_fs_t::readlink(
-        fs_cpath_t path,
+int iso9660_fs_t::readlinkat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         char* buf,
         size_t size)
 {
@@ -750,8 +756,8 @@ int iso9660_fs_t::readlink(
 //
 // Scan directories
 
-int iso9660_fs_t::opendir(fs_file_info_t **fi,
-                           fs_cpath_t path)
+int iso9660_fs_t::opendirat(fs_file_info_t **fi,
+                            fs_file_info_t *dirfi, fs_cpath_t path)
 {
     iso9660_pt_rec_t *ptrec = lookup_path(path, -1);
 
@@ -777,9 +783,9 @@ int iso9660_fs_t::opendir(fs_file_info_t **fi,
     return 0;
 }
 
-ssize_t iso9660_fs_t::readdir(fs_file_info_t *fi,
-                               dirent_t *buf,
-                               off_t offset)
+ssize_t iso9660_fs_t::readdir(
+        fs_file_info_t *fi,
+        dirent_t *buf, off_t offset)
 {
     dir_handle_t *dir = (dir_handle_t*)fi;
 
@@ -818,8 +824,9 @@ int iso9660_fs_t::releasedir(fs_file_info_t *fi)
 //
 // Open/close files
 
-int iso9660_fs_t::open(fs_file_info_t **fi,
-                        fs_cpath_t path, int flags, mode_t)
+int iso9660_fs_t::openat(fs_file_info_t **fi,
+                         fs_file_info_t *dirfi, fs_cpath_t path,
+                         int flags, mode_t)
 {
     if (unlikely((flags & O_CREAT) | ((flags & O_RDWR) == O_WRONLY)))
         return -int(errno_t::EROFS);
@@ -948,8 +955,8 @@ int iso9660_fs_t::lock(fs_file_info_t *fi,
 //
 // Get block map
 
-int iso9660_fs_t::bmap(
-        fs_cpath_t path,
+int iso9660_fs_t::bmapat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         size_t blocksize,
         uint64_t* blockno)
 {
@@ -963,8 +970,8 @@ int iso9660_fs_t::bmap(
 //
 // Read/Write/Enumerate extended attributes
 
-int iso9660_fs_t::getxattr(
-        fs_cpath_t path,
+int iso9660_fs_t::getxattrat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         char const* name,
         char* value,
         size_t size)
@@ -976,8 +983,8 @@ int iso9660_fs_t::getxattr(
     return 0;
 }
 
-int iso9660_fs_t::listxattr(
-        fs_cpath_t path,
+int iso9660_fs_t::listxattrat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         char const* list,
         size_t size)
 {

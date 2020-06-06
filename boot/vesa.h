@@ -4,14 +4,14 @@
 
 // Move only heap array with count
 struct vbe_mode_list_t {
-    vbe_selected_mode_t *modes;
-    size_t count;
+    vbe_selected_mode_t *modes = nullptr;
+    size_t count = 0;
 
-    vbe_mode_list_t();
+    constexpr vbe_mode_list_t() = default;
 
     explicit vbe_mode_list_t(size_t count);
 
-    vbe_mode_list_t(vbe_mode_list_t&& rhs);
+    vbe_mode_list_t(vbe_mode_list_t&& rhs) noexcept;
 
     vbe_mode_list_t& operator=(vbe_mode_list_t) = delete;
 

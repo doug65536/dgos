@@ -454,6 +454,18 @@
 #define PCI_BAR_RTE_SET(r,n) \
     ((r) = ((r) & ~PCI_BAR_RTE) | PCI_BAR_RTE_n((n)))
 
+// PCI_BAR_TYPE_32BIT
+#define PCI_BAR_TYPE_32BIT 0
+
+// PCI_BAR_TYPE_BELOW1M
+#define PCI_BAR_TYPE_BELOW1M 1
+
+// PCI_BAR_TYPE_64BIT
+#define PCI_BAR_TYPE_64BIT 2
+
+// PCI_BAR_TYPE_RESERVED
+#define PCI_BAR_TYPE_RESERVED 3
+
 //
 // PCI_SS: Subsystem identifiers
 

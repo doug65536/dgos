@@ -123,14 +123,7 @@ int thread_run_data_t::invoke() const
     }
 }
 
-thread_cpu_mask_t::thread_cpu_mask_t(int bit)
-    : thread_cpu_mask_t()
-{
-    if (bit >= 0)
-        *this += bit;
-    else
-        std::fill_n(bitmap, countof(bitmap), ~UINT64_C(0));
-}
+
 
 thread_cpu_mask_t &thread_cpu_mask_t::operator+=(size_t bit)
 {

@@ -24,51 +24,13 @@
 
 static uint16_t pic8259_mask;
 
-static void pic8259_init(uint8_t pic1_irq_base,
-                         uint8_t pic2_irq_base)
-{
-    // Base IRQ must be aligned to a multiple of 8
-    assert((pic1_irq_base & PIC_ICW2_VECTOR) == pic1_irq_base);
-    assert((pic2_irq_base & PIC_ICW2_VECTOR) == pic2_irq_base);
-
-    // It doesn't make sense for them both to be at the same base
-    assert(pic1_irq_base != pic2_irq_base);
-
-    // ICW1 - ICW4 needed
-    outb(PIC1_BASE + PIC_ICW1, PIC_ICW1_IC4 | PIC_ICW1_MBS);
-    outb(PIC2_BASE + PIC_ICW1, PIC_ICW1_IC4 | PIC_ICW1_MBS);
-
-    // Base IRQs
-    outb(PIC1_BASE + PIC_ICW2, pic1_irq_base);
-    outb(PIC2_BASE + PIC_ICW2, pic2_irq_base);
-
-    // Slave at IRQ 2, cascade ID
-    outb(PIC1_BASE + PIC_ICW3_M, PIC_ICW3_M_S2);
-    outb(PIC2_BASE + PIC_ICW3_S, PIC_ICW3_S_ID_n(2));
-
-    // 8086 mode
-    outb(PIC1_BASE + PIC_ICW4, PIC_ICW4_8086);
-    outb(PIC2_BASE + PIC_ICW4, PIC_ICW4_8086);
-
-    // Initially all IRQs masked
-    pic8259_mask = 0xFFFF;
-    outb(PIC1_BASE + PIC_OCW1, pic8259_mask & 0xFF);
-    outb(PIC2_BASE + PIC_OCW1, (pic8259_mask >> 8) & 0xFF);
-}
-
 // Get command port for master or slave
 static uint16_t pic8259_port_cmd(int slave)
 {
     return slave ? PIC2_CMD : PIC1_CMD;
 }
 
-// Get data port for master or slave
-static uint16_t pic8259_port_data(int slave)
-{
-    return slave ? PIC2_DATA : PIC1_DATA;
-}
-
-#if 0   // never used
+#if 0 // not used
 // Read Interrupt Request Register
 static uint8_t pic8259_get_IRR(int slave)
 {
@@ -94,6 +56,54 @@ static void pic8259_eoi(int slave)
 
     if (slave)
         outb(PIC1_BASE, PIC_EOI);
+}
+
+static void pic8259_init(uint8_t pic1_irq_base,
+                         uint8_t pic2_irq_base)
+{
+    // Base IRQ must be aligned to a multiple of 8
+    assert((pic1_irq_base & PIC_ICW2_VECTOR) == pic1_irq_base);
+    assert((pic2_irq_base & PIC_ICW2_VECTOR) == pic2_irq_base);
+
+    // It doesn't make sense for them both to be at the same base
+    assert(pic1_irq_base != pic2_irq_base);
+
+    // ICW1 - ICW4 needed
+    outb(PIC1_BASE + PIC_ICW1, PIC_ICW1_IC4 | PIC_ICW1_MBS);
+    outb(PIC2_BASE + PIC_ICW1, PIC_ICW1_IC4 | PIC_ICW1_MBS);
+
+    // Base IRQs
+    outb(PIC1_BASE + PIC_ICW2, pic1_irq_base);
+    outb(PIC2_BASE + PIC_ICW2, pic2_irq_base);
+
+    // Starting with IBM PC/AT (286), there is a second PIC cascaded on IRQ 2
+
+    // Slave bitmask written to master indicates IRQ 2 has slave attached
+    outb(PIC1_BASE + PIC_ICW3_M, PIC_ICW3_M_S2);
+
+    // Indicate that slave should respond when irq 2 cascade occurs
+    outb(PIC2_BASE + PIC_ICW3_S, PIC_ICW3_S_ID_n(2));
+
+    // 8086 mode
+    outb(PIC1_BASE + PIC_ICW4, PIC_ICW4_8086);
+    outb(PIC2_BASE + PIC_ICW4, PIC_ICW4_8086);
+
+    // Initially all IRQs masked
+    pic8259_mask = 0xFFFF;
+    outb(PIC1_BASE + PIC_OCW1, pic8259_mask & 0xFF);
+    outb(PIC2_BASE + PIC_OCW1, (pic8259_mask >> 8) & 0xFF);
+
+    // Clean up the in-service register, EOI everything in service
+    for (size_t slave = 0; slave < 2; ++slave) {
+        while (pic8259_get_ISR(slave))
+            pic8259_eoi(slave);
+    }
+}
+
+// Get data port for master or slave
+static uint16_t pic8259_port_data(int slave)
+{
+    return slave ? PIC2_DATA : PIC1_DATA;
 }
 
 // Detect and discard spurious IRQ

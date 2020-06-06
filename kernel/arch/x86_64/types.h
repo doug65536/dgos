@@ -58,6 +58,12 @@
 #define _hot                    __attribute__((__hot__))
 #define _cold                   __attribute__((__cold__))
 
+#define _assume(expr) \
+    do { \
+        if (!(expr)) \
+            __builtin_unreachable(); \
+    } while (0)
+
 #define _generic_target \
     __attribute__(( \
     __target__("no-sse3"), \

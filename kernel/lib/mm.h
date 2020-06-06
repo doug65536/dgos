@@ -382,14 +382,14 @@ void mm_free_contiguous(uintptr_t addr, size_t size);
 uintptr_t mm_alloc_hole(size_t size);
 void mm_free_hole(uintptr_t addr, size_t size);
 
-uintptr_t mm_new_process(process_t *process);
+uintptr_t mm_new_process(process_t *process, bool use64);
 
 void *mmap_window(size_t size);
 void munmap_window(void *addr, size_t size);
 int alias_window(void *addr, size_t size,
                  mmphysrange_t const *ranges, size_t range_count);
 
-void mm_init_process(process_t *process);
+void mm_init_process(process_t *process, bool use64);
 
 uintptr_t mm_fork_kernel_text();
 

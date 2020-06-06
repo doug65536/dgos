@@ -14,6 +14,8 @@ class mmu_phys_allocator_t {
 public:
     static size_t size_from_highest_page(physaddr_t page_index);
 
+    constexpr mmu_phys_allocator_t() = default;
+
     void init(void *addr, physaddr_t begin_, size_t highest_usable,
               uint8_t log2_pagesz_ = PAGE_SIZE_BIT);
 
@@ -42,17 +44,17 @@ public:
 
     class free_batch_t {
     public:
-        bool empty() const
+        bool empty() const noexcept
         {
             return count == 0;
         }
 
-        physaddr_t pop()
+        physaddr_t pop() noexcept
         {
             return pages[--count];
         }
 
-        void free(physaddr_t addr)
+        void free(physaddr_t addr) noexcept
         {
             // Can't free demand page entry
             if (unlikely(!addr || addr == PTE_ADDR))
@@ -64,7 +66,7 @@ public:
             pages[count++] = addr;
         }
 
-        void flush()
+        void flush() noexcept
         {
             scoped_lock lock(owner.alloc_lock);
             // Heuristic that weakly attempts to free pages so they will be
@@ -82,7 +84,7 @@ public:
             count = 0;
         }
 
-        free_batch_t(mmu_phys_allocator_t& owner)
+        explicit free_batch_t(mmu_phys_allocator_t& owner) noexcept
             : owner(owner)
             , count(0)
         {
@@ -94,6 +96,8 @@ public:
                 flush();
         }
 
+        free_batch_t(free_batch_t const&) = default;
+
     private:
         physaddr_t pages[16];
         mmu_phys_allocator_t &owner;
@@ -101,31 +105,33 @@ public:
     };
 
     // Not locked but it is approximate because it is stale information anyway
-    _always_inline uint64_t get_free_page_count()
+    _always_inline uint64_t get_free_page_count() const noexcept
     {
         return free_page_count;
     }
 
-    _always_inline uint64_t get_phys_mem_size()
+    _always_inline uint64_t get_phys_mem_size() const noexcept
     {
         return highest_usable;
     }
 
 private:
-    _always_inline size_t index_from_addr(physaddr_t addr) const
+    _always_inline size_t index_from_addr(physaddr_t addr) const noexcept
     {
         return (addr - begin) >> log2_pagesz;
     }
 
-    _always_inline physaddr_t addr_from_index(size_t index) const
+    _always_inline physaddr_t addr_from_index(size_t index) const noexcept
     {
         return (index << log2_pagesz) + begin;
     }
 
-    _always_inline bool release_one_locked(physaddr_t addr, scoped_lock&)
+    _always_inline bool release_one_locked(
+            physaddr_t addr, scoped_lock&) noexcept
     {
         size_t index = index_from_addr(addr);
-        assert(index < highest_usable);
+        if (unlikely(!assert(index < highest_usable)))
+            return false;
         assert(entries[index] & used_mask);
         if (entries[index] == (1 | used_mask)) {
             // Free the page
@@ -151,13 +157,13 @@ private:
     static constexpr entry_t used_mask =
             (entry_t(1) << (sizeof(entry_t) * 8 - 1));
 
-    entry_t *entries;
-    physaddr_t begin;
-    entry_t next_free;
-    entry_t free_page_count;
+    entry_t *entries = nullptr;
+    physaddr_t begin = 0;
+    entry_t next_free = 0;
+    entry_t free_page_count = 0;
     lock_type alloc_lock;
-    uint8_t log2_pagesz;
-    size_t highest_usable;
+    uint8_t log2_pagesz = 0;
+    size_t highest_usable = 0;
 };
 
 
@@ -197,6 +203,9 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
             // Have to write these out because we are leaving the lock
             next_free = new_next;
             free_page_count -= count;
+
+            if (free_page_count < 256)
+                printdbg("WARNING: Under 1MB free! Continuing...\n");
 
             break;
         } else {

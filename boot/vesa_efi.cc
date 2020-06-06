@@ -143,7 +143,7 @@ vbe_mode_list_t const& vbe_enumerate_modes()
     return mode_list;
 }
 
-_constructor(ctor_graphics) void vbe_init()
+_constructor(ctor_graphics) static void vbe_init()
 {
     EFI_STATUS status;
 
@@ -157,7 +157,7 @@ _constructor(ctor_graphics) void vbe_init()
                 &efi_num_graphics_output_handles,
                 &efi_graphics_output_handles);
 
-    if (unlikely(EFI_ERROR(status)))
+    if (unlikely(EFI_ERROR(status) || !efi_graphics_output_handles))
         PANIC(TSTR "Unable to query graphics output handle");
 
     status = efi_systab->BootServices->HandleProtocol(

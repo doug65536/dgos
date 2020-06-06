@@ -92,7 +92,7 @@ int vfprintf(FILE *restrict stream, char const *restrict format, va_list ap);
 
 long ftell(FILE *stream);
 int fgetpos(FILE *restrict stream, fpos_t *restrict pos);
-int fseek(FILE *stream, long offset, int origin);
+int fseek(FILE *stream, off_t offset, int origin);
 int fsetpos(FILE *stream, fpos_t const* pos);
 void rewind(FILE *stream);
 void clearerr(FILE *stream);

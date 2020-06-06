@@ -42,6 +42,7 @@ diskio.h
 elf64_abstract.h
 formatter.cc
 formatter.h
+bswap.h
 gdt.S
 gdt.h
 gdt_macros.h
@@ -120,6 +121,8 @@ vesa.h
 .gitignore
 progressbar.cc
 progressbar.h
+messagebar.cc
+messagebar.h
 iso9660.cc
 iso9660.h
 fs.h

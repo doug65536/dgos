@@ -30,6 +30,8 @@
 
 // If this is changed, update isr.S
 
+#define INTR_EX_BASE        0
+
 #define INTR_EX_DIV         0
 #define INTR_EX_DEBUG       1
 #define INTR_EX_NMI         2
@@ -52,37 +54,63 @@
 #define INTR_EX_VIRTUALIZE  20
 
 // 21-31 are reserved for future exceptions
+#define INTR_EX_LAST        31
 
 // Vectors >= 32 go through generic intr_invoke codepath
 #define INTR_SOFT_BASE      32
-#define INTR_THREAD_YIELD   32
 
-// 33-40 reserved
+// Spurious handler must not EOI, so it is outside APIC dispatch range
+// Needs to be on a multiple of 8 on some (old) processors
+#define INTR_APIC_SPURIOUS  32
 
-// Everything below here needs LAPIC EOI
-#define INTR_APIC_DSP_BASE  40
 // Not really used, but yielded context is written using this interrupt number
-// Spurious vector must be aligned to 8 on really old processors
-#define INTR_APIC_SPURIOUS  41
-#define INTR_APIC_ERROR     42
-#define INTR_APIC_THERMAL   43
+#define INTR_THREAD_YIELD   33
+
+// 34-39 reserved
+
+#define INTR_SOFT_LAST      39
+
+// Relatively hot area of the IDT, cache line aligned
+// Everything following here needs LAPIC EOI
+#define INTR_APIC_DSP_BASE  40
+#define INTR_IPI_PANIC      40
+#define INTR_APIC_ERROR     41
+#define INTR_APIC_THERMAL   42
 
 // Vectors >= 44 go through apic_dispatcher codepath
-// Relatively hot area of the IDT, cache line aligned
-#define INTR_APIC_TIMER     44
-#define INTR_IPI_TLB_SHTDN  45
-#define INTR_IPI_RESCHED    46
-#define INTR_IPI_FL_TRACE   47
+#define INTR_APIC_TIMER     43
+#define INTR_IPI_TLB_SHTDN  44
+#define INTR_IPI_RESCHED    45
+#define INTR_IPI_FL_TRACE   46
+// 47 reserved
 
 // 192 vectors for IOAPIC and MSI(x)
 #define INTR_APIC_IRQ_BASE  48
 #define INTR_APIC_IRQ_END   239
-#define INTR_APIC_IRQ_COUNT (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1)
-// Everything above here needs LAPIC EOI
+#define INTR_APIC_DSP_LAST  239
+#define INTR_APIC_IRQ_COUNT (INTR_APIC_DSP_LAST - INTR_APIC_IRQ_BASE + 1)
+// Everything preceding here needs LAPIC EOI
 
-// Everything below here needs PIC EOI
+// Everything following here needs PIC EOI
 // Vectors >= 240 go through pic_dispatcher codepath
 // PIC IRQs 0xF0-0xFF
+#define INTR_PIC_DSP_BASE   240
 #define INTR_PIC1_IRQ_BASE  240
+#define INTR_PIC1_SPURIOUS  247
 #define INTR_PIC2_IRQ_BASE  248
-// Everything above here needs PIC EOI
+#define INTR_PIC2_SPURIOUS  255
+#define INTR_PIC_DSP_LAST   255
+// Everything preceding here needs PIC EOI
+
+#ifndef __ASSEMBLER__
+
+#include "assert.h"
+
+// Spurious vector must be aligned to 8 on really old processors
+C_ASSERT((INTR_APIC_SPURIOUS & -8) == INTR_APIC_SPURIOUS);
+
+// The spurious handler must not EOI
+C_ASSERT(INTR_APIC_SPURIOUS < INTR_APIC_DSP_BASE ||
+         INTR_APIC_SPURIOUS > INTR_APIC_DSP_LAST);
+
+#endif

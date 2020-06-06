@@ -345,24 +345,35 @@ bool ext4_fs_t::is_boot() const
     return false;
 }
 
+int ext4_fs_t::resolve(fs_file_info_t *dirfi, fs_cpath_t path,
+                       size_t &consumed)
+{
+    return -1;
+}
+
 //
 // Read directory entry information
 
-int ext4_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
+int ext4_fs_t::getattrat(fs_file_info_t *dirfi, fs_cpath_t path,
+                         fs_stat_t* stbuf)
 {
+    (void)dirfi;
     (void)path;
     (void)stbuf;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::access(fs_cpath_t path, int mask)
+int ext4_fs_t::accessat(fs_file_info_t *dirfi, fs_cpath_t path,
+                        int mask)
 {
+    (void)dirfi;
     (void)path;
     (void)mask;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
+int ext4_fs_t::readlinkat(fs_file_info_t *dirfi, fs_cpath_t path,
+                          char* buf, size_t size)
 {
     (void)path;
     (void)buf;
@@ -373,8 +384,10 @@ int ext4_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 //
 // Scan directories
 
-int ext4_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
+int ext4_fs_t::opendirat(fs_file_info_t **fi,
+                         fs_file_info_t *dirfi, fs_cpath_t path)
 {
+    (void)dirfi;
     (void)path;
     (void)fi;
     return -int(errno_t::ENOSYS);
@@ -399,7 +412,8 @@ int ext4_fs_t::releasedir(fs_file_info_t *fi)
 //
 // Modify directories
 
-int ext4_fs_t::mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev)
+int ext4_fs_t::mknodat(fs_file_info_t *dirfi, fs_cpath_t path,
+                       fs_mode_t mode, fs_dev_t rdev)
 {
     (void)path;
     (void)mode;
@@ -407,41 +421,45 @@ int ext4_fs_t::mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev)
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
+int ext4_fs_t::mkdirat(fs_file_info_t *dirfi, fs_cpath_t path,
+                       fs_mode_t mode)
 {
     (void)path;
     (void)mode;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::rmdir(fs_cpath_t path)
+int ext4_fs_t::rmdirat(fs_file_info_t *dirfi, fs_cpath_t path)
 {
     (void)path;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
+int ext4_fs_t::symlinkat(fs_file_info_t *dirtofi, fs_cpath_t to,
+                         fs_file_info_t *dirfromfi, fs_cpath_t from)
 {
     (void)to;
     (void)from;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
+int ext4_fs_t::renameat(fs_file_info_t *dirfromfi, fs_cpath_t from,
+                        fs_file_info_t *dirtofi, fs_cpath_t to)
 {
     (void)from;
     (void)to;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::link(fs_cpath_t from, fs_cpath_t to)
+int ext4_fs_t::linkat(fs_file_info_t *dirfromfi, fs_cpath_t from,
+                      fs_file_info_t *dirtofi, fs_cpath_t to)
 {
     (void)from;
     (void)to;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::unlink(fs_cpath_t path)
+int ext4_fs_t::unlinkat(fs_file_info_t *dirfi, fs_cpath_t path)
 {
     (void)path;
     return -int(errno_t::ENOSYS);
@@ -465,14 +483,16 @@ int ext4_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::truncate(fs_cpath_t path, off_t size)
+int ext4_fs_t::truncateat(fs_file_info_t *dirfi, fs_cpath_t path,
+                          off_t size)
 {
     (void)path;
     (void)size;
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::utimens(fs_cpath_t path, fs_timespec_t const *ts)
+int ext4_fs_t::utimensat(fs_file_info_t *dirfi, fs_cpath_t path,
+                         fs_timespec_t const *ts)
 {
     (void)path;
     (void)ts;
@@ -483,8 +503,9 @@ int ext4_fs_t::utimens(fs_cpath_t path, fs_timespec_t const *ts)
 //
 // Open/close files
 
-int ext4_fs_t::open(fs_file_info_t **fi,
-                     fs_cpath_t path, int flags, mode_t mode)
+int ext4_fs_t::openat(fs_file_info_t **fi,
+                      fs_file_info_t *dirfi, fs_cpath_t path,
+                      int flags, mode_t mode)
 {
     (void)fi;
     (void)path;
@@ -588,8 +609,9 @@ int ext4_fs_t::lock(
 //
 // Get block map
 
-int ext4_fs_t::bmap(
-        fs_cpath_t path, size_t blocksize, uint64_t* blockno)
+int ext4_fs_t::bmapat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
+        size_t blocksize, uint64_t* blockno)
 {
     (void)path;
     (void)blocksize;
@@ -600,8 +622,8 @@ int ext4_fs_t::bmap(
 //
 // Read/Write/Enumerate extended attributes
 
-int ext4_fs_t::setxattr(
-        fs_cpath_t path,
+int ext4_fs_t::setxattrat(
+        fs_file_info_t *dirfi,  fs_cpath_t path,
         char const* name, char const* value,
         size_t size, int flags)
 {
@@ -613,8 +635,8 @@ int ext4_fs_t::setxattr(
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::getxattr(
-        fs_cpath_t path,
+int ext4_fs_t::getxattrat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         char const* name, char* value,
         size_t size)
 {
@@ -625,8 +647,8 @@ int ext4_fs_t::getxattr(
     return -int(errno_t::ENOSYS);
 }
 
-int ext4_fs_t::listxattr(
-        fs_cpath_t path,
+int ext4_fs_t::listxattrat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         char const* list, size_t size)
 {
     (void)path;
@@ -657,8 +679,8 @@ int ext4_fs_t::ioctl(
 //
 
 int ext4_fs_t::poll(fs_file_info_t *fi,
-                            fs_pollhandle_t* ph,
-                            unsigned* reventsp)
+                    fs_pollhandle_t* ph,
+                    unsigned* reventsp)
 {
     (void)fi;
     (void)ph;

@@ -28,6 +28,7 @@ class virtio_gpu_dev_t;
 
 class virtio_gpu_factory_t : public virtio_factory_base_t {
 public:
+    virtio_gpu_factory_t() { detect(); }
     ~virtio_gpu_factory_t() {}
     int detect();
 
@@ -35,8 +36,6 @@ protected:
     // virtio_factory_base_t interface
     virtio_base_t *create() override final;
 };
-
-static virtio_gpu_factory_t virtio_gpu_factory;
 
 class virtio_gpu_dev_t : public virtio_base_t {
 public:
@@ -1161,3 +1160,5 @@ bool virtio_gpu_dev_t::verify_features(virtio_base_t::feature_set_t &features)
 
     return true;
 }
+
+static virtio_gpu_factory_t virtio_gpu_factory;

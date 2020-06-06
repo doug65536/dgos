@@ -56,6 +56,8 @@ struct device_t
 struct dev_fs_t final
         : public fs_base_t
 {
+    constexpr dev_fs_t() = default;
+
     FS_BASE_RW_IMPL
 
     struct device_factory_t {

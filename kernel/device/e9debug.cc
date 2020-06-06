@@ -17,8 +17,7 @@ static bool uart_ready;
 
 static char vt102_reset[] = "\x1B" "c";
 
-_constructor(ctor_ctors_ran)
-static void e9debug_serial_ready(void*)
+_constructor(ctor_ctors_ran) static void e9debug_serial_ready(void*)
 {
     // HACK! Enable bochs debugger hardware
     outw(0x8A00, 0x8A00);
@@ -42,16 +41,18 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
     if (!len)
         len = strlen(str);
 
-    if (len > 1 && str) {
-        outsb(0xE9, str, len);
-        n = len;
-    } else if (len == 1 && str) {
-        outb(0xE9, str[0]);
-        n = 1;
-    } else if (str) {
-        while (*str) {
-            outb(0xE9, *str++);
-            ++n;
+    if (bootinfo_parameter(bootparam_t::port_e9_debug)) {
+        if (len > 1 && str) {
+            outsb(0xE9, str, len);
+            n = len;
+        } else if (len == 1 && str) {
+            outb(0xE9, str[0]);
+            n = 1;
+        } else if (str) {
+            while (*str) {
+                outb(0xE9, *str++);
+                ++n;
+            }
         }
     }
 

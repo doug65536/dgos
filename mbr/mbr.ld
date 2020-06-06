@@ -25,11 +25,7 @@ SECTIONS {
 	.debug_str		0 : { *(.debug_str)     }
 	.debug_loc		0 : { *(.debug_loc)     }
 	.comment        0 : { *(.comment)       }
-	.got            0 : { *(.got*)          }
-	.rel            0 : { *(.rel*)          }
-	.iplt           0 : { *(.iplt*)         }
-	.igot           0 : { *(.igot*)         }
-	
+
 	/DISCARD/		: { *(.interp)               }
 	/DISCARD/		: { *(.comment)              }
 	/DISCARD/		: { *(.note.gnu.build-id)    }

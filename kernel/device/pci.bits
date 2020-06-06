@@ -56,6 +56,11 @@
 2:1 TYPE (0=32-bit, 2=64-bit, 1=reserved, 3=reserved)
 0 RTE Resource type indicator
 
+-- PCI_BAR_TYPE_32BIT=0
+-- PCI_BAR_TYPE_BELOW1M=1
+-- PCI_BAR_TYPE_64BIT=2
+-- PCI_BAR_TYPE_RESERVED=3
+
 -- PCI_SS Subsystem identifiers
 31:16 SSID Subsystem identifier
 15:0 SSVID Subsystem vendor identifier

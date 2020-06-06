@@ -3,29 +3,20 @@
 
 struct bios_regs_t {
     // offset 0
-    uint32_t eax;
-    uint32_t ebx;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t esi;
-    uint32_t edi;
-    uint32_t ebp;
+    uint32_t eax = 0;
+    uint32_t ebx = 0;
+    uint32_t ecx = 0;
+    uint32_t edx = 0;
+    uint32_t esi = 0;
+    uint32_t edi = 0;
+    uint32_t ebp = 0;
     // offset 28
-    uint16_t ds;
-    uint16_t es;
-    uint16_t fs;
-    uint16_t gs;
+    uint16_t ds = 0;
+    uint16_t es = 0;
+    uint16_t fs = 0;
+    uint16_t gs = 0;
     // offset 36
-    uint32_t eflags;
-
-    bios_regs_t()
-        : ds(0)
-        , es(0)
-        , fs(0)
-        , gs(0)
-        , eflags(0x202)
-    {
-    }
+    uint32_t eflags = 0x202;    // IF=1 bit1=1
 
     // Helper to get carry flag
     bool flags_CF() const

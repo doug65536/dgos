@@ -72,6 +72,26 @@ AS_IF([test x"$STRIP" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find strip])])
 AC_SUBST([STRIP])
 
+AC_CHECK_PROGS([SFDISK], [sfdisk], [NOT_FOUND])
+AS_IF([test x"$SFDISK" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find sfdisk])])
+AC_SUBST([SFDISK])
+
+AC_CHECK_PROGS([SGDISK], [sgdisk], [NOT_FOUND])
+AS_IF([test x"$SGDISK" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find sgdisk])])
+AC_SUBST([SGDISK])
+
+AC_CHECK_PROGS([MKFS_VFAT], [mkfs.vfat], [NOT_FOUND])
+AS_IF([test x"$MKFS_VFAT" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find mkfs.vfat])])
+AC_SUBST([MKFS_VFAT])
+
+AC_CHECK_PROGS([TRUNCATE], [truncate], [NOT_FOUND])
+AS_IF([test x"$TRUNCATE" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find truncate])])
+AC_SUBST([TRUNCATE])
+
 AC_CHECK_PROGS([MKDIR], [mkdir], [NOT_FOUND])
 AS_IF([test x"$MKDIR" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find mkdir])])
@@ -177,9 +197,11 @@ do
 done
 AC_SUBST([ASAN_FLAGS])
 
+#Wold-style-cast
+
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++17 fno-fat-lto-objects ggdb3 \
+		std=c++14 fno-fat-lto-objects ggdb3 \
 		fno-integrated-as W Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
 		Wstrict-overflow \
@@ -188,13 +210,13 @@ for flag in \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Warray-bounds Wformat-overflow \
 		Wno-address-of-packed-member \
-		Wno-maybe-uninitialized \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
-		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack \
+		mtls-direct-seg-refs fconserve-stack \
 		Wno-unused-parameter \
-		fno-plt
+		fno-plt \
+		$TUNE_FLAGS
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
@@ -316,7 +338,7 @@ AC_SUBST([FREESTANDING_FLAGS])
 
 AS_VAR_SET([NOSTDLIB_FLAGS], [])
 for flag in \
-	nostdlib nostartfiles
+	nostartfiles nostdlib
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([NOSTDLIB_FLAGS], [" -$flag"])],
@@ -335,7 +357,7 @@ AC_SUBST([NO_FLOAT_FLAGS])
 
 # This should be big enough to fit one max path as local variables
 AS_VAR_SET([WARN_STACK_USAGE_FLAGS], [])
-for flag in Wstack-usage=4176
+for flag in Wstack-usage=5120
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([WARN_STACK_USAGE_FLAGS], [" -$flag"])]
@@ -367,6 +389,28 @@ do
 done
 AC_SUBST([USER64_FLAGS])
 
+USER32_FLAGS=
+for flag in \
+	malign-stringops \
+	fbuiltin \
+	mred-zone \
+	m32 \
+	mpreferred-stack-boundary=4 \
+	fPIE \
+	Wl,--no-eh-frame-hdr \
+	fno-exceptions fno-rtti \
+	Wl,-z,max-page-size=4096 \
+	Wl,-z,relro \
+	Wl,-z,now \
+	Wl,--relax \
+	Wl,-g
+do
+	AX_CHECK_COMPILE_FLAG([-$flag -m32],
+		[AS_VAR_APPEND([USER32_FLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USER32_FLAGS])
+
 USER64_SO_FLAGS=
 for flag in \
 	dynamic
@@ -387,6 +431,18 @@ do
 done
 AC_SUBST([USER64_EXE_FLAGS])
 
+USER32_EXE_FLAGS=
+for flag in \
+	m32 \
+	Wl,-T$srcdir/user/user64_phdrs.ld \
+	Wl,-m,elf_i386
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USER32_EXE_FLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USER32_EXE_FLAGS])
+
 USERLIB64_FLAGS=
 for flag in \
 	malign-stringops \
@@ -403,6 +459,22 @@ do
 done
 AC_SUBST([USERLIB64_FLAGS])
 
+USERLIB32_FLAGS=
+for flag in \
+	malign-stringops \
+	fbuiltin \
+	mred-zone \
+	m32 \
+	mpreferred-stack-boundary=4 \
+	fPIC \
+	fno-exceptions fno-rtti
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USERLIB32_FLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USERLIB32_FLAGS])
+
 USER64_LDFLAGS=
 for flag in \
 	Wl,--no-eh-frame-hdr \
@@ -418,7 +490,27 @@ do
 		[AS_VAR_APPEND([USERLIB64_LDFLAGS], [" -$flag"])]
 		[], [])
 done
-AC_SUBST([USERLIB64_LDFLAGS])
+AC_SUBST([USER64_LDFLAGS])
+
+# reuses user64_phdrs, nothing is different for 32 bit!
+USER32_LDFLAGS=
+for flag in \
+	m32 \
+	Wl,-m,elf_i386 \
+	Wl,--no-eh-frame-hdr \
+	Wl,-T$srcdir/user/user64_phdrs.ld \
+	Wl,-z,max-page-size=4096 \
+	Wl,-z,separate-code \
+	Wl,-z,relro \
+	Wl,-z,now \
+	Wl,--relax \
+	Wl,-g
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USERLIB32_LDFLAGS], [" -$flag"])]
+		[], [])
+done
+AC_SUBST([USERLIB32_LDFLAGS])
 
 USERLIB64_LDFLAGS=
 for flag in \
@@ -642,7 +734,7 @@ AS_VAR_SET([TUNE_FLAGS], [])
 #	[], [])
 #AC_SUBST([TUNE_FLAGS])
 
-AS_VAR_SET([DEBUGGING_CODE_FLAGS], [" -Og $NO_SIBLING_CALLS_FLAGS"])
+AS_VAR_SET([DEBUGGING_CODE_FLAGS], [" -Og"])
 
 AC_ARG_ENABLE(ubsan,
 	AS_HELP_STRING([--enable-ubsan],
@@ -656,6 +748,34 @@ AC_ARG_ENABLE(ubsan,
 	]
 )
 AC_SUBST([SANITIZE_UNDEFINED_FLAGS])
+
+AC_ARG_ENABLE(tune,
+	AS_HELP_STRING([--enable-tune],
+		[Tune for processor]), [
+		AC_MSG_NOTICE([Tuning for $enable_tune])
+
+		AS_VAR_SET([TUNE_FLAGS], ["-mtune=$enable_tune"])
+	], [
+		AC_MSG_NOTICE([Disabling tune])
+		AS_VAR_SET([TUNE_FLAGS], [""])
+	]
+)
+AC_SUBST([TUNE_FLAGS])
+
+AC_ARG_ENABLE(dynamiclibs,
+	AS_HELP_STRING([--enable-userspace-so],
+		[Enable shared object builds in userspace]), [
+		AC_MSG_NOTICE([Enabling userspace shared objects])
+
+		AS_VAR_SET([enable_userspace_so], [true])
+	], [
+		AC_MSG_NOTICE([Disabling userspace shared objects])
+		AS_VAR_SET([enable_userspace_so], [false])
+	]
+)
+AM_CONDITIONAL(userspace_so, test x$enable_userspace_so = xtrue)
+AM_CONDITIONAL(userspace_static, test x$enable_userspace_so != xtrue)
+
 AS_VAR_SET([OPTIMIZE_SPEED_FLAGS], [])
 AS_VAR_SET([OPTIMIZE_SIZE_FLAGS], [])
 AC_ARG_ENABLE(lto,

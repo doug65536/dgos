@@ -2,45 +2,48 @@
 #include "bootefi.h"
 #include "ctors.h"
 #include "likely.h"
-#include "screen_abstract.h"
 #include "halt.h"
+#include "assert.h"
 
-tchar const boxchars[] = TSTR "╔╗║╚╝═█";
+tchar const boxchars[] = TSTR "╔╗║│╚╝═─█ ";
 
-static EFI_GUID efi_simple_text_output_protocol_guid = {
-    0x387477c2, 0x69c7, 0x11d2, {
-         0x8e,0x39,0x00,0xa0,0xc9,0x69,0x72,0x3b
-    }
-};
+//static EFI_GUID efi_simple_text_output_protocol_guid = {
+//    0x387477c2, 0x69c7, 0x11d2, {
+//         0x8e,0x39,0x00,0xa0,0xc9,0x69,0x72,0x3b
+//    }
+//};
 
 static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *efi_simple_text_output;
 
-_constructor(ctor_console) void conout_init()
+_constructor(ctor_console) static void conout_init()
 {
-    EFI_STATUS status;
+    // Just use ConOut!
+    efi_simple_text_output = efi_systab->ConOut;
 
-    EFI_HANDLE *efi_text_output_handles = nullptr;
-    UINTN efi_num_text_output_handles = 0;
+//    EFI_STATUS status;
 
-    status = efi_systab->BootServices->LocateHandleBuffer(
-                ByProtocol,
-                &efi_simple_text_output_protocol_guid,
-                nullptr,
-                &efi_num_text_output_handles,
-                &efi_text_output_handles);
+//    EFI_HANDLE *efi_text_output_handles = nullptr;
+//    UINTN efi_num_text_output_handles = 0;
 
-    if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Unable to query text output handle");
+//    status = efi_systab->BootServices->LocateHandleBuffer(
+//                ByProtocol,
+//                &efi_simple_text_output_protocol_guid,
+//                nullptr,
+//                &efi_num_text_output_handles,
+//                &efi_text_output_handles);
 
-    status = efi_systab->BootServices->HandleProtocol(
-                efi_text_output_handles[0],
-            &efi_simple_text_output_protocol_guid,
-            (VOID**)&efi_simple_text_output);
+//    if (unlikely(EFI_ERROR(status)))
+//        PANIC(TSTR "Unable to query text output handle");
 
-    if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Unable to query text output interface");
+//    status = efi_systab->BootServices->HandleProtocol(
+//                efi_text_output_handles[0],
+//            &efi_simple_text_output_protocol_guid,
+//            (VOID**)&efi_simple_text_output);
 
-    efi_simple_text_output->SetMode(efi_simple_text_output, 0);
+//    if (unlikely(EFI_ERROR(status)))
+//        PANIC(TSTR "Unable to query text output interface");
+
+//    efi_simple_text_output->SetMode(efi_simple_text_output, 0);
 }
 
 void scroll_screen(uint8_t attr)
@@ -53,7 +56,7 @@ void scroll_screen(uint8_t attr)
     efi_simple_text_output->OutputString(efi_simple_text_output, TSTR "\n");
 }
 
-void print_at(int row, int col, uint8_t attr,
+void print_at(int col, int row, uint8_t attr,
               size_t length, tchar const *text)
 {
     if (unlikely(!efi_simple_text_output))

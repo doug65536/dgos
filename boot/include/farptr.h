@@ -31,7 +31,7 @@ struct far_ptr_t {
         return (T*)(uintptr_t(segment) << 4) + offset;
     }
 
-    far_ptr_t& adj_seg(uint16_t new_seg)
+    far_ptr_t& adj_seg(uint_fast16_t new_seg)
     {
         uint32_t addr = (segment << 4) + offset;
         uint32_t seg_addr = new_seg << 4;

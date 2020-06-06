@@ -886,8 +886,6 @@ static void rtl8139_startup()
         self->send(pkt);
     }
 }
-//REGISTER_CALLOUT(rtl8139_startup_hack, nullptr,
-//                 callout_type_t::nics_ready, "000");
 #endif
 
 static rtl8139_factory_t rtl8139_factory;

@@ -4,32 +4,64 @@
 #include "paging.h"
 #include "malloc.h"
 
-static tui_str_t tui_ena_dis[] = {
-    TSTR "disabled",
-    TSTR "enabled"
+static tui_str_t tui_timeout[] = {
+    TSTR "1.5",
+    TSTR "5",
+    TSTR "10",
+    TSTR "20",
+    TSTR "never"
+};
+
+static tui_str_t tui_com_port[] = {
+    TSTR "COM1",
+    TSTR "COM2",
+    TSTR "COM3",
+    TSTR "COM4"
+};
+
+static tui_str_t tui_baud_rates[] = {
+    TSTR "115200 (max speed)",
+    TSTR "57600",
+    TSTR "38400",
+    TSTR "19200",
+    TSTR "14400",
+    TSTR "9600",
+    TSTR "4800",
+    TSTR "2400",
+    TSTR "1200",
+    TSTR "600",
+    TSTR "300 (very slow)"
+};
+
+enum tui_menu_item_index_t {
+    menu_timeout,
+    kernel_debugger,
+    serial_output,
+    serial_port,
+    serial_baud,
+    display_resolution,
+    e9_enable,
+    smp_enable,
+    acpi_enable,
+    mps_enable,
+    msi_enable,
+    msix_enable,
 };
 
 static tui_menu_item_t tui_menu[] = {
-    {
-        TSTR "kernel debugger",
-        tui_ena_dis,
-        0
-    },
-    {
-        TSTR "serial debug output",
-        tui_ena_dis,
-        0
-    },
-    {
-        TSTR "display resolution",
-        {},
-        0
-    }
+    { TSTR "menu timeout (sec)", tui_timeout, 0 },
+    { TSTR "kernel debugger", tui_dis_ena, 0 },
+    { TSTR "serial debug output", tui_dis_ena, 0 },
+    { TSTR "serial port", tui_com_port, 0 },
+    { TSTR "serial baud rate", tui_baud_rates, 0 },
+    { TSTR "display resolution", {}, 0 },
+    { TSTR "port 0xe9 debug output", tui_dis_ena, 1 },
+    { TSTR "SMP", tui_dis_ena, 0 },
+    { TSTR "ACPI", tui_dis_ena, 1 },
+    { TSTR "MPS", tui_dis_ena, 1 },
+    { TSTR "MSI", tui_dis_ena, 1 },
+    { TSTR "MSI-X", tui_dis_ena, 1 }
 };
-
-static tui_list_t<tui_menu_item_t> boot_menu_items(tui_menu);
-
-static tui_menu_renderer_t boot_menu(&boot_menu_items);
 
 template<typename T>
 struct remove_reference
@@ -54,7 +86,7 @@ OutIt to_str(T n, OutIt out, size_t out_sz, OutT pad = OutT{})
 
     // We start off the end of the range,
     // but we predecrement before each store
-    auto out_st = buf + (sizeof(buf)/sizeof(*buf));
+    auto out_st = buf + (sizeof(buf) / sizeof(*buf));
 
     auto buf_out = out_st;
 
@@ -81,7 +113,11 @@ OutIt to_str(T n, OutIt out, size_t out_sz, OutT pad = OutT{})
 
 void boot_menu_show(kernel_params_t &params)
 {
-    static vbe_mode_list_t const& vbe_modes =
+    tui_list_t<tui_menu_item_t> boot_menu_items(tui_menu);
+
+    tui_menu_renderer_t boot_menu(&boot_menu_items);
+
+    vbe_mode_list_t const& vbe_modes =
             vbe_enumerate_modes();
 
     // format is %dx%d-%d:%d:%d:%d-%dbpp
@@ -141,16 +177,23 @@ void boot_menu_show(kernel_params_t &params)
         mode_list.items[i].str = str;
     }
 
-    tui_menu[2].options = mode_list;
+    tui_menu[display_resolution].options = mode_list;
 
-    boot_menu.center();
+    boot_menu.center(5);
 
-    boot_menu.interact_timeout(1000);
+    boot_menu.interact_timeout(1500);
 
-    auto mode_index = tui_menu[2].index;
+    auto mode_index = tui_menu[display_resolution].index;
     auto const* mode = &vbe_modes.modes[mode_index];
 
     params.vbe_selected_mode = uintptr_t(mode);
-    params.wait_gdb = tui_menu[0].index != 0;
-    params.serial_debugout = tui_menu[1].index != 0;
+    params.wait_gdb = tui_menu[kernel_debugger].index != 0;
+    params.serial_debugout = tui_menu[serial_output].index != 0;
+    params.serial_baud = tui_menu[serial_baud].index;
+    params.smp_enable = tui_menu[smp_enable].index;
+    params.acpi_enable = tui_menu[acpi_enable].index;
+    params.mps_enable = tui_menu[mps_enable].index;
+    params.msi_enable = tui_menu[msi_enable].index;
+    params.msix_enable = tui_menu[msix_enable].index;
+    params.e9_enable = tui_menu[e9_enable].index;
 }

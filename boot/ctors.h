@@ -6,8 +6,8 @@ enum constructor_order_t {
     ctor_console,
     ctor_graphics,
     ctor_fs,
-    ctor_paging,
-    ctor_physmem
+    ctor_physmem,
+    ctor_paging
 };
 
 extern "C" void ctors_invoke();

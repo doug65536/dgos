@@ -7,13 +7,13 @@
 class acpi_gas_accessor_t {
 public:
     static acpi_gas_accessor_t *from_gas(acpi_gas_t const& gas);
-    static acpi_gas_accessor_t *from_sysmem(uint64_t addr, int size,
+    static acpi_gas_accessor_t *from_sysmem(uint_fast64_t addr, int size,
                                             int bitofs, int bitwidth);
-    static acpi_gas_accessor_t *from_pcicfg(uint32_t addr, int size,
+    static acpi_gas_accessor_t *from_pcicfg(uint_fast32_t addr, int size,
                                             int bitofs, int bitwidth);
-    static acpi_gas_accessor_t *from_ioport(uint16_t ioport, int size,
+    static acpi_gas_accessor_t *from_ioport(uint_fast16_t ioport, int size,
                                             int bitofs, int bitwidth);
-    static acpi_gas_accessor_t *from_fixed(uint16_t ioport, int size,
+    static acpi_gas_accessor_t *from_fixed(uint_fast16_t ioport, int size,
                                            int bitofs, int bitwidth);
 
     virtual ~acpi_gas_accessor_t() = 0;

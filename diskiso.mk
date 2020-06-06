@@ -2,11 +2,11 @@
 #bootia32.efi
 
 $(top_builddir)/isodisk.img: \
-		$(top_builddir)/kernel-generic \
+		$(top_builddir)/dgos-kernel-generic \
 		\
-		$(top_builddir)/kernel-tracing \
+		$(top_builddir)/dgos-kernel-tracing \
 		\
-		$(top_builddir)/kernel-asan \
+		$(top_builddir)/dgos-kernel-asan \
 		\
 		$(top_builddir)/bootx64.efi \
 		\
@@ -23,9 +23,8 @@ $(top_builddir)/isodisk.img: \
 		\
 		$(top_builddir)/fatpart.img \
 		\
-		$(top_builddir)/iso_stage \
-		$(shell test [ "$(top_builddir)/iso_stage" ] && \
-			$(FIND) -L "$(top_builddir)/iso_stage" || true) \
+		$(shell [[ -d "$(top_builddir)/iso_stage/" ]] && \
+			$(FIND) -L "$(top_builddir)/iso_stage/" -type f || true) \
 		\
 		$(top_builddir)/bootiso-bin
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)
@@ -43,11 +42,12 @@ $(top_builddir)/isodisk.img: \
 		-boot-load-size "$$blocks" \
 		-boot-info-table \
 		-boot-load-seg 0x7c0 \
-		-r -J \
+		-r -J -f \
 		-A 'ea870ef2-2483-11e8-9bba-3f1a71a07f83' \
 		-eltorito-alt-boot \
 		-b efipart.img \
 		-iso-level 2 \
 		-no-emul-boot \
+		-r -J -f \
 		-A 'ea870ef2-2483-11e8-9bba-3f1a71a07f83' \
-		"$(top_builddir)/iso_stage"
+		"$(top_builddir)/iso_stage/"

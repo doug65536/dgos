@@ -98,6 +98,7 @@ void modload_init(void)
     export_ht.base_adj = 0;
 }
 
+_unused
 static std::string module_reloc_type(size_t sym_type)
 {
     switch (sym_type) {
@@ -193,6 +194,8 @@ public:
     Elf64_Addr dt_fini_array = 0;
     Elf64_Xword dt_init_arraysz = 0;
     Elf64_Xword dt_fini_arraysz = 0;
+    Elf64_Xword dt_flags_1 = 0;
+    Elf64_Xword dt_relacount = 0;
     size_t unknown_count = 0;
 
     Elf64_Sym const *syms = nullptr;
@@ -345,15 +348,9 @@ _noinline
 void modload_load_symbols(char const *path,
                           uintptr_t text_addr, uintptr_t base_addr)
 {
-    size_t cpu_nr = thread_cpu_number();
+    uint32_t cpu_nr = thread_cpu_number();
 
     // Automated breakpoint is placed here to load symbols
-    // The debugger is actually going to dereference path and get addr
-    // So that memory clobber is really needed, the caller need write
-    // the actual path string into memory there (flow analysis could discard
-    // it without the memory clobber)
-    //__asm__ __volatile__ ("" : : : "memory");
-
     // bochs hack, autoload symbols using rdi and rsi as string ptr and adj
     __asm__ __volatile__ ("outl %%eax,%%dx\n"
                           ".global modload_symbols_autoloaded\n"
@@ -513,6 +510,14 @@ errno_t module_t::parse_dynamic()
 
         case DT_FINI_ARRAYSZ:
             dt_fini_arraysz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_FLAGS_1:
+            dt_flags_1 = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_RELACOUNT:
+            dt_relacount = dyn_ent.d_un.d_val;
             continue;
 
         default:
@@ -676,6 +681,7 @@ static Elf64_Addr modload_lookup_name(
 {
     Elf64_Word bucket = hash % ht->hash_nbucket;
 
+    // Look in the passed hash table table for the name
     for (Elf64_Word i = ht->hash_buckets[bucket]; i != 0;
          i = ht->hash_chains[i]) {
         Elf64_Sym const *chk_sym = ht->symtab + i;
@@ -730,7 +736,7 @@ errno_t module_t::apply_relocs()
     };
 
     size_t const rela_cnts[] = {
-        dt_relaent,
+        dt_relasz / sizeof(Elf64_Rela),
         dt_pltrelsz / sizeof(Elf64_Rela)
     };
 
@@ -748,10 +754,13 @@ errno_t module_t::apply_relocs()
 
             auto const& sym = syms[sym_idx];
 
-            ELF64_TRACE("Fixup at %#zx + %#zx (%#zx), type=%s\n",
+            ELF64_TRACE("Fixup at %#zx + %#zx (%#zx), type=%s name=\"%s\"\n",
                      uintptr_t(base_adj), uintptr_t(rela_ptr[i].r_offset),
                      base_adj + rela_ptr[i].r_offset,
-                     module_reloc_type(sym_type).c_str());
+                     module_reloc_type(sym_type).c_str(),
+                     sym.st_name
+                        ? (char*)dt_strtab + base_adj + sym.st_name
+                        : "");
 
             // A addend
             // B base address
@@ -796,7 +805,7 @@ errno_t module_t::apply_relocs()
             case R_AMD64_JUMP_SLOT://7
                 // word64 S
 
-                if (dt_bind_now) {// || true) {
+                if (dt_bind_now || true) {// || true) {
                     // Link it all right now
                     value = S;
                     *(int64_t*)operand = S;
@@ -1023,7 +1032,8 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
                            : errno_t::ENOEXEC);
     }
 
-    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
+    decltype(file_hdr.e_phentsize) expected_phdr_sz = sizeof(Elf64_Phdr);
+    if (unlikely(file_hdr.e_phentsize != expected_phdr_sz)) {
         printk("Unrecognized program header record size\n");
         return load_failed(errno_t::ENOEXEC);
     }
@@ -1260,15 +1270,19 @@ public:
     }
 };
 
+ext::spinlock __module_register_frame_lock;
+
 EXPORT void __module_register_frame(void const * const *__module_dso_handle,
                                     void *__frame, size_t __size)
 {
+    std::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
     __register_frame(__frame, __size);
 }
 
 EXPORT void __module_unregister_frame(void const * const *__module_dso_handle,
                                       void *__frame)
 {
+    std::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
     __deregister_frame(__frame);
 }
 
@@ -1289,8 +1303,7 @@ extern char kernel_stack[];
 early_atexit_t *early_atexit = (early_atexit_t*)kernel_stack;
 size_t early_atexit_count;
 
-_constructor(ctor_mmu_init)
-void atexit_init()
+_constructor(ctor_mmu_init) static void atexit_init()
 {
     for (size_t i = 0; i < early_atexit_count; ++i) {
         fn_list_t& list = atexit_lookup[early_atexit[i].dso_handle];
@@ -1334,7 +1347,7 @@ EXPORT module_t *modload_closest(ptrdiff_t address)
     for (std::unique_ptr<module_t>& module: loaded_modules) {
         if (address >= module->base_adj) {
             ptrdiff_t distance = address - module->base_adj;
-            if (distance > 0 && closest > distance) {
+            if (closest > distance) {
                 closest = distance;
                 closest_module = module.get();
             }

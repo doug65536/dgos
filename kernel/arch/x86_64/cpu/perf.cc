@@ -12,6 +12,8 @@
 #include "rand.h"
 #include "control_regs_constants.h"
 
+static stacktrace_xlat_fn_t stacktrace_xlat_fn;
+
 using perf_token_table_t = std::vector<std::string>;
 
 using perf_symbol_table_t = ext::fast_map<uintptr_t, size_t>;
@@ -59,7 +61,7 @@ static std::vector<perf_trace_cpu_t> perf_data;
 static std::vector<padded_rand_lfs113_t> perf_rand;
 
 static uint32_t volatile perf_event = 0xC0;
-static uint8_t volatile perf_event_scale = 20;
+static uint8_t volatile perf_event_scale = 21;
 
 using token_map_t = std::map<std::string, size_t>;
 static token_map_t token_map;
@@ -92,7 +94,7 @@ static bool perf_add_symbols(char const *filename,
 {
     file_t syms_fid;
 
-    syms_fid = file_open(filename, O_RDONLY);
+    syms_fid = file_openat(AT_FDCWD, filename, O_RDONLY);
     if (unlikely(syms_fid < 0))
         return false;
 
@@ -227,6 +229,42 @@ void setup_sample(size_t cpu_nr)
 //    perf_data[cpu_nr].last_tsc = cpu_rdtsc();
 }
 
+perf_symbol_table_t::const_iterator lookup_symbol(uintptr_t addr)
+{
+    perf_module_lookup_t::const_iterator
+            it = perf_module_lookup.lower_bound(addr);
+
+    if (likely(it == perf_module_lookup.end() ||
+               it->first != addr))
+        --it;
+
+    if (unlikely(it == perf_module_lookup.end()))
+        return perf_symbol_table_t::const_iterator();
+
+    perf_module_t &mod = *it->second;
+
+    // If it lies outside the module, drop it
+    if (unlikely(addr > mod.base + mod.size))
+        return perf_symbol_table_t::const_iterator();
+
+    // Find offset relative to module base
+    uintptr_t ofs = addr - mod.base;
+
+    // Lookup symbol at that place
+    perf_symbol_table_t::const_iterator
+            sym_it = mod.syms.lower_bound(ofs);
+
+    // If ahead of it, step back one
+    if (likely(sym_it == mod.syms.end() ||
+               sym_it->first > ofs))
+        --sym_it;
+
+    if (sym_it == mod.syms.end())
+        sym_it = perf_symbol_table_t::const_iterator();
+
+    return sym_it;
+}
+
 static void perf_sample(int (*ip)(void*), size_t cpu_nr)
 {
     uintptr_t addr = uintptr_t((void*)ip);
@@ -259,38 +297,15 @@ static void perf_sample(int (*ip)(void*), size_t cpu_nr)
             addr = trace.ips[i];
 
             // Lookup module by base address
-            perf_module_lookup_t::const_iterator
-                    it = perf_module_lookup.lower_bound(addr);
+            perf_symbol_table_t::const_iterator sym_it = lookup_symbol(addr);
 
-            if (likely(it == perf_module_lookup.end() ||
-                       it->first != addr))
-                --it;
-
-            if (unlikely(it == perf_module_lookup.end()))
-                continue;
-
-            perf_module_t &mod = *it->second;
-
-            // If it lies outside the module, drop it
-            if (unlikely(addr > mod.base + mod.size))
-                continue;
-
-            // Find offset relative to module base
-            uintptr_t ofs = addr - mod.base;
-
-            // Lookup symbol at that place
-            perf_symbol_table_t::const_iterator
-                    sym_it = mod.syms.lower_bound(ofs);
-
-            // If ahead of it, step back one
-            if (likely(sym_it == mod.syms.end() ||
-                       sym_it->first > ofs))
-                --sym_it;
-
-            size_t symbol_token = sym_it->second;
-
-            // Don't need fancy atomic thing, this is per-cpu
-            ++trace.samples[symbol_token];
+            if (likely(sym_it != perf_symbol_table_t::const_iterator())) {
+                size_t symbol_token = sym_it->second;
+                // Don't need fancy atomic thing, this is per-cpu
+                ++trace.samples[symbol_token];
+            } else {
+                //printdbg("Lost in space perf sample at %" PRIx64 "\n", addr);
+            }
         }
     }
 }
@@ -340,11 +355,29 @@ EXPORT uint64_t perf_gather_samples(
 
 static isr_context_t *perf_nmi_handler(int intr, isr_context_t *ctx)
 {
-    size_t cpu_nr = thread_cpu_number();
+    uint32_t cpu_nr = thread_cpu_number();
     perf_sample(ISR_CTX_REG_RIP(ctx), cpu_nr);
     setup_sample(cpu_nr);
 
     return ctx;
+}
+
+static void stacktrace_xlat(void * const *ips, size_t count)
+{
+    for (size_t i = 0; i < count; ++i) {
+        perf_symbol_table_t::const_iterator sym_it =
+                lookup_symbol(uintptr_t(ips[i]));
+
+        if (unlikely(sym_it == perf_symbol_table_t::const_iterator()))
+            printdbg("??? (%#" PRIx64 ")\n", uint64_t(ips[i]));
+
+        size_t sym_token = sym_it->second;
+
+        if (perf_tokens.size() > sym_token) {
+            printdbg("%s (%#" PRIx64 ")\n",
+                     perf_tokens[sym_token].c_str(), uint64_t(ips[i]));
+        }
+    }
 }
 
 EXPORT void perf_init()
@@ -372,6 +405,8 @@ EXPORT void perf_init()
 
         perf_add_symbols(symname.c_str(), size, base);
     }
+
+    perf_set_stacktrace_xlat_fn(stacktrace_xlat);
 
 //    printdbg("Modules:\n");
 //    for (perf_module_table_t::value_type const& item: perf_module_syms) {
@@ -433,4 +468,17 @@ EXPORT void perf_set_event(uint32_t event, uint8_t event_scale)
     workq::enqueue_on_all_barrier([](size_t cpu_nr) {
         setup_sample(cpu_nr);
     });
+}
+
+stacktrace_xlat_fn_t perf_set_stacktrace_xlat_fn(stacktrace_xlat_fn_t fn)
+{
+    stacktrace_xlat_fn_t old = stacktrace_xlat_fn;
+    stacktrace_xlat_fn = fn;
+    return old;
+}
+
+void perf_stacktrace_xlat(void * const *ips, size_t count)
+{
+    if (stacktrace_xlat_fn)
+        stacktrace_xlat_fn(ips, count);
 }

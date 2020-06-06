@@ -19,7 +19,7 @@
     .cfi_adjust_cfa_offset -8
 .endm
 
-.macro adj_rsp	ofs
+.macro adj_rsp_cfi	ofs
     lea (\ofs)(%rsp),%rsp
     .cfi_adjust_cfa_offset -(\ofs)
 .endm

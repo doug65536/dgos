@@ -6,7 +6,7 @@
 
 ssize_t write(int fd, void const *buf, size_t n)
 {
-    long status = syscall3(long(fd), long(buf), long(n), SYS_write);
+    long status = syscall3(fd, uintptr_t(buf), n, SYS_write);
 
     if (status >= 0)
         return status;

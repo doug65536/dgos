@@ -6,7 +6,8 @@
 
 int symlinkat(char const *target, int dirfd, char const *link)
 {
-    long status = syscall3(long(target), dirfd, long(link), SYS_symlinkat);
+    long status = syscall3(uintptr_t(target), dirfd,
+                           uintptr_t(link), SYS_symlinkat);
 
     if (status >= 0)
         return status;

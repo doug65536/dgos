@@ -9,7 +9,7 @@ SECTIONS {
 			: __section_alignment__ ) : {
 		__text_st = .;
 
-		*(.entry)
+		KEEP(*(.entry))
 		*(.text)
 		*(.text.*)
 		*(.text.unlikely)
@@ -49,19 +49,22 @@ SECTIONS {
 		*(.edata)
 
 		. = ALIGN(16);
-		PROVIDE(__init_array_start = .);
-		*(.ctors)
-		*(SORT_BY_INIT_PRIORITY(.ctors.*))
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		PROVIDE(__init_array_end = .);
+		__init_array_start = .;
+		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
+		__init_array_end = .;
+
+		__init_array_early_start = .;
+		KEEP(*(.init_array))
+		KEEP(*(.ctors))
+		__init_array_early_end = .;
 
 		. = ALIGN(16);
 		___dtors_st = .;
-		*(.dtors)
-		*(SORT_BY_INIT_PRIORITY(.dtors.*))
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.dtors.*)))
+		KEEP(*(.dtors))
+		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
 		___dtors_en = .;
 
 		/* Place 64 bit code high enough to be outside first 4KB */
@@ -76,10 +79,10 @@ SECTIONS {
 		/* It will protect data from being lost when exiting boot services */
 		/* This section is copied to a 4KB aligned heap block */
 		___smp_st = ABSOLUTE(.);
-		*(.smp.entry)
-		*(.smp.text)
+		KEEP(*(.smp.entry))
+		KEEP(*(.smp.text))
 		. = ALIGN(64);
-		*(.smp.data)
+		KEEP(*(.smp.data))
 		___smp_en = ABSOLUTE(.);
 	}
 
@@ -106,10 +109,9 @@ SECTIONS {
 	}
 
 	.got : ALIGN(64) {
-		PROVIDE_HIDDEN(___got = .);
 		PROVIDE_HIDDEN(_GLOBAL_OFFSET_TABLE_ = .);
-		*(.got)
 		*(.got.plt)
+		*(.got)
 	}
 
 	.rela.dyn : ALIGN(64) {
@@ -138,9 +140,9 @@ SECTIONS {
 	}
 
 	.got : ALIGN(64) {
-		PROVIDE_HIDDEN(___got = .);
-		*(.got*)
+		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got.plt)
+		*(.got*)
 	}
 
 	.data ALIGN(4K) : {
@@ -163,4 +165,15 @@ SECTIONS {
 	}
 
 	/DISCARD/       : { *(.comment)       }
+/*	.debug          (NOLOAD) : { *(.debug)         }
+	.debug_info		(NOLOAD) : { *(.debug_info)    }
+	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  }
+	.debug_aranges	(NOLOAD) : { *(.debug_aranges) }
+	.debug_ranges	(NOLOAD) : { *(.debug_ranges)  }
+	.debug_frame	(NOLOAD) : { *(.debug_frame)   }
+	.debug_macro	(NOLOAD) : { *(.debug_macro)   }
+	.debug_line		(NOLOAD) : { *(.debug_line)    }
+	.debug_str		(NOLOAD) : { *(.debug_str)     }
+	.debug_loc		(NOLOAD) : { *(.debug_loc)     }*/
+
 }

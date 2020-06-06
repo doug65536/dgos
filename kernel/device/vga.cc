@@ -8,6 +8,7 @@ PCI_DRIVER_BY_CLASS(
         PCI_DEV_CLASS_DISPLAY, PCI_SUBCLASS_DISPLAY_VGA, -1);
 
 #include "dev_text.h"
+#include "fs/devfs.h"
 
 #include "bios_data.h"
 #include "mm.h"
@@ -25,6 +26,70 @@ public:
 
     int detect(text_dev_base_t ***ptrs) override final;
 };
+
+static vga_factory_t vga_factory;
+
+class vga_conout_file_t : public dev_fs_file_t {
+public:
+    // dev_fs_file_t interface
+    ssize_t read(char *buf, size_t size, off_t offset) override final
+    {
+        return -int(errno_t::ENOSYS);
+    }
+
+    ssize_t write(const char *buf, size_t size, off_t offset) override final
+    {
+        // lie
+        return size;
+    }
+
+
+    // fs_file_info_t interface
+public:
+    ino_t get_inode() const override final
+    {
+        return -1;
+    }
+};
+
+class vga_conout_reg_t : public dev_fs_file_reg_t {
+public:
+    vga_conout_reg_t() : dev_fs_file_reg_t("conout") {}
+
+    // dev_fs_file_reg_t interface
+    dev_fs_file_t *open(int flags, mode_t mode) override final
+    {
+        return new (std::nothrow) vga_conout_file_t;
+    }
+};
+
+class vga_conerr_reg_t : public dev_fs_file_reg_t {
+public:
+    vga_conerr_reg_t() : dev_fs_file_reg_t("conerr") {}
+
+    // dev_fs_file_reg_t interface
+    dev_fs_file_t *open(int flags, mode_t mode) override final
+    {
+        return new (std::nothrow) vga_conout_file_t;
+    }
+};
+
+// Aligned storage to defer construction
+template<typename T>
+using vga_reg_storage_t =
+typename std::aligned_storage<sizeof(T), alignof(T)>::type;
+
+static vga_reg_storage_t<vga_conout_reg_t> vga_conout_reg_storage;
+static vga_reg_storage_t<vga_conerr_reg_t> vga_conerr_reg_storage;
+
+static void vga_init_devs(void*)
+{
+    devfs_register(new (vga_conout_reg_storage.data) vga_conout_reg_t);
+    devfs_register(new (vga_conerr_reg_storage.data) vga_conout_reg_t);
+}
+
+REGISTER_CALLOUT(vga_init_devs, nullptr, callout_type_t::
+                 devfs_ready, "000");
 
 class text_display_t : public text_dev_base_t {
 protected:
@@ -236,6 +301,9 @@ void text_display_t::write_char_at(int x, int y, int character, int attrib)
 
 void text_display_t::force_char_at(int x, int y, int character, int attrib)
 {
+    if (unlikely(y < 0 || x < 0 || x >= width || y >= height))
+        return;
+
     int mouse_was_shown = mouse_hide_if_at(x, y);
     size_t place = y * width + x;
     uint16_t pair = (character & 0xFF) | ((attrib & 0xFF) << 8);
@@ -480,7 +548,7 @@ int vga_factory_t::detect(text_dev_base_t ***ptrs)
 
 // Startup/shutdown
 
-// Starts statically with a pair of 80x25 buffers for so they always exist
+// Starts statically with a pair of 80x25 buffers so they always exist
 static constexpr size_t initial_video_width = 80;
 static constexpr size_t initial_video_height = 25;
 static constexpr size_t initial_video_count =
@@ -512,6 +580,9 @@ bool text_display_t::init()
     shadow = initial_video_shadow;
 
     mouse_toggle(1);
+
+//    devfs_register(&vga_conout_reg);
+//    devfs_register(&vga_conerr_reg);
 
     return true;
 }

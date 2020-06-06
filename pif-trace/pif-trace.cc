@@ -563,7 +563,7 @@ static std::string to_eng(uint64_t n, bool seconds)
     int tenths;
 
     if (seconds) {
-        static constexpr uint64_t clk_spd = 2500000000;
+        static constexpr uint64_t clk_spd = 3500000000;
 
         // Translate cycle count to 1ps units
         auto ps = (__uint128_t{n} * 1000000000000U) / clk_spd;

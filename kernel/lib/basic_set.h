@@ -889,7 +889,7 @@ public:
 
         node_type_data(node_type_data const& __rhs) = delete;
 
-        constexpr node_type_data(node_type_data&& __rhs);
+        constexpr node_type_data(node_type_data&& __rhs) noexcept;
 
         ~node_type_data();
 
@@ -940,10 +940,14 @@ public:
     public:
         constexpr node_type();
 
+        node_type(node_type&&) = default;
+
         constexpr node_type(__node_allocator_t const& __alloc);
 
         constexpr node_type(__node_t *__node,
                             __node_allocator_t const& __alloc);
+
+        ~node_type() = default;
 
         node_type& operator=(node_type const& __rhs) = delete;
 
@@ -1099,7 +1103,8 @@ public:
             return __curr->__item();
         }
 
-        const_pointer operator->() const
+        typename std::conditional<_Is_const, const_pointer, pointer>::type
+        operator->() const
         {
             return __curr->__item_ptr();
         }
@@ -1209,7 +1214,7 @@ public:
             insert(__item);
     }
 
-    constexpr __basic_tree(__basic_tree&& __rhs)
+    constexpr __basic_tree(__basic_tree&& __rhs) noexcept
         : __root(__rhs.__root)
         , __first(__rhs.__first)
         , __last(__rhs.__last)
@@ -1736,7 +1741,7 @@ template<
     typename _Alloc = allocator<void>>
 constexpr
 __basic_tree<_T, _V, _Compare, _Alloc>::node_type_data::node_type_data(
-        node_type_data&& __rhs)
+        node_type_data&& __rhs) noexcept
     : __node(__rhs.__node)
     , __alloc(move(__rhs.__alloc))
 {
@@ -1750,7 +1755,6 @@ template<
     typename _Alloc = allocator<void>>
 __basic_tree<_T, _V, _Compare, _Alloc>::node_type_data::~node_type_data()
 {
-    // Unlikely because normal use would have reinserted it
     clear();
 }
 

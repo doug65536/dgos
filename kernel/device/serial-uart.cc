@@ -624,7 +624,7 @@ public:
                  clock::time_point timeout) override final;
     bool wait_dsr_until(timeout_t timeout) override final;
 
-    void route_irq(int cpu) override final;
+    bool route_irq(int cpu) override final;
 
 private:
     using lock_type = ext::irq_mutex;
@@ -778,9 +778,9 @@ bool uart_async_t::wait_dsr_until(timeout_t timeout)
     return true;
 }
 
-void uart_async_t::route_irq(int cpu)
+bool uart_async_t::route_irq(int cpu)
 {
-    irq_setcpu(irq, cpu);
+    return irq_setcpu(irq, cpu);
 }
 
 void uart_async_t::send_some(scoped_lock const&)
@@ -1159,7 +1159,13 @@ EXPORT uart_dev_t *uart_dev_t::open(
             : static_cast<uart_dev_t*>(new (std::nothrow)
                                        uart_defs::uart_async_t());
 
-    uart_defs::uarts.emplace_back(static_cast<uart_defs::uart_t*>(uart));
+    if (unlikely(!uart))
+        panic_oom();
+
+    if (unlikely(!uart_defs::uarts.emplace_back(
+                     static_cast<uart_defs::uart_t*>(uart))))
+        panic_oom();
+
     uart->init({port, irq, baud, data_bits, parity_type, stop_bits}, !polled);
 
     return uart;

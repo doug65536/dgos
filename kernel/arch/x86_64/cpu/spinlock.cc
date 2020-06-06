@@ -21,7 +21,9 @@ _hot
 EXPORT void spinlock_lock(spinlock_t *lock)
 {
     cs_enter();
-    while (atomic_ld_acq(lock) != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
+
+    // Try to immediately acquire lock, otherwise go into polling
+    while (atomic_cmpxchg(lock, 0, 1) != 0)
         cpu_wait_value(lock, 0);
 }
 
@@ -31,8 +33,8 @@ EXPORT bool spinlock_try_lock(spinlock_t *lock)
 {
     cs_enter();
 
-    if (atomic_ld_acq(lock) != 0 ||
-            atomic_cmpxchg(lock, 0, 1 /*| intr_enabled*/) != 0) {
+    // Try to immediately acquire the lock, otherwise fail
+    if (atomic_cmpxchg(lock, 0, 1) != 0) {
         cs_leave();
 
         return false;

@@ -1,6 +1,8 @@
 #include "cfile.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/likely.h>
 
 int _FILE::open(int new_fd)
 {
@@ -10,7 +12,11 @@ int _FILE::open(int new_fd)
 
 int _FILE::add_ch(int ch)
 {
-    write(fd, &ch, 1);
+    unsigned char uc = ch;
+    ssize_t sz = write(fd, &uc, 1);
+    if (sz < 0)
+        return -1;
+
     return 0;
 }
 
@@ -18,17 +24,25 @@ long _FILE::readbuf(void *buffer, size_t size, size_t count)
 {
     size_t bytes = size * count;
 
-    if (bytes == 0)
+    if (unlikely(bytes == 0))
         return 0;
+
+    long result = EOF;
 
     int ungot = 0;
 
-    if (unget >= 0) {
-        *((char*)buffer) = unget;
-        buffer = (char*)buffer + 1;
-        unget = -1;
-        --bytes;
-        ungot = 1;
+    size_t ungot_available = unget_size - unget_pos;
+
+    if (unlikely(ungot_available > 0)) {
+        size_t take = ungot_available > count
+                ? count
+                : ungot_available;
+
+        memcpy(buffer, unget_data, take);
+
+        unget_pos += take;
+
+        result = take;
     }
 
     if (bytes > 0) {
@@ -41,7 +55,7 @@ long _FILE::readbuf(void *buffer, size_t size, size_t count)
         }
     }
 
-    return 0;
+    return result;
 }
 
 long _FILE::writebuf(void const *buffer, size_t size, size_t count)

@@ -339,44 +339,16 @@ struct acpi_hpet_t {
 
 static _always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
 {
-    // These are likely uncacheable loads, try to do it decently
-    // Checksum of 76 bytes is so slow, you can see a delay when debugging
-    // on KVM, when doing it as byte loads
-    size_t i = 0;
-
-    size_t wide_count = len >> 3;
     uint8_t sum = 0;
-    while (i < wide_count) {
-        uint64_t value;
-        __builtin_memcpy(&value, &((uint64_t*)bytes)[i++], sizeof(value));
-        sum += value & 0xFF;
-        value >>= 8;
-        sum += value & 0xFF;
-        value >>= 8;
-        sum += value & 0xFF;
-        value >>= 8;
-        sum += value & 0xFF;
-        value >>= 8;
-        sum += value & 0xFF;
-        value >>= 8;
-        sum += value & 0xFF;
-        value >>= 8;
-        sum += value & 0xFF;
-        value >>= 8;
-        sum += value & 0xFF;
-    }
-    i <<= 3;
-
-    for ( ; i < len; ++i)
-        sum += (uint8_t)bytes[i];
-
+    for (size_t i = 0; i < len; ++i)
+        sum += bytes[i];
     return sum;
 }
 
-static _always_inline uint8_t acpi_chk_hdr(void *hdr)
+static _always_inline uint8_t acpi_chk_hdr(void const *hdr)
 {
     size_t ofs = offsetof(acpi_sdt_hdr_t, len);
     uint32_t len = 0;
-    __builtin_memcpy(&len, (char*)hdr + ofs, sizeof(len));
+    __builtin_memcpy(&len, (char const*)hdr + ofs, sizeof(len));
     return checksum_bytes((char const *)hdr, len);
 }

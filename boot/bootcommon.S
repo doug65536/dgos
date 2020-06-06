@@ -13,7 +13,8 @@ early_init:
 
     call detect_ancient_cpu
 
-    fninit
+    // It is at least a 486 with CPUID instruction if it made it to here
+    // without freezing with unsupported CPU message
 
     // 32 bit instructions are okay if detect_ancient_cpu returned...
 
@@ -47,7 +48,7 @@ boot:
     call idt_init
     call cpu_a20_check
     // Do need a20 toggles if A20 was off
-    xorb $1,%al
+    xorb $ 1,%al
     movb %al,cpu_a20_need_toggle
 
     cli
@@ -62,6 +63,11 @@ boot:
     ljmp $ GDT_SEL_PM_CODE32,$ pmode_entry
 pmode_entry:
 .code32
+    .cfi_startproc
+    // Tell stack traces to give up here
+    .cfi_undefined eip
+    .cfi_undefined esp
+
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
@@ -116,7 +122,7 @@ pmode_entry:
     popl %edi
     leavel
     retl
-
+    .cfi_endproc
 .code16
 
 // Returns if the CPU is at least an 80486 with CPUID
@@ -170,6 +176,15 @@ detect_ancient_cpu:
     cmp %ecx,%eax
     jz detected_old_486
 
+    // Make sure the FPU exists
+    // Initialized status word will have exceptions masked (1-bits)
+    fninit
+    xorw %ax,%ax
+    // According to the 80287 manual, ax will only be zero if there is an FPU
+    fnstsw %ax
+    testw %ax,%ax
+    jnz detected_486sx
+
     // CPUID instruction will work
     ret
 
@@ -178,30 +193,35 @@ str_8086:	.asciz "8086"
 str_80286:	.asciz "80286"
 str_80386:	.asciz "80386"
 str_80486:	.asciz "early 80486"
+str_80486sx:.asciz "80486sx"
 str_suffix:	.asciz " cannot run this operating system"
 
 detected_8086:
-    mov $str_8086,%bx
+    mov $ str_8086,%bx
     jmp detection_failed
 
 detected_80286:
-    mov $str_80286,%bx
+    mov $ str_80286,%bx
     jmp detection_failed
 
 detected_80386:
-    mov $str_80386,%bx
+    mov $ str_80386,%bx
     jmp detection_failed
 
 detected_old_486:
-    mov $str_80486,%bx
+    mov $ str_80486,%bx
+    jmp detection_failed
+
+detected_486sx:
+    mov $ str_80486sx,%bx
 
 // ...fall through
 detection_failed:
-    mov $str_prefix,%di
+    mov $ str_prefix,%di
     call fail_str
     mov %bx,%di
     call fail_str
-    mov $str_suffix,%di
+    mov $ str_suffix,%di
     call fail_str
     cli
 0:  hlt
@@ -355,4 +375,5 @@ cpu_a20_chk: .space 1
 .global __dso_handle
 .hidden __dso_handle
 __dso_handle:
+    // 32 bit pointer to itself
     .int __dso_handle

@@ -78,15 +78,17 @@ static filetab_t *file_fh_from_id(int id)
 
         if (likely(item->refcount > 0))
             return item;
+
         assert(!"Zero ref count!");
     }
     return nullptr;
 }
 
-static fs_base_t *file_fs_from_path(char const *path, size_t& consumed)
+static fs_base_t *file_fs_from_path(int dirid, char const *path,
+                                    size_t& consumed)
 {
-    if (path[0] == '/' && !memcmp(path, "/dev/", 5)) {
-        consumed = 5;
+    if (path[0] == '/' && !memcmp(path + consumed, "/dev/", 5)) {
+        consumed += 5;
 
         auto cur_devfs = atomic_ld_acq(&dev_fs);
 
@@ -129,6 +131,9 @@ static filetab_t *file_new_filetab(void)
         return nullptr;
     }
     assert(item->refcount == 0);
+    item->fi = nullptr;
+    item->fs = nullptr;
+    item->pos = 0;
     item->refcount = 1;
     return item;
 }
@@ -160,37 +165,53 @@ bool file_ref_filetab(int id)
 
 REGISTER_CALLOUT(file_init, nullptr, callout_type_t::heap_ready, "000");
 
-EXPORT int file_creat(char const *path, mode_t mode)
+EXPORT int file_creatat(int dirid, char const *path, mode_t mode)
 {
-    return file_open(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
+    return file_openat(dirid, path, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }
 
-EXPORT int file_open(char const *path, int flags, mode_t mode)
+static int file_root_dirid()
+{
+    //  Get root filesystem
+    fs_base_t *fs = fs_from_id(0);
+
+    // Resolve root
+    size_t consumed = 0;
+    int dirid = fs->resolve(nullptr, nullptr, consumed);
+
+    return dirid;
+}
+
+EXPORT int file_openat(int dirid, char const *path, int flags, mode_t mode)
 {
     size_t consumed = 0;
-    fs_base_t *fs = file_fs_from_path(path, consumed);
+    fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
     filetab_t *fh = file_new_filetab();
 
-    int id = fh - file_table.data();
-
     if (unlikely(!fh))
         return -int(errno_t::ENFILE);
 
-    int status = fs->open(&fh->fi, path + consumed, flags, mode);
+    filetab_t *dirfh = file_fh_from_id(dirid);
+
+    int status = fs->openat(&fh->fi, dirfh ? dirfh->fi : nullptr,
+                            path + consumed, flags, mode);
     if (unlikely(status < 0)) {
         FILEHANDLE_TRACE("open failed on %s, status=%d\n", path, status);
         file_del_filetab(fh);
         return status;
     }
 
-    FILEHANDLE_TRACE("opened %s, fd=%d\n", path, id);
 
     fh->fs = fs;
     fh->pos = 0;
+
+    int id = fh - file_table.data();
+
+    FILEHANDLE_TRACE("opened %s, fd=%d\n", path, id);
 
     return id;
 }
@@ -306,6 +327,16 @@ EXPORT int file_ioctl(int id, int cmd, void* arg,
     return fh->fs->ioctl(fh->fi, cmd, arg, flags, data);
 }
 
+EXPORT int file_fstatfs(int id, fs_statvfs_t *buf)
+{
+    filetab_t *fh = file_fh_from_id(id);
+
+    if (unlikely(!fh))
+        return -int(errno_t::EBADF);
+
+    return fh->fs->statfs(buf);
+}
+
 EXPORT ssize_t file_read(int id, void *buf, size_t bytes)
 {
     filetab_t *fh = file_fh_from_id(id);
@@ -350,10 +381,10 @@ EXPORT int file_fdatasync(int id)
     return fh->fs->fsync(fh->fi, 1);
 }
 
-EXPORT int file_opendir(char const *path)
+EXPORT int file_opendirat(int dirid, char const *path)
 {
     size_t consumed = 0;
-    fs_base_t *fs = file_fs_from_path(path, consumed);
+    fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
@@ -365,7 +396,10 @@ EXPORT int file_opendir(char const *path)
 
     fh->fs = fs;
 
-    int status = fh->fs->opendir(&fh->fi, path);
+    filetab_t *dirfh = file_fh_from_id(dirid);
+
+    int status = fh->fs->opendirat(&fh->fi, dirfh ? dirfh->fi : nullptr,
+                                   path + consumed);
     if (unlikely(status < 0)) {
         file_del_filetab(fh);
         return status;
@@ -428,35 +462,42 @@ EXPORT int file_closedir(int id)
     return status;
 }
 
-EXPORT int file_mkdir(char const *path, mode_t mode)
+EXPORT int file_mkdirat(int dirid, char const *path, mode_t mode)
 {
     size_t consumed = 0;
-    fs_base_t *fs = file_fs_from_path(path, consumed);
+    fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->mkdir(path + consumed, mode);
+    filetab_t *dirfh = file_fh_from_id(dirid);
+
+    return fs->mkdirat(dirfh ? dirfh->fi : nullptr,
+                       path + consumed, mode);
 }
 
-EXPORT int file_rmdir(char const *path)
+EXPORT int file_rmdirat(int dirid, char const *path)
 {
     size_t consumed = 0;
-    fs_base_t *fs = file_fs_from_path(path, consumed);
+    fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->rmdir(path + consumed);
+    filetab_t *dirfh = file_fh_from_id(dirid);
+
+    return fs->rmdirat(dirfh ? dirfh->fi : nullptr,
+                       path + consumed);
 }
 
-EXPORT int file_rename(char const *old_path, char const *path)
+EXPORT int file_renameat(int olddirid, char const *old_path,
+                         int newdirid, char const *path)
 {
     size_t old_consumed = 0;
-    fs_base_t *old_fs = file_fs_from_path(old_path, old_consumed);
+    fs_base_t *old_fs = file_fs_from_path(olddirid, old_path, old_consumed);
 
     size_t consumed = 0;
-    fs_base_t *fs = file_fs_from_path(path, consumed);
+    fs_base_t *fs = file_fs_from_path(newdirid, path, consumed);
 
     if (unlikely(old_fs != fs))
         return -int(errno_t::EXDEV);
@@ -464,18 +505,27 @@ EXPORT int file_rename(char const *old_path, char const *path)
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->rename(old_path + old_consumed, path + consumed);
+    filetab_t *olddirfh = file_fh_from_id(olddirid);
+    filetab_t *newdirfh = file_fh_from_id(newdirid);
+
+    return fs->renameat(olddirfh ? olddirfh->fi : nullptr,
+                        old_path + old_consumed,
+                        newdirfh ? newdirfh->fi : nullptr,
+                        path + consumed);
 }
 
-EXPORT int file_unlink(char const *path)
+EXPORT int file_unlinkat(int dirid, char const *path)
 {
     size_t consumed = 0;
-    fs_base_t *fs = file_fs_from_path(path, consumed);
+    fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->unlink(path + consumed);
+    filetab_t *dirfh = file_fh_from_id(dirid);
+
+    return fs->unlinkat(dirfh ? dirfh->fi : nullptr,
+                        path + consumed);
 }
 
 EXPORT int file_fchmod(int id, mode_t mode)

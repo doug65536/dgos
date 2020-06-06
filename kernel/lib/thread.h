@@ -19,25 +19,9 @@ typedef int16_t thread_priority_t;
 
 typedef int (*thread_fn_t)(void*);
 
+void thread_check_stack(int intr);
+
 void thread_startup(thread_fn_t fn, void *p, thread_t id);
-
-struct thread_create_info_t
-{
-    // Thread startup function and argument
-    thread_fn_t fn;
-    void *userdata;
-
-    size_t stack_size;
-    thread_priority_t priority;
-    bool user;
-    bool is_float;
-    bool suspended;
-
-    uintptr_t tls_base;
-    uint64_t affinity;
-
-    char const *name;
-};
 
 // 9 == 512 CPUs max
 #define thread_cpu_mask_t_log2_max 9
@@ -60,7 +44,7 @@ struct thread_cpu_mask_t
     }
 
     // In-place, bit=-1 to set all bits, bit=6 to set bit 6 only, others clear
-    explicit thread_cpu_mask_t(int bit);
+    constexpr explicit thread_cpu_mask_t(int bit);
 
     // += 4 sets bit 4. If bit 7 wasn't clear, writes value unchanged
     thread_cpu_mask_t& operator+=(size_t bit);
@@ -160,6 +144,37 @@ struct thread_cpu_mask_t
 #endif
 };
 
+constexpr thread_cpu_mask_t::thread_cpu_mask_t(int bit)
+    : thread_cpu_mask_t()
+{
+    if (bit >= 0) {
+        *this += bit;
+    } else {
+        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+            bitmap[i] = ~UINT64_C(0);
+    }
+}
+
+struct thread_create_info_t
+{
+    // Thread startup function and argument
+    thread_fn_t fn;
+    void *userdata;
+
+    size_t stack_size;
+    thread_priority_t priority;
+    bool user;
+    bool is_float;
+    bool suspended;
+
+    uintptr_t tls_base;
+    thread_cpu_mask_t affinity;
+
+    char const *name;
+
+    void *stack_ptr;
+};
+
 // Holds 0 if single cpu, otherwise holds -1
 // This allows branchless setting of spincounts to zero
 extern int spincount_mask;
@@ -167,7 +182,8 @@ extern int use_mwait;
 
 // Implemented in arch
 thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
-                       size_t stack_size, bool user, bool is_float);
+                       size_t stack_size, bool user, bool is_float,
+                       thread_cpu_mask_t const& affinity = thread_cpu_mask_t());
 
 thread_t thread_create_with_info(thread_create_info_t const* info);
 
@@ -193,8 +209,11 @@ thread_t thread_get_id(void);
 uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
                                uint64_t timeout_time);
 
+void thread_request_reschedule_noirq();
+void thread_request_reschedule();
+
 // Returns true if you should reschedule
-bool thread_resume(thread_t thread, intptr_t exit_code);
+void thread_resume(thread_t thread, intptr_t exit_code);
 
 thread_priority_t thread_get_priority(thread_t thread_id);
 void thread_set_priority(thread_t thread_id, thread_priority_t priority);
@@ -246,5 +265,7 @@ struct __cxa_eh_globals;
 __cxa_eh_globals *thread_cxa_get_globals();
 
 void thread_set_timer(uint8_t &apic_dcr, uint64_t ns);
+
+void thread_panic_other_cpus();
 
 __END_DECLS

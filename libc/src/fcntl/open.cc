@@ -13,14 +13,9 @@ int open(char const *path, int flags, ...)
         va_start(ap, flags);
         mode = va_arg(ap, mode_t);
         va_end(ap);
+
+        return openat(AT_FDCWD, path, flags, mode);
     }
 
-    long status = syscall3(long(path), long(flags), long(mode), SYS_open);
-
-    if (status >= 0)
-        return int(status);
-
-    errno = int(-status);
-
-    return -1;
+    return openat(AT_FDCWD, path, flags);
 }

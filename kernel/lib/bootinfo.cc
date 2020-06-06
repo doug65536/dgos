@@ -7,8 +7,7 @@
 #include "printk.h"
 
 #ifdef _ASAN_ENABLED
-_constructor(ctor_asan_init)
-static void bootinfo_init()
+_constructor(ctor_asan_init) static void bootinfo_init()
 {
     __asan_storeN_noabort(uintptr_t(kernel_params), sizeof(*kernel_params));
     __asan_storeN_noabort(uintptr_t(kernel_params->vbe_selected_mode),
@@ -61,7 +60,25 @@ EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
     case bootparam_t::initrd_size:
         return data->initrd_sz;
 
-    default:
-        return 0;
+    case bootparam_t::smp_enable:
+        return data->smp_enable;
+
+    case bootparam_t::acpi_enable:
+        return data->acpi_enable;
+
+    case bootparam_t::mps_enable:
+        return data->mps_enable;
+
+    case bootparam_t::msi_enable:
+        return data->msi_enable;
+
+    case bootparam_t::msix_enable:
+        return data->msix_enable;
+
+    case bootparam_t::port_e9_debug:
+        return data->e9_enable;
+
     }
+
+    return 0;
 }

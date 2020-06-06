@@ -28,31 +28,31 @@ isr_entry_st:
 
 .macro fn_trace fn, op
 #ifdef _CALL_TRACE_ENABLED
-    pushq %rax
-    pushq %rcx
-    pushq %rdx
-    pushq %rsi
-    pushq %rdi
-    pushq %r8
-    pushq %r9
-    pushq %r10
-    pushq %r11
-    sub $8,%rsp
+    push_cfi %rax
+    push_cfi %rcx
+    push_cfi %rdx
+    push_cfi %rsi
+    push_cfi %rdi
+    push_cfi %r8
+    push_cfi %r9
+    push_cfi %r10
+    push_cfi %r11
+    adj_rsp_cfi -8
 
-    leaq \fn(%rip),%rdi
+    lea (\fn)(%rip),%rdi
     xor %esi,%esi
     call __cyg_profile_func_\op
 
-    add $8,%rsp
-    popq %r11
-    popq %r10
-    popq %r9
-    popq %r8
-    popq %rdi
-    popq %rsi
-    popq %rdx
-    popq %rcx
-    popq %rax
+    adj_rsp_cfi 8
+    pop_cfi %r11
+    pop_cfi %r10
+    pop_cfi %r9
+    pop_cfi %r8
+    pop_cfi %rdi
+    pop_cfi %rsi
+    pop_cfi %rdx
+    pop_cfi %rcx
+    pop_cfi %rax
 #endif
 .endm
 
@@ -157,7 +157,7 @@ isr_entry 0 INTR_EX_SIMD
 isr_entry 0 INTR_EX_VIRTUALIZE
 
 // Reserved for CPU
-isr_entry 0 21
+isr_entry 1 21
 isr_entry 0 22
 isr_entry 0 23
 isr_entry 0 24
@@ -169,10 +169,12 @@ isr_entry 0 29
 isr_entry 0 30
 isr_entry 0 31
 
+// APIC interrupt but not really because no EOI
+isr_entry 0 INTR_APIC_SPURIOUS
+
 // Software interrupts
 isr_entry 0 INTR_THREAD_YIELD
 
-isr_entry 0 33
 isr_entry 0 34
 isr_entry 0 35
 isr_entry 0 36
@@ -180,15 +182,15 @@ isr_entry 0 37
 isr_entry 0 38
 isr_entry 0 39
 
-isr_entry 0 40
 // Very high priority interrupts
-isr_entry 0 INTR_APIC_SPURIOUS
+isr_entry 0 INTR_IPI_PANIC
 isr_entry 0 INTR_APIC_ERROR
 isr_entry 0 INTR_APIC_THERMAL
 isr_entry 0 INTR_APIC_TIMER
 isr_entry 0 INTR_IPI_TLB_SHTDN
 isr_entry 0 INTR_IPI_RESCHED
 isr_entry 0 INTR_IPI_FL_TRACE
+isr_entry 0 47
 
 // APIC and MSI(x) IRQs [48-240) = 192 interrupt vectors available
 isr_entry 0 48
@@ -385,22 +387,22 @@ isr_entry 0 238
 isr_entry 0 239
 
 // PIC IRQs (lowest priority interrupts)
-isr_entry 0 240
+isr_entry 0 INTR_PIC1_IRQ_BASE
 isr_entry 0 241
 isr_entry 0 242
 isr_entry 0 243
 isr_entry 0 244
 isr_entry 0 245
 isr_entry 0 246
-isr_entry 0 247
-isr_entry 0 248
+isr_entry 0 INTR_PIC1_SPURIOUS
+isr_entry 0 INTR_PIC2_IRQ_BASE
 isr_entry 0 249
 isr_entry 0 250
 isr_entry 0 251
 isr_entry 0 252
 isr_entry 0 253
 isr_entry 0 254
-isr_entry 0 255
+isr_entry 0 INTR_PIC2_SPURIOUS
 
 .section .text.isr, "ax", @progbits
 
@@ -459,7 +461,7 @@ isr_common:
     //  -5    3*8(%rbp) 20*8(%rsp) -> rip           │
     //  -6    2*8(%rbp) 19*8(%rsp) -> error code    │
     //  -7    1*8(%rbp) 18*8(%rsp) -> interrupt     ┘
-    //  -8    0*8(%rbp) 17*8(%rsp) -> caller's rbp  ┐
+    //  -8    0*8(%rbp) 17*8(%rsp) -> caller's rbp  ┐ <- &*rbp
     //  -9   -1*8(%rbp) 16*8(%rsp) -> rbx           │
     // -10   -2*8(%rbp) 15*8(%rsp) -> r15           ├ call preserved
     // -11   -3*8(%rbp) 14*8(%rsp) -> r14           │
@@ -495,6 +497,10 @@ isr_common:
 
     pushq %r12
     .cfi_offset r12,-13*8
+
+    // Make sure access to user pages is blocked
+    insn_fixup
+    clac
 
     movq %cr3,%rbx
     movl %ds,%r15d
@@ -564,8 +570,9 @@ isr_common:
     testl $ 3,frame_cs(%rbp)
     jnz .Lneed_swap
 
-    leaq cpus(%rip),%rax
-    movq cpus_end(%rip),%rdx
+    // Absolute so cloning works
+    lea cpus(%rip),%rax
+    lea cpus_end(%rip),%rdx
 
     cmpq %r14,%rax
     ja .Lneed_swap
@@ -616,10 +623,10 @@ isr_common:
     movq %rsp,%r12
     movzbl frame_intr(%rbp),%ebx
 
-    leaq isr_lookup(%rip),%rax
+    lea isr_lookup(%rip),%rax
     movl %ebx,%edi
     movq %r12,%rsi
-    callq *(%rax,%rbx,8)
+    indirect_call_mem rcx,"(%rax,%rbx,8)"
 
     // If context pointer is null, invoke the exception handler for this thread
     test %rax,%rax
@@ -788,7 +795,7 @@ isr_common:
     call protection_barrier_to_user
 
 .Lnot_iret_to_user:
-    adj_rsp 16
+    adj_rsp_cfi 16
 
     fn_trace isr_common,exit
 
@@ -837,7 +844,7 @@ thread_yield:
     .cfi_register rsp,rax
 
     // push ss:rsp
-    push_cfi $GDT_SEL_KERNEL_DATA
+    push_cfi $(GDT_SEL_KERNEL_DATA)
     .cfi_offset ss,-1*8
     push_cfi %rax
     .cfi_offset rsp,-2*8
@@ -854,7 +861,7 @@ thread_yield:
     xorl %eax,%eax
 
     // push cs:rip
-    push_cfi $GDT_SEL_KERNEL_CODE64
+    push_cfi $(GDT_SEL_KERNEL_CODE64)
     .cfi_offset cs,-4*8
     push_cfi %rcx
     .cfi_offset rip,-5*8
@@ -923,6 +930,7 @@ thread_yield:
     pushq %r12
     .cfi_offset r12,-13*8
 
+    // Uninitialized call clobbered save area
     sub $ 9*8,%rsp
 
     // Save CR3
@@ -940,8 +948,8 @@ thread_yield:
     call thread_schedule
 
     // See if we are restoring a fast context
-    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,ISR_CTX_OFS_INTERRUPT(%rax)
-    jnc .Lrestore_slow_ctx
+    testl $ (1 << ISR_CTX_CTX_FLAGS_FAST_QWBIT),ISR_CTX_OFS_INTERRUPT(%rax)
+    jz .Lrestore_slow_ctx
 
     // Could branch here from full interrupt handler to restore a fast context
 .Lrestore_fast_ctx:
@@ -1009,6 +1017,7 @@ thread_yield:
     // Load flags from interrupt frame (reach over intr+errcode+rip+cs)
     movl 8*4(%rsp),%edi
 
+#ifdef ISR_VALIDATE_FLAGS
     // Read eflags, toggle always set flag (becomes 0 in valid case),
     // Mask out all bits that are allowed to be nonzero, make sure it is zero
     xorl $ CPU_EFLAGS_ALWAYS,%edi
@@ -1017,6 +1026,7 @@ thread_yield:
     call cpu_debug_break
 .Lgood_flags1:
     xorl $ CPU_EFLAGS_ALWAYS,%edi
+#endif
 
     push_cfi %rdi
     popfq_cfi
@@ -1030,7 +1040,7 @@ thread_yield:
     movl %ecx,%r10d
     movl %ecx,%r11d
 
-    adj_rsp 16
+    adj_rsp_cfi 16
 
     // Return and pop cs, eflags, rsp, ss
     retq $((5-1)*8)
@@ -1299,10 +1309,10 @@ protection_barrier_to_user:
     // Just return if it is getting called before patching to MDS clear version
     ret
 
-.hidden protection_barrier_ibpb
-.global protection_barrier_ibpb
+.hidden protection_barrier_from_user_ibpb
+.global protection_barrier_from_user_ibpb
 .balign 16
-protection_barrier_ibpb:
+protection_barrier_from_user_ibpb:
     .cfi_startproc
 
     push_cfi %rax
@@ -1325,10 +1335,10 @@ protection_barrier_ibpb:
     .cfi_endproc
 
 
-.hidden protection_barrier_verw
-.global protection_barrier_verw
+.hidden protection_barrier_to_user_verw
+.global protection_barrier_to_user_verw
 .balign 16
-protection_barrier_verw:
+protection_barrier_to_user_verw:
     .cfi_startproc
 
     pushfq_cfi
@@ -1336,22 +1346,28 @@ protection_barrier_verw:
     // Must be memory operand
     push_cfi $GDT_SEL_KERNEL_DATA
 
-    // Don't start flushing until everything before completes
+    // Stall dispatch until everything up to now retires
     lfence
 
+    // Flush microarchitectural state (MDS mitigation)
+    // Must be memory argument!
     verw (%rsp)
-    addq $ 8,%rsp
+
+    // Stall dispatch until verw completes flushing
+    lfence
+
+    // Discard memory argument
+    adj_rsp_cfi 8
 
     popfq_cfi
-
-    // Stall issue until verw completes flushing
-    lfence
 
     ret
 
     .cfi_endproc
 
-// on entry, rbp=frame, ebx=intr, r12=ctx
+// on entry, rbp=frame,
+// ebx=intr, edi=intr,
+// r12=ctx, esi=ctx
 .balign 16
 .hidden exception_isr_handler
 .global exception_isr_handler
@@ -1393,7 +1409,8 @@ exception_isr_handler:
     retq
 
 .Linvoke_catch:
-     nop
+    // Can breakpoint here to only intercept catch
+    nop
 
 .balign 16
 .Lno_handler:
@@ -1401,14 +1418,8 @@ exception_isr_handler:
     movl %ebx,%edi
     call __exception_handler_invoke
 
-    //call cpu_debug_break
-
-    // (not Tail) call to unhandled_exception_handler
-    // tail call breaks the backtrace, which is bad and not worth
-    // an insignificant tail call optimization  on an already
-    // expensive code path
-.balign 16
-2:  movq %r12,%rdi
+    // if that returned instead of longjmped, then it is unhandled
+    movq %r12,%rdi
     call unhandled_exception_handler
     ret
 
@@ -1441,84 +1452,82 @@ thread_entry:
 
     .cfi_endproc
 
-// _noreturn void isr_sysret64(uintptr_t rip,
-//                             uintptr_t rsp,
-//                             uintptr_t kernel_rsp);
-.hidden isr_sysret64
-.global isr_sysret64
+// _noreturn void isr_sysret(uintptr_t rip,
+//                           uintptr_t rsp,
+//                           uintptr_t kernel_rsp,
+//                           bool use64,
+//                           uintptr_t rdi,
+//                           uintptr_t rsi);
+// expects rdi=rip, rsi=rsp, rdx=kernel_rsp, cl=use64
+.hidden isr_sysret
+.global isr_sysret
 .balign 16
-isr_sysret64:
+isr_sysret:
     .cfi_startproc
 
-    push_cfi %rbx
-    .cfi_offset rbx,-2*8
+     // rdi = rip parameter
+     // rsi = rsp parameter
+     // rdx = kernel_rsp parameter
+     // cl = use64 rip parameter
+     // r8 = rdi usermode parameter
+     // r9 = rsi usermode parameter
 
     xorl %eax,%eax
 
-    push_cfi %rbp
-    .cfi_offset rbp,-3*8
+    // Don't even bother saving register variables, this is a goto user mode
+    // that information is already saved by the caller and we are in the
+    // "setjmp returned 0" path right now
+    //push_cfi %rbx
+    //.cfi_offset rbx,-2*8
+    //push_cfi %rbp
+    //.cfi_offset rbp,-3*8
+    //push_cfi %r12
+    //.cfi_offset r12,-4*8
+    //push_cfi %r13
+    //.cfi_offset r13,-5*8
+    //push_cfi %r14
+    //.cfi_offset r14,-6*8
+    //push_cfi %r15
+    //.cfi_offset r15,-7*8
 
-    push_cfi %r12
-    .cfi_offset r12,-4*8
-
-    push_cfi %r13
-    .cfi_offset r13,-5*8
-
-    push_cfi %r14
-    .cfi_offset r14,-6*8
-
-    push_cfi %r15
-    .cfi_offset r15,-7*8
+    // Copy use64 to bpl
+    mov %cl,%bpl
+    .cfi_undefined rbp
 
     mov %rdi,%rcx
     mov $ CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS,%r11d
 
+    // Prevent IRQ while swapped to user gs or using user stack
+    // in kernel mode or using per-cpu data
+    cli
+
     // Initialize kernel stack pointer for this thread
     // cpu_info_t *rbx = this_cpu()
     movq %gs:CPU_INFO_SELF_OFS(%rax),%rbx
+    .cfi_undefined rbx
 
-    // tss_t *rdx = rbx->tss_ptr
-    movq CPU_INFO_TSS_PTR_OFS(%rbx),%r8
+    // tss_t *r10 = rbx->tss_ptr
+    movq CPU_INFO_TSS_PTR_OFS(%rbx),%r10
 
     // thread_info_t *rbx = rbx->cur_thread
     movq CPU_INFO_CURTHREAD_OFS(%rbx),%rbx
 
     // void *fs_base = rbx->fsbase
     movq THREAD_FSBASE_OFS(%rbx),%r13
+    .cfi_undefined r13
 
     // void *gs_base = rbx->gsbase
     movq THREAD_GSBASE_OFS(%rbx),%r14
+    .cfi_undefined r14
 
-    // rbx->priv_chg_stack = rsp (interrupts use kernel stack below this point)
+    // rbx->priv_chg_stack = kernel_rsp
     movq %rdx,THREAD_PRIV_CHG_STACK_OFS(%rbx)
 
-    // rdx->rsp0 = rbx
-    movq %rdx,TSS_RSP0_OFS(%r8)
-
-    // Avoid leaking any register values to user code
-    // not ecx
-    mov %eax,%edx
-    // not esi
-    mov %eax,%edi
-    mov %eax,%ebp
-    mov %eax,%r8d
-    mov %eax,%r9d
-    mov %eax,%r10d
-    // not r11
-    mov %eax,%r12d
-    // not r13
-    // not r14
-    mov %eax,%r15d
-
-    // Prevent IRQ while swapped to user gs or using user stack
-    // in kernel mode
-    cli
-
-    mov %eax,%ebx
+    // rdx->rsp0 = kernel_rsp
+    movq %rdx,TSS_RSP0_OFS(%r10)
 
     // Protect kernel gs before loading user gs
     swapgs
-    swapgs_boundary
 
     insn_fixup
     wrfsbase %r13
@@ -1527,25 +1536,88 @@ isr_sysret64:
     mov %eax,%r13d
     mov %eax,%r14d
 
-    mov %rsi,%rsp
-    .cfi_undefined rip
+    // Avoid leaking any register values to user code
+    // not ecx
+    // not edx (user stack pointer)
+    // not esi
+    mov %eax,%edi
+    // not ebp
+    // not r8
+    // not r9
+    mov %eax,%r10d
+    // not r11
+    mov %eax,%r12d
+    // not r13
+    // not r14
+    mov %eax,%r15d
+
+    mov %eax,%ebx
+
+    // Needs to be on the kernel stack to save/restore things
+    insn_fixup
+    call protection_barrier_to_user
+
+    // Switch to user stack (and tell debugger frame is at rdx now)
+    mov %rsi,%rdx
+    xchg %rdx,%rsp
+    .cfi_def_cfa_register rdx
+
+    // goto user mode with rip=rcx and load rflags=r11, cs and ss from STAR MSR
+    // interrupts will be reenabled due to restoring their flags
+
+    mov %r8,%rdi
+    mov %eax,%r8d
+    mov %r9,%rsi
+    mov %eax,%r9d
+
+    test %bpl,%bpl
+    mov %eax,%ebp
+    jz 0f
+
+    // 64-bit entry
+    .cfi_remember_state
+
+    // Hide kernel stack frame address from user mode
+    // Lose ability to see call stack after this executes
+    mov %eax,%edx
+
+    // No idea where this call came from anymore
+    // or the location of the kernel stack frame
+    // or their callee preserved registers
     .cfi_undefined rsp
+    .cfi_undefined rip
     .cfi_undefined rbx
     .cfi_undefined rbp
     .cfi_undefined r12
     .cfi_undefined r13
     .cfi_undefined r14
     .cfi_undefined r15
-    // goto user mode with rip=rcx and load rflags=r11, cs and ss from STAR MSR
-    // interrupts will be reenabled due to restoring their flags
 
     sysretq
 
-    swapgs_boundary
+0:  // 32-bit entry
+    .cfi_restore_state
+
+    // Hide kernel stack frame address from user mode
+    // Lose ability to see call stack after this executes
+    mov %eax,%edx
+
+    // No idea where this call came from anymore
+    // or the location of the kernel stack frame
+    // or their callee preserved registers
+    .cfi_undefined rsp
+    .cfi_undefined rip
+    .cfi_undefined rbx
+    .cfi_undefined rbp
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
+
+    sysretl
 
     .cfi_endproc
 
-/// Note! This code assumes -mno-red-zone
 .global __module_dynlink_plt_thunk
 .balign 16
 __module_dynlink_plt_thunk:
@@ -1653,13 +1725,15 @@ __module_dynlink_plt_thunk:
     // actual caller nicely (RSB continues working fine from there on)
 
     call 0f
-    nop
+
+    // ret mispredicts to here, when ret completes, decode will restart in the
+    // right place and this speculated path is discarded
+    // If BTB misses and we fall through to here past the call,
+    // then this is the wrong path too
+    lfence
+
 .balign 16
 0:  lea 8(%rsp),%rsp
-
-    // The ret is going to mispredict, minimize dispatch of incorrect path
-    // The return stack is not correct
-    lfence
 
     // "return" is really tail calling to the entry point of the dynamically
     // linked function that has been written to the GOT for next time.
@@ -1679,7 +1753,7 @@ __module_dynlink_plt_thunk:
 cs_leave_asm:
     .cfi_startproc
     xorl %eax,%eax
-    decl %gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
+    decl %gs:CPU_INFO_LOCKS_HELD_OFS
     js .Lpanic
     jnz .Lreturn
 
@@ -1971,6 +2045,51 @@ nofault_strnlen:
 nofault_define_region nofault_strnlen
 
 
+// Returns 1 if replacement occurred
+// Returns 0 if expected value was not seen
+// Returns -1 if faulted
+// int nofault_compare_exchange_32(int *dest, int *expect, int replacement)
+.global nofault_compare_exchange_32
+.hidden nofault_compare_exchange_32
+nofault_compare_exchange_32:
+    .cfi_startproc
+
+    insn_fixup
+    stac
+
+    // Load expected value
+    mov (%rsi),%eax
+
+    // compare eax with destination,
+    //  if equal, copy source to destination and set eflags.ZF,
+    //  otherwise copy destination to eax
+    lock cmpxchg %edx,(%rdi)
+    jnz .Lnofault_compare_exchange_32_race
+
+    // Return 1 on success
+    mov $ 1,%eax
+
+.Lnofault_compare_exchange_32_faulted: // crash will resume here with -1 in rax
+    insn_fixup
+    clac
+
+    ret
+
+.Lnofault_compare_exchange_32_race:
+    // Update caller's expected value with value we got from failed exchange
+    mov %eax,(%rsi)
+    xor %eax,%eax
+
+    insn_fixup
+    clac
+
+    ret
+
+    .cfi_endproc
+
+.Lnofault_compare_exchange_32_end:
+
+nofault_define_region nofault_compare_exchange_32
 
 // Returns 0 on success
 // Returns -1 if faulted
@@ -2000,7 +2119,7 @@ nofault_memset:
 
 .Lnofault_memset_end:
 
-
+// Returns
 
 // Returns 0 on success
 // Returns -1 if faulted

@@ -36,5 +36,5 @@ static _always_inline T *cpu_gs_ptr(void)
         : "memory"
     );
     // Do the addition outside asm to allow constant folding optimization
-    return (T*)((char*)value + ofs);
+    return reinterpret_cast<T*>(reinterpret_cast<char*>(value) + ofs);
 }

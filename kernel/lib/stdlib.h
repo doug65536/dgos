@@ -72,6 +72,12 @@ struct nothrow_t {
 enum class align_val_t : size_t {};
 extern EXPORT nothrow_t const nothrow;
 
+template<typename _T>
+constexpr _T abs(_T __rhs)
+{
+    return __rhs >= 0 ? __rhs : -__rhs;
+}
+
 __END_NAMESPACE_STD
 
 void* operator new[](size_t count, std::align_val_t alignment);

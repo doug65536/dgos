@@ -11,6 +11,8 @@ extern "C" int nofault_memcpy(void *dest, void const *src, size_t size);
 extern "C" int nofault_memset(void *dest, int value, size_t size);
 extern "C" int nofault_strncpy(char *dest, char const *value, size_t size);
 extern "C" ptrdiff_t nofault_strnlen(char const *s, size_t max_size);
+extern "C" int nofault_compare_exchange_32(
+        int volatile *dest, int *expect, int replacement);
 
 extern "C" ptrdiff_t nofault_offsetof(char const *s, int value, size_t size);
 
@@ -85,3 +87,8 @@ EXPORT mm_copy_string_result_t mm_copy_user_string(
     return result;
 }
 
+
+int mm_compare_exchange_user(int volatile *dest, int *expect, int replacement)
+{
+    return nofault_compare_exchange_32(dest, expect, replacement);
+}

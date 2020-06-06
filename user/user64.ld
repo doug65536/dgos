@@ -112,7 +112,7 @@ SECTIONS {
 	. = ALIGN(4K);
 
 	.got : {
-		PROVIDE_HIDDEN(___got = .);
+		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got)
 	} /*:writ*/
 
@@ -126,17 +126,22 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynamic_en = .);
 	} /*:dyna :writ*/
 
-	.init_array : {
+	.init_array ALIGN(8) : {
 		PROVIDE(__init_array_start) = .;
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
 		PROVIDE(__init_array_end = .);
+
+		PROVIDE(__init_array_early_start) = .;
+		KEEP(*(.init_array))
+		KEEP(*(.ctors))
+		PROVIDE(__init_array_early_end = .);
 	} /*:writ*/
 
-	.fini_array : {
+	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(__fini_array_start = .);
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
 		PROVIDE_HIDDEN(__fini_array_end = .);
 	} /*:writ*/
 

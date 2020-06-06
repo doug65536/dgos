@@ -81,8 +81,10 @@ struct pci_config_hdr_t {
     // 0x34
     uint8_t capabilities_ptr;
 
+    // 0x35
     uint8_t reserved[7];
 
+    // 0x3C
     uint8_t irq_line;
     uint8_t irq_pin;
     uint8_t min_grant;
@@ -102,6 +104,8 @@ struct pci_config_hdr_t {
     EXPORT void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
 };
 
+C_ASSERT(sizeof(pci_config_hdr_t) == 0x40);
+
 template<typename T>
 static _always_inline void pci_config_copy_read(
         pci_addr_t addr, T& dest, int ofs)
@@ -115,6 +119,55 @@ static _always_inline void pci_config_copy_write(
 {
     pci_config_write(addr, ofs, &dest, sizeof(T));
 }
+
+C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
+
+#define PCI_CFG_STATUS_CAPLIST_BIT  4
+#define PCI_CFG_STATUS_CAPLIST      (1<<PCI_CFG_STATUS_CAPLIST_BIT)
+
+struct pci_dev_t {
+    pci_config_hdr_t config;
+    pci_addr_t addr;
+
+    pci_dev_t();
+    ~pci_dev_t();
+};
+
+struct pci_dev_iterator_t : public pci_dev_t {
+    pci_dev_iterator_t();
+    ~pci_dev_iterator_t();
+
+    operator pci_addr_t() const;
+
+    int segment;
+    int bus;
+    int slot;
+    int func;
+
+    int dev_class;
+    int subclass;
+    int vendor;
+    int device;
+
+    uint8_t header_type;
+
+    uint8_t bus_todo_len;
+    uint8_t bus_todo[64];
+
+    void reset();
+
+    pci_dev_iterator_t& copy_from(pci_dev_iterator_t const& rhs);
+
+    bool operator==(pci_dev_iterator_t const& rhs) const;
+};
+
+// Update pci_describe_device if any device classes,
+// subclasses, or progif are added here
+char const *pci_describe_device(pci_dev_iterator_t const& pci_iter);
+
+__BEGIN_DECLS
+
+char const *pci_describe_device(uint8_t cls, uint8_t sc, uint8_t pif);
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
 #define PCI_DEV_CLASS_STORAGE           0x01
@@ -213,8 +266,8 @@ static _always_inline void pci_config_copy_write(
 #define PCI_SUBCLASS_PCI2PCI_SUBTRAC    0x01
 
 // PCI_SUBCLASS_BRIDGE_SEMITP2P
-#define PCI_SUBCLASS_BRIDGE_SEMITP2P_P  0x40
-#define PCI_SUBCLASS_BRIDGE_SEMITP2P_S  0x80
+#define PCI_PROGIF_BRIDGE_SEMITP2P_P    0x40
+#define PCI_PROGIF_BRIDGE_SEMITP2P_S    0x80
 
 // PCI_DEV_CLASS_COMM
 #define PCI_SUBCLASS_COMM_16x50         0x00
@@ -343,8 +396,11 @@ static _always_inline void pci_config_copy_write(
 #define PCI_SUBCLASS_WIRELESS_OTHER     0x80
 
 // PCI_DEV_CLASS_INTELLIGENT
-#define PCI_SUBCLASS_INTELLIGENT_I2O    0x00
-#define PCI_SUBCLASS_INTELLIGENT_FIFO   0x00
+#define PCI_SUBCLASS_INTELLIGENT_IO     0x00
+
+// PCI_PROGIF_INTELLIGENT_IO
+#define PCI_PROGIF_INTELLIGENT_IO_I2O   0x00
+#define PCI_PROGIF_INTELLIGENT_IO_FIFO  0x01
 
 // PCI_DEV_CLASS_SATELLITE
 #define PCI_SUBCLASS_SATELLITE_TV       0x01
@@ -363,49 +419,6 @@ static _always_inline void pci_config_copy_write(
 #define PCI_SUBCLASS_DSP_COMMSYNC       0x10
 #define PCI_SUBCLASS_DSP_MGMTCARD       0x20
 #define PCI_SUBCLASS_DSP_OTHER          0x80
-
-C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
-
-#define PCI_CFG_STATUS_CAPLIST_BIT  4
-#define PCI_CFG_STATUS_CAPLIST      (1<<PCI_CFG_STATUS_CAPLIST_BIT)
-
-struct pci_dev_t {
-    pci_config_hdr_t config;
-    pci_addr_t addr;
-
-    pci_dev_t();
-    ~pci_dev_t();
-};
-
-struct pci_dev_iterator_t : public pci_dev_t {
-    pci_dev_iterator_t();
-    ~pci_dev_iterator_t();
-
-    operator pci_addr_t() const;
-
-    int segment;
-    int bus;
-    int slot;
-    int func;
-
-    int dev_class;
-    int subclass;
-    int vendor;
-    int device;
-
-    uint8_t header_type;
-
-    uint8_t bus_todo_len;
-    uint8_t bus_todo[64];
-
-    void reset();
-
-    pci_dev_iterator_t& copy_from(pci_dev_iterator_t const& rhs);
-
-    bool operator==(pci_dev_iterator_t const& rhs) const;
-};
-
-__BEGIN_DECLS
 
 int pci_init(void);
 
@@ -494,7 +507,8 @@ struct pci_irq_range_t {
     bool msix:1;
 } _packed;
 
-void pci_init_ecam(size_t ecam_count);
+_use_result
+bool pci_init_ecam(size_t ecam_count);
 void pci_init_ecam_entry(uint64_t base, uint16_t seg,
                          uint8_t st_bus, uint8_t en_bus);
 void pci_init_ecam_enable();
@@ -506,7 +520,7 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      int const *target_cpus = nullptr,
                      int const *vector_offsets = nullptr);
 
-bool pci_set_msi_irq(pci_addr_t addr,
+bool pci_set_msi_irq(pci_dev_iterator_t const& pci_dev,
                      pci_irq_range_t *irq_range,
                      int cpu, bool distribute, size_t req_count,
                      intr_handler_t handler, char const *name,
@@ -533,65 +547,74 @@ __END_DECLS
 
 // == MMIO accessor helpers
 
-#define _MM_WR_IMPL(type, mm, value) \
+#define _MM_WR_IMPL(suffix, type, mm, value) \
     __asm__ __volatile__ ( \
-        "mov %" type "[src],(%q[dest])\n\t" \
+        "mov" suffix " %" type "[src],(%q[dest])\n\t" \
         : \
         : [dest] "a" (&(mm)) \
         , [src] "ri" (value) \
         : "memory" \
     )
 
-#define _MM_RD_IMPL(type, value, mm) \
+#define _MM_RD_IMPL(suffix, type, value, mm) \
     __asm__ __volatile__ ( \
-        "mov (%[src]),%" type "[dest]\n\t" \
+        "mov" suffix " (%q[src]),%" type "[dest]\n\t" \
         : [dest] "=r" (value) \
         : [src] "a" (&(mm)) \
         : "memory" \
     ); \
     return value
 
-static inline void mm_wr(uint8_t volatile& dest, uint8_t src)
+_always_optimize
+static _always_inline void mm_wr(uint8_t volatile& dest, uint8_t src)
 {
-    _MM_WR_IMPL("b", dest, src);
+    _MM_WR_IMPL("b", "b", dest, src);
 }
 
-static inline void mm_wr(uint16_t volatile& dest, uint16_t src)
+_always_optimize
+static _always_inline void mm_wr(uint16_t volatile& dest, uint16_t src)
 {
-    _MM_WR_IMPL("w", dest, src);
+    _MM_WR_IMPL("w", "w", dest, src);
 }
 
-static inline void mm_wr(uint32_t volatile& dest, uint32_t src)
+_always_optimize
+static _always_inline void mm_wr(uint32_t volatile& dest, uint32_t src)
 {
-    _MM_WR_IMPL("k", dest, src);
+    _MM_WR_IMPL("l", "k", dest, src);
 }
 
-static inline void mm_wr(uint64_t volatile& dest, uint64_t src)
+_always_optimize
+static _always_inline void mm_wr(uint64_t volatile& dest, uint64_t src)
 {
-    _MM_WR_IMPL("q", dest, src);
+    _MM_WR_IMPL("q", "q", dest, src);
 }
 
-static inline void mm_wr(int8_t volatile& dest, int8_t src)
+_always_optimize
+static _always_inline void mm_wr(int8_t volatile& dest, int8_t src)
 {
-    _MM_WR_IMPL("b", dest, src);
+    _MM_WR_IMPL("b", "b", dest, src);
 }
 
-static inline void mm_wr(int16_t volatile& dest, int16_t src)
+_always_optimize
+static _always_inline void mm_wr(int16_t volatile& dest, int16_t src)
 {
-    _MM_WR_IMPL("w", dest, src);
+    _MM_WR_IMPL("w", "w", dest, src);
 }
 
-static inline void mm_wr(int32_t volatile& dest, int32_t src)
+_always_optimize
+static _always_inline void mm_wr(int32_t volatile& dest, int32_t src)
 {
-    _MM_WR_IMPL("k", dest, src);
+    _MM_WR_IMPL("l", "k", dest, src);
 }
 
-static inline void mm_wr(int64_t volatile& dest, int64_t src)
+_always_optimize
+static _always_inline void mm_wr(int64_t volatile& dest, int64_t src)
 {
-    _MM_WR_IMPL("q", dest, src);
+    _MM_WR_IMPL("q", "q", dest, src);
 }
 
-static inline void mm_copy_wr(void volatile *dst, void const *src, size_t sz)
+static _always_inline void mm_copy_wr(void volatile *dst,
+                                      void const *src, size_t sz)
 {
     while (sz >= sizeof(uint32_t)) {
         mm_wr(*(uint32_t volatile*)dst, *(uint32_t const*)src);
@@ -617,55 +640,62 @@ static inline void mm_copy_wr(void volatile *dst, void const *src, size_t sz)
 
 //
 
-static inline uint8_t mm_rd(uint8_t volatile const& src)
+_always_optimize
+static _always_inline uint8_t mm_rd(uint8_t volatile const& src)
 {
     uint8_t dest;
-    _MM_RD_IMPL("b", dest, src);
+    _MM_RD_IMPL("b", "b", dest, src);
 }
 
-static inline int8_t mm_rd(int8_t volatile const& src)
+_always_optimize
+static _always_inline int8_t mm_rd(int8_t volatile const& src)
 {
     uint8_t dest;
-    _MM_RD_IMPL("b", dest, src);
+    _MM_RD_IMPL("b", "b", dest, src);
 }
 
-static inline uint16_t mm_rd(uint16_t volatile const& src)
+_always_optimize
+static _always_inline uint16_t mm_rd(uint16_t volatile const& src)
 {
     uint16_t dest;
-    _MM_RD_IMPL("w", dest, src);
+    _MM_RD_IMPL("w", "w", dest, src);
 }
 
-static inline int16_t mm_rd(int16_t volatile const& src)
+_always_optimize
+static _always_inline int16_t mm_rd(int16_t volatile const& src)
 {
     uint16_t dest;
-    _MM_RD_IMPL("w", dest, src);
+    _MM_RD_IMPL("w", "w", dest, src);
 }
 
-static inline uint32_t mm_rd(uint32_t volatile const& src)
+_always_optimize
+static _always_inline uint32_t mm_rd(uint32_t volatile const& src)
 {
     uint32_t dest;
-    _MM_RD_IMPL("k", dest, src);
+    _MM_RD_IMPL("l", "k", dest, src);
 }
 
-static inline int32_t mm_rd(int32_t volatile const& src)
+_always_optimize
+static _always_inline int32_t mm_rd(int32_t volatile const& src)
 {
     uint32_t dest;
-    _MM_RD_IMPL("k", dest, src);
+    _MM_RD_IMPL("l", "k", dest, src);
 }
 
-static inline uint64_t mm_rd(uint64_t volatile const& src)
+static _always_inline uint64_t mm_rd(uint64_t volatile const& src)
 {
     uint64_t dest;
-    _MM_RD_IMPL("q", dest, src);
+    _MM_RD_IMPL("q", "q", dest, src);
 }
 
-static inline int64_t mm_rd(int64_t volatile const& src)
+static _always_inline int64_t mm_rd(int64_t volatile const& src)
 {
     uint64_t dest;
-    _MM_RD_IMPL("q", dest, src);
+    _MM_RD_IMPL("q", "q", dest, src);
 }
 
-static inline void mm_copy_rd(void *dst, void const volatile *src, size_t sz)
+static _always_inline void mm_copy_rd(
+        void *dst, void const volatile *src, size_t sz)
 {
     while (sz >= sizeof(uint32_t)) {
         *(uint32_t*)dst = mm_rd(*(uint32_t const volatile *)src);
@@ -674,19 +704,21 @@ static inline void mm_copy_rd(void *dst, void const volatile *src, size_t sz)
         sz -= sizeof(uint32_t);
     }
 
-    while (sz >= sizeof(uint16_t)) {
+    if (sz >= sizeof(uint16_t)) {
         *(uint16_t*)dst = mm_rd(*(uint16_t const*)src);
         dst = (char*)dst + sizeof(uint16_t);
         src = (char*)src + sizeof(uint16_t);
         sz -= sizeof(uint16_t);
     }
 
-    while (sz >= sizeof(uint8_t)) {
+    if (sz >= sizeof(uint8_t)) {
         *(uint8_t*)dst = mm_rd(*(uint8_t const*)src);
         dst = (char*)dst + sizeof(uint8_t);
         src = (char*)src + sizeof(uint8_t);
         sz -= sizeof(uint8_t);
     }
+
+    assert(sz == 0);
 }
 
 #undef _MM_RD_IMPL

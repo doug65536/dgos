@@ -18,7 +18,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___rodata_st = .);
 
 		PROVIDE_HIDDEN(___callout_array_st = .);
-		*(SORT(.callout_array.*))
+		KEEP(*(SORT(.callout_array.*)))
 		PROVIDE_HIDDEN(___callout_array_en = .);
 
 		. = ALIGN(64);
@@ -153,17 +153,14 @@ SECTIONS {
 
 	. = ALIGN(4K);
 
-	.got : {
-		PROVIDE_HIDDEN(___got = .);
+	.got ALIGN(8) : {
+		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got)
 	} :data
 
-	.got.plt : {
-		*(.got.plt)
-	} :data
-
-	.igot.plt : {
-		*(.igot.plt)
+	.got : {
+		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
+		*(.got)
 	} :data
 
 	.dynamic ALIGN(8) : {
@@ -174,15 +171,20 @@ SECTIONS {
 
 	.init_array ALIGN(8) : {
 		PROVIDE_HIDDEN(__init_array_start = .);
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
 		PROVIDE_HIDDEN(__init_array_end = .);
+
+		PROVIDE_HIDDEN(__init_array_early_start = .);
+		KEEP(*(.init_array))
+		KEEP(*(.ctors))
+		PROVIDE_HIDDEN(__init_array_early_end = .);
 	} :data
 
 	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(___fini_st = .);
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
 		PROVIDE_HIDDEN(___fini_en = .);
 	} :data
 

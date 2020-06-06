@@ -23,14 +23,16 @@ public:
     uintptr_t alloc_linear(size_t size);
     bool take_linear(linaddr_t addr, size_t size, bool require_free);
     void release_linear(uintptr_t addr, size_t size);
-    void dump(char const *format, ...) const;
-    void dumpv(char const *format, va_list ap) const;
+    void dump(char const *format, ...) const
+    _printf_format(2, 3);
+    void dumpv(char const *format, va_list ap) const
+    _printf_format(2, 0);
 
-    _printf_format(3, 4)
-    void dump_locked(scoped_lock& lock, char const *format, ...) const;
+    void dump_locked(scoped_lock& lock, char const *format, ...) const
+    _printf_format(3, 4);
 
-    _printf_format(3, 0)
-    void dump_lockedv(scoped_lock& lock, char const *format, va_list ap) const;
+    void dump_lockedv(scoped_lock& lock, char const *format, va_list ap) const
+    _printf_format(3, 0);
 
     bool validate() const;
     bool validate_locked(scoped_lock &lock) const;

@@ -23,7 +23,9 @@ done
 ln -fsTr "$TOPSRC/user/background.png" stage/background.png || exit
 
 mkdir -p stage/sym || exit
-cp -R sym/* stage/sym || exit
+for f in sym/*; do
+    ln -fsTr "$f" "stage/$f" || exit
+done
 
 # EFI boot files
 mkdir -p stage/EFI/boot || exit

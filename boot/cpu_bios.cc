@@ -25,7 +25,7 @@ void cpu_a20_exitpm()
 
 void cpu_a20_init()
 {
-    bios_regs_t regs{};
+    //bios_regs_t regs{};
 }
 
 bool cpu_a20_toggle(bool enabled)

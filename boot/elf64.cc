@@ -13,6 +13,7 @@
 #include "farptr.h"
 #include "vesa.h"
 #include "progressbar.h"
+#include "messagebar.h"
 #include "bootloader.h"
 #include "bootmenu.h"
 #include "physmap.h"
@@ -135,6 +136,8 @@ static kernel_params_t *prompt_kernel_param(
 {
     kernel_params_t *params = new (std::nothrow) kernel_params_t();
 
+    PRINT("Preparing kernel parameter structure at %p\n", (void*)params);
+
     params->size = sizeof(*params);
 
     params->ap_entry = uintptr_t((void(*)())ap_entry_ptr);
@@ -148,7 +151,11 @@ static kernel_params_t *prompt_kernel_param(
     // Find NUMA information
     params->numa = boottbl_find_numa(params->acpi_rsdt);
 
+    PRINT("Showing boot menu");
+
     boot_menu_show(*params);
+
+    PRINT("Done boot menu");
 
     // Map framebuffer
     if (params->vbe_selected_mode) {
@@ -247,6 +254,8 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 
+    PRINT("Bootloader entering kernel");
+
     run_kernel(entry_point, params);
 }
 
@@ -260,13 +269,57 @@ void enter_kernel(uint64_t entry_point, uint64_t base)
     }
 }
 
-void load_initrd()
+void progress(size_t fsz, size_t msz, elf64_context_t *ctx)
+{
+    int64_t now = systime();
+
+    ctx->done_file_bytes += fsz;
+    ctx->done_mem_bytes += msz;
+
+    _assume(ctx->done_file_bytes < ctx->total_file_bytes);
+
+    int file_percent = int(UINT64_C(100) *
+                           ctx->done_file_bytes / ctx->total_file_bytes);
+    int mem_percent = int(UINT64_C(100) *
+                           ctx->done_mem_bytes / ctx->total_mem_bytes);
+
+    progress_bar_draw(17, 0, 63, file_percent, TSTR "I/O");
+
+    progress_bar_draw(17, 3, 63, mem_percent, TSTR "RAM");
+
+    print_line_at(65, 1, 0x7, TSTR "%" PRIu64 "/%" PRIu64 "MB",
+                  ctx->done_file_bytes >> 20,
+                  ctx->total_file_bytes >> 20);
+
+    print_line_at(65, 4, 0x7, TSTR "%" PRIu64 "/%" PRIu64 "MB",
+                  ctx->done_mem_bytes >> 20,
+                  ctx->total_mem_bytes >> 20);
+
+    int64_t elap = 0;
+    if ((ctx->last_time && now > ctx->last_time) || file_percent == 100) {
+        elap = now - ctx->last_time;
+
+        int64_t delta, ms;
+        if (file_percent < 100) {
+            delta = ctx->done_file_bytes - ctx->last_file_bytes;
+            ctx->last_file_bytes = ctx->done_file_bytes;
+        } else {
+            elap = now - ctx->start_time;
+            delta = ctx->done_file_bytes;
+        }
+
+        ms = (elap * 10000) / 182;
+        assert(ms);
+        int64_t kps = ms ? delta / ms : INT64_MAX;
+
+        print_line_at(65, 5, 0x7, TSTR "%" PRId64 "KB/s", kps);
+    }
+    ctx->last_time = now;
+}
+
+void load_initrd(int initrd_fd, off_t initrd_filesize, elf64_context_t *ctx)
 {
     ELF64_TRACE("Loading initrd...");
-
-    int initrd_fd = boot_open(TSTR "initrd");
-
-    initrd_size = boot_filesize(initrd_fd);
 
     // load initrd at -64TB
     initrd_base = -(UINT64_C(64) << 40);
@@ -276,12 +329,21 @@ void load_initrd()
     paging_map_range(&allocator, initrd_base, initrd_size,
                      PTE_PRESENT | PTE_ACCESSED | PTE_NX);
 
-    auto read_size = paging_iovec_read(
-                initrd_fd, 0, initrd_base, initrd_size, 1 << 30);
-    if (unlikely(initrd_size != read_size))
-        PANIC("Could not load initrd file\n");
+    constexpr off_t sz2M = 1 << 21;
+    for (off_t blk_end, ofs = 0; ofs < initrd_size; ofs = blk_end) {
+        blk_end = ofs + sz2M;
+        off_t blk_size = (blk_end < initrd_size
+                          ? blk_end
+                          : initrd_size) - ofs;
 
-    boot_close(initrd_fd);
+        auto read_size = paging_iovec_read(
+                    initrd_fd, ofs, initrd_base + ofs, blk_size, 1 << 30);
+
+        if (unlikely(read_size != blk_size))
+            PANIC("Could not load initrd file\n");
+
+        progress(blk_size, blk_size, ctx);
+    }
 }
 
 void elf64_run(tchar const *filename)
@@ -295,6 +357,15 @@ void elf64_run(tchar const *filename)
     uint64_t nx_page_flags = 0;
     if (likely(cpu_has_no_execute()))
         nx_page_flags = PTE_NX;
+
+    message_bar_draw(10, 7, 70, TSTR "Getting initrd size");
+
+    int initrd_fd = boot_open(TSTR "initrd");
+    initrd_size = boot_filesize(initrd_fd);
+    boot_close(initrd_fd);
+    initrd_fd = -1;
+
+    message_bar_draw(10, 7, 70, TSTR "Opening kernel image");
 
     int file = boot_open(filename);
 
@@ -325,7 +396,7 @@ void elf64_run(tchar const *filename)
     if (unlikely(file_hdr.e_shentsize != sizeof(Elf64_Shdr)))
         PANIC("Executable has unexpected section header size");
 
-    if (unlikely(file_hdr.e_machine != 62))
+    if (unlikely(file_hdr.e_machine != EM_AMD64))
         PANIC("Executable is for an unexpected machine id");
 
     // Load program headers
@@ -343,10 +414,22 @@ void elf64_run(tchar const *filename)
     elf64_context_t *ctx = load_kernel_begin();
 
     // Calculate the total bytes to be read for I/O progress bar
-    for (unsigned i = 0; i < file_hdr.e_phnum; ++i) {
-        if ((program_hdrs[i].p_flags & (PF_R | PF_W | PF_X)) != 0)
-            ctx->total_bytes += program_hdrs[i].p_memsz;
+    for (size_t i = 0; i < file_hdr.e_phnum; ++i) {
+        if ((program_hdrs[i].p_flags & (PF_R | PF_W | PF_X)) != 0) {
+            ctx->total_file_bytes += program_hdrs[i].p_filesz;
+            ctx->total_mem_bytes += program_hdrs[i].p_memsz;
+        }
     }
+
+    ctx->total_file_bytes += initrd_size;
+    ctx->total_mem_bytes += initrd_size;
+
+    PRINT("Expecting to load %s%" PRIu64 "KiB",
+          (ctx->total_file_bytes & ~-(1 << 10)) ? "~" : "",
+          ctx->total_file_bytes >> 10);
+    PRINT("Expecting to initialize %s%" PRIu64 "KiB",
+          (ctx->total_mem_bytes & ~-(1 << 10)) ? "~" : "",
+          ctx->total_mem_bytes >> 10);
 
     // Load relocations
     ssize_t shbytes = file_hdr.e_shentsize * file_hdr.e_shnum;
@@ -362,7 +445,9 @@ void elf64_run(tchar const *filename)
     uint64_t new_base = 0xFFFFFFFF80000000;
     base_adj = new_base - 0xFFFFFFFF80000000;
 
-    //PRINT("Loading kernel...");
+    message_bar_draw(10, 7, 70, TSTR "Loading kernel");
+
+    ctx->start_time = systime();
 
     // For each program header
     for (size_t i = 0; i < file_hdr.e_phnum; ++i) {
@@ -397,15 +482,10 @@ void elf64_run(tchar const *filename)
             load_kernel_chunk(blk, file, ctx);
         }
 
-        ctx->done_bytes += blk->p_memsz;
-
-        int percent = int(UINT64_C(100) * ctx->done_bytes / ctx->total_bytes);
-
-        progress_bar_draw(0, 10, 70, percent);
+        progress(blk->p_filesz, blk->p_memsz, ctx);
     }
 
-    load_kernel_end(ctx);
-    ctx = nullptr;
+    message_bar_draw(10, 7, 70, TSTR "Applying relocations");
 
     for (size_t i = 0; i < file_hdr.e_shnum; ++i) {
         // If no adjustment, don't bother
@@ -435,9 +515,21 @@ void elf64_run(tchar const *filename)
 
     free(program_hdrs);
 
-    load_initrd();
+    message_bar_draw(10, 7, 70, TSTR "Loading initrd");
+
+    assert(initrd_fd == -1);
+    initrd_fd = boot_open(TSTR "initrd");
+
+    load_initrd(initrd_fd, initrd_size, ctx);
+    boot_close(initrd_fd);
+
+    load_kernel_end(ctx);
+
+    ctx = nullptr;
 
     ELF64_TRACE("Entering kernel");
+
+    message_bar_draw(10, 7, 70, TSTR "Showing boot menu");
 
     enter_kernel(file_hdr.e_entry + base_adj, 0xFFFFFFFF80000000 + base_adj);
 }

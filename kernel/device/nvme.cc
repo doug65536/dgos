@@ -1017,7 +1017,7 @@ void nvme_if_t::deferred_irq_handler(int irq_offset)
 
     if (irq_offset && irq_range.msix && irq_range.count == 2) {
         // Infer queue index from CPU number
-        int current_cpu = thread_cpu_number();
+        uint32_t current_cpu = thread_cpu_number();
         nvme_queue_state_t& queue = queues[1 + current_cpu];
         queue.process_completions(this, queues);
     } else {
@@ -1038,7 +1038,7 @@ uint32_t volatile* nvme_if_t::doorbell_ptr(bool completion, size_t queue)
 unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
                        uint8_t log2_sectorsize)
 {
-    size_t cur_cpu = thread_cpu_number();
+    uint32_t cur_cpu = thread_cpu_number();
 
     int queue_index;
 
@@ -1174,6 +1174,11 @@ errno_t nvme_dev_t::io(
    iocp->set_expect(expect);
 
    return errno_t::OK;
+}
+
+errno_t nvme_dev_t::cancel_io(iocp_t *iocp)
+{
+    return errno_t::ENOSYS;
 }
 
 errno_t nvme_dev_t::read_async(

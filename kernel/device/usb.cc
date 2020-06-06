@@ -23,24 +23,30 @@ EXPORT usb_desc_device const &usb_config_helper::device() const
     return dev_desc;
 }
 
-EXPORT usb_desc_config const *usb_config_helper::find_config(int cfg_index) const
+EXPORT usb_desc_config const *usb_config_helper::find_config(
+        size_t cfg_index) const
 {
     if (unlikely(!data))
         return nullptr;
 
     usb_desc_config const *cfg = (usb_desc_config*)data;
 
-    int index = 0;
-    int ofs = 0;
-    while (index < cfg_index && ofs < len && cfg->hdr.len) {
-        cfg = (usb_desc_config*)((char*)cfg + cfg->total_len);
+    size_t index = 0;
+    size_t ofs = 0;
+    bool is_cfg = false;
+    while (ofs < len && cfg->hdr.len && cfg->hdr.len != 0xFF &&
+           (!(is_cfg = mask_desctype_cs(cfg->hdr.desc_type) ==
+           usb_desctype_t::CONFIGURATION) || index < cfg_index)) {
         ofs += cfg->total_len;
-        ++index;
+        cfg = (usb_desc_config*)((char*)cfg + cfg->total_len);
+        index += is_cfg;
+        is_cfg = false;
     }
 
-    return ofs < len &&
-            cfg->hdr.desc_type == usb_desctype_t::CONFIGURATION
-            ? cfg : nullptr;
+    assert(!is_cfg ||
+           (cfg && is_cfg));
+
+    return is_cfg ? cfg : nullptr;
 }
 
 EXPORT usb_desc_iface const *usb_config_helper::find_iface(
@@ -49,33 +55,50 @@ EXPORT usb_desc_iface const *usb_config_helper::find_iface(
     if (unlikely(!cfg || iface_index >= cfg->num_iface || iface_index < 0))
         return nullptr;
 
-    auto const *iface_st = (usb_desc_iface const*)((char*)cfg + cfg->hdr.len);
-    auto const *iface_en = iface_st + cfg->num_iface;
-    auto const *iface = iface_st;
+    usb_desc_iface const *iface_st = (usb_desc_iface const*)
+            ((char*)cfg + cfg->hdr.len);
+    usb_desc_iface const *iface_en = iface_st + cfg->num_iface;
+    usb_desc_iface const *iface = iface_st;
     int index = 0;
-    while (index < iface_index && iface < iface_en && iface->hdr.len) {
+    bool is_iface = false;
+    while (iface < iface_en && iface->hdr.len && iface->hdr.len != 0xFF &&
+           (!(is_iface = mask_desctype_cs(iface->hdr.desc_type) ==
+            usb_desctype_t::INTERFACE) || index < iface_index)) {
         iface = (usb_desc_iface*)((char*)iface + iface->hdr.len);
-        ++index;
+        index += is_iface;
+        is_iface = false;
     }
-    return iface < iface_en ? iface : nullptr;
+
+    assert(!is_iface || iface);
+
+    return is_iface ? iface : nullptr;
 }
 
 EXPORT usb_desc_ep const *usb_config_helper::find_ep(
-        usb_desc_iface const *iface, int ep_index)
+        usb_desc_iface const *iface, size_t ep_index)
 {
-    if (unlikely(!iface || ep_index >= iface->num_ep || ep_index < 0))
+    if (unlikely(!iface))
         return nullptr;
 
-    usb_desc_ep const *ep_st = (usb_desc_ep*)((char*)iface + iface->hdr.len);
+    usb_desc_ep const *ep_st = (usb_desc_ep*)
+            ((char const *)iface + iface->hdr.len);
+
     usb_desc_ep const *ep = ep_st;
-    int index = 0;
-    while ((ep->hdr.desc_type != usb_desctype_t::ENDPOINT ||
-           index < ep_index) && ep->hdr.len &&
-           index < iface->num_ep) {
-        index += (ep->hdr.desc_type == usb_desctype_t::ENDPOINT);
+
+    size_t index = 0;
+
+    bool is_ep = false;
+    while (ep->hdr.len && ep->hdr.len != 0xFF &&
+           (!(is_ep = mask_desctype_cs(ep->hdr.desc_type) ==
+              usb_desctype_t::ENDPOINT) || index < ep_index)) {
         ep = (usb_desc_ep*)((char*)ep + ep->hdr.len);
+        index += is_ep;
+        is_ep = false;
     }
-    return index < iface->num_ep ? ep : nullptr;
+
+    assert(!is_ep || ep);
+
+    return is_ep ? ep : nullptr;
 }
 
 EXPORT usb_desc_iface const *usb_config_helper::match_iface(

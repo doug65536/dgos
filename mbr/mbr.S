@@ -4,7 +4,9 @@
 #include "../boot/gpt.h"
 #include "../boot/dap.h"
 
-#define UNRELOCATED(n) n+0x7C00-0x600
+// Code is linked at 0x600, but initially loaded at 0x7c00
+// Helper to adjust symbols to where they are before relocating to 0x600
+#define UNRELOCATED(n) (0x7c00-0x600)+n
 
 // BIOS calls this code with:
 //  DL = boot drive
@@ -17,12 +19,10 @@
 // ----------------------------------------------------------------------
 .globl entry
 entry:
-    ljmp $0,$ UNRELOCATED(entry_start)
+    ljmp $ 0,$ UNRELOCATED(entry_start)
 
 init_stack:
     .int 0x0000FFF8
-
-// Data close to start to get byte-sized offsets
 
 dap:
     .byte dap_length
@@ -46,7 +46,7 @@ entry_start:
     // Workaround for faulty BIOS, if DL is <= 0x80, use 0x80
     test %dl,%dl
     js 0f
-    mov $0x80,%dl
+    mov $ 0x80,%dl
 0:
 
     // Don't clobber dx!
@@ -54,37 +54,34 @@ entry_start:
     xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
-    
-// hang and wait for gdb
-//0:
-//    test %ax,%ax
-//    jz 0b
 
     // Initialize stack to top of first 64KB
-    movw init_stack-0x600+0x7c00+2,%ss
-    movw init_stack-0x600+0x7c00,%sp
+    // Could do this: lss UNRELOCATED(init_stack),%sp
+    // but I want code running this early to be 8088 compatible
+    movw UNRELOCATED(init_stack+2),%ss
+    movw UNRELOCATED(init_stack),%sp
 
     // Relocate to 0x600
-    movw $0x7c00,%si
-    movw $0x0600,%di
-    movw $256,%cx
+    movw $ 0x7c00,%si
+    movw $ 0x0600,%di
+    movw $ 256,%cx
     cld
     rep movsw
     ljmpw $ 0,$ relocated_entry
 relocated_entry:
 
     // Search for first bootable partition
-    movw $partition_table,%bx
-    movw $4,%cx
+    movw $ partition_table,%bx
+    movw $ 4,%cx
 
-0:  cmpb $0xEE,ptbl_ent_sysid(%bx)
+0:  cmpb $ 0xEE,ptbl_ent_sysid(%bx)
     je found_gpt
 
-    cmpb $0x80,ptbl_ent_bootflag(%bx)
+    cmpb $ 0x80,ptbl_ent_bootflag(%bx)
     je boot_partition
 
 bad_signature:
-    addw $ptbl_ent_length,%bx
+    addw $ ptbl_ent_length,%bx
     decw %cx
     jnz 0b
     jmp no_active_partition
@@ -92,27 +89,27 @@ bad_signature:
 boot_partition:
     movw ptbl_ent_stsec(%bx),%ax
     movw ptbl_ent_stsec+2(%bx),%cx
-    movw $1,dap+dap_block_count
+    movw $ 1,dap+dap_block_count
     call disk_io_with_lba
-    cmpw $0xaa55,0x7dfe
+    cmpw $ 0xaa55,0x7dfe
     je 0x7c00
     jmp bad_signature
 
 found_gpt:
     movw %bx,ptbl_ent_ptr
-    movw $2,dap+dap_lba
-    andw $0,dap+dap_lba+2
+    movw $ 2,dap+dap_lba
+    andw $ 0,dap+dap_lba+2
 
 .Lanother_gpt:
-    movw $1,dap+dap_block_count
+    movw $ 1,dap+dap_block_count
     call disk_io
 
     // Look for bootable flag
-    testb $gpt_lba2_part_attr_bios,0x7c00+gpt_lba2_part_attr
+    testb $ gpt_lba2_part_attr_bios,0x7c00+gpt_lba2_part_attr
     jnz boot_gpt
 
-    addw $1,dap+dap_lba
-    adcw $0,dap+dap_lba+2
+    addw $ 1,dap+dap_lba
+    adcw $ 0,dap+dap_lba+2
     jmp .Lanother_gpt
 
 boot_gpt:
@@ -121,8 +118,8 @@ boot_gpt:
     movw 0x7c00+gpt_lba2_part_lba_en+2,%cx
     subw 0x7c00+gpt_lba2_part_lba_st,%ax
     sbbw 0x7c00+gpt_lba2_part_lba_st+2,%cx
-    addw $1,%ax
-    adcw $0,%cx
+    addw $ 1,%ax
+    adcw $ 0,%cx
     movw %ax,ptbl_ent_numsec(%bx)
     movw %cx,ptbl_ent_numsec+2(%bx)
 
@@ -134,7 +131,7 @@ boot_gpt:
 
 .Lpart_no_good:
     incb dap_lba(%si)
-    cmpb $34,dap_lba(%si)
+    cmpb $ 34,dap_lba(%si)
     jb .Lanother_gpt
 
 //.space 220
@@ -144,30 +141,30 @@ disk_io_with_lba:
     movw %cx,dap_lba+2(%si)
     // fall through
 disk_io:
-    movw $dap,%si
-    movw $0x4200,%ax
-    int $0x13
+    movw $ dap,%si
+    movw $ 0x4200,%ax
+    int $ 0x13
     jc disk_error
     ret
 
 disk_error:
-    movw $'d'+0xF00,%ax
+    movw $ 'd'+0xF00,%ax
     jmp fail_message
 
 bad_bootsector:
-    movw $'b'+0xF00,%ax
+    movw $ 'b'+0xF00,%ax
     jmp fail_message
 
 no_active_partition:
-    movw $'p'+0xF00,%ax
+    movw $ 'p'+0xF00,%ax
 
 fail_message:
-    pushw $0xb800
+    pushw $ 0xb800
     popw %ds
     movw %ax,0
 
 give_up:
-    int $0x18
+    int $ 0x18
     jmp give_up
 
 // ----------------------------------------------------------------------

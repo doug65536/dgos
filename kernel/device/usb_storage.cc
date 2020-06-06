@@ -328,6 +328,11 @@ void usb_msc_dev_t::cleanup_dev()
 {
 }
 
+errno_t usb_msc_dev_t::cancel_io(iocp_t *iocp)
+{
+    return errno_t::ENOSYS;
+}
+
 errno_t usb_msc_dev_t::read_async(
         void *data, int64_t count,
         uint64_t lba, iocp_t *iocp)
@@ -520,7 +525,8 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
     for (int lun = 0; lun <= max_lun; ++lun) {
         USB_MSC_TRACE("Initializing lun %d\n", lun);
 
-        std::unique_ptr<usb_msc_dev_t> drv(new (std::nothrow) usb_msc_dev_t{});
+        std::unique_ptr<usb_msc_dev_t> drv(
+                    new (std::nothrow) usb_msc_dev_t{});
 
         // Get size and block size
         wrapper_t cap;

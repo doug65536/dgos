@@ -4,6 +4,11 @@
 
 fs_api_t fs_api;
 
+tchar const *boot_name()
+{
+    return fs_api.name;
+}
+
 int boot_open(tchar const *filename)
 {
     return fs_api.boot_open(filename);
@@ -54,7 +59,7 @@ bool disk_io_plan_t::add(uint32_t lba, uint16_t sector_count,
 
         disk_vec_t &prev = vec[count - 1];
 
-        uint16_t sector_size = 1 << log2_sector_size;;
+        uint_fast16_t sector_size = 1 << log2_sector_size;
 
         if (prev.lba + prev.count == lba &&
                 prev.sector_ofs == 0 &&

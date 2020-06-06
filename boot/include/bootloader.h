@@ -77,7 +77,6 @@ struct alignas(8) kernel_params_t {
     uint64_t phys_mem_table_size;
     ptr64_t<void(*)()> ap_entry;
     ptr64_t<vbe_info_t> vbe_info;
-    //ptr64_t<vbe_mode_info_t> vbe_mode_info;
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
     // 3 * 8 bytes
     boottbl_acpi_info_t acpi_rsdt;
@@ -92,8 +91,15 @@ struct alignas(8) kernel_params_t {
     uint64_t phys_mapping_sz;
     uint8_t wait_gdb;
     uint8_t serial_debugout;
-    uint8_t reserved[6];
+    uint8_t serial_baud;
+
+    uint8_t smp_enable;
+    uint8_t acpi_enable;
+    uint8_t mps_enable;
+    uint8_t msi_enable;
+    uint8_t msix_enable;
+    uint8_t e9_enable;
 } _packed;
 
 // Ensure that all of the architectures have the same layout
-C_ASSERT(sizeof(kernel_params_t) == 20 * 8);
+C_ASSERT(sizeof(kernel_params_t) == 21 * 8);

@@ -10,6 +10,11 @@ __setjmp:
     // Save call preserved registers
     movq %rbx,2*8(%rdi)
     movq %rbp,3*8(%rdi)
+
+    // Save return address
+    movq (%rsp),%rax
+    movq %rax,(%rdi)
+
     movq %r12,4*8(%rdi)
     movq %r13,5*8(%rdi)
     movq %r14,6*8(%rdi)
@@ -20,10 +25,6 @@ __setjmp:
     .cfi_adjust_cfa_offset 8
     popq 8*8(%rdi)
     .cfi_adjust_cfa_offset -8
-
-    // Save return address
-    movq (%rsp),%rax
-    movq %rax,(%rdi)
 
     // Save callers stack pointer
     leaq 8(%rsp),%rax
@@ -87,7 +88,7 @@ __exception_longjmp_unwind:
     .cfi_offset rbx,-16
     push_cfi %r12
     .cfi_offset r12,-24
-    adj_rsp -8
+    adj_rsp_cfi -8
     movq %rdi,%rbx
     movq %rsi,%r12
 

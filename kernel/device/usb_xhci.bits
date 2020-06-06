@@ -251,3 +251,15 @@
 7:0 CAPID Capability ID
 15:8 NEXT Offset in dwords to next capability ID
 31:16 SPECIFIC Capability specific
+
+-- USBXHCI_PROTCAP_USB3
+
+27:25 MHD Hub depth
+
+-- USBXHCI_PROTCAP_USB2
+
+27:25 MHD Hub depth
+20 BLC BESL LPM capability
+19 HLC Hardware LPM capability
+18 IHI Integrated hub implemented
+17 HSO High speed only

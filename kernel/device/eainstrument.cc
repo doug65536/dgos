@@ -51,21 +51,29 @@ struct eainst_scoped_irq_dis {
     uintptr_t flags;
 };
 
+#define EAINST_SERIALIZING 1
+
 // Return thread id in low 32 bits, apicid in high 32 bits
 _no_instrument
 static uintptr_t eainst_get_current_thread(uint64_t* tsc)
 {
     intptr_t ids;
     __asm__ __volatile__ (
+#if EAINST_SERIALIZING
         "rdtscp\n\t"
-
         // rdtscp puts tsc in edx:eax and CPU_MSR_TSC_AUX (0xC0000103) into ecx
+#else
+        "rdtsc\n\t"
+        // Load apic id from cpuinfo (analogous to rdtscp without serializing)
+        "mov %%gs:%c[apic_id_ofs],%%ecx\n\t"
+#endif
+
         "shlq $32,%%rdx\n\t"
         "orq %%rdx,%%rax\n\t"
         "movq %%rax,(%[tsc_ptr])\n\t"
 
         // Get APIC ID into high 32 bits of rcx
-        "shlq $32,%%rcx\n\t"
+        "shlq $ 32,%%rcx\n\t"
 
         // Get GSBASE into RAX, to handle null GS (and give 0 TID if too early)
         "rdgsbase %q[ids]\n\t"
@@ -89,6 +97,7 @@ static uintptr_t eainst_get_current_thread(uint64_t* tsc)
         : [ids] "=&a" (ids)
         : [cur_thread_ofs] "n" (CPU_INFO_CURTHREAD_OFS)
         , [thread_id_ofs] "n" (THREAD_THREAD_ID_OFS)
+        , [apic_id_ofs] "n" (CPU_INFO_APIC_ID_OFS)
         , [tsc_ptr] "D" (tsc)
         : "memory", "rdx", "rcx"
     );
@@ -249,7 +258,7 @@ static isr_context_t *eainst_intr_handler(int intr, isr_context_t *ctx)
 {
     apic_eoi_noinst(intr);
 
-    int cpu_nr = thread_cpu_number();
+    uint32_t cpu_nr = thread_cpu_number();
     size_t &cpu_queue_count = trace_queue_counts[cpu_nr].count;
 
     if (cpu_queue_count) {

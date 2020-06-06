@@ -8,6 +8,34 @@
 
 #define USE_REP_STRING 1
 
+#ifdef USE_REP_STRING
+EXPORT void memcpy_movsq(void *dest, void *src, size_t u64_count)
+{
+    __asm__ __volatile__ (
+        "rep movsq"
+        : "+D" (dest)
+        , "+S" (src)
+        , "+c" (u64_count)
+        :
+        : "memory"
+    );
+}
+
+// Parameter order puts parameters in the right registers
+EXPORT void memset_stosq(void *dest, uint64_t value, size_t u64_count)
+{
+    value &= 0xFF;
+    value *= UINT64_C(0x0101010101010101);
+    __asm__ __volatile__ (
+        "rep stosq"
+        : "+D" (dest)
+        , "+c" (u64_count)
+        : "a" (value)
+        : "memory"
+    );
+}
+#endif
+
 EXPORT size_t strlen(char const *src)
 {
     size_t len = 0;
@@ -17,29 +45,34 @@ EXPORT size_t strlen(char const *src)
 
 EXPORT void *memchr(void const *mem, int ch, size_t count)
 {
-    for (unsigned char const *p = (unsigned char const *)mem; count--; ++p)
-        if ((unsigned char)*p == (unsigned char)ch)
+    unsigned char c = (unsigned char)ch;
+    unsigned char const *p;
+    for (p = (unsigned char const *)mem; count--; ++p)
+        if (*p == c)
             return (void *)p;
-   return nullptr;
+    return nullptr;
 }
 
 EXPORT void *memrchr(void const *mem, int ch, size_t count)
 {
-    for (char const *p = (char const *)mem + count; count--; --p)
-        if (p[-1] == (char)ch)
+    unsigned char c = (unsigned char)ch;
+    unsigned char const *p;
+    for (p = (unsigned char const *)mem + count; count--; --p)
+        if (p[-1] == c)
             return (void*)(p - 1);
-   return nullptr;
+    return nullptr;
 }
 
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
 EXPORT char *strchr(char const *s, int ch)
 {
-    for (;; ++s) {
-        char c = *s;
-        if (c == (char)ch)
-            return (char*)s;
-        if (c == 0)
+    unsigned char v, c = (unsigned char)ch;
+    for (size_t i = 0; ; ++i) {
+        v = (unsigned char)s[i];
+        if (v == c)
+            return (char*)s + i;
+        if (v == 0)
             return nullptr;
     }
 }
@@ -48,11 +81,21 @@ EXPORT char *strchr(char const *s, int ch)
 // of the string and can be found when searching for '\0'.
 EXPORT char *strrchr(char const *s, int ch)
 {
-    for (char const *p = s + strlen(s); p >= s; --p) {
-        if ((char)*p == (char)ch)
-            return (char*)p;
+    unsigned char v, c = (unsigned char)ch;
+
+    // One pass algorithm finds last occurrence of ch and length
+    size_t best = 0;
+    for (size_t i = 0; ; ++i) {
+        v = (unsigned char)s[i];
+
+        if (v == c)
+            best = i + 1;
+
+        if (v == 0)
+            break;
     }
-    return nullptr;
+
+    return best ? (char *)(s + best - 1) : nullptr;
 }
 
 EXPORT int strcmp(char const *lhs, char const *rhs)
@@ -201,10 +244,16 @@ EXPORT void *memset(void *dest, int c, size_t n)
     return dest;
 }
 
+#if USE_REP_STRING
+void clear64(void *dest, size_t n)
+{
+    memset_stosq(dest, 0, n);
+}
+#else
 // GCC erroneously disables __builtin_ia32_movnti64
 // when using mgeneral-regs-only
 __attribute__((target("sse2")))
-void clear64(void *dest, size_t n)
+void clear64(void *dest, size_t u64_count)
 {
     long long *d = (long long *)dest;
 
@@ -218,9 +267,10 @@ void clear64(void *dest, size_t n)
         __builtin_ia32_movnti64(d+6, 0);
         __builtin_ia32_movnti64(d+7, 0);
         d += 8;
-    } while (n -= 64);
+    } while (u64_count--);
     __builtin_ia32_sfence();
 }
+#endif
 
 static _always_inline void memcpy_byte(char *d, char const *s, uint32_t &ofs)
 {

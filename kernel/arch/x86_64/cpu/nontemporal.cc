@@ -4,6 +4,7 @@
 #include "likely.h"
 #include "string.h"
 #include "printk.h"
+#include "export.h"
 
 #define DEBUG_NONTEMPORAL   1
 #if DEBUG_NONTEMPORAL
@@ -126,7 +127,7 @@ memset32_fn_t resolve_memset32_nt()
 __attribute__((ifunc("resolve_memset32_nt")))
 void *memset32_nt(void *dest, uint32_t val, size_t n);
 #else
-void *memset32_nt(void *dest, uint32_t val, size_t n)
+EXPORT void *memset32_nt(void *dest, uint32_t val, size_t n)
 {
     int32_t *d = (int32_t*)dest;
 
@@ -138,17 +139,17 @@ void *memset32_nt(void *dest, uint32_t val, size_t n)
     return dest;
 }
 
-void *memcpy32_nt(void *dest, void const *src, size_t n)
+EXPORT void *memcpy32_nt(void *dest, void const *src, size_t n)
 {
     return memcpy(dest, src, n);
 }
 
-void *memcpy512_nt(void *dest, void const *src, size_t n)
+EXPORT void *memcpy512_nt(void *dest, void const *src, size_t n)
 {
     return memcpy(dest, src, n);
 }
 
-void memcpy_nt_fence()
+EXPORT void memcpy_nt_fence()
 {
 }
 

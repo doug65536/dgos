@@ -90,6 +90,25 @@ static int id_from_fd(int fd)
     return id;
 }
 
+int sys_fstatfs(int fd, fs_statvfs_t *buf)
+{
+    int id = id_from_fd(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+
+    fs_statvfs_t tmp;
+
+    int status = file_fstatfs(id, &tmp);
+
+    if (likely(status >= 0)) {
+        if (unlikely(!mm_copy_user(buf, &tmp, sizeof(tmp))))
+            status = -int(errno_t::EFAULT);
+    }
+
+    return status;
+}
+
 ssize_t sys_read(int fd, void *bufaddr, size_t count)
 {
     if (unlikely(!mm_is_user_range(bufaddr, count)))
@@ -203,7 +222,7 @@ off_t sys_lseek(int fd, off_t ofs, int whence)
     return err(pos);
 }
 
-int sys_opendir(char const* pathname)
+int sys_opendirat(int dirfd, char const* pathname)
 {
     user_str_t path(pathname);
 
@@ -212,12 +231,14 @@ int sys_opendir(char const* pathname)
 
     process_t *p = fast_cur_process();
 
+    int dirid = p->dirfd_to_id(dirfd);
+
     int fd = p->ids.desc_alloc.alloc();
 
     if (unlikely(fd < 0))
-        return err(errno_t::EMFILE);
+        return toomany_err();
 
-    int id = file_opendir(path);
+    int id = file_opendirat(dirid, path);
 
     if (unlikely(id < 0)) {
         p->ids.desc_alloc.free(fd);
@@ -341,6 +362,11 @@ int sys_ioctl(int fd, int cmd, void* arg)
     return status;
 }
 
+int sys_faccess(int fd, int mask)
+{
+    return nosys_err();
+}
+
 int sys_dup(int oldfd)
 {
     process_t *p = fast_cur_process();
@@ -372,7 +398,6 @@ int sys_dup3(int oldfd, int newfd, int flags)
     else if (!p->ids.desc_alloc.take(newfd))
         return toomany_err();
 
-
     if (likely(file_ref_filetab(id))) {
         p->ids.ids[newfd].set(id, flags);
         return newfd;
@@ -390,7 +415,33 @@ int sys_dup2(int oldfd, int newfd)
 
 // == APIs that take paths ==
 
-int sys_open(char const* pathname, int flags, mode_t mode)
+int sys_statfs(char const *pathname, fs_statvfs_t *buf)
+{
+    user_str_t path(pathname);
+
+    int id = file_openat(AT_FDCWD, path, 0);
+
+    if (unlikely(id < 0))
+        return id;
+
+    fs_statvfs_t tmp{};
+
+    int status = file_fstatfs(id, &tmp);
+
+    int close_status = file_close(id);
+
+    if (unlikely(status >= 0 && close_status < 0))
+        status = close_status;
+
+    if (likely(status >= 0)) {
+        if (unlikely(!mm_copy_user(buf, &tmp, sizeof(tmp))))
+            status = -int(errno_t::EFAULT);
+    }
+
+    return status;
+}
+
+int sys_openat(int dirfd, char const* pathname, int flags, mode_t mode)
 {
     user_str_t path(pathname);
 
@@ -402,9 +453,11 @@ int sys_open(char const* pathname, int flags, mode_t mode)
     int fd = p->ids.desc_alloc.alloc();
 
     if (unlikely(fd < 0))
-        return err(errno_t::EMFILE);
+        return toomany_err();
 
-    int id = file_open(path, flags, mode);
+    int dirid = p->dirfd_to_id(dirfd);
+
+    int id = file_openat(dirid, path, flags, mode);
 
     if (unlikely(id < 0)) {
         p->ids.desc_alloc.free(fd);
@@ -415,18 +468,20 @@ int sys_open(char const* pathname, int flags, mode_t mode)
     return fd;
 }
 
-int sys_creat(char const *pathname, mode_t mode)
+int sys_creatat(int dirfd, char const *pathname, mode_t mode)
 {
     user_str_t path(pathname);
 
     process_t *p = fast_cur_process();
+
+    int dirid = p->dirfd_to_id(dirfd);
 
     int fd = p->ids.desc_alloc.alloc();
 
     if (unlikely(fd < 0))
         return toomany_err();
 
-    int id = file_creat(path, mode);
+    int id = file_creatat(dirid, path, mode);
 
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;
@@ -437,16 +492,23 @@ int sys_creat(char const *pathname, mode_t mode)
     return err(-id);
 }
 
-int sys_truncate(char const *path, off_t size)
+int sys_truncateat(int dirfd, char const *path, off_t size)
 {
-    int fd = sys_open(path, O_RDWR, 0);
-    int err = sys_ftruncate(fd, size);
-    sys_close(fd);
-    return err;
+    int fd = sys_openat(dirfd, path, O_RDWR, 0);
+    if (fd >= 0) {
+        int err = sys_ftruncate(fd, size);
+        sys_close(fd);
+        return err;
+    }
+
+    return fd;
 }
 
-int sys_rename(char const *old_pathname, char const *new_pathname)
+int sys_renameat(int olddirfd, char const *old_pathname,
+                 int newdirfd, char const *new_pathname)
 {
+    process_t *p = fast_cur_process();
+
     std::unique_ptr<user_str_t> old_path_storage(
                 new (std::nothrow) user_str_t(old_pathname));
 
@@ -468,55 +530,76 @@ int sys_rename(char const *old_pathname, char const *new_pathname)
     if (unlikely(!new_path))
         return fault_err();
 
-    int status = file_rename(old_path, new_path);
+    int olddirid = p->dirfd_to_id(olddirfd);
+
+    int newdirid = p->dirfd_to_id(newdirfd);
+
+    int status = file_renameat(olddirid, old_path, newdirid, new_path);
     if (unlikely(status < 0))
         return err(status);
 
     return status;
 }
 
-int sys_mkdir(char const *path, mode_t mode)
+int sys_mkdirat(int dirfd, char const *path, mode_t mode)
 {
-    int status = file_mkdir(path, mode);
+    process_t *p = fast_cur_process();
+
+    int dirid = p->dirfd_to_id(dirfd);
+
+    int status = file_mkdirat(dirid, path, mode);
     if (unlikely(status < 0))
         return err(status);
 
     return status;
 }
 
-int sys_rmdir(char const *path)
+int sys_rmdirat(int dirfd, char const *path)
 {
-    int status = file_rmdir(path);
+    process_t *p = fast_cur_process();
+
+    int dirid = p->dirfd_to_id(dirfd);
+
+    int status = file_rmdirat(dirid, path);
     if (unlikely(status < 0))
         return err(status);
 
     return status;
 }
 
-int sys_unlink(char const *path)
+int sys_unlinkat(int dirfd, char const *path)
 {
-    int status = file_unlink(path);
+    process_t *p = fast_cur_process();
+
+    int dirid = p->dirfd_to_id(dirfd);
+
+    int status = file_unlinkat(dirid, path);
     if (likely(status >= 0))
         return status;
 
     return err(status);
 }
 
-int sys_mknod(char const *path, mode_t mode, int rdev)
+int sys_mknodat(int dirfd, char const *path, mode_t mode, int rdev)
 {
     // FIXME: implement me
     return nosys_err();
 }
 
-int sys_link(char const *from, char const *to)
+int sys_linkat(int fromdirfd, char const *from,
+               int todirfd, char const *to)
 {
     // FIXME: implement me
     return nosys_err();
 }
 
-int sys_chmod(char const *path, mode_t mode)
+int sys_chmodat(int dirfd, char const *path, mode_t mode)
 {
-    file_t id(file_open(path, O_EXCL));
+    process_t *p = fast_cur_process();
+
+    int dirid = p->dirfd_to_id(dirfd);
+
+    file_t id(file_openat(dirid, path, O_EXCL));
     if (unlikely(id < 0))
         return id;
 
@@ -543,9 +626,13 @@ int sys_fchmod(int fd, mode_t mode)
     return file_fchmod(id, mode);
 }
 
-int sys_chown(char const *path, int uid, int gid)
+int sys_chownat(int dirfd, char const *path, int uid, int gid)
 {
-    file_t id(file_open(path, O_EXCL));
+    process_t *p = fast_cur_process();
+
+    int dirid = p->dirfd_to_id(dirfd);
+
+    file_t id(file_openat(dirid, path, O_EXCL));
     if (unlikely(id < 0))
         return id;
 
@@ -562,11 +649,6 @@ int sys_chown(char const *path, int uid, int gid)
     return chmod_status;
 }
 
-int sys_chownat(int dirfd, char const *path, int uid, int gid)
-{
-    return nosys_err();
-}
-
 int sys_fchown(int fd, int uid, int gid)
 {
     int id = id_from_fd(fd);
@@ -579,31 +661,38 @@ int sys_fchown(int fd, int uid, int gid)
     return chown_status;
 }
 
-int sys_setxattr(char const *path,
-                 char const *name, char const *value,
-                 size_t size, int flags)
+int sys_setxattrat(int dirfd, char const *path,
+                   char const *name, char const *value,
+                   size_t size, int flags)
 {
     // FIXME: implement me
     return nosys_err();
 }
 
-int sys_getxattr(char const *path,
-                 char const *name, char *value,
-                 size_t size)
+int sys_getxattrat(int dirfd, char const *path,
+                   char const *name, char *value, size_t size)
 {
     // FIXME: implement me
     return nosys_err();
 }
 
-int sys_listxattr(char const *path, char const *list, size_t size)
+int sys_listxattrat(int dirfd, char const *path,
+                    char const *list, size_t size)
 {
     // FIXME: implement me
     return nosys_err();
 }
 
-int sys_access(char const *path, int mask)
+int sys_accessat(int dirfd, char const *path,
+                 int mask)
 {
     // FIXME: implement me
+    return nosys_err();
+}
+
+int sys_readlinkat(int dirfd, char const *path,
+                   int mask)
+{
     return nosys_err();
 }
 

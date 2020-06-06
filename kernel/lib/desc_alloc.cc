@@ -57,7 +57,11 @@ void desc_alloc_t::free(int fd)
 bool desc_alloc_t::take(int fd)
 {
     scoped_lock_t lock(alloc_lock);
+    return take_locked(fd, lock);
+}
 
+bool desc_alloc_t::take_locked(int fd, scoped_lock_t& lock)
+{
     assert(fd >= 0 && fd < 4096);
     if (unlikely(fd < 0 || fd >= 4096))
         return false;
@@ -69,15 +73,24 @@ bool desc_alloc_t::take(int fd)
 
     uint64_t set = uint64_t(1) << bitlvl1;
 
-    if (mask & set)
+    if (unlikely(mask & set))
         return false;
 
     // Mark it taken
     mask |= set;
 
     // If this one became full clear bit in level0
-    if (mask == ~int64_t(0))
+    if (unlikely(mask == ~int64_t(0)))
         level0 &= ~(uint64_t(1) << bitlvl0);
 
     return true;
+}
+
+bool desc_alloc_t::take(std::initializer_list<int> fds)
+{
+    scoped_lock_t lock(alloc_lock);
+    bool result = true;
+    for (auto it = fds.begin(), en = fds.end(); it != en; ++it)
+        result &= take_locked(*it, lock);
+    return result;
 }

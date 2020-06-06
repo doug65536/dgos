@@ -96,8 +96,9 @@ int utf16_to_ucs4(char16_t const *in, char16_t const **ret_end)
 }
 
 // out should have room for at least 5 bytes
-// if out is null, returns how many bytes it
-// would have wrote to out, not including null terminator
+// If out is null, nothing is written to it
+// Returns how many bytes it would have wrote to out,
+// not including null terminator
 // Returns 0 for values outside 0 <= in < 0x101000 range
 // Always writes null terminator if out is not null
 int ucs4_to_utf8(char *out, char32_t in)

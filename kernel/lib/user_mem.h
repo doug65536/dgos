@@ -16,6 +16,8 @@ ptrdiff_t mm_copy_user_str(char *dst, char const *src, size_t size);
 
 intptr_t mm_lenof_user_str(char const *src, size_t max_size);
 
+int mm_compare_exchange_user(volatile int *dest, int *expect, int replacement);
+
 _use_result
 _const
 bool mm_is_user_range(void const *buf, size_t size);

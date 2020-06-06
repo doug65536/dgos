@@ -910,7 +910,9 @@ EXPORT void vpanic(char const * restrict format, va_list ap)
 {
     printk("KERNEL PANIC! ");
     vprintk(format, ap);
+    printdbg(format, ap);
     cpu_debug_break();
+    thread_panic_other_cpus();
     halt_forever();
 }
 
@@ -923,7 +925,7 @@ struct vsnprintf_context_t {
 static int vsnprintf_emit_chars(char const * restrict s,
                                 intptr_t ch, void * restrict context)
 {
-    vsnprintf_context_t *ctx = (vsnprintf_context_t *)context;
+    vsnprintf_context_t *ctx = reinterpret_cast<vsnprintf_context_t*>(context);
     char buf[5];
 
     intptr_t len = 0;
@@ -1037,7 +1039,7 @@ static int hex_dump_formatter(void const volatile *mem,
                               _printf_format(1, 2))
 {
     uint8_t volatile *buf = (uint8_t volatile *)mem;
-    char line_buf[16 + 1 + 1 + 3*16 + 1 + 16 + 2];
+    char line_buf[16 + 1 + 1 + 3*16 + 1 + 16 + 2 + 4];
     int written = 0;
 
     int line_ofs = 0;
@@ -1045,6 +1047,11 @@ static int hex_dump_formatter(void const volatile *mem,
         if (!(i & 15)) {
             line_ofs = snprintf(line_buf, sizeof(line_buf),
                                 "%08zx:", i + base);
+        }
+
+        if ((i & 0xF) && !(i & 3)) {
+            line_buf[line_ofs++] = ' ';
+            line_buf[line_ofs] = 0;
         }
 
         if (i < size) {

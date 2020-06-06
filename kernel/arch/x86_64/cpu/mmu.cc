@@ -230,13 +230,12 @@ physmem_range_t phys_mem_map[64];
 size_t phys_mem_map_count;
 
 // Memory map
-static physmem_range_t mem_ranges[64];
-static size_t usable_mem_ranges;
+static physmem_range_t early_mem_ranges[64];
+static size_t usable_early_mem_ranges;
 
 physaddr_t root_physaddr;
 static pte_t const * master_pagedir;
 static pte_t *current_pagedir;
-
 
 extern char ___init_brk[];
 
@@ -276,10 +275,7 @@ static physaddr_t mmu_alloc_phys()
 {
     physaddr_t page;
 
-    // Try to get high/low page as specified
     page = phys_allocator.alloc_one();
-    if (unlikely(!page))
-        return 0;
 
     return page;
 }
@@ -688,14 +684,14 @@ static size_t mmu_fixup_mem_map(physmem_range_t *list)
 
 static physaddr_t init_take_page()
 {
-    if (likely(usable_mem_ranges == 0))
+    if (likely(usable_early_mem_ranges == 0))
         return mmu_alloc_phys();
 
-    assert(usable_mem_ranges > 0);
+    assert(usable_early_mem_ranges > 0);
 
     physmem_range_t *range = nullptr;
-    for (size_t i = usable_mem_ranges; i > 0; --i) {
-        auto& chk = mem_ranges[i - 1];
+    for (size_t i = usable_early_mem_ranges; i > 0; --i) {
+        auto& chk = early_mem_ranges[i - 1];
         if (chk.size >= PAGE_SIZE) {
             range = &chk;
             break;
@@ -847,7 +843,7 @@ static void clear_phys(physaddr_t addr)
     // Shootdowns for this are never done so just flush that TLB entry
     cpu_page_invalidate(window);
 
-    clear64((char*)window + offset, PAGE_SIZE);
+    clear64((char*)window + offset, PAGE_SIZE >> 3);
 }
 
 //
@@ -875,6 +871,8 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
                 physaddr_t ptaddr = init_take_page();
                 clear_phys(ptaddr);
                 *ptes[i] = (ptaddr | path_flags) & global_mask;
+                if (i < 3)
+                    cpu_page_invalidate(uintptr_t(ptes[i + 1]));
             }
         }
 
@@ -898,10 +896,10 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
     (void)intr;
     assert(intr == INTR_IPI_TLB_SHTDN);
 
-    int cpu_number = thread_cpu_number();
+    uint32_t cpu_nr = thread_cpu_number();
 
     // Clear pending
-    shootdown_pending.atom_clr(cpu_number);
+    shootdown_pending.atom_clr(cpu_nr);
 
     mmu_tlb_perform_shootdown();
 
@@ -910,16 +908,16 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 
 static void mmu_send_tlb_shootdown(bool synchronous = false)
 {
-    int cpu_count = thread_cpu_count();
+    uint32_t cpu_count = thread_cpu_count();
 
     // Skip if too early or uniprocessor
     if (unlikely(cpu_count <= 1))
         return;
 
     cpu_scoped_irq_disable irq_was_enabled;
-    int cur_cpu = thread_cpu_number();
+    uint32_t cur_cpu_nr = thread_cpu_number();
     thread_cpu_mask_t all_cpu_mask(-1);
-    thread_cpu_mask_t cur_cpu_mask(cur_cpu);
+    thread_cpu_mask_t cur_cpu_mask(cur_cpu_nr);
     thread_cpu_mask_t other_cpu_mask = all_cpu_mask - cur_cpu_mask;
     thread_cpu_mask_t new_pending = shootdown_pending.atom_or(other_cpu_mask);
     thread_cpu_mask_t need_ipi_mask = new_pending & other_cpu_mask;
@@ -927,8 +925,8 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
     std::vector<uint64_t> shootdown_counts;
     if (synchronous) {
         shootdown_counts.reserve(thread_cpu_count());
-        for (int i = 0; i < cpu_count; ++i) {
-            shootdown_counts.push_back((i != cur_cpu)
+        for (uint32_t i = 0; i < cpu_count; ++i) {
+            shootdown_counts.push_back((i != cur_cpu_nr)
                                        ? thread_shootdown_count(i)
                                        : -1);
         }
@@ -940,9 +938,9 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
             apic_send_ipi(-1, INTR_IPI_TLB_SHTDN);
         } else {
             int cpu_mask = 1;
-            for (int cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
+            for (uint32_t cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
                 if (!(new_pending & thread_cpu_mask_t(cpu_mask)) &&
-                    !!(need_ipi_mask & thread_cpu_mask_t(cpu_mask)))
+                        !!(need_ipi_mask & thread_cpu_mask_t(cpu_mask)))
                     thread_send_ipi(cpu, INTR_IPI_TLB_SHTDN);
             }
         }
@@ -952,7 +950,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
         uint64_t wait_st = nano_time();
         uint64_t loops = 0;
         for (int wait_count = cpu_count - 1; wait_count > 0; pause()) {
-            for (int i = 0; i < cpu_count; ++i) {
+            for (uint32_t i = 0; i < cpu_count; ++i) {
                 uint64_t &count = shootdown_counts[i];
                 if (count != uint64_t(-1) &&
                         thread_shootdown_count(i) > count) {
@@ -1043,6 +1041,8 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
                      ((err_code & CTX_ERRCODE_PF_I) && (pte & PTE_NX)))))
             return ctx;
     }
+
+    bool should_panic = false;
 
     // If the page table exists
     if (present_mask == 0x07) {
@@ -1165,17 +1165,20 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
             goto no_landing_pad;
         } else {
 no_landing_pad:
-            printdbg("Invalid page fault at %#zx, RIP=%p\n",
-                     fault_addr, (void*)ISR_CTX_REG_RIP(ctx));
+            thread_t tid = thread_get_id();
+            unsigned cpu = thread_current_cpu(-1);
+            printdbg("Invalid page fault at %#zx, RIP=%p (tid=%d, cpu=%d)\n",
+                     fault_addr, (void*)ISR_CTX_REG_RIP(ctx),
+                     tid, cpu);
             if (thread_get_exception_top())
                 return nullptr;
 
             dump_context(ctx, 1);
 
-            linear_allocator.dump("page faullt");
+            linear_allocator.dump("page fault");
             linear_allocator.validate();
 
-            assert(!"Invalid page fault");
+            should_panic = true;
         }
     } else if (present_mask != 0x0F) {
         if (thread_get_exception_top())
@@ -1213,6 +1216,9 @@ no_landing_pad:
     mmu_dump_pf(err_code);
     mmu_dump_ptes(ptes);
 
+    if (unlikely(should_panic))
+        panic("Invalid page fault");
+
     return nullptr;
 }
 
@@ -1244,10 +1250,16 @@ static void mmu_configure_pat(void)
 #define TRACE_INIT(...) ((void)0)
 #endif
 
-_constructor(ctor_mmu_init)
-static void mmu_init_bsp()
+_constructor(ctor_mmu_init) static void mmu_init_bsp()
 {
     mmu_init();
+}
+
+static bool mmu_init_pagedir(size_t idx, uint8_t log2_pagesz, physaddr_t paddr)
+{
+    clear_phys(paddr);
+    PT0_PTR[idx + 256] = paddr | PTE_WRITABLE | PTE_PRESENT;
+    return true;
 }
 
 void mmu_init()
@@ -1267,27 +1279,28 @@ void mmu_init()
                            kernel_params->phys_mem_table_size));
     phys_mem_map_count = kernel_params->phys_mem_table_size;
 
-    usable_mem_ranges = mmu_fixup_mem_map(phys_mem_map);
+    usable_early_mem_ranges = mmu_fixup_mem_map(phys_mem_map);
 
-    if (usable_mem_ranges > countof(mem_ranges)) {
+    if (usable_early_mem_ranges > countof(early_mem_ranges)) {
         printdbg("Physical memory is incredibly fragmented!\n");
-        usable_mem_ranges = countof(mem_ranges);
+        usable_early_mem_ranges = countof(early_mem_ranges);
     }
 
-    for (physmem_range_t *ranges_in = phys_mem_map, *ranges_out = mem_ranges;
+    for (physmem_range_t *ranges_in = phys_mem_map,
+         *ranges_out = early_mem_ranges;
          ranges_in < phys_mem_map + phys_mem_map_count; ++ranges_in) {
         if (ranges_in->type == PHYSMEM_TYPE_NORMAL)
             *ranges_out++ = *ranges_in;
 
         // Cap
-        if (ranges_out >= mem_ranges + usable_mem_ranges)
+        if (ranges_out >= early_mem_ranges + usable_early_mem_ranges)
             break;
     }
 
     size_t usable_pages = 0;
     physaddr_t highest_usable = 0;
-    for (physmem_range_t *mem = mem_ranges;
-         mem < mem_ranges + usable_mem_ranges; ++mem) {
+    for (physmem_range_t *mem = early_mem_ranges;
+         mem < early_mem_ranges + usable_early_mem_ranges; ++mem) {
         printdbg("Memory: addr=%#" PRIx64 " size=%#" PRIx64 " type=%#x\n",
                mem->base, mem->size, mem->type);
 
@@ -1344,7 +1357,7 @@ void mmu_init()
     cpu_page_directory_set(root_phys_addr);
 
     // Make zero page not present to catch null pointers
-    *PT3_PTR = 0;
+    PT3_PTR[0] = 0;
     cpu_page_invalidate(0);
     cpu_tlb_flush();
 
@@ -1358,16 +1371,16 @@ void mmu_init()
     // Take space off the top of the highest address range which is large
     // enough to have the required amount of contiguous free space,
     // and use the taken space for the contiguous allocator pool
-    for (int i = usable_mem_ranges; i > 0; --i) {
-        auto& range = mem_ranges[i - 1];
+    for (int i = usable_early_mem_ranges; i > 0; --i) {
+        auto& range = early_mem_ranges[i - 1];
 
         if (range.size >= contig_pool_size && range.base < 0x100000000) {
             contiguous_start = range.base + range.size - contig_pool_size;
             range.size -= contig_pool_size;
 
             if (range.size == 0) {
-                memmove(mem_ranges + i - 1, mem_ranges + i,
-                        sizeof(*mem_ranges) * --usable_mem_ranges - i);
+                memmove(early_mem_ranges + i - 1, early_mem_ranges + i,
+                        sizeof(*early_mem_ranges) * --usable_early_mem_ranges - i);
             }
 
             break;
@@ -1399,19 +1412,19 @@ void mmu_init()
     // Put all of the remaining physical memory into the free lists
     uintptr_t free_count = 0;
 
-    while (usable_mem_ranges) {
-        physmem_range_t range = mem_ranges[usable_mem_ranges-1];
+    while (usable_early_mem_ranges) {
+        physmem_range_t range = early_mem_ranges[usable_early_mem_ranges-1];
 
         if (range.base >= 0x100000 && range.size > 0) {
             phys_allocator.add_free_space(range.base, range.size);
             free_count += range.size >> PAGE_SCALE;
         }
 
-        --usable_mem_ranges;
+        --usable_early_mem_ranges;
     }
 
     // Start using physical memory allocator
-    usable_mem_ranges = 0;
+    usable_early_mem_ranges = 0;
 
     printdbg("%" PRIu64 " pages free (%" PRIu64 "MB)\n",
            free_count, free_count >> (20 - PAGE_SIZE_BIT));
@@ -1435,6 +1448,10 @@ void mmu_init()
 
     // Preallocate the second level kernel PTPD pages so we don't
     // need to worry about process-specific page directory synchronization
+//    bool success;
+//    success = phys_allocator.alloc_multiple(PAGE_SIZE * 256, mmu_init_pagedir);
+//    assert(success);
+
     for (size_t i = 256; i < 512; ++i) {
         if (PT0_PTR[i] == 0) {
             physaddr_t page = mmu_alloc_phys();
@@ -1650,7 +1667,9 @@ static void mm_destroy_pagetables_aligned(uintptr_t start, size_t size)
     // TODO: implement
 }
 
-static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
+static pte_t *mm_create_pagetables_aligned(
+        uintptr_t start, size_t size,
+        mmu_phys_allocator_t::free_batch_t& free_batch)
 {
     pte_t *pte_st[4];
     pte_t *pte_en[4];
@@ -1677,8 +1696,6 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
             PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT | PTE_WRITABLE;
 
     pte_t global_mask = ~PTE_GLOBAL;
-
-    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
     for (unsigned level = 0; level < 3; ++level) {
         pte_t * const base = pte_st[level];
@@ -1791,6 +1808,11 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     flags |= zero_if_false((flags & (MAP_STACK | MAP_USER)) == MAP_STACK,
                            MAP_POPULATE);
 
+    // No-commit user stacks
+//    flags |= zero_if_false((flags & (MAP_STACK | MAP_USER)) ==
+//                           (MAP_STACK | MAP_USER),
+//                           MAP_NOCOMMIT);
+
     // Set physical and present flag on physical memory mapping
     page_flags |= zero_if_false(flags & MAP_PHYSICAL,
                                 PTE_EX_PHYSICAL | PTE_PRESENT);
@@ -1856,17 +1878,15 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
-    if (likely(!usable_mem_ranges)) {
-        pte_t *base_pte = mm_create_pagetables_aligned(linear_addr, len);
+    if (likely(!usable_early_mem_ranges)) {
+        pte_t *base_pte = mm_create_pagetables_aligned(linear_addr, len,
+                                                       free_batch);
 
         if (unlikely(!base_pte)) {
             mm_destroy_pagetables_aligned(linear_addr, len);
             munmap((void*)linear_addr, len);
             return MAP_FAILED;
         }
-
-        //printdbg("mmap %#zx bytes at %#zx-%#zx\n",
-        //         len, linear_addr, linear_addr + len);
 
         if ((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) {
             // POPULATE, not PHYSICAL
@@ -1998,7 +2018,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     return (void*)(linear_addr + misalignment);
 }
 
-void *mremap(
+EXPORT void *mremap(
         void *old_address,
         size_t old_size,
         size_t new_size,
@@ -2072,7 +2092,7 @@ void *mremap(
         // Expand in place
         new_st = old_st + old_size;
         new_size -= old_size;
-        new_base = mm_create_pagetables_aligned(new_st, new_size);
+        new_base = mm_create_pagetables_aligned(new_st, new_size, free_batch);
         pte_t new_pte = (low ? PTE_USER : PTE_GLOBAL) |
                 PTE_WRITABLE | PTE_ADDR;
         for (size_t i = 0, e = new_size >> PAGE_SCALE; i < e; ++i) {
@@ -2087,7 +2107,7 @@ void *mremap(
     ptes_from_addr(old_pte, old_st);
 
     new_st = allocator->alloc_linear(new_size);
-    new_base = mm_create_pagetables_aligned(new_st, new_size);
+    new_base = mm_create_pagetables_aligned(new_st, new_size, free_batch);
 
     size_t i, e;
     for (i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
@@ -2197,16 +2217,9 @@ EXPORT int munmap(void *addr, size_t size)
             (a < 0x800000000000U) ?
                 (contiguous_allocator_t*)
                 thread_current_process()->get_allocator()
-            //: (a >= uintptr_t(___text_st)) ? &near_allocator
             : &linear_allocator;
 
-    if (addr == (void*)0xfffffd0052257000 && size==0x40000)
-        allocator->dump("late bug 2");
-
     allocator->release_linear((linaddr_t)addr - misalignment, size);
-
-    if (addr == (void*)0xfffffd0052257000 && size==0x40000)
-        allocator->dump("after late bug 2");
 
     return 0;
 }
@@ -2921,7 +2934,7 @@ int munlock(void const *addr, size_t len)
     return 0;
 }
 
-uintptr_t mm_new_process(process_t *process)
+uintptr_t mm_new_process(process_t *process, bool use64)
 {
     // Allocate a page directory
     pte_t *dir = (pte_t*)mmap(nullptr, PAGE_SIZE,
@@ -2942,7 +2955,7 @@ uintptr_t mm_new_process(process_t *process)
 
     //cpu_tlb_flush();
 
-    mm_init_process(process);
+    mm_init_process(process, use64);
 
     return dir_physaddr;
 }
@@ -3017,16 +3030,24 @@ void mm_destroy_process()
     free_batch.free(dir);
 }
 
-void mm_init_process(process_t *process)
+void mm_init_process(process_t *process, bool use64)
 {
     contiguous_allocator_t *allocator =
             new (std::nothrow) contiguous_allocator_t{};
-    // 4MB unavailable margin at end of low memory
-    // 0-0x3ffffff is reserved (4MB)
-    // User memory available range is 0x400000 to 0x7fffffc00000 (99.9%)
-    // 0x7fffffc00000 - 0x7fffffffffff is reserved (4MB)
-    allocator->init(0x400000, UINT64_C(0x7fffffc00000) - UINT64_C(0x400000),
-                    "process");
+
+    uintptr_t user_mem_st;
+    uintptr_t user_mem_en;
+    uintptr_t userTop = UINT64_C(1) << 47;
+    constexpr uintptr_t fourMB = 4 << 20;
+
+    // 4MB unavailable margin at start and end of memory
+    // (top-4MB) to (top) is reserved (4MB)
+    userTop = use64 ? UINT64_C(1) << 47 : (UINT32_C(1) << 31);
+
+    user_mem_st = fourMB;
+    user_mem_en = userTop - fourMB;
+    allocator->init(user_mem_st, user_mem_en - user_mem_st, "process");
+
     process->set_allocator(allocator);
 }
 
@@ -3041,7 +3062,7 @@ uintptr_t mm_fork_kernel_text()
     uintptr_t src_linaddr = uintptr_t(window);
     uintptr_t dst_linaddr = uintptr_t(window + 512);
 
-    pte_t constexpr flags = PTE_PRESENT | PTE_WRITABLE;
+    constexpr pte_t flags = PTE_PRESENT | PTE_WRITABLE;
 
     // Clone root page directory
     physaddr_t page = mmu_alloc_phys();
@@ -3052,6 +3073,7 @@ uintptr_t mm_fork_kernel_text()
 
     uintptr_t orig_pagedir = cpu_page_directory_get();
     cpu_page_directory_set(page);
+    cpu_tlb_flush();
 
     pte_t *st_ptes[4];
     pte_t *en_ptes[4];
@@ -3065,7 +3087,9 @@ uintptr_t mm_fork_kernel_text()
             page = mmu_alloc_phys();
 
             // Map original
-            mmu_map_page(src_linaddr, (*pte & PTE_ADDR), flags);
+            pte_t orig_pte = *pte;
+            physaddr_t orig_physaddr = orig_pte & PTE_ADDR;
+            mmu_map_page(src_linaddr, orig_physaddr, flags);
 
             // Map clone
             mmu_map_page(dst_linaddr, page, flags);
@@ -3077,11 +3101,13 @@ uintptr_t mm_fork_kernel_text()
             memcpy(window + 512, window, PAGE_SIZE);
 
             // Point PTE to clone
-            atomic_st_rel(pte, page | flags);
+            *pte = page | (orig_pte & ~PTE_ADDR);
 
             cpu_tlb_flush();
         }
     }
+
+    munmap_window(window, PAGE_SIZE << 1);
     cpu_tlb_flush();
 
     return orig_pagedir;

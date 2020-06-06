@@ -24,8 +24,8 @@
 
 uint8_t pxe_server_ip[4];
 
-uint16_t pxe_entry_vec[2];
-uint16_t bang_pxe_ptr[2];
+uint16_t pxe_entry_vec[2];  // [ off16, seg16 ] 16-bit far pointer
+uint16_t bang_pxe_ptr[2];   // [ off16, seg16 ] 16-bit far pointer
 
 uint16_t (*pxe_call)(uint16_t op, pxenv_base_t *arg_struct);
 
@@ -39,6 +39,26 @@ template<typename T>
 static _always_inline bool pxe_api_op_run(T *op)
 {
     return pxe_api_op_invoke(pxenv_opcode_t<T>::opcode, op);
+}
+
+int64_t pxe_api_tftp_get_fsize(char const *filename)
+{
+    PXE_TFTP_TRACE("getting filesize of file %s", filename);
+
+    pxenv_tftp_get_fsize_t op{};
+
+    strncpy(op.filename, filename, sizeof(op.filename));
+    op.filename[countof(op.filename)-1] = 0;
+
+    C_ASSERT(sizeof(op.server_ip) == sizeof(pxe_server_ip));
+    memcpy(op.server_ip, pxe_server_ip, sizeof(op.server_ip));
+
+    pxe_call(PXENV_TFTP_GET_FSIZE, &op);
+
+    if (unlikely(op.status != 0))
+        return -1;
+
+    return op.file_size;
 }
 
 // Returns negotiated block size on success, -1 on error
@@ -110,8 +130,8 @@ int pxe_api_tftp_read(void *buffer, uint16_t sequence, uint16_t size)
 
 static bool pxe_set_api(bangpxe_t *bp)
 {
-    if (memcmp(bp->sig, "!PXE", 4) ||
-            boottbl_checksum((char const *)bp, bp->StructLength))
+    if (unlikely(memcmp(bp->sig, "!PXE", 4) ||
+                 boottbl_checksum((char const *)bp, bp->StructLength)))
         return false;
 
 #if PXE_USE_PROTECTED_MODE
@@ -187,8 +207,9 @@ static bool pxe_set_api(bangpxe_t *bp)
 #else
     pxe_call = pxe_call_bangpxe_rm;
 
-    pxe_entry_vec[0] = bp->EntryPointSP_ofs;
-    pxe_entry_vec[1] = bp->EntryPointSP_seg;
+    // 16-bit far pointer, seg:off little endian
+    pxe_entry_vec[0] = bp->EntryPointIP_ofs;
+    pxe_entry_vec[1] = bp->EntryPointIP_seg;
 #endif
 
     PRINT("Using %s API", "!PXE");
@@ -198,13 +219,14 @@ static bool pxe_set_api(bangpxe_t *bp)
 
 static bool pxe_set_api(pxenv_plus_t *pep)
 {
-    if (memcmp(pep->sig, "PXENV+", 6) ||
-            boottbl_checksum((char const *)pep, pep->length))
+    if (unlikely(memcmp(pep->sig, "PXENV+", 6) ||
+            boottbl_checksum((char const *)pep, pep->length)))
         return false;
 
-    if (pep->version >= 0x201) {
+    if (likely(pep->version >= 0x201)) {
         bang_pxe_ptr[0] = pep->pxe_ptr_ofs;
         bang_pxe_ptr[1] = pep->pxe_ptr_seg;
+
         return pxe_set_api((bangpxe_t*)((uintptr_t(pep->pxe_ptr_seg) << 4) +
                                         pep->pxe_ptr_ofs));
     }
@@ -239,13 +261,17 @@ void pxe_init_tftp()
         PANIC("Failed to get cached network info!");
 
     memcpy(pxe_server_ip, buf + 20, sizeof(pxe_server_ip));
+
+    PRINT("Booting from %u.%u.%u.%u\n",
+          pxe_server_ip[0], pxe_server_ip[1],
+          pxe_server_ip[2], pxe_server_ip[3]);
 }
 
 extern "C" void pxe_main(pxenv_plus_t *pep, bangpxe_t *)
 {
     PRINT("PXE bootloader started...");
 
-    if (!pxe_set_api(pep))
+    if (unlikely(!pxe_set_api(pep)))
         return;
 
     pxe_init_fs();

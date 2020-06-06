@@ -6,7 +6,7 @@
 
 char *getcwd(char *buf, size_t sz)
 {
-    long status = syscall2(long(buf), sz, SYS_getcwd);
+    long status = syscall2(uintptr_t(buf), sz, SYS_getcwd);
 
     if (status >= 0)
         return buf;

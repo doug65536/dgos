@@ -29,9 +29,18 @@ int main()
 extern void (*__init_array_start[])();
 extern void (*__init_array_end[])();
 
+extern void (*__init_array_early_start[])();
+extern void (*__init_array_early_end[])();
+
 extern "C" void _start()
 {
-    size_t n = __init_array_end - __init_array_start;
+    size_t n = __init_array_early_end - __init_array_early_start;
+
+    for (size_t i = 0; i < n; ++i)
+        if (__init_array_early_start[i])
+            __init_array_early_start[i]();
+
+    n = __init_array_end - __init_array_start;
 
     for (size_t i = 0; i < n; ++i)
         if (__init_array_start[i])

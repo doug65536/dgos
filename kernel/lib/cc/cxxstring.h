@@ -223,7 +223,45 @@ public:
 
         __str.assign(__rhs, __rhs + __sz);
         __str[__sz] = 0;
+
         return *this;
+    }
+
+    basic_string &assign(size_t __sz, _CharT __ch)
+    {
+        if (likely(assign_noexcept(__sz, __ch)))
+            return *this;
+
+        throw std::bad_alloc();
+    }
+
+    template<typename _InputIt,
+             typename = typename
+             std::iterator_traits<_InputIt>::iterator_category>
+    bool assign_noexcept(_InputIt __st, _InputIt __en) noexcept
+    {
+        __str.clear();
+
+        if (unlikely(!__str.reserve((__en - __st) + 1)))
+            return false;
+
+        while (__st != __en)
+            __str.push_back(*__st++);
+
+        return true;
+    }
+
+    bool assign_noexcept(size_t __sz, _CharT __ch) noexcept
+    {
+        if (unlikely(!__str.reserve(__sz + 1)))
+            return false;
+
+        if (unlikely(!__str.assign(__sz, __ch)))
+            return false;
+
+        __str[__sz] = 0;
+
+        return true;
     }
 
     static constexpr const _CharT __empty_str[1] = {};
@@ -1018,11 +1056,11 @@ std::string to_hex(_T value, bool prefix)
 __END_NAMESPACE_EXT
 
 // Explicit instantiations
-extern template class std::char_traits<char>;
-extern template class std::char_traits<wchar_t>;
-extern template class std::char_traits<char16_t>;
-extern template class std::char_traits<char32_t>;
-extern template class std::basic_string<char>;
-extern template class std::basic_string<wchar_t>;
-extern template class std::basic_string<char16_t>;
-extern template class std::basic_string<char32_t>;
+//extern template class std::char_traits<char>;
+//extern template class std::char_traits<wchar_t>;
+//extern template class std::char_traits<char16_t>;
+//extern template class std::char_traits<char32_t>;
+//extern template class std::basic_string<char>;
+//extern template class std::basic_string<wchar_t>;
+//extern template class std::basic_string<char16_t>;
+//extern template class std::basic_string<char32_t>;

@@ -1,7 +1,7 @@
 #include "screen.h"
-#include "screen_abstract.h"
 
-char const boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
+// "╔╗║│╚╝═─█ " but in code page 437
+char const boxchars[] = "\xC9\xBB\xBA\xB3\xC8\xBC\xCD\xC4\xDB ";
 
 // INT 0x10
 // AH = 0x13
@@ -19,7 +19,7 @@ char const boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
 // CX = number of characters in string.
 // DH,DL = row,column at which to start writing.
 // ES:BP -> string to write
-void print_at(int row, int col, uint8_t attr, size_t length, char const *text)
+void print_at(int col, int row, uint8_t attr, size_t length, char const *text)
 {
     bios_regs_t regs;
 
@@ -27,7 +27,8 @@ void print_at(int row, int col, uint8_t attr, size_t length, char const *text)
     regs.ebx = attr;
     regs.ecx = length;
     regs.edx = col | (row << 8);
-    regs.ebp = (uint32_t)text;
+    regs.es = uint32_t(text) >> 4;
+    regs.ebp = uint32_t(text) & 0xF;
 
     bioscall(&regs, 0x10);
 }
@@ -46,13 +47,13 @@ static void bios_scroll_region(uint16_t top_left, uint16_t bottom_right,
 
     regs.ecx = top_left;
     regs.edx = bottom_right;
-    regs.eax = (lines | (0x06 << 8));
-    regs.ebx = (attr << 8);
+    regs.eax = lines | (0x06 << 8);
+    regs.ebx = attr << 8;
 
     bioscall(&regs, 0x10);
 }
 
 void scroll_screen(uint8_t attr)
 {
-    bios_scroll_region(0, ((24 << 8) | 79), 1, attr);
+    bios_scroll_region(0, (24 << 8) | 79, 1, attr);
 }

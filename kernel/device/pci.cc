@@ -8,8 +8,9 @@
 #include "numeric.h"
 #include "inttypes.h"
 #include "time.h"
+#include "bootinfo.h"
 
-#define PCI_DEBUG   0
+#define PCI_DEBUG   1
 #if PCI_DEBUG
 #define PCI_TRACE(...) printk("pci: " __VA_ARGS__)
 #else
@@ -26,7 +27,8 @@ public:
 
     // Write an arbitrarily sized and aligned block of values
     virtual bool write(pci_addr_t addr, size_t offset,
-                           void const *values, size_t size) = 0;
+                       void const *values, size_t size,
+                       bool align32 = true) = 0;
 
     // Read an arbitrarily sized and aligned block of values
     virtual bool copy(pci_addr_t addr, void *dest,
@@ -39,7 +41,7 @@ public:
     // pci_config_rw interface
     uint32_t read(pci_addr_t addr, size_t offset, size_t size) override final;
     bool write(pci_addr_t addr, size_t offset,
-               void const *values, size_t size) override final;
+               void const *values, size_t size, bool align32) override final;
     bool copy(pci_addr_t addr, void *dest,
               size_t offset, size_t size) override final;
 
@@ -54,7 +56,7 @@ public:
     // pci_config_rw interface
     uint32_t read(pci_addr_t addr, size_t offset, size_t size) override final;
     bool write(pci_addr_t addr, size_t offset,
-               void const *values, size_t size) override final;
+               void const *values, size_t size, bool align32) override final;
     bool copy(pci_addr_t addr, void *dest,
               size_t offset, size_t size) override final;
 
@@ -67,7 +69,7 @@ private:
 
 struct pci_ecam_t {
     uint64_t base;
-    char *mapping;
+    char volatile *mapping;
     uint16_t segment;
     uint8_t st_bus;
     uint8_t en_bus;
@@ -206,7 +208,7 @@ uint32_t pci_config_pio::read(pci_addr_t addr, size_t offset, size_t size)
 }
 
 bool pci_config_pio::write(pci_addr_t addr, size_t offset,
-                           void const *values, size_t size)
+                           void const *values, size_t size, bool )
 {
     // Validate
     if (!(offset < 256 && size <= 256 && offset + size <= 256))
@@ -341,7 +343,7 @@ uint32_t pci_config_mmio::read(pci_addr_t addr, size_t offset, size_t size)
 }
 
 bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
-                            void const *values, size_t size)
+                            void const *values, size_t size, bool align32)
 {
     int bus = addr.bus();
 
@@ -352,20 +354,63 @@ bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
 
     uint64_t ecam_offset = ecamofs(addr, ent->st_bus, offset);
 
+    if (align32 && size < sizeof(uint32_t)) {
+        // Round down to 32 bit boundary
+        size_t word32_aligned_offset = ecam_offset & -4;
+
+        // Calculate offset from 32 bit boundary
+        size_t misalignment = ecam_offset - word32_aligned_offset;
+
+        // Convert byte offset/size to bits
+        uint8_t misalignment_bits = misalignment * 8;
+        uint8_t value_bits = size * 8;
+
+        // Make a mask with (value_bits) least signficant bits set to 1
+        uint32_t value_mask = ~-(UINT32_C(1) << value_bits);
+
+        // Figure out which bits we keep
+        uint32_t and_mask = ~(value_mask << misalignment_bits);
+
+        // Figure out which bits we set
+        uint32_t or_mask = 0;
+        memcpy((char*)&or_mask, values, size);
+        or_mask <<= misalignment_bits;
+
+        // Read, modify, write the old 32 bit value
+        uint32_t value = mm_rd(*(uint32_t volatile *)
+                               (ent->mapping + word32_aligned_offset));
+        value &= and_mask;
+        value |= or_mask;
+        mm_wr(*(uint32_t volatile *)
+              (ent->mapping + word32_aligned_offset), value);
+
+        return true;
+    }
+
+    uint64_t value = 0;
+
     switch (size) {
     case 1:
-        mm_wr(*(uint8_t volatile *)(ent->mapping + ecam_offset),
-              *(uint8_t const*)values);
+        memcpy(&value, values, size);
+        mm_wr(*(uint8_t volatile *)(ent->mapping + ecam_offset), value);
         return true;
 
     case 2:
-        mm_wr(*(uint16_t volatile*)(ent->mapping + ecam_offset),
-              *(uint16_t const*)values);
+        memcpy(&value, values, size);
+        assert((ecam_offset & -2) == ecam_offset);
+        mm_wr(*(uint16_t volatile*)(ent->mapping + ecam_offset), value);
         return true;
 
     case 4:
-        mm_wr(*(uint32_t volatile *)(ent->mapping + ecam_offset),
-              *(uint32_t const*)values);
+        assert((ecam_offset & -4) == ecam_offset);
+        memcpy(&value, values, size);
+        mm_wr(*(uint32_t volatile *)(ent->mapping + ecam_offset), value);
+        return true;
+
+    case 8:
+        assert((ecam_offset & -8) == ecam_offset);
+        memcpy(&value, values, size);
+        mm_wr(*(uint64_t volatile *)(ent->mapping + ecam_offset), value);
         return true;
 
     default:
@@ -584,27 +629,28 @@ int pci_init(void)
     printk("Caching PCI device list\n");
 
     do {
-        printk("Found PCI device"
-               ", bus=%#.4x"
+        printk("Found PCI device (%s)\n"
+               " bus=%#.4x"
                ", slot=%#.2x"
                ", func=%#.2x"
                ", vendor=%#.4x"
                ", device=%#.4x"
-               ", class=%#.2x (%s)"
+               ", class=%#.2x"
                ", subclass=%#.2x"
                ", progif=%#.2x\n",
+               pci_describe_device(pci_iter),
                pci_iter.bus,
                pci_iter.slot,
                pci_iter.func,
                pci_iter.config.vendor,
                pci_iter.config.device,
                pci_iter.config.dev_class,
-               pci_device_class_text(pci_iter.config.dev_class),
                pci_iter.config.subclass,
                pci_iter.config.prog_if);
 
-        pci_cache.iters.push_back(pci_iter);
-    } while (pci_enumerate_next_direct(&pci_iter));
+        if (unlikely(!pci_cache.iters.push_back(pci_iter)))
+            panic_oom();
+    } while (likely(pci_enumerate_next_direct(&pci_iter)));
 
     printk("Enumerating PCI Express capabilities\n");
 
@@ -640,95 +686,101 @@ int pci_init(void)
 
     for (pci_dev_iterator_t const& it : pci_cache.iters) {
         int ofs = pci_find_capability(it.addr, PCICAP_PCIE);
-        if (!ofs)
-            continue;
-        pcie_cap_t pcie_cap;
 
-        pci_config_copy(it.addr, &pcie_cap, ofs, sizeof(pcie_cap));
+        if (ofs) {
+            pcie_cap_t pcie_cap;
 
-        printk("Found PCIe capability on %#.2x:%#.2x:%#.2x\n",
-               it.addr.bus(), it.addr.slot(), it.addr.func());
+            pci_config_copy(it.addr, &pcie_cap, ofs, sizeof(pcie_cap));
+
+            printk("Found PCIe capability on %#.2x:%#.2x:%#.2x\n",
+                   it.addr.bus(), it.addr.slot(), it.addr.func());
+        } else {
+            printk("No PCIe capability on %.2x:%.2x:%.2x\n",
+                   it.addr.bus(), it.addr.slot(), it.addr.func());
+        }
     }
 
     printk("Autoconfiguring PCI BARs\n");
 
     for (pci_dev_iterator_t& pci_iter : pci_cache.iters) {
-        printk("Probing %d:%d:%d\n",
-                  pci_iter.bus, pci_iter.slot, pci_iter.func);
+        char const *description = pci_describe_device(pci_iter);
 
+        printk("Probing %d:%d:%d (%s)\n",
+               pci_iter.bus, pci_iter.slot, pci_iter.func,
+               description);
 
         bool any_mmio = false;
         bool any_io = false;
         bool is_64 = false;
 
-        for (int bar = 0; bar < 6; bar += is_64 ? 2 : 1) {
+        for (int_fast8_t bar = 0; bar < 6; bar += is_64 ? 2 : 1) {
             is_64 = pci_iter.config.is_bar_64bit(bar);
-
-            // Ignore I/O space BARs
-            if (!pci_iter.config.is_bar_mmio(bar)) {
-                any_io = true;
-                continue;
-            }
 
             // Save original base
             uint64_t orig = pci_iter.config.get_bar(bar);
 
-            // Skip already assigned
-            if (orig & -16)
-                continue;
+            if (pci_iter.config.is_bar_mmio(bar)) {
+                any_io = true;
+            } else {
+                any_mmio = true;
 
-            // Write all ones
-            pci_iter.config.set_mmio_bar(pci_iter, bar, -1);
+                // Write all ones
+                pci_iter.config.set_mmio_bar(pci_iter, bar, ~0U);
 
-            // Get readback value
-            uint64_t readback = pci_iter.config.get_bar(bar);
+                // Get readback value
+                uint64_t readback = pci_iter.config.get_bar(bar);
 
-            // Mask off information bits 3:0
-            readback &= -16;
+                // Restore original value
+                pci_iter.config.set_mmio_bar(pci_iter, bar, orig);
 
-            // Ignore BAR if it resulted in zero
-            if (!readback)
-                continue;
+                // Keep info
+                uint_fast8_t info = readback & ~-16;
 
-            any_mmio = true;
+                // Mask off information bits 3:0
+                readback &= -16;
 
-            // Get size
-            uint8_t log2_size = bit_lsb_set(readback & -16);
-            uint64_t size = UINT64_C(1) << log2_size;
+                // Ignore BAR if it resulted in zero
+                if (!readback)
+                    continue;
 
-            // Allocate twice the needed size to align
-            uint64_t newbase = mm_alloc_hole(size * 2);
-            uint64_t newend = newbase + size * 2;
+                // Get size
+                uint_fast8_t log2_size = bit_lsb_set(readback & -16);
+                uint64_t size = UINT64_C(1) << log2_size;
 
-            // Calculate aligned range to use
-            uint64_t used_st = (newbase + size - 1) & -size;
-            uint64_t used_en = used_st + size;
+                // Allocate twice the needed size to align
+                uint64_t newbase = mm_alloc_hole(size * 2);
+                uint64_t newend = newbase + size * 2;
 
-            // Compute unused portion at beginning of allocation
-            uint64_t unused_lo_st = newbase;
-            uint64_t unused_lo_en = used_st;
-            uint64_t unused_lo_sz = unused_lo_en - unused_lo_st;
+                // Calculate aligned range to use
+                uint64_t used_st = (newbase + size - 1) & -size;
+                uint64_t used_en = used_st + size;
 
-            // Compute unused portion at end of allocation
-            uint64_t unused_hi_st = used_en;
-            uint64_t unused_hi_en = newend;
-            uint64_t unused_hi_sz = unused_hi_en - unused_hi_st;
+                // Compute unused portion at beginning of allocation
+                uint64_t unused_lo_st = newbase;
+                uint64_t unused_lo_en = used_st;
+                uint64_t unused_lo_sz = unused_lo_en - unused_lo_st;
 
-            // Return unused beginning portion to allocator
-            if (unused_lo_sz)
-                mm_free_hole(unused_lo_st, unused_lo_sz);
+                // Compute unused portion at end of allocation
+                uint64_t unused_hi_st = used_en;
+                uint64_t unused_hi_en = newend;
+                uint64_t unused_hi_sz = unused_hi_en - unused_hi_st;
 
-            // Return unused end portion to allocator
-            if (unused_hi_sz)
-                mm_free_hole(unused_hi_st, unused_hi_sz);
+                // Return unused beginning portion to allocator
+                if (unused_lo_sz)
+                    mm_free_hole(unused_lo_st, unused_lo_sz);
 
-            // Set the BAR
-            pci_iter.config.set_mmio_bar(pci_iter, bar, used_st);
+                // Return unused end portion to allocator
+                if (unused_hi_sz)
+                    mm_free_hole(unused_hi_st, unused_hi_sz);
 
-            printk("...assigned %d:%d:%d BAR[%d] to MMIO"
-                      "=%#" PRIx64 "-%#" PRIx64 "\n",
-                      pci_iter.bus, pci_iter.slot, pci_iter.func, bar,
-                      used_st, used_en-1);
+                // Set the BAR
+                pci_iter.config.set_mmio_bar(pci_iter, bar, used_st);
+
+                printk("...assigned %d:%d:%d BAR[%d] to MMIO"
+                          "=%#" PRIx64 "-%#" PRIx64 "\n",
+                          pci_iter.bus, pci_iter.slot, pci_iter.func, bar,
+                          used_st, used_en-1);
+            }
         }
 
         pci_adj_control_bits(pci_iter, (any_mmio ? PCI_CMD_MSE : 0) |
@@ -742,7 +794,7 @@ int pci_init(void)
     return 0;
 }
 
-static uint64_t pci_set_bar(pci_addr_t addr, int bir)
+static uint64_t pci_setup_bar(pci_addr_t addr, int bir)
 {
     uint64_t bar;
     uint32_t bar_ofs = offsetof(pci_config_hdr_t, base_addr) +
@@ -865,8 +917,8 @@ EXPORT int pci_find_capability(pci_addr_t addr, int capability_id, int start)
 EXPORT bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                             pci_irq_range_t *irq_range,
                             int cpu, bool distribute, int req_count,
-                            intr_handler_t handler,
-                            char const *name, int const *target_cpus,
+                            intr_handler_t handler, char const *name,
+                            int const *target_cpus,
                             int const *vector_offsets)
 {
     // Assume we can't use MSI at first, prepare to use pin interrupt
@@ -895,8 +947,12 @@ EXPORT bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
 static int pci_find_msi_msix(pci_addr_t addr,
                              bool& msix, pci_msi_caps_hdr_t& caps)
 {
+
     // Look for the MSI-X extended capability
-    int capability = pci_find_capability(addr, PCICAP_MSIX);
+    int capability = 0;
+
+    if (likely(bootinfo_parameter(bootparam_t::msix_enable)))
+        capability = pci_find_capability(addr, PCICAP_MSIX);
 
     if (capability) {
         msix = true;
@@ -905,7 +961,9 @@ static int pci_find_msi_msix(pci_addr_t addr,
     } else {
         // Fall back to MSI
         msix = false;
-        capability = pci_find_capability(addr, PCICAP_MSI);
+
+        if (likely(bootinfo_parameter(bootparam_t::msi_enable)))
+            capability = pci_find_capability(addr, PCICAP_MSI);
 
         if (capability) {
             PCI_TRACE("Found MSI capability for PCI %u:%u:%u\n",
@@ -917,7 +975,7 @@ static int pci_find_msi_msix(pci_addr_t addr,
         // Read the header
         pci_config_copy(addr, &caps, capability, sizeof(caps));
     } else {
-        PCI_TRACE("No MSI/MSI-X capability for PCI %u:%u:%u\n",
+        PCI_TRACE("No MSI/MSI-X capability (or disabled) for PCI %u:%u:%u\n",
                   addr.bus(), addr.slot(), addr.func());
         return 0;
     }
@@ -936,11 +994,14 @@ EXPORT int pci_vector_count_from_offsets(int const *vector_offsets, int count)
 
 // Returns with the function masked if possible
 // Use pci_set_irq_mask to unmask it when appropriate
-EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
-                            int cpu, bool distribute, size_t req_count,
+EXPORT bool pci_set_msi_irq(pci_dev_iterator_t const& pci_dev,
+                            pci_irq_range_t *irq_range, int cpu,
+                            bool distribute, size_t req_count,
                             intr_handler_t handler, char const *name,
                             int const *target_cpus, int const *vector_offsets)
 {
+    pci_addr_t addr = pci_dev;
+
     bool msix = false;
     pci_msi_caps_hdr_t caps{};
     int capability = pci_find_msi_msix(addr, msix, caps);
@@ -982,33 +1043,32 @@ EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         uint64_t tbl_base = 0;
         uint64_t pba_base = 0;
 
+        tbl_base = pci_dev.config.get_bar(tbl_bir);
+
         // Read the BAR indicated by the table BIR
-        pci_config_copy(addr, &tbl_base,
-                        offsetof(pci_config_hdr_t, base_addr) +
-                        sizeof(uint32_t) * tbl_bir, sizeof(tbl_base));
+//        pci_config_copy(addr, &tbl_base,
+//                        offsetof(pci_config_hdr_t, base_addr) +
+//                        sizeof(uint32_t) * tbl_bir, sizeof(tbl_base));
 
         // Read the BAR indicated by the PBA BIR
-        pci_config_copy(addr, &pba_base,
-                        offsetof(pci_config_hdr_t, base_addr) +
-                        sizeof(uint32_t) * pba_bir, sizeof(pba_base));
+        pba_base = pci_dev.config.get_bar(pba_base);
 
-        // Mask off upper 32 bits if BAR is 32 bit
-        if (PCI_BAR_TYPE_GET(tbl_base) == 0)
-            tbl_base &= 0xFFFFFFFF;
-        if (PCI_BAR_TYPE_GET(pba_base) == 0)
-            pba_base &= 0xFFFFFFFF;
+//        pci_config_copy(addr, &pba_base,
+//                        offsetof(pci_config_hdr_t, base_addr) +
+//                        sizeof(uint32_t) * pba_bir, sizeof(pba_base));
 
-        // Handle uninitialized table BAR
-        if (unlikely(PCI_BAR_BA_GET(tbl_base) == 0)) {
-            tbl_base = pci_set_bar(addr, tbl_bir);
+       // Handle uninitialized table BAR
+
+        if (unlikely(tbl_base == 0)) {
+            tbl_base = pci_setup_bar(addr, tbl_bir);
 
             if (tbl_bir == pba_bir)
                 pba_base = tbl_base;
         }
 
         // Handle uninitialized PBA BAR
-        if (unlikely((pba_base & -8) == 0 && tbl_bir != pba_bir))
-            pba_base = pci_set_bar(addr, pba_bir);
+        if (unlikely(pba_base == 0 && tbl_bir != pba_bir))
+            pba_base = pci_setup_bar(addr, pba_bir);
 
         tbl_base += tbl_ofs;
         pba_base += pba_ofs;
@@ -1021,8 +1081,9 @@ EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                 mmap((void*)(pba_base & -16), pba_sz, PROT_READ | PROT_WRITE,
                      MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
 
-        pcix_tables.emplace_back(addr, pci_msix_mappings{
-                                     tbl, pba, tbl_sz, pba_sz });
+        if (unlikely(!pcix_tables.emplace_back(addr, pci_msix_mappings{
+                                               tbl, pba, tbl_sz, pba_sz })))
+            panic_oom();
 
         size_t tbl_cnt = std::min(req_count, table_count);
 
@@ -1231,9 +1292,9 @@ EXPORT char const *pci_device_class_text(uint8_t cls)
     return nullptr;
 }
 
-void pci_init_ecam(size_t ecam_count)
+bool pci_init_ecam(size_t ecam_count)
 {
-    pci_ecam_list.reserve(ecam_count);
+    return pci_ecam_list.reserve(ecam_count);
 }
 
 void pci_init_ecam_entry(uint64_t base, uint16_t seg,
@@ -1257,7 +1318,7 @@ EXPORT uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
     uint64_t addr;
 
     if (is_bar_mmio(bar)) {
-        addr = base_addr[bar] & -16;
+        addr = base_addr[bar] & PCI_BAR_BA;
 
         if (is_bar_64bit(bar))
             addr |= uint64_t(base_addr[bar + 1]) << 32;
@@ -1281,13 +1342,15 @@ EXPORT void pci_config_hdr_t::set_mmio_bar(
         size = sizeof(uint32_t);
     }
 
+    uint32_t& selected_bar = base_addr[bar];
+
+    size_t bar_offset = (char*)&selected_bar - (char*)&vendor;
+
     // Write the value
-    pci_config_write(pci_addr, (char*)&base_addr[bar] - (char*)this,
-                     &addr, size);
+    pci_config_write(pci_addr, bar_offset, &addr, size);
 
     // Read it back
-    pci_config_copy(pci_addr, (char*)&base_addr[bar],
-                    (char*)&base_addr[bar] - (char*)this, size);
+    pci_config_copy(pci_addr, (char*)&selected_bar, bar_offset, size);
 }
 
 EXPORT int pci_enumerate_begin(
@@ -1415,22 +1478,22 @@ EXPORT bool pci_dev_iterator_t::operator==(pci_dev_iterator_t const& rhs) const
 
 EXPORT bool pci_config_hdr_t::is_bar_mmio(ptrdiff_t bar) const
 {
-    return (base_addr[bar] & 1) == 0;
+    return PCI_BAR_RTE_GET(base_addr[bar]) == 0;
 }
 
 EXPORT bool pci_config_hdr_t::is_bar_portio(ptrdiff_t bar) const
 {
-    return base_addr[bar] & 1;
+    return PCI_BAR_RTE_GET(base_addr[bar]) != 0;
 }
 
 EXPORT bool pci_config_hdr_t::is_bar_prefetchable(ptrdiff_t bar) const
 {
-    return base_addr[bar] & 8;
+    return PCI_BAR_PF_GET(base_addr[bar]);
 }
 
 EXPORT bool pci_config_hdr_t::is_bar_64bit(ptrdiff_t bar) const
 {
-    return (base_addr[bar] & 7) == 4;
+    return PCI_BAR_TYPE_GET(base_addr[bar]) == PCI_BAR_TYPE_64BIT;
 }
 
 EXPORT pci_dev_t::pci_dev_t()
@@ -1450,4 +1513,493 @@ EXPORT pci_dev_iterator_t::pci_dev_iterator_t()
 EXPORT pci_dev_iterator_t::~pci_dev_iterator_t()
 {
 
+}
+
+EXPORT char const *pci_describe_device(pci_dev_iterator_t const& pci_iter)
+{
+    return pci_describe_device(pci_iter.config.dev_class,
+                               pci_iter.config.subclass,
+                               pci_iter.config.prog_if);
+}
+
+EXPORT char const *pci_describe_device(uint8_t cls, uint8_t sc, uint8_t pif)
+{
+    switch (cls) {
+    case PCI_DEV_CLASS_UNCLASSIFIED:
+        switch (sc) {
+        case PCI_SUBCLASS_UNCLASSIFIED_OLD:
+            return "Unclassified/Old";
+        case PCI_SUBCLASS_UNCLASSIFIED_VGA:
+            return "Unclassified/VGA";
+        default:
+            return "Unclassified/Unknown";
+        }
+    case PCI_DEV_CLASS_STORAGE:
+        switch (sc) {
+        case PCI_SUBCLASS_STORAGE_SCSI:
+            return "Storage/SCSI";
+        case PCI_SUBCLASS_STORAGE_IDE:
+            return "Storage/IDE";
+        case PCI_SUBCLASS_STORAGE_FLOPPY:
+            return "Storage/Floppy";
+        case PCI_SUBCLASS_STORAGE_IPIBUS:
+            return "Storage/IPIBus";
+        case PCI_SUBCLASS_STORAGE_RAID:
+            return "Storage/RAID";
+        case PCI_SUBCLASS_STORAGE_ATA:
+            return "Storage/ATA";
+        case PCI_SUBCLASS_STORAGE_SATA:
+            switch (pif) {
+            case PCI_PROGIF_STORAGE_SATA_VEND:
+                return "Storage/SATA/Vendor Specific";
+            case PCI_PROGIF_STORAGE_SATA_AHCI:
+                return "Storage/SATA/AHCI";
+            case PCI_PROGIF_STORAGE_SATA_SERIAL:
+                return "Storage/SATA/Serial";
+            default:
+                return "Storage/SATA/Unknown";
+            }
+        case PCI_SUBCLASS_STORAGE_SAS:
+            return "Storage/SAS";
+        case PCI_SUBCLASS_STORAGE_NVM:
+            switch (pif) {
+            case PCI_PROGIF_STORAGE_NVM_NVME:
+                return "Storage/NVM/NVMe";
+            default:
+                return "Storage/NVM/Unknown";
+            }
+        case PCI_SUBCLASS_STORAGE_MASS:
+            return "Storage/Mass";
+        default:
+            return "Storage/Unknown";
+        }
+    case PCI_DEV_CLASS_NETWORK:
+        switch (sc) {
+        case PCI_SUBCLASS_NETWORK_ETHERNET:
+            return "Network/Ethernet";
+        case PCI_SUBCLASS_NETWORK_TOKENRING:
+            return "Network/TokenRing";
+        case PCI_SUBCLASS_NETWORK_FDDI:
+            return "Network/FDDI";
+        case PCI_SUBCLASS_NETWORK_ATM:
+            return "Network/ATM";
+        case PCI_SUBCLASS_NETWORK_ISDN:
+            return "Network/IDSN";
+        case PCI_SUBCLASS_NETWORK_WFLIP:
+            return "Network/WFLIP";
+        case PCI_SUBCLASS_NETWORK_PICMGMC:
+            return "Network/PICMGMC";
+        case PCI_SUBCLASS_NETWORK_OTHER:
+            return "Network/Other";
+        default:
+            return "Network/Unknown";
+        }
+    case PCI_DEV_CLASS_DISPLAY:
+        switch (sc) {
+        case PCI_SUBCLASS_DISPLAY_VGA:
+            switch (pif) {
+            case PCI_PROGIF_DISPLAY_VGA_STD:
+                return "Display/VGA/Standard";
+            case PCI_PROGIF_DISPLAY_VGA_8514:
+                return "Display/VGA/8514";
+            default:
+                return "Display/VGA/Unknown";
+            }
+        case PCI_SUBCLASS_DISPLAY_XGA:
+            return "Display/XGA";
+        case PCI_SUBCLASS_DISPLAY_3D:
+            return "Display/3D";
+        case PCI_SUBCLASS_DISPLAY_OTHER:
+            return "Display/Other";
+        default:
+            return "Display/Unknown";
+        }
+    case PCI_DEV_CLASS_MULTIMEDIA:
+        switch (sc) {
+        case PCI_SUBCLASS_MULTIMEDIA_VIDEO:
+            return "Multimedia/Video";
+        case PCI_SUBCLASS_MULTIMEDIA_AUDIO:
+            return "Multimedia/Audio";
+        case PCI_SUBCLASS_MULTIMEDIA_TELEP:
+            return "Multimedia/Telephony";
+        case PCI_SUBCLASS_MULTIMEDIA_OTHER:
+            return "Multimedia/Other";
+        default:
+            return "Multimedia/Unknown";
+        }
+    case PCI_DEV_CLASS_MEMORY:
+        switch (sc) {
+        case PCI_SUBCLASS_MEMORY_RAM:
+            return "Memory/RAM";
+        case PCI_SUBCLASS_MEMORY_FLASH:
+            return "Memory/Flash";
+        case PCI_SUBCLASS_MEMORY_OTHER:
+            return "Memory/Other";
+        default:
+            return "Memory/Unknown";
+        }
+    case PCI_DEV_CLASS_BRIDGE:
+        switch (sc) {
+        case PCI_SUBCLASS_BRIDGE_HOST:
+            return "Bridge/Host";
+        case PCI_SUBCLASS_BRIDGE_ISA:
+            return "Bridge/ISA";
+        case PCI_SUBCLASS_BRIDGE_EISA:
+            return "Bridge/EISA";
+        case PCI_SUBCLASS_BRIDGE_MCA:
+            return "Bridge/MCA";
+        case PCI_SUBCLASS_BRIDGE_PCI2PCI:
+            switch (pif) {
+            case PCI_SUBCLASS_PCI2PCI_NORMAL:
+                return "Bridge/PCI2PCI/Normal";
+            case PCI_SUBCLASS_PCI2PCI_SUBTRAC:
+                return "Bridge/PCI2PCI/Subtractive";
+            default:
+                return "Bridge/PCI2PCI/Unknown";
+            }
+        case PCI_SUBCLASS_BRIDGE_PCMCIA:
+            return "Bridge/PCMCIA";
+        case PCI_SUBCLASS_BRIDGE_NUBUS:
+            return "Bridge/NuBus";
+        case PCI_SUBCLASS_BRIDGE_CARDBUS:
+            return "Bridge/CardBus";
+        case PCI_SUBCLASS_BRIDGE_RACEWAY:
+            return "Bridge/RaceWay";
+        case PCI_SUBCLASS_BRIDGE_SEMITP2P:
+            switch (pif) {
+            case PCI_PROGIF_BRIDGE_SEMITP2P_P:
+                return "Bridge/SEMITP2P/P";
+            case PCI_PROGIF_BRIDGE_SEMITP2P_S:
+                return "Bridge/SEMITP2P/S";
+            default:
+                return "Bridge/SEMITP2P/Unknown";
+            }
+        case PCI_SUBCLASS_BRIDGE_INFINITI:
+            return "Bridge/Infiniti";
+        case PCI_SUBCLASS_BRIDGE_OTHER:
+            return "Bridge/Other";
+        default:
+            return "Bridge/Unknown";
+        }
+    case PCI_DEV_CLASS_COMM:
+        switch (sc) {
+        case PCI_SUBCLASS_COMM_16x50:
+            switch (pif) {
+            case PCI_PROGIF_COMM_16x50_XT:
+                return "Comm/16x50/XT";
+            case PCI_PROGIF_COMM_16x50_16450:
+                return "Comm/16x50/16450";
+            case PCI_PROGIF_COMM_16x50_16550:
+                return "Comm/16x50/16550";
+            case PCI_PROGIF_COMM_16x50_16650:
+                return "Comm/16x50/16650";
+            case PCI_PROGIF_COMM_16x50_16750:
+                return "Comm/16x50/16750";
+            case PCI_PROGIF_COMM_16x50_16850:
+                return "Comm/16x50/16850";
+            case PCI_PROGIF_COMM_16x50_16960:
+                return "Comm/16x50/16950";
+            default:
+                return "Comm/16x50/Unknown";
+            }
+        case PCI_SUBCLASS_COMM_PARALLEL:
+            // PCI_SUBCLASS_COMM_PARALLEL
+            switch (pif) {
+            case PCI_PROGIF_COMM_PARALLEL_BASIC:
+                return "Comm/Parallel/Basic";
+            case PCI_PROGIF_COMM_PARALLEL_BIDIR:
+                return "Comm/Parallel/Bidirectional";
+            case PCI_PROGIF_COMM_PARALLEL_ECP:
+                return "Comm/Parallel/ECP";
+            case PCI_PROGIF_COMM_PARALLEL_1284:
+                return "Comm/Parallel/1284";
+            case PCI_PROGIF_COMM_PARALLEL_1284D:
+                return "Comm/Parallel/1284D";
+            default:
+                return "Comm/Parallel/Unknown";
+            }
+        case PCI_SUBCLASS_COMM_MULTIPORT:
+            return "Comm/Multiport";
+        case PCI_SUBCLASS_COMM_MODEM:
+            switch (pif) {
+            case PCI_PROGIF_COMM_MODEM_GENERIC:
+                return "Comm/Modem/Generic";
+            case PCI_PROGIF_COMM_MODEM_HAYES_450:
+                return "Comm/Modem/Hayes_450";
+            case PCI_PROGIF_COMM_MODEM_HAYES_550:
+                return "Comm/Modem/Hayes_550";
+            case PCI_PROGIF_COMM_MODEM_HAYES_650:
+                return "Comm/Modem/Hayes_650";
+            case PCI_PROGIF_COMM_MODEM_HAYES_750:
+                return "Comm/Modem/Hayes_750";
+            default:
+                return "Comm/Modem/Unknown";
+            }
+        case PCI_SUBCLASS_COMM_GPIB:
+            return "Comm/GPIB";
+        case PCI_SUBCLASS_COMM_SMARTCARD:
+            return "Comm/SmartCard";
+        case PCI_SUBCLASS_COMM_OTHER:
+            return "Comm/Other";
+        default:
+            return "Comm/Unknown";
+        }
+    case PCI_DEV_CLASS_SYSTEM:
+        switch (sc) {
+        case PCI_SUBCLASS_SYSTEM_PIC:
+            switch (pif) {
+            case PCI_PROGIF_SYSTEM_PIC_8259:
+                return "System/PIC/8259";
+            case PCI_PROGIF_SYSTEM_PIC_ISA:
+                return "System/PIC/ISA";
+            case PCI_PROGIF_SYSTEM_PIC_EISA:
+                return "System/PIC/EISA";
+            case PCI_PROGIF_SYSTEM_PIC_IOAPIC:
+                return "System/PIC/IOAPIC";
+            case PCI_PROGIF_SYSTEM_PIC_IOXAPIC:
+                return "System/PIC/IOXAPIC";
+            default:
+                return "System/PIC/Unknown";
+            }
+        case PCI_SUBCLASS_SYSTEM_DMA:
+            switch (pif) {
+            case PCI_PROGIF_SYSTEM_DMA_8237:
+                return "System/DMA/8237";
+            case PCI_PROGIF_SYSTEM_DMA_ISA:
+                return "System/DMA/ISA";
+            case PCI_PROGIF_SYSTEM_DMA_EISA:
+                return "System/DMA/EISA";
+            default:
+                return "System/DMA/Unknown";
+            }
+        case PCI_SUBCLASS_SYSTEM_TIMER:
+            switch (pif) {
+            case PCI_PROGIF_SYSTEM_TIMER_8254:
+                return "System/Timer/8254";
+            case PCI_PROGIF_SYSTEM_TIMER_ISA:
+                return "System/Timer/ISA";
+            case PCI_PROGIF_SYSTEM_TIMER_EISA:
+                return "System/Timer/EISA";
+            default:
+                return "System/Timer/Unknown";
+            }
+        case PCI_SUBCLASS_SYSTEM_RTC:
+            switch (pif) {
+            case PCI_PROGIF_SYSTEM_RTC_GENERIC:
+                return "System/RTC/Generic";
+            case PCI_PROGIF_SYSTEM_RTC_ISA:
+                return "System/RTC/ISA";
+            default:
+                return "System/RTC/Unknown";
+            }
+        case PCI_SUBCLASS_SYSTEM_HOTPLUG:
+            return "System/Hotplug";
+        case PCI_SUBCLASS_SYSTEM_SDHOST:
+            return "System/SDHost";
+        case PCI_SUBCLASS_SYSTEM_OTHER:
+            return "System/Other";
+        default:
+            return "System/Unknown";
+        }
+    case PCI_DEV_CLASS_INPUT:
+        switch (sc) {
+        case PCI_SUBCLASS_INPUT_KEYBOARD:
+            return "Input/Keyboard";
+        case PCI_SUBCLASS_INPUT_DIGIPEN:
+            return "Input/DigiPen";
+        case PCI_SUBCLASS_INPUT_MOUSE:
+            return "Input/Mouse";
+        case PCI_SUBCLASS_INPUT_SCANNER:
+            return "Input/Scanner";
+        case PCI_SUBCLASS_INPUT_GAME:
+            switch (pif) {
+            case PCI_PROGIF_INPUT_GAME_GENERIC:
+                return "Input/Game/Generic";
+            case PCI_PROGIF_INPUT_GAME_STD:
+                return "Input/Game/Standard";
+            default:
+                return "Input/Game/Unknown";
+            }
+        case PCI_SUBCLASS_INPUT_OTHER:
+            return "Input/Other";
+        default:
+            return "Input/Unknown";
+        }
+    case PCI_DEV_CLASS_DOCKING:
+        switch (sc) {
+        case PCI_SUBCLASS_DOCKING_GENERIC:
+            return "Docking/Generic";
+        case PCI_SUBCLASS_DOCKING_OTHER:
+            return "Docking/Other";
+        default:
+            return "Docking/Unknown";
+        }
+    case PCI_DEV_CLASS_PROCESSOR:
+        switch (sc) {
+        case PCI_SUBCLASS_PROCESSOR_386:
+            return "Processor/386";
+        case PCI_SUBCLASS_PROCESSOR_486:
+            return "Processor/486";
+        case PCI_SUBCLASS_PROCESSOR_PENTIUM:
+            return "Processor/Pentium";
+        case PCI_SUBCLASS_PROCESSOR_ALPHA:
+            return "Processor/Alpha";
+        case PCI_SUBCLASS_PROCESSOR_PPC:
+            return "Processor/PPC";
+        case PCI_SUBCLASS_PROCESSOR_MIPS:
+            return "Processor/MIPS";
+        case PCI_SUBCLASS_PROCESSOR_COPROC:
+            return "Processor/Coprocessor";
+        default:
+            return "Processor/Unknown";
+        }
+    case PCI_DEV_CLASS_SERIAL:
+        switch (sc) {
+        case PCI_SUBCLASS_SERIAL_IEEE1394:
+            switch (pif) {
+            case PCI_PROGIF_SERIAL_IEEE1394_FW:
+                return "Serial/IEEE1394/FW";
+            default:
+                return "Serial/IEEE1394/Unknown";
+            }
+        case PCI_SUBCLASS_SERIAL_ACCESS:
+        case PCI_SUBCLASS_SERIAL_SSA:
+        case PCI_SUBCLASS_SERIAL_USB:
+            switch (pif) {
+            case PCI_PROGIF_SERIAL_USB_UHCI:
+                return "Serial/USB/UHCI";
+            case PCI_PROGIF_SERIAL_USB_OHCI:
+                return "Serial/USB/OHCI";
+            case PCI_PROGIF_SERIAL_USB_EHCI:
+                return "Serial/USB/EHCI";
+            case PCI_PROGIF_SERIAL_USB_XHCI:
+                return "Serial/USB/XHCI";
+            case PCI_PROGIF_SERIAL_USB_UNSPEC:
+                return "Serial/USB/Unspecified";
+            case PCI_PROGIF_SERIAL_USB_USBDEV:
+                return "Serial/USB/USBDev";
+            default:
+                return "Serial/USB/Unknown";
+            }
+        case PCI_SUBCLASS_SERIAL_FIBRECHAN:
+            return "Serial/FibreChannel";
+        case PCI_SUBCLASS_SERIAL_SMBUS:
+            return "Serial/SMBus";
+        case PCI_SUBCLASS_SERIAL_INFINIBAND:
+            return "Serial/InfiniBand";
+        case PCI_SUBCLASS_SERIAL_IPMI:
+            switch (pif) {
+            case PCI_PROGIF_SERIAL_IPMI_SMIC:
+                return "Serial/IPMI/SMIC";
+            case PCI_PROGIF_SERIAL_IPMI_KEYBD:
+                return "Serial/IPMI/Keyboard";
+            case PCI_PROGIF_SERIAL_IPMI_BLOCK:
+                return "Serial/IPMI/Block";
+            default:
+                return "Serial/IPMI/Unknown";
+            }
+        case PCI_SUBCLASS_SERIAL_SERCOS:
+            return "Serial/SerCos";
+        case PCI_SUBCLASS_SERIAL_CANBUS:
+            return "Serial/CanBus";
+        default:
+            return "Serial/Unknown";
+        }
+    case PCI_DEV_CLASS_WIRELESS:
+        switch (sc) {
+        case PCI_SUBCLASS_WIRELESS_IRDA:
+            return "Wireless/IRDA";
+        case PCI_SUBCLASS_WIRELESS_IR:
+            return "Wireless/IR";
+        case PCI_SUBCLASS_WIRELESS_RF:
+            return "Wireless/RF";
+        case PCI_SUBCLASS_WIRELESS_BLUETOOTH:
+            return "Wireless/BlueTooth";
+        case PCI_SUBCLASS_WIRELESS_BROADBAND:
+            return "Wireless/Broadband";
+        case PCI_SUBCLASS_WIRELESS_ETH5GHz:
+            return "Wireless/Ethernet5GHz";
+        case PCI_SUBCLASS_WIRELESS_ETH2GHz:
+            return "Wireless/Ethernet2.4GHz";
+        case PCI_SUBCLASS_WIRELESS_OTHER:
+            return "Wireless/Other";
+        default:
+            return "Wireless/Unknown";
+        }
+    case PCI_DEV_CLASS_INTELLIGENT:
+        switch (sc) {
+        case PCI_SUBCLASS_INTELLIGENT_IO:
+            switch (pif) {
+            case PCI_PROGIF_INTELLIGENT_IO_I2O:
+                return "Intelligent/IO/I2O";
+            case PCI_PROGIF_INTELLIGENT_IO_FIFO:
+                return "Intelligent/IO/FIFO";
+            default:
+                return "Intelligent/IO/Unknown";
+            }
+        default:
+            return "Intelligent/Unknown";
+        }
+    case PCI_DEV_CLASS_SATELLITE:
+        switch (sc) {
+        case PCI_SUBCLASS_SATELLITE_TV:
+            return "Satellite/TV";
+        case PCI_SUBCLASS_SATELLITE_AUDIO:
+            return "Satellite/Audio";
+        case PCI_SUBCLASS_SATELLITE_VOICE:
+            return "Satellite/Voice";
+        case PCI_SUBCLASS_SATELLITE_DATA:
+            return "Satellite/Data";
+        default:
+            return "Satellite/Unknown";
+        }
+    case PCI_DEV_CLASS_ENCRYPTION:
+        switch (sc) {
+        case PCI_SUBCLASS_ENCRYPTION_NET:
+            return "Encryption/Net";
+        case PCI_SUBCLASS_ENCRYPTION_ENTAIN:
+            return "Encryption/Entain";
+        case PCI_SUBCLASS_ENCRYPTION_OTHER:
+            return "Encryption/Other";
+        default:
+            return "Encryption/Unknown";
+        }
+    case PCI_DEV_CLASS_DSP:
+        switch (sc) {
+        case PCI_SUBCLASS_DSP_DPIO:
+            return "DSP/DPIO";
+        case PCI_SUBCLASS_DSP_PERFCNT:
+            return "DSP/PerfCount";
+        case PCI_SUBCLASS_DSP_COMMSYNC:
+            return "DSP/CommSync";
+        case PCI_SUBCLASS_DSP_MGMTCARD:
+            return "DSP/ManagementCard";
+        case PCI_SUBCLASS_DSP_OTHER:
+            return "DSP/Other";
+        default:
+            return "DSP/Unknown";
+        }
+    case PCI_DEV_CLASS_ACCELERATOR:
+        switch (sc) {
+        default:
+            return "Accelerator/Unknown";
+        }
+    case PCI_DEV_CLASS_INSTRUMENTATION:
+        switch (sc) {
+        default:
+            return "Instrumentation/Unknown";
+        }
+    case PCI_DEV_CLASS_COPROCESSOR:
+        switch (sc) {
+        default:
+            return "Coprocessor/Unknown";
+        }
+    case PCI_DEV_CLASS_UNASSIGNED:
+        switch (sc) {
+        default:
+            return "Unassigned/Unknown";
+        }
+    default:
+        return "Unknown";
+    }
 }

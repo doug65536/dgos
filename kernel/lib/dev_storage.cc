@@ -14,6 +14,8 @@
 #define STORAGE_TRACE(...) ((void)0)
 #endif
 
+dev_base_t::major_map_t dev_base_t::dev_lookup;
+
 struct fs_mount_t {
     fs_factory_t *reg;
     fs_base_t *fs;
@@ -189,7 +191,7 @@ static void probe_part_factory_on_drive(
         std::vector<part_dev_t*> part_list = factory->detect(drive);
 
         // Mount partitions
-        for (unsigned i = 0; i < part_list.size(); ++i) {
+        for (size_t i = 0; i < part_list.size(); ++i) {
             part_dev_t *part = part_list[i];
             fs_init_info_t info;
             info.drive = drive;
@@ -295,9 +297,9 @@ EXPORT int storage_dev_base_t::flush()
 //
 // Modify directories
 
-EXPORT int fs_base_ro_t::mknod(fs_cpath_t path,
-                         fs_mode_t mode,
-                         fs_dev_t rdev)
+EXPORT int fs_base_ro_t::mknodat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
+        fs_mode_t mode, fs_dev_t rdev)
 {
     (void)path;
     (void)mode;
@@ -306,8 +308,9 @@ EXPORT int fs_base_ro_t::mknod(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::mkdir(fs_cpath_t path,
-                         fs_mode_t mode)
+EXPORT int fs_base_ro_t::mkdirat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
+        fs_mode_t mode)
 {
     (void)path;
     (void)mode;
@@ -315,16 +318,17 @@ EXPORT int fs_base_ro_t::mkdir(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::rmdir(fs_cpath_t path)
+EXPORT int fs_base_ro_t::rmdirat(
+        fs_file_info_t *dirfi, fs_cpath_t path)
 {
     (void)path;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::symlink(
-        fs_cpath_t to,
-        fs_cpath_t from)
+EXPORT int fs_base_ro_t::symlinkat(
+        fs_file_info_t *dirtofi, fs_cpath_t to,
+        fs_file_info_t *dirfromfi, fs_cpath_t from)
 {
     (void)to;
     (void)from;
@@ -332,9 +336,9 @@ EXPORT int fs_base_ro_t::symlink(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::rename(
-        fs_cpath_t from,
-        fs_cpath_t to)
+EXPORT int fs_base_ro_t::renameat(
+        fs_file_info_t *dirfromfi, fs_cpath_t from,
+        fs_file_info_t *dirtofi, fs_cpath_t to)
 {
     (void)from;
     (void)to;
@@ -342,9 +346,9 @@ EXPORT int fs_base_ro_t::rename(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::link(
-        fs_cpath_t from,
-        fs_cpath_t to)
+EXPORT int fs_base_ro_t::linkat(
+        fs_file_info_t *dirfromfi, fs_cpath_t from,
+        fs_file_info_t *dirtofi, fs_cpath_t to)
 {
     (void)from;
     (void)to;
@@ -352,8 +356,8 @@ EXPORT int fs_base_ro_t::link(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::unlink(
-        fs_cpath_t path)
+EXPORT int fs_base_ro_t::unlinkat(
+        fs_file_info_t *dirfi, fs_cpath_t path)
 {
     (void)path;
     // Fail, read only
@@ -385,8 +389,8 @@ EXPORT int fs_base_ro_t::fchown(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::truncate(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::truncateat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         off_t size)
 {
     (void)path;
@@ -395,8 +399,8 @@ EXPORT int fs_base_ro_t::truncate(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::utimens(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::utimensat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         fs_timespec_t const *ts)
 {
     (void)path;
@@ -455,8 +459,8 @@ EXPORT int fs_base_ro_t::flush(fs_file_info_t *fi)
     return 0;
 }
 
-EXPORT int fs_base_ro_t::setxattr(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::setxattrat(
+        fs_file_info_t *dirfi, fs_cpath_t path,
         char const* name,
         char const* value,
         size_t size,
@@ -576,3 +580,4 @@ fs_factory_t::fs_factory_t(const char *factory_name)
 fs_base_t::~fs_base_t()
 {
 }
+

@@ -10,3 +10,14 @@ diff -durN gdb-8.1/gdb/remote-original.c gdb-8.1/gdb/remote.c
      error (_("Remote 'g' packet reply is too long (expected %ld bytes, got %d "
  	     "bytes): %s"), rsa->sizeof_g_packet, buf_len / 2, rs->buf);
 
+--- gdb-9.1-orig/gdb/i386-tdep.c	2020-05-30 23:35:32.204688927 -0400
++++ gdb-9.1/gdb/i386-tdep.c	2020-05-30 23:38:10.416447646 -0400
+@@ -8514,7 +8514,7 @@
+   set_gdbarch_get_longjmp_target (gdbarch, i386_get_longjmp_target);
+
+   /* Call dummy code.  */
+-  set_gdbarch_call_dummy_location (gdbarch, ON_STACK);
++  set_gdbarch_call_dummy_location (gdbarch, AT_ENTRY_POINT);
+   set_gdbarch_push_dummy_code (gdbarch, i386_push_dummy_code);
+   set_gdbarch_push_dummy_call (gdbarch, i386_push_dummy_call);
+   set_gdbarch_frame_align (gdbarch, i386_frame_align);

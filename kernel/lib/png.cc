@@ -252,13 +252,13 @@ png_image_t *png_load(char const *path)
     // Allocate read buffer
     std::unique_ptr<uint8_t> buf = new uint8_t[PNG_BUFSIZE]();
     if (!buf)
-        return 0;
+        return nullptr;
 
     uint8_t * const read_buf = buf;
     uint8_t * const decomp_buf = buf + (PNG_BUFSIZE >> 1);
 
     // Open PNG file
-    file_t fd = file_open(path, O_RDONLY);
+    file_t fd = file_openat(AT_FDCWD, path, O_RDONLY);
 
     if (!fd.is_open())
         return 0;

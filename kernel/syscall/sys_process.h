@@ -1,5 +1,6 @@
 #pragma once
 #include "sys_time.h"
+#include "process.h"
 
 struct posix_spawn_file_actions_t;
 struct posix_spawnattr_t;
@@ -15,3 +16,5 @@ long sys_posix_spawn(pid_t *restrict pid,
                      posix_spawnattr_t const *restrict attr,
                      char const * * restrict argv,
                      char const * * restrict envp);
+
+long sys_clone(int (*fn)(void *arg), void *child_stack, int flags, void *arg);

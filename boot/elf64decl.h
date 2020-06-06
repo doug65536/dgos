@@ -41,7 +41,21 @@ struct Elf64_Ehdr {
 #define EI_PAD 9 // Start of padding bytes
 #define EI_NIDENT 16 // Size of e_ident[]
 
-char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
+static constexpr char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
+
+// e_machine
+#define EM_NO_SPEC 0x00
+#define EM_SPARC   0x02
+#define EM_X86     0x03
+#define EM_MIPS    0x08
+#define EM_POWERPC 0x14
+#define EM_S390    0x16
+#define EM_ARM     0x28
+#define EM_SUPERH  0x2A
+#define EM_IA_64   0x32
+#define EM_AMD64   0x3E
+#define EM_AARCH64 0xB7
+#define EM_RISC_V  0xF3
 
 // 32-bit objects
 #define ELFCLASS32 1

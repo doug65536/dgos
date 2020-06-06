@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dirent.h"
+#include "dev_storage.h"
 
 extern "C" {
 
@@ -15,7 +16,7 @@ ssize_t sys_pread64(int fd, void *bufaddr,
 ssize_t sys_pwrite64(int fd, void const *bufaddr,
                      size_t count, off_t ofs);
 int sys_readdir_r(int fd, dirent_t *buf);
-int sys_opendir(char const *pathname);
+int sys_opendirat(int dirfd, char const *pathname);
 int sys_closedir(int fd);
 int sys_fsync(int fd);
 int sys_fdatasync(int fd);
@@ -24,31 +25,35 @@ int sys_dup2(int oldfd, int newfd);
 int sys_dup3(int oldfd, int newfd, int flags);
 int sys_ftruncate(int fd, off_t size);
 int sys_ioctl(int fd, int cmd, void* arg);
+int sys_faccess(int fd, int mask);
+int sys_openat(int dirfd, char const *pathname, int flags, mode_t mode);
+int sys_creatat(int dirfd, char const *pathname, mode_t mode);
+int sys_renameat(int olddirfd, char const *old_pathname,
+                 int newdirfd, char const *new_pathname);
+int sys_mkdirat(int dirfd, char const *path, mode_t mode);
+int sys_rmdirat(int dirfd, char const *path);
+int sys_unlinkat(int dirfd, char const *path);
+int sys_truncateat(int dirfd, char const *path, off_t size);
+int sys_accessat(int dirfd, char const *path, int mask);
 
-int sys_open(char const *pathname, int flags, mode_t mode);
-int sys_creat(char const *pathname, mode_t mode);
-int sys_rename(char const *old_pathname, char const *new_pathname);
-int sys_mkdir(char const *path, mode_t mode);
-int sys_rmdir(char const *path);
-int sys_unlink(char const *path);
-int sys_truncate(char const *path, off_t size);
-int sys_access(char const *path, int mask);
+int sys_mknodat(int dirfd, char const *path, mode_t mode, int rdev);
 
-int sys_mknod(char const *path, mode_t mode, int rdev);
-
-int sys_link(char const *from, char const *to);
-int sys_chmod(char const *path, mode_t mode);
+int sys_linkat(int fromdirfd, char const *from,
+               int todirfd, char const *to);
+int sys_chmodat(int dirfd, char const *path, mode_t mode);
 int sys_fchmod(int fd, mode_t mode);
-int sys_chown(char const *path, int uid, int gid);
+int sys_chownat(int dirfd, char const *path, int uid, int gid);
 int sys_fchown(int fd, int uid, int gid);
 
-int sys_setxattr(char const *path,
-        char const* name, char const* value,
-        size_t size, int flags);
-int sys_getxattr(char const *path,
-        char const* name, char* value, size_t size);
-int sys_listxattr(char const *path,
-         char const* list, size_t size);
+int sys_setxattrat(int dirfd, char const *path,
+                   char const* name, char const* value,
+                   size_t size, int flags);
+int sys_getxattrat(int dirfd, char const *path,
+                   char const* name, char* value, size_t size);
+int sys_listxattrat(int dirfd, char const *path,
+                    char const* list, size_t size);
+int sys_readlinkat(int dirfd, char const *path,
+                   int mask);
 
 //int opendir(fs_file_info_t **fi, fs_cpath_t path) final;
 //ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,
@@ -89,3 +94,6 @@ int sys_listen(int sockfd, int backlog);
 char *sys_getcwd(char *buf, size_t size);
 
 int sys_fcntl(int fd, int cmd, void *arg);
+
+int sys_statfs(char const *path, fs_statvfs_t *buf);
+int sys_fstatfs(int fd, fs_statvfs_t *buf);

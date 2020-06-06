@@ -1,15 +1,16 @@
+#include "assert.h"
+#include "vesainfo.h"
+#include "export.h"
 #if 0
 #include "framebuffer.h"
 #include "thread.h"
 #include "mm.h"
 #include "string.h"
 #include "likely.h"
-#include "assert.h"
 #include "math.h"
 #include "printk.h"
 #include "utility.h"
 #include "bootinfo.h"
-#include "vesainfo.h"
 #include "dev_text.h"
 
 #define CHARHEIGHT 16
@@ -1398,3 +1399,10 @@ surface_t surface_t::map(rect_t region)
     return map_noclip(region);
 }
 #endif
+
+EXPORT void fb_change_backing(vbe_selected_mode_t const& mode)
+{
+//    assert(mode.framebuffer_addr != 0);
+//    fb.backing = (uint8_t*)mode.framebuffer_addr;
+//    fb.video_mem = (uint8_t*)mode.framebuffer_addr;
+}

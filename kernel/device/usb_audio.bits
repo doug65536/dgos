@@ -1,0 +1,31 @@
+-- USB_AUDIO_CH_CFG Bitmask of positions present in cluster
+
+0 FL Front Left
+1 FR Front Right
+2 FC Front Center
+3 LFE Low Frequency Effects
+4 BL Back Left
+5 BR Back Right
+6 FLC Front Left of Center
+7 FRC Front Right of Center
+8 BKC Back Center
+9 SL Side Left
+10 SR Side Right
+11 TC Top Center
+12 TFL Top Front Left
+13 TFC Top Front Center
+14 TFR Top Front Right
+15 TBL Top Back Left
+16 TBC Top Back Center
+17 TBR Top Back Right
+18 TFLC Top Front Left of Center
+19 TFRC Top Front Right of Center
+20 LLFE Left Low Frequency Effects
+21 RLFE Right Low Frequency Effects
+22 TSL Top Side Left
+23 TSR Top Side Right
+24 BC Bottom Center
+25 BLC Back Left of Center
+26 BRC Back Right of Center
+#27..30 reserved
+31 RD Raw Data

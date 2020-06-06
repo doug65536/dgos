@@ -8,6 +8,7 @@ SECTIONS {
 		*(.data)
 		*(.bss)
 		*(.rel*)
+		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got*)
 		*(.igot*)
 		*(.iplt*)

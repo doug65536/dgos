@@ -75,9 +75,10 @@ static _always_inline unsigned devload_impl(
 {
     unsigned result;
     __asm__ __volatile__ (
-        "movzbl %[src],%k[result]\n\t"
+        "movzbl (%[src]),%k[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" (*(uint8_t *)p)
+        : [src] "r" (p)
+        : "memory"
     );
     return result;
 }
@@ -88,9 +89,10 @@ static _always_inline unsigned devload_impl(
 {
     unsigned result;
     __asm__ __volatile__ (
-        "movzwl %[src],%k[result]\n\t"
+        "movzwl (%[src]),%k[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" (*(uint16_t *)p)
+        : [src] "r" (p)
+        : "memory"
     );
     return result;
 }
@@ -101,9 +103,10 @@ static _always_inline unsigned devload_impl(
 {
     unsigned result;
     __asm__ __volatile__ (
-        "movl %[src],%k[result]\n\t"
+        "movl (%[src]),%k[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" (*(uint32_t *)p)
+        : [src] "m" (p)
+        : "memory"
     );
     return result;
 }
@@ -114,9 +117,10 @@ static _always_inline uint64_t devload_impl(
 {
     uint64_t result;
     __asm__ __volatile__ (
-        "movq %[src],%q[result]\n\t"
+        "movq (%[src]),%q[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" (*(uint64_t *)p)
+        : [src] "m" (p)
+        : "memory"
     );
     return result;
 }
@@ -129,9 +133,10 @@ static _always_inline int devload_impl(
 {
     int result;
     __asm__ __volatile__ (
-        "movsbl %[src],%k[result]\n\t"
+        "movsbl (%[src]),%k[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" (*(uint8_t *)p)
+        : [src] "r" (p)
+        : "memory"
     );
     return result;
 }
@@ -142,9 +147,10 @@ static _always_inline int devload_impl(
 {
     int result;
     __asm__ __volatile__ (
-        "movswl %[src],%k[result]\n\t"
+        "movswl (%[src]),%k[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" (*(uint16_t *)p)
+        : [src] "r" (p)
+        : "memory"
     );
     return result;
 }
@@ -155,9 +161,10 @@ static _always_inline int devload_impl(
 {
     int result;
     __asm__ __volatile__ (
-        "movl %[src],%k[dest]\n\t"
+        "movl (%[src]),%k[dest]\n\t"
         : [dest] "=r" (result)
-        : [src] "m" (*(uint32_t *)p)
+        : [src] "r" (p)
+        : "memory"
     );
     return result;
 }
@@ -168,9 +175,10 @@ static _always_inline int64_t devload_impl(
 {
     int64_t result;
     __asm__ __volatile__ (
-        "movq %[src],%q[dest]\n\t"
+        "movq (%[src]),%q[dest]\n\t"
         : [dest] "=r" (result)
-        : [src] "m" (*(uint64_t *)p)
+        : [src] "r" (p)
+        : "memory"
     );
     return result;
 }
@@ -182,9 +190,11 @@ static _always_inline void devstore_impl(
         T *p, T const& val, std::integral_constant<size_t, 1>::type)
 {
     __asm__ __volatile__ (
-        "movb %b[src],%[dest]\n\t"
-        : [dest] "=m" (*(uint8_t *)p)
-        : [src] "r" (val)
+        "movb %b[src],(%[dest])\n\t"
+        :
+        : [dest] "r" (p)
+        , [src] "r" (val)
+        : "memory"
     );
 }
 
@@ -193,9 +203,11 @@ static _always_inline void devstore_impl(
         T *p, T const& val, std::integral_constant<size_t, 2>::type)
 {
     __asm__ __volatile__ (
-        "movw %w[src],%[dest]\n\t"
-        : [dest] "=m" (*(uint8_t *)p)
-        : [src] "r" (val)
+        "movw %w[src],(%[dest])\n\t"
+        :
+        : [dest] "r" (p)
+        , [src] "r" (val)
+        : "memory"
     );
 }
 
@@ -205,8 +217,10 @@ static _always_inline void devstore_impl(
 {
     __asm__ __volatile__ (
         "movl %k[src],%[dest]\n\t"
-        : [dest] "=m" (*(uint8_t *)p)
-        : [src] "r" (val)
+        :
+        : [dest] "r" (p)
+        , [src] "r" (val)
+        : "memory"
     );
 }
 
@@ -216,8 +230,10 @@ static _always_inline void devstore_impl(
 {
     __asm__ __volatile__ (
         "movq %q[src],%[dest]\n\t"
-        : [dest] "=m" (*(uint64_t *)p)
-        : [src] "r" (val)
+        :
+        : [dest] "r" (p)
+        , [src] "r" (val)
+        : "memory"
     );
 }
 

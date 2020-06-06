@@ -6,7 +6,8 @@
 
 int unlinkat(int dirfd, char const *path, int flags)
 {
-    long status = syscall3(dirfd, long(path), flags, SYS_unlinkat);
+    long status = syscall3(dirfd, uintptr_t(path),
+                           unsigned(flags), SYS_unlinkat);
 
     if (status >= 0)
         return status;

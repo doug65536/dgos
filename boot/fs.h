@@ -2,6 +2,7 @@
 #include "types.h"
 
 struct fs_api_t {
+    tchar const *name;
     int (*boot_open)(tchar const *filename);
     int (*boot_close)(int file);
     off_t (*boot_filesize)(int file);
@@ -12,6 +13,7 @@ struct fs_api_t {
 extern fs_api_t fs_api;
 
 // Open/close/read file on the boot drive
+tchar const *boot_name();
 int boot_open(tchar const *filename);
 off_t boot_filesize(int file);
 int boot_close(int file);

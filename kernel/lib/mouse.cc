@@ -3,11 +3,21 @@
 #include "printk.h"
 #include "export.h"
 
+#define DEBUG_MOUSE 1
+#if DEBUG_MOUSE
+#define MOUSE_TRACE(...) printdbg("mouse: " __VA_ARGS__)
+#else
+#define MOUSE_TRACE(...) ((void)0)
+#endif
+
 static int accum_x;
 static int accum_y;
 
 EXPORT void mouse_event(mouse_raw_event_t event)
 {
+    MOUSE_TRACE("hdist=%+d, vdist=%+d, buttons=0x%x\n",
+                event.hdist, event.vdist, event.buttons);
+
     accum_x += event.hdist * 10;
     accum_y += -event.vdist * 10;
 

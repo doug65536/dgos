@@ -82,6 +82,10 @@ device/usb_hub.cc
 device/usb_hub.h
 device/usb_storage.cc
 device/usb_storage.h
+device/usb_audio.bits
+device/usb_audio.bits.h
+device/usb_audio.cc
+device/usb_audio.h
 device/usb_xhci.bits
 device/usb_xhci.bits.h
 device/virtio-base.cc
@@ -194,6 +198,7 @@ syscall/syscall_helper.h
 syscall/syscall_helper.cc
 ../AUTHORS
 ../toolchain/build-crossgcc-gcc.patch
+../toolchain/build-crossgcc-gdb.patch
 ../configure.ac
 ../Makefile.am
 ../README

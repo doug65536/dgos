@@ -13,6 +13,26 @@ struct random_access_iterator_tag : public bidirectional_iterator_tag { };
 // C++20
 struct contiguous_iterator_tag: public random_access_iterator_tag { };
 
+template<typename _T, size_t _N>
+_T *begin(_T(&__array)[_N]) noexcept {
+    return __array;
+}
+
+template<typename _T, size_t _N>
+_T *end(_T(&__array)[_N]) noexcept {
+    return __array + _N;
+}
+
+template<typename _T, size_t _N>
+_T *begin(_T const (&__array)[_N]) noexcept {
+    return __array;
+}
+
+template<typename _T, size_t _N>
+_T *end(_T const (&__array)[_N]) noexcept {
+    return __array + _N;
+}
+
 __BEGIN_NAMESPACE_DETAIL
 
 

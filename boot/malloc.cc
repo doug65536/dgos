@@ -54,6 +54,7 @@ struct blk_hdr_t {
 
     _always_inline void make_valid()
     {
+        // It doesn't matter if this is truncated, the LSBs are plenty
         self = uint32_t(intptr_t(this));
     }
 
@@ -260,7 +261,7 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
 
         // Unable to expand in place
         void *other_blk = malloc_aligned(bytes, alignment);
-        if (!other_blk)
+        if (unlikely(!other_blk))
             return nullptr;
 
         memcpy(other_blk, blk + 1, blk->size - sizeof(*blk));

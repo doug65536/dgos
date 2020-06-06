@@ -216,7 +216,7 @@ void virtio_blk_factory_t::found_device(virtio_base_t *device)
 
 int virtio_blk_if_t::io(request_t *request)
 {
-    int cpu_nr = thread_cpu_number();
+    uint32_t cpu_nr = thread_cpu_number();
     unsigned queue_nr = cpu_nr % queue_count;
 
     return per_queue[queue_nr].io(request);
@@ -381,10 +381,10 @@ void virtio_blk_if_t::irq_handler(int offset)
         config_irq();
 
     if (offset == 1 || irq_range.count == 1) {
-        int cpu_nr = thread_cpu_number();
-        int queue_nr = cpu_nr % queue_count;
+        uint32_t cpu_nr = thread_cpu_number();
+        uint32_t queue_nr = cpu_nr % queue_count;
 
-        VIRTIO_BLK_TRACE("IRQ offset=%d, cpu=%d, queue=%d\n",
+        VIRTIO_BLK_TRACE("IRQ offset=%d, cpu=%u, queue=%u\n",
                          offset, cpu_nr, queue_nr);
 
         per_queue[queue_nr].req_queue->recycle_used();
@@ -416,6 +416,11 @@ void virtio_blk_if_t::cleanup_if()
 
 void virtio_blk_if_t::cleanup_dev()
 {
+}
+
+errno_t virtio_blk_if_t::cancel_io(iocp_t *iocp)
+{
+    return errno_t::ENOSYS;
 }
 
 errno_t virtio_blk_if_t::read_async(void *data, int64_t count,

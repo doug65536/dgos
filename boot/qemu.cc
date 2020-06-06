@@ -60,7 +60,7 @@ static int qemu_fw_cfg_detect()
     outw(FW_CFG_PORT_SEL, FW_CFG_SIGNATURE);
     insb(FW_CFG_PORT_DATA, sig, 4);
 
-    if (memcmp(sig, "QEMU", 4))
+    if (unlikely(memcmp(sig, "QEMU", 4)))
         return false;
 
     // Proven
@@ -70,7 +70,7 @@ static int qemu_fw_cfg_detect()
     uint32_t dma_port_signature[2];
     dma_port_signature[0] = inl(FW_CFG_PORT_DMA);
     dma_port_signature[1] = inl(FW_CFG_PORT_DMA + 4);
-    if (!memcmp(&dma_port_signature, "QEMU CFG", sizeof(uint32_t) * 2))
+    if (likely(!memcmp(&dma_port_signature, "QEMU CFG", sizeof(uint32_t) * 2)))
         fw_cfg_detected = 2;
 
     return fw_cfg_detected;
@@ -92,10 +92,10 @@ static inline bool qemu_fw_cfg_has_dma()
 int qemu_selector_by_name(char const * restrict name,
                           uint32_t * restrict file_size_out)
 {
-    if (file_size_out)
+    if (likely(file_size_out))
         *file_size_out = 0;
 
-    if (!qemu_fw_cfg_present())
+    if (likely(!qemu_fw_cfg_present()))
         return -1;
 
     uint32_t file_count;
@@ -112,6 +112,7 @@ int qemu_selector_by_name(char const * restrict name,
     int sel = -1;
 
     for (uint32_t i = 0; i < file_count; ++i) {
+        // Sequentially read one directory entry at a time
         qemu_fw_cfg(&file, sizeof(file), dir_file_size);
 
         if (!strcmp(file.name, name)) {
@@ -154,7 +155,7 @@ bool qemu_fw_cfg(void *buffer, uint32_t size, uint32_t file_size,
         return false;
 
     // DMA has this behaviour, touching one out of bounds byte = fail fast
-    if (uint64_t(file_offset) + size > file_size)
+    if (unlikely(uint64_t(file_offset) + size > file_size))
         return false;
 
     if (unlikely(present == 1)) {
@@ -192,7 +193,8 @@ bool qemu_fw_cfg(void *buffer, uint32_t size, uint32_t file_size,
 
     // A command to select a file
     if (selector >= 0) {
-        cmd->control = htonl(uint32_t(fw_cfg_ctl_t::select) | (selector << 16));
+        cmd->control = htonl(uint32_t(fw_cfg_ctl_t::select) |
+                             (selector << 16));
         ++cmd;
     }
 

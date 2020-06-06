@@ -7,6 +7,7 @@
 #include "printk.h"
 #include "cpu/interrupts.h"
 #include "cpu/control_regs.h"
+#include "thread.h"
 
 typedef int16_t intr_link_t;
 
@@ -159,6 +160,12 @@ void intr_hook(int intr, intr_handler_t handler,
     cpu_scoped_irq_disable irq_dis;
     intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
 
+    assert((intr >= INTR_APIC_DSP_BASE && intr <= INTR_APIC_DSP_LAST &&
+           eoi_handler == eoi_lapic) ||
+           (intr >= INTR_PIC_DSP_BASE && intr <= INTR_PIC_DSP_LAST &&
+           eoi_handler == eoi_i8259) ||
+           eoi_handler == eoi_none);
+
     if (intr_handlers_count == 0) {
         // First time initialization
         intr_first_free = -1;
@@ -195,7 +202,7 @@ void intr_hook(int intr, intr_handler_t handler,
         if (eoi_handler == eoi_auto) {
             if (intr < 32)
                 eoi_handler = eoi_none;
-            else if (intr < INTR_APIC_IRQ_END)
+            else if (intr <= INTR_APIC_IRQ_END)
                 eoi_handler = eoi_lapic;
             else
                 eoi_handler = eoi_i8259;
@@ -279,10 +286,10 @@ int intr_has_handler(int intr)
 
 isr_context_t *intr_invoke(int intr, isr_context_t *ctx)
 {
+    thread_check_stack(intr);
+
     intr_handler_reg_t *entry;
     intr_link_t i = intr_first[intr];
-    // assert not empty handler list
-    assert(i >= 0);
     for ( ; i >= 0 && ctx; i = entry->next) {
         entry = intr_handlers + i;
         ctx = entry->handler(intr, ctx);

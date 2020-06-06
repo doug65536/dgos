@@ -24,7 +24,7 @@ template<typename _T, typename _C>
 class __exception_catcher_t
 {
 public:
-    __exception_catcher_t(_T&& __guarded, _C&& __catcher)
+    __exception_catcher_t(_T&& __guarded, _C&& __catcher) noexcept
         : __guarded(std::forward<_T>(__guarded))
         , __catcher(std::forward<_C>(__catcher))
     {
@@ -43,8 +43,8 @@ public:
 template<typename _T, typename _C>
 void try_catch(_T&& __guarded, _C&& __catcher)
 {
-    __exception_catcher_t ec(std::forward<_T>(__guarded),
-                             std::forward<_C>(__catcher));
+    __exception_catcher_t<_T, _C> ec(std::forward<_T>(__guarded),
+                                     std::forward<_C>(__catcher));
 
     if (__setjmp(__exception_handler_add_owned(&ec.ectx)) == 0) {
         ec.__guarded();

@@ -33,13 +33,6 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
 
     this->name = name;
 
-//    linaddr_t initial_addr = *linear_base_ptr;
-
-//    // Account for space taken creating trees
-
-//    size_t size_adj = *linear_base_ptr - initial_addr;
-//    size -= size_adj;
-
     uintptr_t aligned_base;
 
     bool shared = false;
@@ -239,8 +232,8 @@ EXPORT bool contiguous_allocator_t::take_linear(
 {
     scoped_lock lock(free_addr_lock);
 
+    dump_locked(lock, "---- Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
 #if DEBUG_ADDR_ALLOC
-    //dump("---- Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
 #endif
 
     assert(size > 0);
@@ -401,6 +394,10 @@ EXPORT bool contiguous_allocator_t::take_linear(
     }
 
     assert(free_addr_by_addr.size() == free_addr_by_size.size());
+
+    dump_locked(lock, "---- After Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
+#if DEBUG_ADDR_ALLOC
+#endif
 
     return true;
 }
@@ -590,13 +587,13 @@ EXPORT void contiguous_allocator_t::dump_lockedv(
     printdbg("\nBy addr\n");
     for (tree_t::const_iterator st = free_addr_by_addr.begin(),
          en = free_addr_by_addr.end(), it = st, prev; it != en; ++it) {
-        engineering_t eng(it->second, 0, 1024);
+        engineering_t<uint64_t> eng(it->second, 0, 1024);
 
         if (it != st && prev->first + prev->second < it->first) {
             printdbg("---  addr=%#zx, size=%#zx (%sB)\n",
                      prev->first + prev->second, it->first -
                      (prev->first + prev->second),
-                     engineering_t(it->first -
+                     engineering_t<uint64_t>(it->first -
                                    (prev->first + prev->second),
                                    0, 1024).ptr());
         }

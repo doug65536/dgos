@@ -17,6 +17,12 @@
 #include "bitsearch.h"
 #include "memory.h"
 
+#if defined(_VECTOR_COMPLAIN_EN) && _VECTOR_COMPLAIN_EN
+#define VECTOR_COMPLAIN(...) __VA_ARGS__
+#else
+#define _VECTOR_COMPLAIN(...)
+#endif
+
 __BEGIN_NAMESPACE_STD
 
 template<typename _T, typename _Allocator = allocator<_T>>
@@ -120,24 +126,30 @@ public:
     void clear();
     void reset();
 
+    _VECTOR_COMPLAIN(_use_result)
     iterator insert(const_iterator __pos,
                     _T const& __value);
 
+    _VECTOR_COMPLAIN(_use_result)
     iterator insert(const_iterator __pos,
                     _T&& __value);
 
+    _VECTOR_COMPLAIN(_use_result)
     iterator insert(const_iterator __pos,
                     size_type __count,
                     _T const& __value);
 
     template<typename InputIt>
+    _VECTOR_COMPLAIN(_use_result)
     iterator insert(const_iterator __pos,
                     InputIt __first, InputIt __last);
 
+    _VECTOR_COMPLAIN(_use_result)
     iterator insert(const_iterator __pos,
                     initializer_list<_T> __ilist);
 
     template<typename... _Args >
+    _VECTOR_COMPLAIN(_use_result)
     iterator emplace(const_iterator __pos,
                      _Args&&... __args);
 
@@ -152,13 +164,16 @@ public:
     // Move the last element into the erased position with move constructor
     iterator move_erase(const_iterator __pos);
 
-    bool push_back(_T const& __value);
-    bool push_back(_T&& __value);
+    bool push_back(_T const& __value) noexcept;
+
+    _VECTOR_COMPLAIN(_use_result)
+    bool push_back(_T&& __value) noexcept;
 
     template<typename... _Args>
-    bool emplace_back(_Args&&... __args);
+    _VECTOR_COMPLAIN(_use_result)
+    bool emplace_back(_Args&&... __args) noexcept;
 
-    void pop_back();
+    void pop_back() noexcept;
 
     bool resize(size_type __count);
 
@@ -794,9 +809,11 @@ vector<_T,_Allocator>::insert(
 {
     iterator __it = iterator(__pos.__p);
     pointer place = __make_space(__it, __count);
-    uninitialized_fill(place, place + __count, __value);
+    if (likely(place)) {
+        uninitialized_fill(place, place + __count, __value);
 
-    __sz += __count;
+        __sz += __count;
+    }
 
     return __it;
 }
@@ -810,7 +827,10 @@ vector<_T,_Allocator>::insert(const_iterator __pos,
     iterator __it(__pos.__p);
     size_t __count = __last - __first;
     pointer place = __make_space(__it, __count);
-    uninitialized_copy(__first, __last, place);
+    if (likely(place))
+        uninitialized_copy(__first, __last, place);
+    else
+        __it.__p = nullptr;
 
     return __it;
 }
@@ -884,7 +904,7 @@ vector<_T, _Allocator>::move_erase(const_iterator __pos)
 }
 
 template<typename _T, typename _Allocator>
-bool vector<_T,_Allocator>::push_back(_T const& __value)
+bool vector<_T,_Allocator>::push_back(_T const& __value) noexcept
 {
     if (unlikely(__sz + 1 > __capacity)) {
         if (unlikely(!__grow()))
@@ -899,13 +919,15 @@ bool vector<_T,_Allocator>::push_back(_T const& __value)
 }
 
 template<typename _T, typename _Allocator>
-bool vector<_T,_Allocator>::push_back(_T&& __value)
+bool vector<_T,_Allocator>::push_back(_T&& __value) noexcept
 {
     if (unlikely(__sz + 1 > __capacity)) {
         if (unlikely(!__grow()))
+            // Return with object intact and unmodified
             return false;
     }
 
+    // Move begins when certain memory space exists
     new (__m + __sz) value_type(move(__value));
 
     ++__sz;
@@ -915,7 +937,7 @@ bool vector<_T,_Allocator>::push_back(_T&& __value)
 
 template<typename _T, typename _Allocator>
 template<typename... _Args>
-bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
+bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args) noexcept
 {
     if (unlikely(__sz + 1 > __capacity)) {
         if (unlikely(!__grow()))
@@ -930,7 +952,7 @@ bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::pop_back()
+void vector<_T,_Allocator>::pop_back() noexcept
 {
     __alloc.destruct(__m + --__sz);
 }

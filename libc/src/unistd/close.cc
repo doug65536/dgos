@@ -6,7 +6,7 @@
 
 int close(int fd)
 {
-    long status = syscall1(long(fd), SYS_close);
+    long status = syscall1(fd, SYS_close);
 
     if (status >= 0)
         return status;

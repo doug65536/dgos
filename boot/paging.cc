@@ -80,7 +80,7 @@ static pte_t *paging_find_pte(addr64_t linear_addr,
         pte_t next_segment = (pte & PTE_ADDR);
 
         if (next_segment == 0) {
-            if (!create)
+            if (unlikely(!create))
                 return nullptr;
 
             // Allocate a page table on first use
@@ -398,7 +398,7 @@ void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
     // F is phys_addr + length rounded up to a 4KB boundary          //
     // B is A rounded up to a 2MB boundary                           //
     // C is B rounded up to a 1GB boundary                           //
-    // E is F rounded down to a 1MB boundary                         //
+    // E is F rounded down to a 2MB boundary                         //
     // D is E rounded down to a 1GB boundary                         //
     //                                                               //
     // r = B - A (4KB pages)                                         //
@@ -548,7 +548,7 @@ uint32_t paging_root_addr()
 
 // Identity map the first 64KB of physical addresses and
 // prepare to populate tables
-_constructor(500) void paging_init()
+_constructor(ctor_paging) static void paging_init()
 {
     // Clear the root page directory
     root_page_dir = (pte_t*)malloc_aligned(PAGE_SIZE, PAGE_SIZE);

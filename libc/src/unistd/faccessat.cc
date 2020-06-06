@@ -6,7 +6,8 @@
 
 int faccessat(int dirfd, char const *path, int mode, int flags)
 {
-    long status = syscall4(dirfd, long(path), mode, flags, SYS_faccessat);
+    long status = syscall4(dirfd, uintptr_t(path), unsigned(mode),
+                           unsigned(flags), SYS_faccessat);
 
     if (status >= 0)
         return status;

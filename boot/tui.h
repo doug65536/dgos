@@ -9,15 +9,15 @@ struct tui_str_t
     {
     }
 
-    constexpr tui_str_t(tchar const *txt, size_t sz)
-        : len(sz)
+    template<size_t sz>
+    constexpr tui_str_t(tchar const(&txt)[sz])
+        : len(sz-1)
         , str(txt)
     {
     }
 
-    template<size_t sz>
-    constexpr tui_str_t(tchar const(&txt)[sz])
-        : len(sz-1)
+    constexpr tui_str_t(tchar const *txt, size_t sz)
+        : len(sz)
         , str(txt)
     {
     }
@@ -44,7 +44,7 @@ struct tui_list_t {
     {
     }
 
-    template<int sz>
+    template<size_t sz>
     constexpr tui_list_t(T(&items)[sz])
         : count(sz)
         , items(items)
@@ -56,23 +56,23 @@ struct tui_list_t {
         return items[index];
     }
 
-    int count;
+    size_t count;
     T * items;
 };
 
 struct tui_menu_item_t {
     tui_str_t title;
     tui_list_t<tui_str_t> options;
-    int index;
+    size_t index;
 };
 
 class tui_menu_renderer_t {
 public:
-    tui_menu_renderer_t(tui_list_t<tui_menu_item_t> *items);
+    constexpr tui_menu_renderer_t(tui_list_t<tui_menu_item_t> *items);
 
-    void center();
+    void center(int offset = 0);
     void position(int x, int y);
-    void draw(int selection);
+    void draw(size_t index, size_t selected, bool full);
     void interact_timeout(int ms);
 
 private:
@@ -80,13 +80,23 @@ private:
     void resize(int width, int height);
 
     tui_list_t<tui_menu_item_t> *items;
-    int left;
-    int top;
-    int right;
-    int bottom;
-    int max_title;
-    int max_value;
+
+    int dirty_st = -1;
+    int dirty_en = -1;
+    int left = 0;
+    int top = 0;
+    int right = 0;
+    int bottom = 0;
+    int max_title = 0;
+    int max_value = 0;
+    int scroll_pos = 0;
 };
+
+constexpr tui_menu_renderer_t::tui_menu_renderer_t(
+        tui_list_t<tui_menu_item_t> *items)
+    : items(items)
+{
+}
 
 int readkey();
 int64_t systime();
@@ -100,3 +110,5 @@ struct mouse_evt {
     int lmb;
     int rmb;
 };
+
+extern tui_str_t tui_dis_ena[2];

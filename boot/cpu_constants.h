@@ -4,7 +4,6 @@
 
 
 // IA32_EFER MSR
-
 #define CPU_MSR_EFER            0xC0000080U
 
 #define CPU_MSR_EFER_LME_BIT    8
@@ -12,6 +11,9 @@
 
 #define CPU_MSR_EFER_LME        (1U << CPU_MSR_EFER_LME_BIT)
 #define CPU_MSR_EFER_NX         (1U << CPU_MSR_EFER_NX_BIT)
+
+// IA32_XSS MSR
+#define CPU_MSR_IA32_XSS        0xDA0
 
 //
 // APIC_BASE MSR

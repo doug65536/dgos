@@ -19,6 +19,8 @@
 #include "stacktrace.h"
 #include "apic.h"
 #include "elf64.h"
+#include "perf.h"
+#include "utility.h"
 
 // Enforce that we use the correct value in syscall.S
 C_ASSERT(SYSCALL_RFLAGS == (CPU_EFLAGS_IF | 2));
@@ -31,30 +33,33 @@ intr_handler_t isr_lookup[256];
 
 idt_entry_64_t idt[256];
 
+std::pair<void *, void *> ist_stacks[MAX_CPUS][IDT_IST_SLOT_COUNT];
+
 static idt_unhandled_exception_handler_t unhandled_exception_handler_vec;
 
 uint32_t xsave_supported_states;
 uint32_t xsave_enabled_states;
 
 static format_flag_info_t const cpu_eflags_info[] = {
-    { "ID",   1,                    nullptr, CPU_EFLAGS_ID_BIT   },
-    { "VIP",  1,                    nullptr, CPU_EFLAGS_VIP_BIT  },
-    { "VIF",  1,                    nullptr, CPU_EFLAGS_VIF_BIT  },
-    { "AC",   1,                    nullptr, CPU_EFLAGS_AC_BIT   },
-    { "VM",   1,                    nullptr, CPU_EFLAGS_VM_BIT   },
-    { "RF",   1,                    nullptr, CPU_EFLAGS_RF_BIT   },
-    { "NT",   1,                    nullptr, CPU_EFLAGS_NT_BIT   },
-    { "IOPL", CPU_EFLAGS_IOPL_MASK, nullptr, CPU_EFLAGS_IOPL_BIT },
-    { "OF",   1,                    nullptr, CPU_EFLAGS_OF_BIT   },
-    { "DF",   1,                    nullptr, CPU_EFLAGS_DF_BIT   },
-    { "IF",   1,                    nullptr, CPU_EFLAGS_IF_BIT   },
-    { "TF",   1,                    nullptr, CPU_EFLAGS_TF_BIT   },
-    { "SF",   1,                    nullptr, CPU_EFLAGS_SF_BIT   },
-    { "ZF",   1,                    nullptr, CPU_EFLAGS_ZF_BIT   },
-    { "AF",   1,                    nullptr, CPU_EFLAGS_AF_BIT   },
-    { "PF",   1,                    nullptr, CPU_EFLAGS_PF_BIT   },
-    { "CF",   1,                    nullptr, CPU_EFLAGS_CF_BIT   },
-    { nullptr,0,                    nullptr, -1                  }
+    { "ID",   1,                    nullptr, CPU_EFLAGS_ID_BIT     },
+    { "1",    1,                    nullptr, CPU_EFLAGS_ALWAYS_BIT },
+    { "VIP",  1,                    nullptr, CPU_EFLAGS_VIP_BIT    },
+    { "VIF",  1,                    nullptr, CPU_EFLAGS_VIF_BIT    },
+    { "AC",   1,                    nullptr, CPU_EFLAGS_AC_BIT     },
+    { "VM",   1,                    nullptr, CPU_EFLAGS_VM_BIT     },
+    { "RF",   1,                    nullptr, CPU_EFLAGS_RF_BIT     },
+    { "NT",   1,                    nullptr, CPU_EFLAGS_NT_BIT     },
+    { "IOPL", CPU_EFLAGS_IOPL_MASK, nullptr, CPU_EFLAGS_IOPL_BIT   },
+    { "OF",   1,                    nullptr, CPU_EFLAGS_OF_BIT     },
+    { "DF",   1,                    nullptr, CPU_EFLAGS_DF_BIT     },
+    { "IF",   1,                    nullptr, CPU_EFLAGS_IF_BIT     },
+    { "TF",   1,                    nullptr, CPU_EFLAGS_TF_BIT     },
+    { "SF",   1,                    nullptr, CPU_EFLAGS_SF_BIT     },
+    { "ZF",   1,                    nullptr, CPU_EFLAGS_ZF_BIT     },
+    { "AF",   1,                    nullptr, CPU_EFLAGS_AF_BIT     },
+    { "PF",   1,                    nullptr, CPU_EFLAGS_PF_BIT     },
+    { "CF",   1,                    nullptr, CPU_EFLAGS_CF_BIT     },
+    { nullptr,0,                    nullptr, -1                    }
 };
 
 static char const *cpu_mxcsr_rc[] = {
@@ -98,7 +103,9 @@ static format_flag_info_t const cpu_fpucw_info[] = {
     { "UM",     1,                  nullptr,      CPU_FPUCW_UM_BIT },
     { "PM",     1,                  nullptr,      CPU_FPUCW_PM_BIT },
     { "PC",     CPU_FPUCW_PC_BITS,  cpu_fpucw_pc, CPU_FPUCW_PC_BIT },
+    // This looks like a bug but no, it is sharing the mxcsr lookup table:
     { "RC",     CPU_FPUCW_RC_BITS,  cpu_mxcsr_rc, CPU_FPUCW_RC_BIT },
+    { "1",      1,                  nullptr,      CPU_FPUCW_ALWAYS_BIT },
     { nullptr,  0,                  nullptr,      -1               }
 };
 
@@ -173,11 +180,9 @@ static void idtr_load(table_register_64_t *table_reg)
 
 extern "C" isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx);
 extern "C" isr_context_t *pic8259_dispatcher(int intr, isr_context_t *ctx);
-extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
 extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx);
 
-_constructor(ctor_ctors_ran)
-static void isr_lookup_init()
+_constructor(ctor_ctors_ran) static void isr_lookup_init()
 {
     // Interrupt dispatch
     // 0x00-0x1F -> exception_isr_handler
@@ -185,21 +190,26 @@ static void isr_lookup_init()
     // 0x30-0xEF -> apic_dispatcher
     // 0xF0-0xFF -> pic_dispatcher
 
-    for (size_t i = 0; i < 0x20; ++i)
+    for (size_t i = INTR_EX_BASE; i <= INTR_EX_LAST; ++i)
         isr_lookup[i] = exception_isr_handler;
+
+    isr_lookup[INTR_EX_NMI] = intr_invoke;
 
     // Couple of special cases
     isr_lookup[INTR_EX_GPF] = cpu_gpf_handler;
     isr_lookup[INTR_EX_PAGE] = mmu_page_fault_handler;
 
-    for (size_t i = 0x20; i < INTR_APIC_DSP_BASE; ++i)
+    for (size_t i = INTR_SOFT_BASE; i <= INTR_SOFT_LAST; ++i)
         isr_lookup[i] = intr_invoke;
 
-    for (size_t i = INTR_APIC_DSP_BASE; i < 0xF0; ++i)
+    for (size_t i = INTR_APIC_DSP_BASE; i <= INTR_APIC_DSP_LAST; ++i)
         isr_lookup[i] = apic_dispatcher;
 
-    for (size_t i = 0xF0; i < 0xF0 + 16; ++i)
+    for (size_t i = INTR_PIC_DSP_BASE; i <= INTR_PIC_DSP_LAST; ++i)
         isr_lookup[i] = pic8259_dispatcher;
+
+    for (size_t i = 0; i < 255; ++i)
+        assert(isr_lookup[i] != intr_handler_t(nullptr));
 }
 
 // Assume the worst
@@ -211,80 +221,96 @@ void idt_xsave_detect(int ap)
 
     // Patch FS/GS loading code if CPU supports wrfsbase/wrgsbase
 
+    if (!ap)
+        xsave_support = xsave_support_t::FXSAVE;
+
     while (cpuid_has_xsave()) {
         cpuid_t info;
 
-        xsave_support = xsave_support_t::FXSAVE;
-
         // Get size of save area
-        if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
-            break;
+        bool cpuid_ok = cpuid(&info, CPUID_INFO_XSAVE, 0);
+        assert(cpuid_ok);
 
-        xsave_support = xsave_support_t::XSAVE;
+        if (!ap) {
+            xsave_support = xsave_support_t::XSAVE;
 
-        // Store size of save area
-        assert(info.ebx < UINT16_MAX);
-        sse_context_size = (info.ebx + 15) & -16;
+            // Store size of save area
+            assert(info.ebx < UINT16_MAX);
+            sse_context_size = (info.ebx + 15) & -16;
+        }
 
         // Use compact format if available
-        if (cpuid(&info, CPUID_INFO_XSAVE, 1)) {
-            // xsave area must be aligned on a 64 byte boundary
+        // xsave area must be aligned on a 64 byte boundary
+        if (!ap)
             sse_context_size = (sse_context_size + 63) & -64;
 
-			if (info.eax & (1 << 3)) {
-                // xsaves available, awesome!
+        if (cpuid_has_xsaves()) {
+            // xsaves available, awesome!
 
+            if (!ap)
                 xsave_support = xsave_support_t::XSAVES;
 
-			} else if (info.eax & (1 << 0)) {
-                // xsaveopt available, pretty good
+            cpu_msr_set(CPU_MSR_IA32_XSS, 0);
+        } else if (cpuid_has_xsavec()) {
+            // xsavec available
 
-                xsave_support = xsave_support_t::XSAVEOPT;
-
-            } else if (info.eax & (1 << 1)) {
-                // xsavec available
-
+            if (!ap)
                 xsave_support = xsave_support_t::XSAVEC;
 
-            }
+        } else if (cpuid_has_xsaveopt()) {
+            // xsaveopt available
+
+            if (!ap)
+                xsave_support = xsave_support_t::XSAVEOPT;
+
         }
 
         // Save offsets/sizes of extended contexts
 
-        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX_BIT)) {
+        if (cpuid_has_avx() && cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX_BIT)) {
             assert(info.ebx < UINT16_MAX);
             assert(info.eax < UINT16_MAX);
             assert(info.ebx + info.eax <= UINT16_MAX);
 
-            sse_avx_offset = (uint16_t)info.ebx;
-            sse_avx_size = (uint16_t)info.eax;
+            if (!ap) {
+                sse_avx_offset = (uint16_t)info.ebx;
+                sse_avx_size = (uint16_t)info.eax;
+            }
         }
 
-        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_OPMASK_BIT)) {
-            assert(info.ebx < UINT16_MAX);
-            assert(info.eax < UINT16_MAX);
-            assert(info.ebx + info.eax <= UINT16_MAX);
+        if (cpuid_has_avx512f()) {
+            if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_OPMASK_BIT)) {
+                assert(info.ebx < UINT16_MAX);
+                assert(info.eax < UINT16_MAX);
+                assert(info.ebx + info.eax <= UINT16_MAX);
 
-            sse_avx512_opmask_offset = (uint16_t)info.ebx;
-            sse_avx512_opmask_size = (uint16_t)info.eax;
-        }
+                if (!ap) {
+                    sse_avx512_opmask_offset = (uint16_t)info.ebx;
+                    sse_avx512_opmask_size = (uint16_t)info.eax;
+                }
+            }
 
-        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_UPPER_BIT)) {
-            assert(info.ebx < UINT16_MAX);
-            assert(info.eax < UINT16_MAX);
-            assert(info.ebx + info.eax <= UINT16_MAX);
+            if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_UPPER_BIT)) {
+                assert(info.ebx < UINT16_MAX);
+                assert(info.eax < UINT16_MAX);
+                assert(info.ebx + info.eax <= UINT16_MAX);
 
-            sse_avx512_upper_offset = (uint16_t)info.ebx;
-            sse_avx512_upper_size = (uint16_t)info.eax;
-        }
+                if (!ap) {
+                    sse_avx512_upper_offset = (uint16_t)info.ebx;
+                    sse_avx512_upper_size = (uint16_t)info.eax;
+                }
+            }
 
-        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_XREGS_BIT)) {
-            assert(info.ebx < UINT16_MAX);
-            assert(info.eax < UINT16_MAX);
-            assert(info.ebx + info.eax <= UINT16_MAX);
+            if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_XREGS_BIT)) {
+                assert(info.ebx < UINT16_MAX);
+                assert(info.eax < UINT16_MAX);
+                assert(info.ebx + info.eax <= UINT16_MAX);
 
-            sse_avx512_xregs_offset = (uint16_t)info.ebx;
-            sse_avx512_xregs_size = (uint16_t)info.eax;
+                if (!ap) {
+                    sse_avx512_xregs_offset = (uint16_t)info.ebx;
+                    sse_avx512_xregs_size = (uint16_t)info.eax;
+                }
+            }
         }
 
         // Sanity check offsets
@@ -393,15 +419,6 @@ int idt_init(int ap)
         idt[INTR_EX_DBLFAULT].ist = IDT_IST_SLOT_DBLFAULT;
         idt[INTR_IPI_FL_TRACE].ist = IDT_IST_SLOT_FLUSH_TRACE;
         idt[INTR_EX_NMI].ist = IDT_IST_SLOT_NMI;
-        //idt[INTR_EX_TSS].ist = 3;
-        //idt[INTR_EX_GPF].ist = 4;
-        //idt[INTR_EX_PAGE].ist = 5;
-
-//        intr_hook(INTR_EX_DEBUG, debug_exception_handler,
-//                  "debug", eoi_none);
-
-//        intr_hook(INTR_EX_OPCODE, opcode_exception_handler,
-//                  "#UD", eoi_none);
     }
 
     table_register_64_t idtr;
@@ -553,32 +570,37 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
 //    printk("at cfa=%#16zx ip=%#16zx\n", rbp, rip);
 //}
 
+// In pop order if you were restoring context
+static char const *reg_names[] = {
+    // Clobbered parameter registers below here
+    "rdi",
+    "rsi",
+    "rdx",
+    "rcx",
+    " r8",
+    " r9",
+    // Clobbered registers below here
+    "rax",
+    "r10",
+    "r11",
+    // Call preserved below here
+    "r12",
+    "r13",
+    "r14",
+    "r15",
+    "rbx",
+    "rbp"
+};
+
+static char const *seg_names[] = {
+    "ds", "es", "fs", "gs"
+};
+
 void dump_context(isr_context_t *ctx, int to_screen)
 {
     char fmt_buf[64];
     int color = 0x0F;
     int width;
-    static char const *reg_names[] = {
-        "rdi",
-        "rsi",
-        "rdx",
-        "rcx",
-        " r8",
-        " r9",
-        "rax",
-        "rbx",
-        "r10",
-        "r11",
-        "r12",
-        "r13",
-        "r14",
-        "r15",
-        "rbp"
-    };
-
-    static char const *seg_names[] = {
-        "ds", "es", "fs", "gs"
-    };
 
     void *fsbase = thread_get_fsbase(-1);
     void *gsbase = thread_get_gsbase(-1);
@@ -629,9 +651,13 @@ void dump_context(isr_context_t *ctx, int to_screen)
                  ctx->gpr.s.r[i]);
     }
 
-    printdbg("ss:rsp=%#4lx:%#016lx\n", ISR_CTX_REG_SS(ctx), ISR_CTX_REG_RSP(ctx));
-    printdbg("cs:rip=%#4lx:%#016zx\n", ISR_CTX_REG_CS(ctx),
-             uintptr_t(ISR_CTX_REG_RIP(ctx)));
+    printdbg("cs:rip=%#4zx:%#016zx\n",
+             ISR_CTX_REG_CS(ctx),
+             uintptr_t((void*)ISR_CTX_REG_RIP(ctx)));
+
+    printdbg("ss:rsp=%#4zx:%#016zx\n",
+             ISR_CTX_REG_SS(ctx),
+             ISR_CTX_REG_RSP(ctx));
 
     // Exception
     if (ISR_CTX_INTR(ctx) < 32) {
@@ -684,6 +710,20 @@ void dump_context(isr_context_t *ctx, int to_screen)
                  modload_get_name(closest_module).c_str(),
                  rip - modload_get_base(closest_module));
     }
+
+    printdbg("-------------------------------------------\n");
+
+    void *stacktrace_addrs[32];
+    size_t frame_cnt = stacktrace(stacktrace_addrs,
+                                  countof(stacktrace_addrs));
+
+    for (size_t i = 0; i < frame_cnt; ++i)
+        printdbg("[%zu] rip=%#zx\n",
+                 i, uintptr_t(stacktrace_addrs[i]));
+
+    printdbg("- - - - - - - - - - - - - - - - - - - - - -\n");
+
+    perf_stacktrace_xlat(stacktrace_addrs, frame_cnt);
 
     printdbg("-------------------------------------------\n");
 
@@ -841,6 +881,24 @@ void idt_set_unhandled_exception_handler(
     unhandled_exception_handler_vec = handler;
 }
 
+void idt_set_ist_stack(size_t cpu_nr, size_t ist_slot, void *st, void *en)
+{
+    assert(cpu_nr < MAX_CPUS);
+    assert(ist_slot < IDT_IST_SLOT_COUNT);
+    ist_stacks[cpu_nr][ist_slot] = { st, en };
+}
+
+std::pair<void *, void *> idt_get_ist_stack(size_t cpu_nr, size_t ist_slot)
+{
+    assert(cpu_nr < MAX_CPUS);
+    assert(ist_slot < IDT_IST_SLOT_COUNT);
+
+    if (ist_slot == 0)
+        return { nullptr, nullptr };
+
+    return ist_stacks[cpu_nr][ist_slot];
+}
+
 void idt_override_vector(int intr, irq_dispatcher_handler_t handler)
 {
     idt[intr].offset_lo = uint16_t(uintptr_t(handler) >> 0);
@@ -853,12 +911,14 @@ void idt_clone_debug_exception_dispatcher(void)
     // From linker script
     extern char ___isr_st[];
     extern char ___isr_en[];
-    char const * bp_entry = (char const *)isr_entry_point(3);
-    char const * debug_entry = (char const *)isr_entry_point(1);
+    char const * bp_entry = (char const *)isr_entry_point(INTR_EX_BREAKPOINT);
+    char const * debug_entry = (char const *)isr_entry_point(INTR_EX_DEBUG);
+    char const * nmi_entry = (char const *)isr_entry_point(INTR_EX_NMI);
 
     size_t isr_size = ___isr_en - ___isr_st;
     size_t bp_entry_ofs = bp_entry - ___isr_st;
     size_t debug_entry_ofs = debug_entry - ___isr_st;
+    size_t nmi_entry_ofs = nmi_entry - ___isr_st;
 
     char *clone = (char*)mmap(nullptr, isr_size,
                               PROT_READ | PROT_WRITE | PROT_EXEC,
@@ -870,9 +930,11 @@ void idt_clone_debug_exception_dispatcher(void)
 
     auto clone_breakpoint = irq_dispatcher_handler_t(clone + bp_entry_ofs);
     auto clone_debug = irq_dispatcher_handler_t(clone + debug_entry_ofs);
+    auto clone_nmi = irq_dispatcher_handler_t(clone + nmi_entry_ofs);
 
     idt_override_vector(INTR_EX_BREAKPOINT, clone_breakpoint);
     idt_override_vector(INTR_EX_DEBUG, clone_debug);
+    idt_override_vector(INTR_EX_NMI, clone_nmi);
 }
 
 extern char const isr_entry_st[];

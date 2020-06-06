@@ -7,12 +7,14 @@
 #include "mutex.h"
 #include "inttypes.h"
 #include "stdlib.h"
+#include "idt.h"
+#include "main.h"
 
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
 C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
-#define TSS_STACK_SIZE (64 << 10)
+#define TSS_STACK_SIZE (16 << 10)
 
 // Must match control_regs_constants.h GDT_SEL_* defines!
 __aligned(64) gdt_entry_combined_t gdt[24] = {
@@ -120,10 +122,12 @@ void gdt_init_tss(size_t cpu_count)
     //tss_list = (tss_t*)mmap(nullptr, sizeof(*tss_list) * cpu_count,
     //                       PROT_READ | PROT_WRITE, MAP_POPULATE);
 
-    size_t constexpr stack_count_per_cpu = 5;
+    size_t constexpr stack_count_per_cpu = IDT_IST_SLOT_COUNT;
 
     size_t stacks_nr = cpu_count * stack_count_per_cpu;
     size_t stacks_sz = TSS_STACK_SIZE * stacks_nr;
+
+    printdbg("Allocating %zuKB per-cpu stacks\n", stacks_sz >> 10);
 
     // Map space for all the stacks
     char *stacks_base = (char*)mmap(
@@ -133,14 +137,13 @@ void gdt_init_tss(size_t cpu_count)
         panic_oom();
     char *stacks_alloc = stacks_base;
 
-    for (size_t i = 0; i < cpu_count; ++i) {
-        tss_t *tss = tss_list + i;
+    for (size_t cpu_nr = 0; cpu_nr < cpu_count; ++cpu_nr) {
+        tss_t *tss = tss_list + cpu_nr;
 
         tss->iomap_base = uint16_t(uintptr_t(tss + 1) - uintptr_t(tss));
 
         for (size_t st = 0; st < stack_count_per_cpu; ++st) {
             char *stack = stacks_alloc;
-
             stacks_alloc += TSS_STACK_SIZE;
 
             char *stack_st = stack + PAGE_SIZE;
@@ -150,7 +153,7 @@ void gdt_init_tss(size_t cpu_count)
             madvise(stack_st, stack_en - stack_st, MADV_WILLNEED);
 
             printdbg("Allocated IST cpu=%zu slot=%zu at %#zx\n",
-                     i, st, (uintptr_t)stack);
+                     cpu_nr, st, (uintptr_t)stack);
 
             tss->stack[st] = stack;
 
@@ -159,6 +162,12 @@ void gdt_init_tss(size_t cpu_count)
             else
                 tss->rsp[0] = uintptr_t(stack) + TSS_STACK_SIZE;
 
+            if (cpu_nr || st)
+                idt_set_ist_stack(cpu_nr, st, stack, stack + TSS_STACK_SIZE);
+            else
+                idt_set_ist_stack(cpu_nr, st, kernel_stack,
+                                  kernel_stack + kernel_stack_size);
+
             assert(tss->reserved0 == 0);
             assert(tss->reserved3 == 0);
             assert(tss->reserved4 == 0);
@@ -166,7 +175,7 @@ void gdt_init_tss(size_t cpu_count)
         }
     }
 
-   callout_call(callout_type_t::tss_list_ready);
+    callout_call(callout_type_t::tss_list_ready);
 }
 
 extern tss_t early_tss;

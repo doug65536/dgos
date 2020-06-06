@@ -35,6 +35,7 @@ private:
     using base = acpi_gas_mask_t<size>;
 public:
     using typename base::value_type;
+    using base::mask_shift;
 
     acpi_gas_accessor_sysmem_t(uint64_t mem_addr, int bitofs, int bitwidth)
         : acpi_gas_mask_t<size>(bitofs, bitwidth)
@@ -57,7 +58,7 @@ public:
         if (base::mask == value_type(-1))
             *mem = value_type(value);
         else
-            *mem = base::mask_shift(*mem, value);
+            *mem = mask_shift(*mem, value);
     }
 
 private:
@@ -149,7 +150,7 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_gas(acpi_gas_t const& gas)
     }
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_sysmem(uint64_t addr, int size,
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_sysmem(uint_fast64_t addr, int size,
                                                       int bitofs, int bitwidth)
 {
     switch (size) {
@@ -165,7 +166,7 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_sysmem(uint64_t addr, int size,
     }
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_pcicfg(uint32_t addr, int size,
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_pcicfg(uint_fast32_t addr, int size,
                                                       int bitofs, int bitwidth)
 {
     switch (size) {
@@ -181,8 +182,7 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_pcicfg(uint32_t addr, int size,
     }
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_ioport(uint16_t ioport, int size,
-                                                      int bitofs, int bitwidth)
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_ioport(uint_fast16_t ioport, int size, int bitofs, int bitwidth)
 {
 #if defined(__x86_64__) || defined(__i386__)
     switch (size) {
@@ -200,7 +200,7 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_ioport(uint16_t ioport, int size,
 #endif
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_fixed(uint16_t ioport, int size,
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_fixed(uint_fast16_t ioport, int size,
                                                      int bitofs, int bitwidth)
 {
     return from_ioport(ioport, size, bitofs, bitwidth);

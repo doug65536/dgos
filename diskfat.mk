@@ -7,17 +7,16 @@
 # Copy the entire bootfat-bin into sector 2 of the partition
 #  (Avoids overwriting FS information sector)
 
+DISK_SIZE_MB=256
+
 $(top_builddir)/fatpart.img: \
 		$(top_srcdir)/diskfat.mk \
 		\
-		$(top_builddir)/dgos-kernel-generic \
-		$(top_builddir)/kernel-generic \
+		dgos-kernel-generic \
 		\
-		$(top_builddir)/dgos-kernel-tracing \
-		$(top_builddir)/kernel-tracing \
+		dgos-kernel-tracing \
 		\
-		$(top_builddir)/dgos-kernel-asan \
-		$(top_builddir)/kernel-asan \
+		dgos-kernel-asan \
 		\
 		$(top_builddir)/bootx64.efi \
 		\
@@ -43,13 +42,13 @@ $(top_builddir)/fatpart.img: \
 		\
 		$(MODULE_LIST)
 	set -x && \
-		rm -f $(top_builddir)/fatpart.img \
+		$(RM) -f $(top_builddir)/fatpart.img \
 			$(top_builddir)/mbrdisk.img \
 			$(top_builddir)/gptdisk.img && \
 		\
-		truncate --size=96M $(top_builddir)/fatpart.img && \
+		$(TRUNCATE) --size="$(DISK_SIZE_MB)M" $(top_builddir)/fatpart.img && \
 		\
-		mkfs.vfat \
+		$(MKFS_VFAT) \
 			-F 32 \
 			-S $(SECTOR_SZ) \
 			-R $$(( 0x10000 / $(SECTOR_SZ) )) \
@@ -94,11 +93,11 @@ DGOS_UUID=0615151f-d802-4edf-914a-734dc4f03687
 
 $(top_builddir)/mbrdisk.img: \
 		fatpart.img
-	truncate --size=128M $(top_builddir)/mbrdisk.img && \
+	$(TRUNCATE) --size="$(DISK_SIZE_MB)M" $(top_builddir)/mbrdisk.img && \
 		\
 		printf 'label: dos\nlength=2048, uuid=%s, name=DGOS, bootable\n' \
 				$(DGOS_GUID) | \
-			sfdisk $(top_builddir)/mbrdisk.img && \
+			$(SFDISK) $(top_builddir)/mbrdisk.img && \
 			\
 		$(DD) if=$(top_builddir)/fatpart.img \
 			of=$(top_builddir)/mbrdisk.img \
@@ -120,19 +119,19 @@ $(top_builddir)/mbrdisk.img: \
 			conv=notrunc
 
 $(top_builddir)/gptdisk.img: fatpart.img
-	truncate --size=128M $(top_builddir)/gptdisk.img && \
+	$(TRUNCATE) --size=256M $(top_builddir)/gptdisk.img && \
 	\
 		printf 'label: gpt\n2048,,U,*' | \
 			sfdisk $(top_builddir)/gptdisk.img && \
 			\
-		sgdisk -A 1:set:2 $(top_builddir)/gptdisk.img && \
+		$(SGDISK) -A 1:set:2 -h 1 $(top_builddir)/gptdisk.img && \
 		\
 		$(DD) if=$(top_builddir)/fatpart.img \
 			of=$(top_builddir)/gptdisk.img \
 			bs=$(SECTOR_SZ) \
 			seek=2048 \
 			conv=notrunc && \
-			\
+		\
 		$(DD) if=$(top_builddir)/mbr-bin \
 			of=$(top_builddir)/gptdisk.img \
 			bs=1 \
@@ -151,3 +150,6 @@ $(top_builddir)/mbrdisk.qcow: $(top_builddir)/mbrdisk.img
 
 $(top_builddir)/gptdisk.qcow: $(top_builddir)/gptdisk.img
 	$(QEMU_IMG) convert -f raw -O qcow -p $< $@
+
+$(top_builddir)/gptdisk.qcow.img: $(top_builddir)/gptdisk.qcow
+	$(QEMU_IMG) convert -f qcow -O raw -p $< $@

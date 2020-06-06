@@ -21,6 +21,13 @@ struct table_register_64_t {
     uintptr_t base;
 };
 
+static _always_inline void cpu_halt()
+{
+    __asm__ __volatile__ (
+        "hlt"
+    );
+}
+
 static _always_inline uint64_t cpu_msr_get(uint32_t msr)
 {
     uint32_t lo, hi;
@@ -426,6 +433,11 @@ static _always_inline void cpu_gsbase_set(void *gs_base)
     cpu_msr_set(CPU_MSR_GSBASE, (uintptr_t)gs_base);
 }
 
+static _always_inline void *cpu_gsbase_get()
+{
+    return (void*)cpu_msr_get(CPU_MSR_GSBASE);
+}
+
 static _always_inline void cpu_altgsbase_set(void *gs_base)
 {
     cpu_msr_set(CPU_MSR_KGSBASE, (uintptr_t)gs_base);
@@ -585,6 +597,62 @@ static _always_inline void cpu_fninit()
 {
     __asm__ __volatile__ (
         "fninit\n\t"
+    );
+}
+
+static _always_inline void cpu_fxsave64_insn_fixup(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "fxsave64 (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+static _always_inline void cpu_fxrstor64_insn_fixup(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "fxrstor64 (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+static _always_inline void cpu_fxsave32_insn_fixup(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "fxsave (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+static _always_inline void cpu_fxrstor_insn_fixup(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "fxrstor (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
     );
 }
 

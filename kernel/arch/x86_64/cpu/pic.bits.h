@@ -397,73 +397,33 @@
 // PIC_OCW2_OP_RAEM: Rotate in automatic EOI mode (clear)
 #define PIC_OCW2_OP_RAEM 0
 
-
-
-
-
-
 //
 // PIC_OCW2_OP_EOI: Non-specific EOI
 #define PIC_OCW2_OP_EOI 1
-
-
-
-
-
 
 //
 // PIC_OCW2_OP_NOP: No operation
 #define PIC_OCW2_OP_NOP 2
 
-
-
-
-
-
 //
 // PIC_OCW2_OP_SEOI: Specific EOI
 #define PIC_OCW2_OP_SEOI 3
-
-
-
-
-
 
 //
 // PIC_OCW2_OP_RAEOI: Rotate in automatic EOI mode (set)
 #define PIC_OCW2_OP_RAEOI 4
 
-
-
-
-
-
 //
 // PIC_OCW2_OP_RNSEOI: Rotate on non-specific EOI
 #define PIC_OCW2_OP_RNSEOI 5
-
-
-
-
-
 
 //
 // PIC_OCW2_OP_SETPRIO: Set priority
 #define PIC_OCW2_OP_SETPRIO 6
 
-
-
-
-
-
 //
 // PIC_OCW2_OP_RSEOI: Rotate on specific EOI
 #define PIC_OCW2_OP_RSEOI 7
-
-
-
-
-
 
 // PIC_OCW3
 #define PIC_OCW3               0

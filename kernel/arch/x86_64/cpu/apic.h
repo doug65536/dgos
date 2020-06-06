@@ -3,6 +3,7 @@
 #include "irq.h"
 
 int apic_init(int ap);
+void apic_init_timer();
 void apic_start_smp(void);
 void apic_init_apic_smp();
 unsigned apic_get_id(void);
@@ -12,8 +13,8 @@ size_t apic_cpu_count();
 // if target_apic_id is <= -2, sends to all CPUs
 // if target_apic_id is == -1, sends to other CPUs
 // if target_apid_id is >= 0, sends to specific APIC ID
-void apic_send_ipi(int target_apic_id, uint8_t intr);
-void apic_send_ipi_noinst(int target_apic_id, uint8_t intr);
+void apic_send_ipi(int32_t target_apic_id, uint8_t intr);
+void apic_send_ipi_noinst(int32_t target_apic_id, uint8_t intr);
 
 void apic_eoi(int intr);
 void apic_eoi_noinst(int intr);
@@ -23,7 +24,7 @@ void apic_dump_regs(int ap);
 uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask);
 uint64_t apic_timer_hw_oneshot(uint8_t &dcr_shadow, uint64_t icr);
 
-int apic_enable(void);
+bool apic_enable(void);
 bool ioapic_irq_setcpu(int irq, int cpu);
 
 void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector);
@@ -39,6 +40,14 @@ void apic_config_cpu();
 void apic_hook_perf_local_irq(intr_handler_t handler, char const *name);
 
 int acpi_have8259pic(void);
+
+struct memory_affinity_t {
+    uint64_t base;
+    uint64_t length;
+    uint32_t domain;
+};
+
+
 
 _pure
 uint32_t acpi_cpu_count();

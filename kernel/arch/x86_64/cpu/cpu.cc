@@ -24,11 +24,15 @@
 #include "utility.h"
 #include "irq.h"
 #include "nofault.h"
+#include "halt.h"
+#include "bootinfo.h"
 
 uint32_t default_mxcsr_mask;
 
 HIDDEN extern uint8_t * const ___rodata_fixup_insn_st[];
 HIDDEN extern uint8_t * const ___rodata_fixup_insn_en[];
+
+// smap control
 
 static uint8_t const stac_insn[] = {
     0x0f, 0x01, 0xcb
@@ -38,9 +42,13 @@ static uint8_t const clac_insn[] = {
     0x0f, 0x01, 0xca
 };
 
+// zeroall safe
+
 static uint8_t const vzeroall_nopw_insn[] = {
     0xc5, 0xfc, 0x77, 0x66, 0x90
 };
+
+// fsgsbase
 
 static uint8_t const rdfsbase_r13_insn[] = {
     0xf3, 0x49, 0x0f, 0xae, 0xc5
@@ -58,24 +66,52 @@ static uint8_t const wrgsbase_r14_insn[] = {
     0xf3, 0x49, 0x0f, 0xae, 0xde
 };
 
-static uint8_t const xsaves_rsi_insn[] = {
-    0x0f, 0xc7, 0x2e    // xsaves (%rsi)
+// xsave variations
+
+static uint8_t const fxsave_rsi_insn[] = {
+    0x0f, 0xae, 0x06    // fxsave (%rsi)
 };
 
 static uint8_t const xsaveopt_rsi_insn[] = {
     0x0f, 0xae, 0x36    // xsaveopt (%rsi)
 };
 
-static uint8_t const xsavec_rsi_insn[] = {
-    0x0f, 0xc7, 0x26    // xsavec (%rsi)
-};
-
 static uint8_t const xsave_rsi_insn[] = {
     0x0f, 0xae, 0x26    // xsave  (%rsi)
 };
 
-static uint8_t const fxsave_rsi_insn[] = {
-    0x0f, 0xae, 0x06    // fxsave (%rsi)
+static uint8_t const xsavec_rsi_insn[] = {
+    0x0f, 0xc7, 0x26    // xsavec (%rsi)
+};
+
+static uint8_t const xsaves_rsi_insn[] = {
+    0x0f, 0xc7, 0x2e    // xsaves (%rsi)
+};
+
+static uint8_t const fxsave64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x06  // fxsave64 (%rsi)
+};
+
+static uint8_t const xsaveopt64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x36  // xsaveopt64 (%rsi)
+};
+
+static uint8_t const xsave64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x26  // xsave64 (%rsi)
+};
+
+static uint8_t const xsavec64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x26  // xsavec64 (%rsi)
+};
+
+static uint8_t const xsaves64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x2e  // xsaves64 (%rsi)
+};
+
+// xrstor variations
+
+static uint8_t const fxrstor_rsi_insn[] = {
+    0x0f, 0xae, 0x0e    // fxrstor (%rsi)
 };
 
 static uint8_t const xrstor_rsi_insn[] = {
@@ -84,30 +120,6 @@ static uint8_t const xrstor_rsi_insn[] = {
 
 static uint8_t const xrstors_rsi_insn[] = {
     0x0f, 0xc7, 0x1e    // xrstors (%rsi)
-};
-
-static uint8_t const fxrstor_rsi_insn[] = {
-    0x0f, 0xae, 0x0e        // fxrstor (%rsi)
-};
-
-static uint8_t const xsaves64_rsi_insn[] = {
-    0x48, 0x0f, 0xc7, 0x2e  // xsaves64 (%rsi)
-};
-
-static uint8_t const xsaveopt64_rsi_insn[] = {
-    0x48, 0x0f, 0xae, 0x36  // xsaveopt64 (%rsi)
-};
-
-static uint8_t const xsavec64_rsi_insn[] = {
-    0x48, 0x0f, 0xc7, 0x26  // xsavec64 (%rsi)
-};
-
-static uint8_t const xsave64_rsi_insn[] = {
-    0x48, 0x0f, 0xae, 0x26  // xsave64 (%rsi)
-};
-
-static uint8_t const fxsave64_rsi_insn[] = {
-    0x48, 0x0f, 0xae, 0x06  // fxsave64 (%rsi)
 };
 
 static uint8_t const xrstor64_rsi_insn[] = {
@@ -143,9 +155,9 @@ static uint8_t const *xsave64_insn(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return fxsave64_rsi_insn;
+    case xsave_support_t::XSAVEOPT: return xsaveopt64_rsi_insn;
     case xsave_support_t::XSAVE: return xsave64_rsi_insn;
     case xsave_support_t::XSAVEC: return xsavec64_rsi_insn;
-    case xsave_support_t::XSAVEOPT: return xsaveopt64_rsi_insn;
     case xsave_support_t::XSAVES: return xsaves64_rsi_insn;
     }
 }
@@ -155,9 +167,9 @@ static size_t xsave64_sz(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return sizeof(fxsave64_rsi_insn);
+    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt64_rsi_insn);
     case xsave_support_t::XSAVE: return sizeof(xsave64_rsi_insn);
     case xsave_support_t::XSAVEC: return sizeof(xsavec64_rsi_insn);
-    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt64_rsi_insn);
     case xsave_support_t::XSAVES: return sizeof(xsaves64_rsi_insn);
     }
 }
@@ -167,9 +179,9 @@ static uint8_t const *xsave32_insn(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return fxsave_rsi_insn;
+    case xsave_support_t::XSAVEOPT: return xsaveopt_rsi_insn;
     case xsave_support_t::XSAVE: return xsave_rsi_insn;
     case xsave_support_t::XSAVEC: return xsavec_rsi_insn;
-    case xsave_support_t::XSAVEOPT: return xsaveopt_rsi_insn;
     case xsave_support_t::XSAVES: return xsaves_rsi_insn;
     }
 }
@@ -179,9 +191,9 @@ static size_t xsave32_sz(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return sizeof(fxsave_rsi_insn);
+    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt_rsi_insn);
     case xsave_support_t::XSAVE: return sizeof(xsave_rsi_insn);
     case xsave_support_t::XSAVEC: return sizeof(xsavec_rsi_insn);
-    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt_rsi_insn);
     case xsave_support_t::XSAVES: return sizeof(xsaves_rsi_insn);
     }
 }
@@ -191,9 +203,9 @@ static uint8_t const *xrstor64_insn(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return fxrstor64_rsi_insn;
-    case xsave_support_t::XSAVE:
-    case xsave_support_t::XSAVEC:
-    case xsave_support_t::XSAVEOPT: return xrstor64_rsi_insn;
+    case xsave_support_t::XSAVEOPT: // fall through
+    case xsave_support_t::XSAVE: // fall through
+    case xsave_support_t::XSAVEC: return xrstor64_rsi_insn;
     case xsave_support_t::XSAVES: return xrstors64_rsi_insn;
     }
 }
@@ -203,9 +215,9 @@ static size_t xrstor64_sz(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return sizeof(fxrstor64_rsi_insn);
-    case xsave_support_t::XSAVE:
-    case xsave_support_t::XSAVEC:
-    case xsave_support_t::XSAVEOPT: return sizeof(xrstor64_rsi_insn);
+    case xsave_support_t::XSAVEOPT: // fall through
+    case xsave_support_t::XSAVE: // fall through
+    case xsave_support_t::XSAVEC: return sizeof(xrstor64_rsi_insn);
     case xsave_support_t::XSAVES: return sizeof(xrstors64_rsi_insn);
     }
 }
@@ -215,9 +227,9 @@ static uint8_t const *xrstor32_insn(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return fxrstor_rsi_insn;
-    case xsave_support_t::XSAVE:
-    case xsave_support_t::XSAVEC:
-    case xsave_support_t::XSAVEOPT: return xrstor_rsi_insn;
+    case xsave_support_t::XSAVE: // fall through
+    case xsave_support_t::XSAVEOPT: // fall through
+    case xsave_support_t::XSAVEC: return xrstor_rsi_insn;
     case xsave_support_t::XSAVES: return xrstors_rsi_insn;
     }
 }
@@ -227,9 +239,9 @@ static size_t xrstor32_sz(xsave_support_t support)
     switch (support) {
     default:
     case xsave_support_t::FXSAVE: return sizeof(fxrstor_rsi_insn);
-    case xsave_support_t::XSAVE:
-    case xsave_support_t::XSAVEC:
-    case xsave_support_t::XSAVEOPT: return sizeof(xrstor_rsi_insn);
+    case xsave_support_t::XSAVEOPT: // fall through
+    case xsave_support_t::XSAVE: // fall through
+    case xsave_support_t::XSAVEC: return sizeof(xrstor_rsi_insn);
     case xsave_support_t::XSAVES: return sizeof(xrstors_rsi_insn);
     }
 }
@@ -252,45 +264,56 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
          fixup_ptr < rodata_en; ++fixup_ptr) {
         uint8_t *code = *fixup_ptr;
 
-        uintptr_t addr = uintptr_t(code);
-        uintptr_t next = 0;
+        intptr_t addr = uintptr_t(code);
+        intptr_t next = 0;
 
         intptr_t dist = 0;
         size_t old_sz = 0;
         size_t new_sz = 0;
 
         switch (*code) {
+        case 0x67:
+            // fall through
         case 0xE8:
             // Call instruction
             int32_t disp32;
+            int32_t operand_ofs;
             old_sz = 5;
+            operand_ofs = 1;
 
-            next = addr + 5;
+            // Handle relaxed indirect call
+            bool is_relaxed_indirect;
+            is_relaxed_indirect = (*code == 0x67);
+            operand_ofs += is_relaxed_indirect;
+
+            next = addr + old_sz;
             disp32 = 0;
-            memcpy(&disp32, code + 1, sizeof(disp32));
+            memcpy(&disp32, code + operand_ofs, sizeof(disp32));
 
-            uintptr_t dest_addr;
+            intptr_t dest_addr;
             dest_addr = next + disp32;
 
-            if (dest_addr == uintptr_t(protection_barrier_from_user)) {
+            if (dest_addr == intptr_t(protection_barrier_from_user)) {
                 // Prevent user code influencing anything
                 if (cpuid_has_ibpb()) {
                     // Call ibpb function
+                    code += is_relaxed_indirect;
                     new_sz = 5;
-                    dist = uintptr_t(protection_barrier_ibpb) - next;
+                    dist = intptr_t(protection_barrier_from_user_ibpb) - next;
                 } else {
                     // nop it out
                     new_sz = 0;
                 }
 
                 break;
-            } else if (dest_addr == uintptr_t(protection_barrier_to_user)) {
+            } else if (dest_addr == intptr_t(protection_barrier_to_user)) {
                 // Prevent any information leaking back to user mode
                 // Clear microarchitectural data (intel)
                 if (cpuid_has_md_clear()) {
                     // Call verw function
+                    code += is_relaxed_indirect;
                     new_sz = 5;
-                    dist = uintptr_t(protection_barrier_verw) - next;
+                    dist = intptr_t(protection_barrier_to_user_verw) - next;
                 } else {
                     // nop it out
                     new_sz = 0;
@@ -301,7 +324,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
 
             printdbg("Ignoring useless or unrecognized"
                      " insn_fixup on call at %#zx\n",
-                     uintptr_t(code));
+                     intptr_t(code));
 
             continue;
 
@@ -392,7 +415,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
             break;
 
         case 0x0f:
-            // 32 bit fxsave/fxrstor
+            // 32 bit fxsave/fxrstor and stac/clac
             if (unlikely(!memcmp(code, fxsave_rsi_insn,
                                  sizeof(fxsave_rsi_insn)))) {
                 old_sz = xsave32_sz(xsave_support_t::FXSAVE);
@@ -463,7 +486,11 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                 panic("Relocation would be truncated to fit");
 
             code[0] = call_disp32_insn[0];
-            memcpy(code + 1, &dist, sizeof(uint32_t));
+
+            // Convert it first so the memcpy isn't assuming endianness
+            int32_t dist32 = int32_t(dist);
+
+            memcpy(code + 1, &dist32, sizeof(dist32));
         }
 
         if (old_sz > new_sz)
@@ -488,7 +515,9 @@ void cpu_init_early(int ap)
     cpu_ds_set(GDT_SEL_USER_DATA | 3);
     cpu_es_set(GDT_SEL_USER_DATA | 3);
     cpu_fs_set(GDT_SEL_USER_DATA | 3);
+    void *saved_gsbase = cpu_gsbase_get();
     cpu_gs_set(GDT_SEL_USER_DATA | 3);
+    cpu_gsbase_set(saved_gsbase);
 
     thread_cls_init_early(ap);
 
@@ -502,12 +531,11 @@ void cpu_init_early(int ap)
 
     if (!ap) {
         // Detect the MXCSR mask from fxsave context
-        isr_fxsave_context_t __aligned(64) fctx;
-        cpu_fxsave64(&fctx);
-        if (fctx.mxcsr_mask)
-            default_mxcsr_mask = fctx.mxcsr_mask;
-        else
-            default_mxcsr_mask = 0xFFBF;
+        isr_fxsave_context_t __aligned(64) fxctx;
+        cpu_fxsave64(&fxctx);
+        default_mxcsr_mask = fxctx.mxcsr_mask
+                ? fxctx.mxcsr_mask
+                : 0xFFBF;
     }
 
     cpu_mxcsr_set(CPU_MXCSR_ELF_INIT & default_mxcsr_mask);
@@ -535,8 +563,7 @@ void cpu_init_early(int ap)
         cpu_apply_fixups(___rodata_fixup_insn_st, ___rodata_fixup_insn_en);
 }
 
-_constructor(ctor_cpu_init_bsp)
-static void cpu_init_bsp()
+_constructor(ctor_cpu_init_bsp) static void cpu_init_bsp()
 {
     cpu_init(0);
 }
@@ -564,9 +591,17 @@ extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
 }
 
 _noreturn
+static isr_context_t *cpu_panic_handler(int intr, isr_context_t *ctx)
+{
+    halt_forever();
+}
+
+_noreturn
 void cpu_init_ap()
 {
-    cpu_init_early(1);
+    uint32_t cpu_nr = thread_cpu_number();
+
+    cpu_init_early(cpu_nr);
     cpu_init(1);
     apic_init(1);
     thread_init(1);
@@ -672,8 +707,8 @@ void cpu_init(int ap)
                 CPU_EFLAGS_TF | CPU_EFLAGS_IF | CPU_EFLAGS_RF |
                 CPU_EFLAGS_VM);
     // Set 64 bit syscall kernel entry point
-    cpu_msr_set(CPU_MSR_LSTAR, uint64_t(syscall_entry));
-    cpu_msr_set(CPU_MSR_CSTAR, uint64_t(syscall32_entry));
+    cpu_msr_set(CPU_MSR_LSTAR, uintptr_t(syscall_entry));
+    cpu_msr_set(CPU_MSR_CSTAR, uintptr_t(syscall32_entry));
     // syscall CS/SS at bit 48, sysret CS/SS at bit 32
     cpu_msr_set(CPU_MSR_STAR,
                 (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
@@ -721,10 +756,12 @@ void cpu_init(int ap)
     cpu_ldt_set(0);
 
     intr_hook(INTR_EX_GPF, cpu_gpf_handler, "cpu_gpf_handler", eoi_none);
+
+    intr_hook(INTR_IPI_PANIC, cpu_panic_handler,
+              "cpu_panic_handler", eoi_lapic);
 }
 
-_constructor(ctor_cpu_hw_init)
-static void cpu_hw_init_bsp()
+_constructor(ctor_cpu_hw_init) static void cpu_hw_init_bsp()
 {
     cpu_hw_init(0);
 }
@@ -744,20 +781,42 @@ void cpu_hw_init(int ap)
 
     thread_set_cpu_count(apic_cpu_count());
 
-    // Initialize APIC, but fallback to 8259 if no MP tables
+    // Initialize APIC
     if (!apic_enable()) {
+        // Fall back to 8259, APIC init failed
         printk("Enabling 8259 PIC\n");
         pic8259_enable();
     } else if (acpi_have8259pic()) {
+        // 8259 present, mask them
         printk("Disabling 8259 PIC\n");
         pic8259_disable();
     } else {
         panic("No IOAPICs, no MPS, and no 8259! Can't use IRQs! Halting.");
     }
 
-    printk("Starting SMP\n");
+    printk("Initializing APIC timer\n");
 
-    apic_start_smp();
+    apic_init_timer();
+
+    size_t cpu_nr = !ap ? 0 : thread_current_cpu(-1);
+
+    if (!ap) {
+        if (bootinfo_parameter(bootparam_t::smp_enable)) {
+            printk("Starting SMP\n");
+            apic_start_smp();
+            gdt_init_tss(cpu_count);
+        } else {
+            printk("Starting with single processor\n");
+            cpu_count = 1;
+            gdt_init_tss(1);
+        }
+
+        gdt_load_tr(0);
+    } else {
+        gdt_load_tr(cpu_nr);
+    }
+
+    thread_init_cpu_count(cpu_count);
 
     callout_call(callout_type_t::smp_online);
 
@@ -792,7 +851,6 @@ void cpu_patch_code(void *addr, void const *src, size_t size)
 
     // Enable write protect
     cpu_cr0_change_bits(0, CPU_CR0_WP);
-    atomic_fence();
 }
 
 // points refers to an array of pointers to labels that are after the calls
@@ -918,8 +976,21 @@ static void cpu_init_late_msrs_one_cpu()
     // MSR is available on family 10h/12h/14h/15h/16h/17h
     if (cpuid_is_amd() && cpuid_family() >= 0x10 && cpuid_family() <= 0x17 &&
             cpuid_family() != 0x11 && cpuid_family() != 0x13) {
-        if (!cpu_msr_set_safe(0xC0011029, 1)) {
-            printdbg("Unable to set MSR 0xC0011029, lfence configuration\n");
+        uint64_t old_spec_ctl = 0;
+        if (cpu_msr_get_safe(0xC0011029, old_spec_ctl)) {
+            if (!(old_spec_ctl & 2)) {
+                if (cpu_msr_set_safe(0xC0011029, old_spec_ctl | 2)) {
+                    printdbg("Enabled lfence speculation control\n");
+                } else {
+                    printdbg("Unable to set MSR 0xC0011029,"
+                             " lfence configuration, was %#" PRIx64 "\n",
+                             old_spec_ctl);
+                }
+            } else {
+                printdbg("lfence speculation control was already enabled\n");
+            }
+        } else {
+            printdbg("Unable to read lfence speculation control MSR\n");
         }
     }
 }

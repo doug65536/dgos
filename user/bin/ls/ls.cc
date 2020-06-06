@@ -9,7 +9,6 @@ int main(int argc, char const **argv)
         return 1;
     struct dirent *de;
     while (de = readdir(dir)) {
-
         printf("%s\n", de->d_name);
     }
     closedir(dir);

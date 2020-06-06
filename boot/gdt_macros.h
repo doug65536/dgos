@@ -95,5 +95,4 @@
 		.quad 0
 		.quad 0
 		.quad 0
-	gdt_end:
 .endm

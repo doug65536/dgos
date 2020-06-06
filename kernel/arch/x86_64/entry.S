@@ -1,5 +1,8 @@
+## entry.S
+
 #include "cpu/control_regs_constants.h"
 #include "cpu/interrupts.h"
+#include "cpu/asm_constants.h"
 #include "cfi_helpers.h"
 #include "cpu_bug.h"
 
@@ -27,21 +30,31 @@ entry:
     .cfi_undefined r14
     .cfi_undefined r15
 
-    xor %esp,%esp
-
     cld
 
     // Save parameter in call-preserved register
     movl %ecx,%r15d
     xorl %ebp,%ebp
 
-#ifdef _CALL_TRACE_ENABLED
-    // Enable FSGSBASE ASAP if tracing
-    movq %cr4,%rax
-    orq $0x10000,%rax
-    movq %rax,%cr4
+    // Initialize GSBASE ASAP
+    imul $ CPU_INFO_SIZE,thread_booting_ap_index(%rip),%eax
+    leaq cpus(%rip),%rdx
+    addq %rdx,%rax
+    movq %rax,%rdx
+    shrq $ 32,%rdx
+    movl $ CPU_MSR_GSBASE,%ecx
+    wrmsr
+    // Set cpu self pointer at gs:0 (abs 0 encoding is 9 bytes, rbp rel is 5)
+    mov %rax,%gs:0(%rbp)
 
-    // Copy APIC ID into IA32_TSC_AUX
+    // Force initialize cpus[cur_cpu].cur_thread
+    imul $ THREAD_INFO_SIZE,thread_booting_ap_index(%rip),%eax
+    leaq threads(%rip),%rdx
+    addq %rdx,%rax
+    movq %rax,%gs:CPU_INFO_CURTHREAD_OFS(%rbp)
+
+    // Initialize APIC ID ASAP
+    // Copy APIC ID into gs:CPU_INFO_APIC_ID_OFS
     xorl %eax,%eax
     cpuid
     cmpl $ 0xB,%eax
@@ -51,8 +64,7 @@ entry:
     movl $ 0xB,%eax
     cpuid
     movl %edx,%eax
-    xorl %edx,%edx
-    jmp .Lset_tsc_aux
+    jmp .Lgot_apic_id
 
 .Lapic8bit:
     // Read cpuid leaf 1, ebx[31:24] contains the APIC ID
@@ -60,11 +72,15 @@ entry:
     cpuid
     shrl $ 24,%ebx
     movl %ebx,%eax
-    xorl %edx,%edx
 
-.Lset_tsc_aux:
-    movl $ CPU_MSR_TSC_AUX,%ecx
-    wrmsr
+.Lgot_apic_id:
+    movl %eax,%gs:CPU_INFO_APIC_ID_OFS
+
+#ifdef _CALL_TRACE_ENABLED
+    // Enable FSGSBASE ASAP if tracing
+    movq %cr4,%rax
+    orq $ 0x10000,%rax
+    movq %rax,%cr4
 #endif
 
     // See if this is the bootstrap processor
@@ -182,9 +198,74 @@ bsp_init:
 #endif
 
     // Call the constructors
+    leaq __init_array_early_start(%rip),%rdi
+    leaq __init_array_early_end(%rip),%rsi
+    call __invoke_function_array
+
     leaq __init_array_start(%rip),%rdi
     leaq __init_array_end(%rip),%rsi
     call __invoke_function_array
+
+//.pushsection .data, "aw", @progbits
+//.balign 8
+//.space 8
+//perfdata:
+//.space 8*64
+//.popsection
+//
+//    // run 4+ billion loops for warmup
+//    xor %eax,%eax
+//.balign 16
+//0:
+//    add $-1,%eax
+//    jnz 0b
+//
+//    andq $-16,%rsp
+//
+//    movl %ss,%eax
+//    push %rax
+//
+//    push $ 0
+//
+//    pushfq
+//
+//    movl %cs,%eax
+//    push %rax
+//
+//    mov %rsp,2*8(%rsp)
+//
+//    mov $ 64,%r9d
+//    lea perfdata(%rip),%r8
+//.balign 16
+//0:
+//    lfence
+//    rdtsc
+//    mov %eax,perfdata-8(%rip)
+//    mov %edx,perfdata-4(%rip)
+//
+//    .rept 1000
+//    call just_iretq
+//    .endr
+//
+//    lfence
+//    rdtsc
+//    sub perfdata-8(%rip),%eax
+//    sbb perfdata-4(%rip),%edx
+//    shlq $32,%rdx
+//    orq %rdx,%rax
+//    mov %rax,(%r8)
+//    add $8,%r8
+//    add $ -1,%r9d
+//    jnz 0b
+//
+//    jmp .Ldone_perf
+//
+//.balign 16
+//just_iretq:
+//    iretq
+//
+//.Ldone_perf:
+//    add $ 8*4,%rsp
 
     call main
 
@@ -223,7 +304,7 @@ early_tss:
     //  uint16_t reserved5;
     .short 0
     //  uint16_t iomap_base;
-    .short early_tss_end - early_tss
+    .short early_tss_end - (early_tss + 4) - 1
     //  uint32_t dummy_align2;
     .int 0
     //

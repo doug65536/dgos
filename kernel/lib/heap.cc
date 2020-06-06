@@ -319,8 +319,6 @@ void *heap_t::alloc(size_t size)
     // Add room for bucket header
     size += sizeof(heap_hdr_t);
 
-    size_t orig_size = size;
-
     // Calculate ceil(log(size) / log(2))
     uint8_t log2size = bit_log2(size);
 
@@ -457,8 +455,18 @@ bool heap_t::validate_locked(bool dump, scoped_lock const& lock) const
 {
     for (size_t i = 0; i < arena_count; ++i) {
         size_t sz = size_t(1) << arenas[i].slot_size;
+
         heap_hdr_t *st = (heap_hdr_t*)arenas[i].mem;
-        heap_hdr_t *en = (heap_hdr_t*)((char*)arenas[i].mem + HEAP_BUCKET_SIZE);
+
+        if (unlikely(uintptr_t(st) >= -HEAP_BUCKET_SIZE))
+            return validate_failed();
+
+        unsigned long long en_addr;
+        if (unlikely(__builtin_add_overflow((unsigned long long)st,
+                                            HEAP_BUCKET_SIZE, &en_addr)))
+            return validate_failed();
+
+        heap_hdr_t *en = (heap_hdr_t*)en_addr;
 
         if (unlikely(dump))
             dbgout << "Processing  bucket, " << sz << " bytes per slot\n";
@@ -644,7 +652,11 @@ void *pageheap_alloc(heap_t *heap, size_t size)
     char *blk = (char*)mmap(nullptr, alloc,
                             PROT_READ | PROT_WRITE, MAP_NOCOMMIT);
 
+    // Calculate pointer to header as near end of accessible area as posssible
     heap_hdr_t *hdr = (heap_hdr_t*)(blk + (end_guard - size));
+
+    // Fill the region after start guard but before the block
+    memset(blk + PAGESIZE, 0xFB, intptr_t(hdr) - intptr_t(blk + PAGESIZE));
 
     hdr->size_next = size;
     hdr->sig1 = HEAP_BLK_TYPE_USED;
@@ -653,10 +665,14 @@ void *pageheap_alloc(heap_t *heap, size_t size)
     mprotect(blk, PAGESIZE, PROT_NONE);
     mprotect(blk + end_guard, PAGESIZE, PROT_NONE);
 
+    // Fill region after the block but before the end guard
     memset(blk + PAGESIZE, 0xFA, (char*)hdr - (blk + PAGESIZE));
 
+    // Ideally fill heap allocation with garbage that will crash
+    // if uninitialized contents are used as a pointer
     memset(hdr + 1, 0xF0, size - sizeof(heap_hdr_t));
 
+    // We promised the compiler it is aligned like this, make sure
     assert((uintptr_t(hdr + 1) & ~-16) == 0);
 
     return hdr + 1;

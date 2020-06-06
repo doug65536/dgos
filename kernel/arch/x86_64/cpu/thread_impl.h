@@ -3,12 +3,14 @@
 #include "cpu/isr.h"
 #include "segrw.h"
 #include "asm_constants.h"
+#include "atomic.h"
 
 __BEGIN_DECLS
 
 struct process_t;
 
-extern uint32_t volatile thread_smp_running;
+extern "C" uint32_t volatile thread_aps_running;
+extern "C" uint32_t volatile thread_booting_ap_index;
 
 struct thread_info_t;
 struct cpu_info_t;
@@ -22,7 +24,7 @@ void thread_init_cpu(size_t cpu_nr, uint32_t apic_id);
 uint32_t thread_cpus_started(void);
 
 _pure
-uint32_t thread_get_cpu_apic_id(int cpu);
+uint32_t thread_get_cpu_apic_id(uint32_t cpu);
 
 void thread_exit(int exitcode);
 
@@ -30,8 +32,6 @@ void thread_exit(int exitcode);
 size_t thread_cls_alloc(void);
 void *thread_cls_get(size_t slot);
 void thread_cls_set(size_t slot, void *value);
-
-void thread_check_stack(void);
 
 typedef void *(*thread_cls_init_handler_t)(void *);
 typedef void (*thread_cls_each_handler_t)(int cpu ,void *, void *, size_t);

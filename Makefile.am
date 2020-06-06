@@ -10,23 +10,37 @@ noinst_PROGRAMS =
 
 DUMPDIR = $(top_builddir)/dump
 
-STARTUP_FILE_NAMES = \
-	crt0 crt0pc80 crt0pc64 crt0pc32
+STARTUP_FILE_NAMES = crt0 crt0pc80 crt0pc64 crt0pc32
+STARTUP_FILE_NAMES_32 = crt032 crt0pc8032 crt0pc6432 crt0pc3232
 
 STDLIB_FILE_NAMES = c g m stdc++
+STDLIB_FILE_NAMES_32 = c32 g32 m32 stdc++32
 
 STARTUP_FILES_INSTALLED = \
 	$(patsubst %,$(top_builddir)/sysroot/lib/%.o,$(STARTUP_FILE_NAMES))
 
+STARTUP_FILES_INSTALLED_32 = \
+	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.o,$(STARTUP_FILE_NAMES_32))
+
 STDLIB_STATIC_FILES_INSTALLED = \
 	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,$(STDLIB_FILE_NAMES))
 
+STDLIB_STATIC_FILES_INSTALLED_32 = \
+	$(patsubst %32,$(top_builddir)/sysroot/lib/32/lib%.a,$(STDLIB_FILE_NAMES_32))
+
+if userspace_so
 STDLIB_SHARED_FILES_INSTALLED = \
 	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.so,$(STDLIB_FILE_NAMES))
 
+STDLIB_SHARED_FILES_INSTALLED_32 = \
+	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.so,$(STDLIB_FILE_NAMES_32))
+endif
+
 ALL_STDLIB_INSTALLED = \
 	$(STARTUP_FILES_INSTALLED) \
-	$(STDLIB_STATIC_FILES_INSTALLED)
+	$(STARTUP_FILES_INSTALLED_32) \
+	$(STDLIB_STATIC_FILES_INSTALLED) \
+	$(STDLIB_STATIC_FILES_INSTALLED_32)
 
 BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
@@ -36,6 +50,8 @@ BUILT_SOURCES = \
 
 BOOTLOADER_COMMON_FLAGS = \
 	-D__DGOS__
+
+LIB_SO_FLAGS = -fPIC -shared -nostdlib -Wl,-shared
 
 #sysroot/lib/libc.so \
 #sysroot/lib/libg.so \
@@ -139,9 +155,8 @@ boot1_elf_CCASFLAGS = \
 boot1_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
 	$(REGPARM_FLAGS) \
-	-Wl,-m,elf_i386 \
+	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/boot/boot1.ld \
-	-Wl,-N \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -static \
 	$(NOSTDLIB_FLAGS)
@@ -189,10 +204,11 @@ libbootsect_a_SOURCES = \
 	boot/elf64.cc \
 	boot/rand.cc \
 	boot/physmap.cc \
+	boot/progressbar.cc \
+	boot/messagebar.cc \
 	boot/physmem_bios.cc \
 	boot/vesa.cc \
 	boot/vesa_bios.cc \
-	boot/progressbar.cc \
 	boot/debug.cc \
 	boot/part.s \
 	boot/exception.s \
@@ -200,6 +216,7 @@ libbootsect_a_SOURCES = \
 	boot/part.h \
 	boot/vesainfo.h \
 	boot/progressbar.h \
+	boot/messagebar.h \
 	boot/paging.h \
 	boot/rand.h \
 	boot/types.h \
@@ -309,6 +326,7 @@ bootfat_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
+	-Wl,--no-dynamic-linker -Wl,--relax \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
@@ -479,6 +497,9 @@ bootefi_amd64_SOURCES = \
 	boot/elf64.cc \
 	boot/mpentry_efi.S \
 	boot/progressbar.cc \
+	boot/progressbar.h \
+	boot/messagebar.cc \
+	boot/messagebar.h \
 	boot/bootmenu.cc \
 	boot/tui.cc \
 	boot/tui_efi.cc \
@@ -741,7 +762,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/user_mem.h \
 	kernel/lib/uleb.cc \
 	kernel/lib/uleb.h \
-	kernel/fs/ext4.cc \
 	kernel/fs/devfs.cc \
 	kernel/fs/tmpfs.cc \
 	kernel/net/arp_frame.cc \
@@ -826,6 +846,24 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/syscall_dispatch.h \
 	kernel/arch/x86_64/cpu/thread_impl.cc \
 	kernel/arch/x86_64/cpu/thread_impl.h \
+	kernel/arch/x86_64/elf64.cc \
+	kernel/arch/x86_64/elf64_decl.h \
+	kernel/arch/x86_64/elf64.h \
+	kernel/arch/x86_64/gdbstub.cc \
+	kernel/arch/x86_64/gdbstub.h \
+	kernel/arch/x86_64/nano_time.cc \
+	kernel/arch/x86_64/stacktrace.cc \
+	kernel/arch/x86_64/stacktrace.h \
+	kernel/arch/x86_64/types.h \
+	kernel/syscall/syscall_helper.h \
+	kernel/syscall/syscall_helper.cc \
+	kernel/syscall/sys_fd.cc \
+	kernel/syscall/sys_mem.cc \
+	kernel/syscall/sys_time.cc \
+	kernel/syscall/sys_process.cc \
+	kernel/syscall/sys_module.cc \
+	kernel/syscall/sys_sys.cc \
+	kernel/syscall/sys_render.cc \
 	kernel/device/acpigas.cc \
 	kernel/device/acpigas.h \
 	kernel/device/acpihw.cc \
@@ -859,25 +897,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/vt100.cc \
 	kernel/device/vt100.h \
 	kernel/device/vt100_out.cc \
-	kernel/device/vt100_out.h \
-	kernel/arch/x86_64/elf64.cc \
-	kernel/arch/x86_64/elf64_decl.h \
-	kernel/arch/x86_64/elf64.h \
-	kernel/arch/x86_64/gdbstub.cc \
-	kernel/arch/x86_64/gdbstub.h \
-	kernel/arch/x86_64/nano_time.cc \
-	kernel/arch/x86_64/stacktrace.cc \
-	kernel/arch/x86_64/stacktrace.h \
-	kernel/arch/x86_64/types.h \
-	kernel/syscall/syscall_helper.h \
-	kernel/syscall/syscall_helper.cc \
-	kernel/syscall/sys_fd.cc \
-	kernel/syscall/sys_mem.cc \
-	kernel/syscall/sys_time.cc \
-	kernel/syscall/sys_process.cc \
-	kernel/syscall/sys_module.cc \
-	kernel/syscall/sys_sys.cc \
-	kernel/syscall/sys_render.cc
+	kernel/device/vt100_out.h
 
 KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/boot/include \
@@ -948,6 +968,19 @@ EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 
 
 KERNEL_LDADD_SHARED = -lgcc $(top_builddir)/u_vga16.o
+
+# Separate debug info for kernels
+
+define separate_debug =
+
+dgos-$(1): $(1)
+	$$(STRIP) --strip-debug --strip-unneeded -o "$$@" "$$<"
+
+endef
+
+$(eval $(call separate_debug,kernel-generic))
+$(eval $(call separate_debug,kernel-tracing))
+$(eval $(call separate_debug,kernel-asan))
 
 # ----------------------------------------------------------------------------
 # Explicit instantiations because __attribute__((__visibility__(...))) is broken
@@ -1068,15 +1101,6 @@ kernel_asan_LDADD = $(KERNEL_LDADD_SHARED)
 EXTRA_kernel_asan_DEPENDENCIES = \
 	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
-$(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
-	$(LN) -f "$<" "$@"
-
-$(top_builddir)/dgos-kernel-tracing: $(top_builddir)/kernel-tracing
-	$(LN) -f "$<" "$@"
-
-$(top_builddir)/dgos-kernel-asan: $(top_builddir)/kernel-asan
-	$(LN) -f "$<" "$@"
-
 # ----------------------------------------------------------------------------
 # parse-trace
 
@@ -1097,16 +1121,27 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 # ----------------------------------------------------------------------------
 #
 
+if userspace_so
+TLS_MODEL_FLAGS = -ftls-model=global-dynamic
+else
+TLS_MODEL_FLAGS = -ftls-model=initial-exec
+endif
+
 
 # ----------------------------------------------------------------------------
 # crt0
 
-INCLUDES_NAMES = $(shell cd $(top_srcdir)/libc/include && $(FIND) -type f)
+INCLUDES_NAMES = $(shell \
+	cd $(top_srcdir)/libc/include && \
+	$(FIND) -type f)
 INCLUDES_DEPLOYED = \
 	$(patsubst %,$(top_builddir)/sysroot/include/%,$(INCLUDES_NAMES))
 
 sysroot/lib/:
-	$(MKDIR) -p $@
+	$(MKDIR) -p "$@"
+
+sysroot/lib/32/:
+	$(MKDIR) -p "$@"
 
 define compilestartup =
 STARTUPFILES += $(top_builddir)/sysroot/lib/$(1)
@@ -1121,8 +1156,22 @@ $(top_builddir)/sysroot/lib/$(1): \
 			$$(ASM_DEBUG_INFO_FLAGS) \
 			--sysroot $(top_builddir)/sysroot \
 			-isystem $(top_builddir)/sysroot/include \
-			-o $$@ \
-			-c $$<
+			-o "$$@" \
+			-c "$$<"
+
+$(top_builddir)/sysroot/lib/32/$(1): \
+		$(2) \
+		$(top_srcdir)/libc/include/sys/cpu_bug.h \
+		$(INCLUDES_DEPLOYED)
+	$$(MKDIR) -p "$$(@D)" && \
+		$$(CXX) \
+			-m32 \
+			-g \
+			$$(ASM_DEBUG_INFO_FLAGS) \
+			--sysroot $(top_builddir)/sysroot \
+			-isystem $(top_builddir)/sysroot/include \
+			-o "$$@" \
+			-c "$$<"
 
 endef
 
@@ -1153,6 +1202,9 @@ $(eval $(call \
 define deploy_stdlib=
 
 $(top_builddir)/sysroot/lib/lib$(1).a: $(top_builddir)/lib$(1).a
+	$$(MKDIR) -p $$(@D) && $$(CP) "$$<" "$$@"
+
+$(top_builddir)/sysroot/lib/32/lib$(1).a: $(top_builddir)/lib$(1)32.a
 	$$(MKDIR) -p $$(@D) && $$(CP) "$$<" "$$@"
 
 endef
@@ -1212,8 +1264,8 @@ $(top_srcdir)/user/shell/grammar.c \
 	$(top_srcdir)/user/shell/grammar.h \
 	$(top_srcdir)/user/shell/grammar.out: \
 	$(top_srcdir)/user/shell/grammar.y
-	$(RM) -rf $@
-	lemon $<
+	$(RM) -rf "$@"
+	$(LEMON) "$<"
 
 EXTRA_shell_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
@@ -1502,6 +1554,76 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
+	libc/src/pthread/pthread_spin_trylock.cc \
+	libc/src/pthread/pthread_rwlockattr_init.cc \
+	libc/src/pthread/pthread_cancel.cc \
+	libc/src/pthread/pthread_rwlock_timedwrlock.cc \
+	libc/src/pthread/pthread_attr_getschedparam.cc \
+	libc/src/pthread/pthread_rwlock_tryrdlock.cc \
+	libc/src/pthread/pthread_rwlock_timedrdlock.cc \
+	libc/src/pthread/pthread_mutexattr_settype.cc \
+	libc/src/pthread/pthread_attr_setdetachstate.cc \
+	libc/src/pthread/pthread_cond_signal.cc \
+	libc/src/pthread/pthread_atfork.cc \
+	libc/src/pthread/pthread_rwlock_rdlock.cc \
+	libc/src/pthread/pthread_mutexattr_getrobust.cc \
+	libc/src/pthread/pthread_setcancelstate.cc \
+	libc/src/pthread/pthread_mutex_destroy.cc \
+	libc/src/pthread/pthread_cond_broadcast.cc \
+	libc/src/pthread/pthread_mutexattr_destroy.cc \
+	libc/src/pthread/pthread_rwlock_unlock.cc \
+	libc/src/pthread/pthread_spin_init.cc \
+	libc/src/pthread/pthread_attr_setguardsize.cc \
+	libc/src/pthread/pthread_cond_destroy.cc \
+	libc/src/pthread/pthread_testcancel.cc \
+	libc/src/pthread/pthread_cond_timedwait.cc \
+	libc/src/pthread/pthread_setspecific.cc \
+	libc/src/pthread/pthread_detach.cc \
+	libc/src/pthread/pthread_barrierattr_init.cc \
+	libc/src/pthread/pthread_condattr_init.cc \
+	libc/src/pthread/pthread_rwlock_destroy.cc \
+	libc/src/pthread/pthread_barrier_wait.cc \
+	libc/src/pthread/pthread_once.cc \
+	libc/src/pthread/pthread_attr_getguardsize.cc \
+	libc/src/pthread/pthread_cond_init.cc \
+	libc/src/pthread/pthread_condattr_setclock.cc \
+	libc/src/pthread/pthread_equal.cc \
+	libc/src/pthread/pthread_join.cc \
+	libc/src/pthread/pthread_mutex_consistent.cc \
+	libc/src/pthread/pthread_attr_init.cc \
+	libc/src/pthread/pthread_self.cc \
+	libc/src/pthread/pthread_attr_getdetachstate.cc \
+	libc/src/pthread/pthread_spin_lock.cc \
+	libc/src/pthread/pthread_barrier_destroy.cc \
+	libc/src/pthread/pthread_mutex_lock.cc \
+	libc/src/pthread/pthread_rwlock_init.cc \
+	libc/src/pthread/pthread_cond_wait.cc \
+	libc/src/pthread/pthread_key_create.cc \
+	libc/src/pthread/pthread_mutex_unlock.cc \
+	libc/src/pthread/pthread_mutex_timedlock.cc \
+	libc/src/pthread/pthread_mutexattr_gettype.cc \
+	libc/src/pthread/pthread_mutexattr_init.cc \
+	libc/src/pthread/pthread_mutex_trylock.cc \
+	libc/src/pthread/pthread_exit.cc \
+	libc/src/pthread/pthread_getspecific.cc \
+	libc/src/pthread/pthread_attr_destroy.cc \
+	libc/src/pthread/pthread_mutexattr_setrobust.cc \
+	libc/src/pthread/pthread_condattr_destroy.cc \
+	libc/src/pthread/pthread_rwlock_trywrlock.cc \
+	libc/src/pthread/pthread_key_delete.cc \
+	libc/src/pthread/pthread_spin_destroy.cc \
+	libc/src/pthread/pthread_barrier_init.cc \
+	libc/src/pthread/pthread_setcanceltype.cc \
+	libc/src/pthread/pthread_rwlockattr_destroy.cc \
+	libc/src/pthread/pthread_create.cc \
+	libc/src/pthread/pthread_condattr_getclock.cc \
+	libc/src/pthread/pthread_spin_unlock.cc \
+	libc/src/pthread/pthread_rwlock_wrlock.cc \
+	libc/src/pthread/pthread_barrierattr_destroy.cc \
+	libc/src/pthread/pthread_attr_setschedparam.cc \
+	libc/src/pthread/pthread_mutex_init.cc \
+	libc/src/pthread/__futex.cc \
+	libc/src/pthread/__clone.cc \
 	libc/src/sys/socket/socket.cc \
 	libc/src/sys/module/init_module.cc \
 	libc/src/sys/module/probe_pci_for.cc \
@@ -1520,6 +1642,24 @@ libc_a_CXXFLAGS = \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
+libc_a_CCASFLAGS = $(libc_a_CXXFLAGS)
+
+EXTRA_libc_a_DEPENDENCIES =
+
+# libc32.a 32-bit
+
+noinst_LIBRARIES += libc32.a
+generate_symbols_list += libc32.a
+
+libc32_a_SOURCES = $(libc_a_SOURCES)
+libc32_a_CXXFLAGS = $(libc_a_CXXFLAGS) $(USERLIB32_FLAGS)
+libc32_a_CCASFLAGS = $(libc32_a_CXXFLAGS)
+libc32_a_CFLAGS = $(libc_a_CFLAGS) $(USERLIB32_FLAGS)
+EXTRA_libc32_a_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
+
+# libc.so 64-bit
+
+if userspace_so
 bin_PROGRAMS += libc.so
 generate_symbols_list += libc.so
 
@@ -1527,22 +1667,22 @@ libc_so_SOURCES = $(libc_a_SOURCES)
 
 libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) \
 	$(USERLIB64_FLAGS) \
-	-fPIC -shared -nostdlib -ftls-model=global-dynamic
+	$(LIB_SO_FLAGS) $(TLS_MODEL_FLAGS)
 
 libc_so_CFLAGS = $(libc_a_CFLAGS) \
-	-fPIC -shared -nostdlib
+	$(LIB_SO_FLAGS)
 
 libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) \
-	-fPIC -shared -nostdlib
+	$(LIB_SO_FLAGS)
 
-libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fno-pie -fPIC -shared -nostdlib \
+libc_so_LDFLAGS = $(libc_a_LDFLAGS) \
 	-isystem $(top_srcdir)/libc/include \
-	$(FREESTANDING_FLAGS) \
-	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS) \
-	$(USERLIB64_LDFLAGS) -Wl,-shared
+	$(LIB_SO_FLAGS) \
+	$(USERLIB64_LDFLAGS) \
+	$(NOSTDLIB_FLAGS)
 
 EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
+endif
 
 noinst_LIBRARIES += libm.a
 
@@ -1555,17 +1695,68 @@ libm_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
-	$(USER64_FLAGS)
+	$(USERLIB64_FLAGS)
+
+# libm.a 32-bit
+
+noinst_LIBRARIES += libm32.a
+
+libm32_a_SOURCES = $(libm_a_SOURCES)
+
+libm32_a_CXXFLAGS = \
+	$(libm_a_CXXFLAGS) \
+	$(USERLIB32_FLAGS)
+
+libm32_a_CFLAGS = \
+	$(libm_a_CFLAGS) \
+	$(USERLIB32_FLAGS)
+
+libm32_a_CCASFLAGS = \
+	$(libm_a_CCASFLAGS) \
+	$(USERLIB32_FLAGS)
+
+EXTRA_libm32_a_DEPENDENCIES = $(EXTRA_libm_a_DEPENDENCIES)
+
+if userspace_so
+# libm.so 64-bit
 
 bin_PROGRAMS += libm.so
 
-libm_so_SOURCES = $(libm_a_SOURCES) -fPIC -shared -nostdlib
-libm_so_CXXFLAGS = $(libm_a_CXXFLAGS) -fPIC -shared -nostdlib
-libm_so_CFLAGS = $(libm_a_CFLAGS) -fPIC -shared -nostdlib
-libm_so_CCASFLAGS = $(libm_a_CCASFLAGS) -fPIC -shared -nostdlib
-libm_so_LDFLAGS = $(libm_a_LDFLAGS) -fPIC -shared -nostdlib
+libm_so_SOURCES = $(libm_a_SOURCES) $(LIB_SO_FLAGS)
+libm_so_CXXFLAGS = $(libm_a_CXXFLAGS) $(LIB_SO_FLAGS)
+libm_so_CFLAGS = $(libm_a_CFLAGS) $(LIB_SO_FLAGS)
+libm_so_CCASFLAGS = $(libm_a_CCASFLAGS) $(LIB_SO_FLAGS)
+libm_so_LDFLAGS = $(libm_a_LDFLAGS) $(LIB_SO_FLAGS) \
+    $(USER64_LDFLAGS) \
+    $(USERLIB64_LDFLAGS)
 EXTRA_libm_so_DEPENDENCIES = $(EXTRA_libm_a_DEPENDENCIES)
 libm_so_LDADD = -lgcc
+
+# libm32.so 32-bit
+
+bin_PROGRAMS += libm32.so
+
+libm32_so_SOURCES = $(libm_so_SOURCES) $(LIB_SO_FLAGS)
+libm32_so_CXXFLAGS = $(libm_so_CXXFLAGS) $(LIB_SO_FLAGS) \
+	$(USER32_FLAGS) \
+	$(USERLIB32_FLAGS)
+
+libm32_so_CFLAGS = $(libm_so_CFLAGS) $(LIB_SO_FLAGS) \
+	$(USER32_FLAGS) \
+	$(USERLIB32_FLAGS)
+
+libm32_so_CCASFLAGS = $(libm_so_CCASFLAGS) $(LIB_SO_FLAGS) \
+	$(USER32_FLAGS) \
+	$(USERLIB32_FLAGS)
+libm32_so_LDFLAGS = $(libm_so_LDFLAGS) $(LIB_SO_FLAGS) \
+	$(USER32_LDFLAGS) \
+	$(USERLIB32_LDFLAGS)
+
+EXTRA_libm32_so_DEPENDENCIES = $(EXTRA_libm_so_DEPENDENCIES)
+libm32_so_LDADD = -lgcc
+endif
+
+# libstdc++.a 64-bit
 
 noinst_LIBRARIES += libstdc++.a
 
@@ -1578,9 +1769,48 @@ libstdc___a_CXXFLAGS = \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
-	$(USER64_FLAGS)
+	$(USERLIB64_FLAGS) \
+	$(NOSTDLIB_FLAGS)
 
-noinst_PROGRAMS += libstdc++.so
+# libstdc++32.a 32-bit
+
+noinst_LIBRARIES += libstdc++32.a
+
+libstdc__32_a_SOURCES = \
+	$(libstdc___a_SOURCES)
+
+libstdc__32_a_CXXFLAGS = \
+	$(libstdc___a_CXXFLAGS) \
+	$(USERLIB32_FLAGS)
+
+libstdc__32_a_CFLAGS = \
+	$(libstdc___a_CFLAGS) \
+	$(USERLIB32_FLAGS)
+
+if userspace_so
+# libstdc++32.so 32-bit
+
+noinst_PROGRAMS += libstdc++32.so
+
+libstdc__32_so_SOURCES = \
+	$(libstdc___a_SOURCES)
+
+libstdc__32_so_CXXFLAGS = \
+	$(libstdc___a_CXXFLAGS) \
+	$(USER32_FLAGS) \
+	$(USERLIB32_FLAGS)
+
+libstdc__32_so_CFLAGS = \
+	$(libstdc___a_CXXFLAGS) \
+	$(USER32_FLAGS) \
+	$(USERLIB32_FLAGS)
+
+libstdc__32_so_LDFLAGS = \
+	$(libstdc___so_LDFLAGS) \
+	$(USER32_LDFLAGS) \
+	$(USERLIB32_LDFLAGS)
+
+bin_PROGRAMS += libstdc++.so
 
 libstdc___so_SOURCES = \
 	libc/cxx/terminate.cc \
@@ -1591,10 +1821,15 @@ libstdc___so_CXXFLAGS = \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
-	$(USERLIB64_FLAGS)
+	$(USERLIB64_FLAGS) \
+	$(NOSTDLIB_FLAGS)
 
 libstdc___so_LDFLAGS = \
-	$(USERLIB64_LDFLAGS)
+	$(libstdc___a_LDFLAGS) \
+	$(USERLIB64_LDFLAGS) \
+	$(LIB_SO_FLAGS) \
+	$(NOSTDLIB_FLAGS)
+endif
 
 # ----------------------------------------------------------------------------
 # libc unit tests
@@ -1655,13 +1890,22 @@ libg_a_CFLAGS = $(LIBC_CXXFLAGS)
 libg_a_CXXFLAGS = $(LIBC_CXXFLAGS)
 libg_a_CCASFLAGS = $(LIBC_CXXFLAGS)
 
-#bin_PROGRAMS += libg.so
-#libg_so_SOURCES = $(libg_a_SOURCES) -fPIC -shared -nostdlib
-#libg_so_CXXFLAGS = $(libg_a_CXXFLAGS) -fPIC -shared -nostdlib
-#libg_so_CFLAGS = $(libg_a_CFLAGS) -fPIC -shared -nostdlib
-#libg_so_CCASFLAGS = $(libg_a_CCASFLAGS) -fPIC -shared -nostdlib
-#libg_so_LDFLAGS = $(libg_a_LDFLAGS) -fPIC -shared -nostdlib
-#EXTRA_libg_so_DEPENDENCIES = $(EXTRA_libg_a_DEPENDENCIES)
+#x if userspace_so
+#x bin_PROGRAMS += libg.so
+#x libg_so_SOURCES = $(libg_a_SOURCES) $(LIB_SO_FLAGS)
+#x libg_so_CXXFLAGS = $(libg_a_CXXFLAGS) $(LIB_SO_FLAGS)
+#x libg_so_CFLAGS = $(libg_a_CFLAGS) $(LIB_SO_FLAGS)
+#x libg_so_CCASFLAGS = $(libg_a_CCASFLAGS) $(LIB_SO_FLAGS)
+#x libg_so_LDFLAGS = $(libg_a_LDFLAGS) $(LIB_SO_FLAGS)
+#x EXTRA_libg_so_DEPENDENCIES = $(EXTRA_libg_a_DEPENDENCIES)
+#x endif
+
+noinst_LIBRARIES += libg32.a
+
+libg32_a_SOURCES = $(libg_a_SOURCES)
+libg32_a_CFLAGS = $(LIBC_CXXFLAGS) $(USERLIB32_FLAGS)
+libg32_a_CXXFLAGS = $(LIBC_CXXFLAGS) $(USERLIB32_FLAGS)
+libg32_a_CCASFLAGS = $(LIBC_CXXFLAGS) $(USERLIB32_FLAGS)
 
 # ----------------------------------------------------------------------------
 # User programs
@@ -2036,6 +2280,27 @@ EXTRA_virtio_gpu_km_DEPENDENCIES = \
 
 #==========
 
+bin_PROGRAMS += ext4.km
+generate_symbols_list += ext4.km
+generate_kallsym_list += ext4.km
+
+ext4_km_SOURCES = \
+	kernel/fs/ext4.cc
+
+ext4_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+ext4_km_LDFLAGS = \
+	$(call KERNEL_MODULE_LDFLAGS_FN,ext4)
+
+ext4_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_ext4_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
 bin_PROGRAMS += fat32.km
 generate_symbols_list += fat32.km
 generate_kallsym_list += fat32.km
@@ -2162,6 +2427,9 @@ EXTRA_user_shell_DEPENDENCIES = \
 bin_PROGRAMS += init
 generate_symbols_list += init
 
+init_SOURCES = \
+	user/init/init.cc
+
 init_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
 	-ggdb \
@@ -2178,13 +2446,17 @@ init_CFLAGS = \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
 
-init_SOURCES = \
-	user/init/init.cc
-
-init_LDFLAGS = -Wl,-Bdynamic
+init_LDFLAGS =
+#-Wl,-Bdynamic $(USER64_LDFLAGS) $(ELF64_FLAGS) -nostdlib
 #-Wl,--no-eh-frame-hdr
 
-init_LDADD =
+init_LDADD = \
+	-lgcc
+
+#$(top_builddir)/sysroot/lib/64/crt0.o
+#$(top_builddir)/sysroot/lib/64/libc.a
+#$(top_builddir)/sysroot/lib/64/libstdc++.a
+#$(top_builddir)/sysroot/lib/64/libm.a
 
 init_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -2208,7 +2480,7 @@ init_shared_CXXFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS) \
-	-ftls-model=global-dynamic
+	$(TLS_MODEL_FLAGS)
 
 init_shared_CFLAGS = \
 	-DFROMCFLAGS  \
@@ -2221,10 +2493,12 @@ init_shared_CFLAGS = \
 init_shared_SOURCES = \
 	user/init/init.cc
 
-init_shared_LDFLAGS = -dynamic
+init_shared_LDFLAGS = -static
 #-Wl,--no-eh-frame-hdr
 
+if userspace_so
 init_shared_LDADD =  libc.so
+endif
 
 init_shared_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -2255,7 +2529,7 @@ $(top_builddir)/sym/:
 
 $(top_builddir)/initrd: $(CPIO_LIST)
 	$(CPIO) -o --device-independent -H bin \
-		< <($(patsubst %,echo "%";,$(CPIO_LIST))) > "$@"
+		< <($(patsubst %,printf "\%s\n" "%";,$(CPIO_LIST))) > "$@"
 
 # ----------------------------------------------------------------------------
 # Misc make rules
@@ -2283,19 +2557,19 @@ clean-local:
 
 	rm -f $(top_builddir)/*.map
 
-	rm -f $(top_builddir)/*.dis.gz
-	rm -f $(top_builddir)/bochs-debuglog
-	rm -f $(top_builddir)/mbrdisk.img
-	rm -f $(top_builddir)/gptdisk.img
-	rm -f $(top_builddir)/fatpart.img
-	rm -f $(top_builddir)/isodisk.img
-	rm -f $(top_builddir)/initrd
+	rm -f "$(top_builddir)/*.dis.gz"
+	rm -f "$(top_builddir)/bochs-debuglog"
+	rm -f "$(top_builddir)/mbrdisk.img"
+	rm -f "$(top_builddir)/gptdisk.img"
+	rm -f "$(top_builddir)/fatpart.img"
+	rm -f "$(top_builddir)/isodisk.img"
+	rm -f "$(top_builddir)/initrd"
 
-	rm -f $(top_builddir)/boot1-bin
-	rm -f $(top_builddir)/dgos-kernel-asan
-	rm -f $(top_builddir)/dgos-kernel-generic
-	rm -f $(top_builddir)/dgos-kernel-tracing
-	rm -f $(top_builddir)/u_vga16.raw
+	rm -f "$(top_builddir)/boot1-bin"
+	rm -f "$(top_builddir)/dgos-kernel-asan"
+	rm -f "$(top_builddir)/dgos-kernel-generic"
+	rm -f "$(top_builddir)/dgos-kernel-tracing"
+	rm -f "$(top_builddir)/u_vga16.raw"
 
 distclean-local:
 	rm -rf $(top_builddir)/extern
@@ -2321,10 +2595,12 @@ BITFIELD_FILES = \
 
 # 1=path to bits file
 define bitfield_gen =
-$(1).h: $(1) $$(top_srcdir)/genregs.py
+$(1).h: $(1)
 	rm -f "$$@"
 	$$(top_srcdir)/genregs.py "$$<" > "$$@"
 endef
+
+$(1).h: $$(top_srcdir)/genregs.py
 
 $(foreach bitsfile,$(BITFIELD_FILES), \
 	$(eval $(call bitfield_gen,$(bitsfile))) \
@@ -2360,7 +2636,7 @@ $(DUMPDIR)/qemu-debug-out:
 	$(MKDIR) -p "$(@D)"
 	mkfifo "$@"
 
-$(top_builddir)/iso_stage:
+$(top_builddir)/iso_stage/:
 	mkdir -p "$(top_builddir)/iso_stage"
 
 $(DUMPDIR)/call-trace-out:
@@ -2374,11 +2650,11 @@ QEMU_EXTRA_DEPS = \
 #random-mem.img
 
 QEMU_CPUS = $(shell $(NPROC))
-QEMU_THREADS = 2
+QEMU_THREADS = 1
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = host,migratable=false,host-cache-info=true,fsgsbase
 
-QEMU_RAM = 4G
+QEMU_RAM = 8G
 
 QEMU_MEMFILL =
 #QEMU_MEMFILL = \
@@ -2413,9 +2689,10 @@ QEMU_USB = \
 #-device usb-storage,bus=xhci.0,drive=stick
 
 QEMU_NET = \
-	-net nic,model=rtl8139,id=nic_rtl8139 \
-	-net user \
+	-net nic,model=rtl8139,id=nic_rtl8139,netdev=n1 \
 	$(QEMU_BRIDGE)
+
+#-net user
 
 #	-object filter-dump,file=dump/netdump_rtl8139.pcap,netdev=nic_rtl8139,id=pcap \
 #	-nic model=ne2k_pci,id=nic_ne2k
@@ -2481,27 +2758,32 @@ QEMU_DISPLAY = $(QEMU_DISPLAY_$(1))
 QEMU_MACHINE = -machine q35
 #$(QEMU_DISPLAY_$(1))
 
-QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
+# I give up, nothing in qemu or bochs implement non 512/2KB sectors
+QEMU_BLKSIZE =
+
+#logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 
 QEMU_DISK_TYPE_iso = ide-cd
 QEMU_DISK_TYPE_mbr = ide-hd
 QEMU_DISK_TYPE_gpt = ide-hd
 
-QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42
 QEMU_HDCTL_DEV_virtio = \
-	-device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
+	-device virtio-blk-pci,drive=bootdrv,disable-legacy=on
 #,num-queues=$(QEMU_CPUS)
 
 #-device ich9-ahci,id=bootif
 
+QEMU_HDCTL_DEV_none =
+
 QEMU_HDCTL_DEV_ahci = \
-	-device $(QEMU_DISK_TYPE_$(1)),$(QEMU_BLKSIZE),bus=ide.0,drive=bootdrv
+	-device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv
 
 QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=bootif.0,drive=bootdrv
 
 QEMU_HDCTL_DEV_usb = \
-	-device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE)
+	-device usb-storage,drive=bootdrv,bus=xhci.0
 
 QEMU_HDCTL = $(call QEMU_MACHINE,$(1)) $(call QEMU_HDCTL_DEV_$(1),$(2))
 
@@ -2523,11 +2805,22 @@ QEMU_NP_numa = \
     -numa node,cpus=0-$(shell echo $$(( $(QEMU_CPUS) / 2 - 1 ))) \
     -numa node,cpus=$(shell echo $$(( $(QEMU_CPUS) / 2 )))-$(shell echo $$(( $(QEMU_CPUS)-1 ))) \
     -numa dist,src=1,dst=0,val=25 \
-    -numa dist,src=0,dst=1,val=15
+    -numa dist,src=0,dst=1,val=15 \
+    -device pcie-root-port,id=pcie_root1,bus=pcie.1,slot=0 \
+    -device pxb-pcie,id=pcie.1,bus_nr=0x40,numa_node=1 \
+    \
+    -netdev type=user,hostname=qemu,id=net0,hostfwd=tcp::10022-:22 \
+    -device virtio-net-pci,netdev=net0,bus=pcie_bridge1 \
+    \
+    -device pcie-root-port,id=pcie_bridge2,bus=pcie.0,slot=1
+
+#    -drive file=disk.img,if=none,id=hd0 \
+#    -device virtio-blk-pci,drive=hd0,bus=pcie_bridge2
+
 
 QEMU_EMU = $(QEMU_EMU_$(1))
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand,fsgsbase
-QEMU_EMU_tcg_BASE = -cpu max,migratable=false,fsgsbase,invtsc,vmware-cpuid-freq
+QEMU_EMU_tcg_BASE = -cpu max,migratable=false,fsgsbase,vmware-cpuid-freq
 QEMU_EMU_tcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=single
 QEMU_EMU_mttcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=multi
 #-cpu max,la57
@@ -2537,14 +2830,18 @@ QEMU_BOOT_bios = -bios $(top_srcdir)/emu/seabios.rom
 QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
 
 QEMU_BOOTMEDIA = $(QEMU_BOOTMEDIA_$(1)_$(2))
-QEMU_BOOTMEDIA_hd_bios = -boot c
-QEMU_BOOTMEDIA_hd_efi = -boot c
-QEMU_BOOTMEDIA_pxe_bios = -boot n \
-	-net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
-QEMU_BOOTMEDIA_pxe_efi = \
-	-boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
+QEMU_BOOTMEDIA_hd_bios = -boot c \
+	-netdev user,id=n1
 
-	-boot n -net user,tftp=$(top_builddir)/,bootfile=bootx64.efi
+QEMU_BOOTMEDIA_hd_efi = -boot c \
+	-netdev user,id=n1
+
+QEMU_BOOTMEDIA_pxe_bios = -boot n \
+	-netdev user,id=n1,tftp=$(top_builddir)/,bootfile=/bootpxe-bios-bin
+
+QEMU_BOOTMEDIA_pxe_efi = \
+	-boot n -netdev user,id=n1,tftp=$(top_builddir)/,bootfile=bootx64.efi
+
 #$(top_builddir)/
 QEMU_VIDEO = $(QEMU_VIDEO_$(1)) $(QEMU_DISPLAY_$(1))
 QEMU_VIDEO_vga = -vga std
@@ -2571,7 +2868,7 @@ QL_NP = up smp numa
 QL_BT = bios efi
 QL_BM = pxe hd
 QL_FS = iso mbr gpt
-QL_SC = ahci ide nvme usb virtio
+QL_SC = none ahci ide nvme usb virtio
 QL_VO = vga gl
 QL_EM = kvm tcg mttcg
 
@@ -2632,7 +2929,7 @@ $$(top_builddir)/sym/$(1)-kallsyms: $(1) $$(top_srcdir)/Makefile.am
 $$(top_builddir)/sym/$(1)-klinesyms: $(1) $$(top_srcdir)/Makefile.am
 	$$(OBJDUMP) --dwarf=decodedline "$$<" | \
 		$$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+)\s*x?/\1 \2 \3/g' | \
-		grep -P '.*\s+\d+\s+0x[0-9a-f]+' > "$$@"
+		$$(GREP) -P '.*\s+\d+\s+0x[0-9a-f]+' > "$$@"
 
 endef
 
@@ -2667,7 +2964,7 @@ BOCHS_PART = kernel boot
 define bochs_launcher =
 $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
-	cp "$$<" "$$@"
+	$$(CP) "$$<" "$$@"
 
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
 		$(SYMBOL_FILES_INSTALLED) \
@@ -2690,26 +2987,54 @@ $(foreach media,$(BOCHS_MEDIA), \
 	) \
 )
 
-debug: debug-up-efi-hd-iso-ahci-vga-tcg
+debug: all debug-up-efi-hd-iso-ahci-vga-tcg
 
 .PHONY: debug
 
-debug-kvm: debug-up-bios-hd-iso-ahci-vga-kvm
+debug-pxe: all debug-up-bios-pxe-gpt-ahci-vga-tcg
+
+.PHONY: debug-pxe
+
+debug-smp: all debug-smp-efi-hd-iso-ahci-vga-tcg
+
+.PHONY: debug-smp
+
+debug-bios: all debug-smp-bios-hd-iso-ahci-vga-tcg
+
+.PHONY: debug-bios
+
+debug-kvm: all debug-smp-bios-hd-iso-ahci-vga-kvm
 
 .PHONY: debug-kvm
 
-run-kvm: run-up-bios-hd-iso-ahci-vga-kvm
+run: all run-up-bios-hd-gpt-ahci-vga-tcg
+
+.PHONY: run
+
+run-smp: all run-smp-efi-hd-gpt-ahci-vga-tcg
+
+.PHONY: run-smp
+
+run-bios: all run-smp-bios-hd-gpt-ahci-vga-tcg
+
+.PHONY: run-bios
+
+run-pxe: all run-up-bios-pxe-gpt-ahci-vga-tcg
+
+.PHONY: run-pxe
+
+run-kvm: all run-smp-bios-hd-iso-ahci-vga-kvm
 
 .PHONY: run-kvm
 
-debug-bochs: debug-gpt-bios-bochs-kernel
+run-smp-kvm: all run-smp-bios-hd-iso-ahci-vga-kvm
+
+.PHONY: run-smp-kvm
+
+debug-bochs: all debug-gpt-bios-bochs-kernel
 
 .PHONY: debug-bochs
 
-debug-bochs-boot: debug-gpt-bios-bochs-boot
+debug-bochs-boot: all debug-gpt-bios-bochs-boot
 
 .PHONY: debug-bochs-boot
-
-run: run-up-bios-hd-gpt-ahci-vga-tcg
-
-.PHONY: run

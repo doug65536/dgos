@@ -276,7 +276,7 @@ class EXPORT virtio_base_t {
 public:
     virtio_base_t() = default;
     virtio_base_t(virtio_base_t const&) = delete;
-    virtio_base_t(virtio_base_t&&) = default;
+    virtio_base_t(virtio_base_t&&) noexcept = default;
 
     virtual ~virtio_base_t() = 0;
 protected:

@@ -9,9 +9,11 @@
 #define CPU_INFO_PF_COUNT_OFS       48
 #define CPU_INFO_LOCKS_HELD_OFS     56
 #define CPU_INFO_CSW_DEFERRED_OFS   60
+#define CPU_INFO_APIC_ID_OFS        64
 #define CPU_INFO_AFTER_CSW_FN_OFS   112
 #define CPU_INFO_AFTER_CSW_VP_OFS   120
 
+#define CPU_INFO_SIZE               512
 #define TSS_RSP0_OFS                8
 
 #define THREAD_FSBASE_OFS           8
@@ -25,6 +27,8 @@
 
 #define THREAD_SC_MXCSR_OFS         24
 #define THREAD_SC_FCW87_OFS         28
+
+#define THREAD_INFO_SIZE            512
 
 #define SYSCALL_COUNT   321
 #define SYSCALL_ENOSYS  -81

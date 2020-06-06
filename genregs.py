@@ -79,14 +79,18 @@ def write_one_prefix(prefix_data):
 			prefix_value
 		))
 
-	print('')
+	if len(items):
+		print('')
+
 	for item in items:
 		print_line('{0} {1}'.format(
 			define(prefix, item['name'], '_BIT', max_len),
 			item['bit']
 		))
 
-	print('')
+	if len(items):
+		print('')
+
 	for item in items:
 		print_line('{0} {1}'.format(
 			define(prefix, item['name'], '_BITS', max_len),
@@ -106,21 +110,27 @@ def write_one_prefix(prefix_data):
 			prefix, item['name']
 		))
 
-	print('')
+	if len(items):
+		print('')
+
 	for item in items:
 		print_line('{0} ({3}(n) << {1}_{2}_BIT)'.format(
 			define(prefix, item['name'], '_n(n)', max_len),
 			prefix, item['name'], cast
 		))
 
-	print('')
+	if len(items):
+		print('')
+
 	for item in items:
 		print_line('{0} (((n) >> {1}_{2}_BIT) & {1}_{2}_MASK)'.format(
 			define(prefix, item['name'], '_GET(n)', max_len),
 			prefix, item['name']
 		))
 
-	print('')
+	if len(items):
+		print('')
+
 	for item in items:
 		print_line('{0} ((r) = ((r) & ~{1}_{2}) | {1}_{2}_n((n)))'.format(
 			define(prefix, item['name'], '_SET(r,n)', max_len),

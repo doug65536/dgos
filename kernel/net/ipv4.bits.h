@@ -81,64 +81,24 @@
 // IPv4_TOS_PREC_NETCTL
 #define IPv4_TOS_PREC_NETCTL 7
 
-
-
-
-
-
 // IPv4_TOS_PREC_INETCTL
 #define IPv4_TOS_PREC_INETCTL 6
-
-
-
-
-
 
 // IPv4_TOS_PREC_ECP
 #define IPv4_TOS_PREC_ECP 5
 
-
-
-
-
-
 // IPv4_TOS_PREC_FLASHOVR
 #define IPv4_TOS_PREC_FLASHOVR 4
-
-
-
-
-
 
 // IPv4_TOS_PREC_FLASH
 #define IPv4_TOS_PREC_FLASH 3
 
-
-
-
-
-
 // IPv4_TOS_PREC_IMMEDIATE
 #define IPv4_TOS_PREC_IMMEDIATE 2
-
-
-
-
-
 
 // IPv4_TOS_PREC_PRIORITY
 #define IPv4_TOS_PREC_PRIORITY 1
 
-
-
-
-
-
 // IPv4_TOS_PREC_ROUTINE
 #define IPv4_TOS_PREC_ROUTINE 0
-
-
-
-
-
 

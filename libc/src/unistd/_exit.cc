@@ -4,6 +4,6 @@
 
 extern "C" void exit(int exitcode)
 {
-    syscall1(exitcode, SYS_exit);
+    syscall1(unsigned(exitcode), SYS_exit);
     __builtin_unreachable();
 }

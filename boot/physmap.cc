@@ -34,7 +34,7 @@ static bool physmap_init()
 {
     physalloc_20bit_pt = -1;
 
-    if (!get_ram_regions())
+    if (unlikely(!get_ram_regions()))
         return false;
 
     // Perform fixups
@@ -51,7 +51,7 @@ static bool physmap_init()
             top = ranges[0].base + ranges[0].size;
 
         for (size_t i = 1; i < count; ++i) {
-            if (!ranges[i].valid)
+            if (unlikely(!ranges[i].valid))
                 continue;
 
             top = ranges[i].base + ranges[i].size;
@@ -184,7 +184,7 @@ static bool physmap_init()
     return true;
 }
 
-_constructor((ctor_physmem)) void physmap_startup()
+_constructor(ctor_physmem) static void physmap_startup()
 {
     if (unlikely(!physmap_init()))
         PANIC("Could not initialize physical memory map");

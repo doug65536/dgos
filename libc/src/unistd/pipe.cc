@@ -6,7 +6,7 @@
 
 int pipe(int *fds)
 {
-    long status = syscall1(long(fds), SYS_pipe);
+    long status = syscall1(uintptr_t(fds), SYS_pipe);
 
     if (status >= 0)
         return status;

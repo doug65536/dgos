@@ -1,9 +1,10 @@
 #!/bin/bash
 
+arches=x86_64-elf
 quiet=0
 scriptroot="$(cd "$(dirname "$0")" && pwd)"
 gnu_mirror="https://mirrors.kernel.org/gnu"
-outdir=
+outdir=gcc-build
 archives=
 prefixdir=
 logfile=
@@ -281,7 +282,8 @@ if [[ -z extractonly ]]; then
 	exit 0
 fi
 
-gcc_config="--target=$arches --with-system-zlib \
+gcc_config="--target=$arches \
+--with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \
 --with-gnu-as --with-gnu-ld \
 --enable-initfini-array \
@@ -295,6 +297,7 @@ gcc_config="--target=$arches --with-system-zlib \
 --disable-nls \
 --enable-system-zlib \
 --enable-multiarch \
+--disable-hosted-libstdcxx \
 --with-arch-32=i686 --with-abi=m64 \
 --with-multilib-list=m32,m64,mx32"
 
@@ -324,7 +327,8 @@ process_tarball "$archives/$bintar" "make_tool" install "$bin_config" || exit
 process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config" || exit
 process_tarball "$archives/$gdbtar" "make_tool" install "$gdb_config" || exit
 
-for target in all-gcc all-target-libgcc install-gcc install-target-libgcc; do
+for target in all-gcc all-target-libgcc \
+		install-gcc install-target-libgcc; do
 	process_tarball "$archives/$gcctar" "make_tool" \
 		"$target" "$gcc_config" || exit
 done

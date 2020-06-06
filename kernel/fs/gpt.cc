@@ -133,7 +133,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
             part->lba_len = ptent.lba_en - ptent.lba_st + 1;
             part->name = "fat32";
             GPT_TRACE("Found %" PRIu64 " block partition at LBA"
-                      " %" PRIu64, part->lba_len, part->lba_st);
+                      " %" PRIu64 "\n", part->lba_len, part->lba_st);
 
             if (unlikely(!partitions.push_back(part)))
                 panic_oom();

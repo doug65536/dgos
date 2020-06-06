@@ -136,10 +136,10 @@ struct fat32_fs_t final : public fs_base_t {
 
     off_t walk_cluster_chain(file_handle_t *file, off_t offset, bool append);
 
-    fat32_dir_union_t *lookup_dirent(char const *pathname,
+    fat32_dir_union_t *lookup_dirent(fs_file_info_t *dirfi, char const *pathname,
                                      fat32_dir_union_t **dde);
 
-    fat32_dir_union_t *create_dirent(char const *pathname,
+    fat32_dir_union_t *create_dirent(fs_file_info_t *dirfi, char const *pathname,
                                      fat32_dir_union_t *dde, mode_t mode);
 
     fat32_dir_union_t *dirent_create(fat32_dir_union_t *dde,
@@ -159,8 +159,8 @@ struct fat32_fs_t final : public fs_base_t {
                             unsigned date_field, unsigned time_field,
                             unsigned centiseconds);
 
-    file_handle_t *create_handle(char const *path, int flags,
-                                 mode_t mode, errno_t &err);
+    file_handle_t *create_handle(fs_file_info_t *dirfi, char const *path,
+                                 int flags, mode_t mode, errno_t &err);
 
     ssize_t internal_rw(file_handle_t *file,
             void *buf, size_t size, off_t offset, bool read);
@@ -206,6 +206,8 @@ struct fat32_fs_t final : public fs_base_t {
     // directory entry
     fat32_dir_union_t root_dirent;
 };
+
+constexpr char const fat32_fs_t::allowed_dos_chars[];
 
 pool_t<fat32_fs_t::file_handle_t> fat32_fs_t::handles;
 
@@ -810,8 +812,9 @@ off_t fat32_fs_t::walk_cluster_chain(
     return walked;
 }
 
-fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
-                                             fat32_dir_union_t **dde)
+fat32_dir_union_t *fat32_fs_t::lookup_dirent(
+        fs_file_info_t *dirfi, char const *pathname,
+        fat32_dir_union_t **dde)
 {
     cluster_t cluster = root_cluster;
     fat32_dir_union_t *de = nullptr;
@@ -829,8 +832,7 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
     for ( ; name_st < path_end; name_st = name_en + 1) {
         name_en = (char*)memchr(name_st, '/', path_end - name_st);
 
-        if (!name_en)
-            name_en = path_end;
+        name_en = name_en ? name_en : path_end;
 
         size_t name_len = name_en - name_st;
 
@@ -852,7 +854,8 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
 }
 
 fat32_dir_union_t *fat32_fs_t::create_dirent(
-        char const *pathname, fat32_dir_union_t *dde, mode_t mode)
+        fs_file_info_t *dirfi, char const *pathname,
+        fat32_dir_union_t *dde, mode_t mode)
 {
     // Find the end of the pathname
     char const *name_en = pathname + strlen(pathname);
@@ -1146,10 +1149,11 @@ int32_t fat32_fs_t::transact_cluster(
 }
 
 fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
-        char const *path, int flags, mode_t mode, errno_t& err)
+        fs_file_info_t *dirfi, char const *path,
+        int flags, mode_t mode, errno_t& err)
 {
     fat32_dir_union_t *dde;
-    fat32_dir_union_t *fde = lookup_dirent(path, &dde);
+    fat32_dir_union_t *fde = lookup_dirent(dirfi, path, &dde);
 
     if (!(flags & O_CREAT)) {
         // Opening existing file
@@ -1173,7 +1177,7 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
         }
 
         if (!fde) {
-            fde = create_dirent(path, dde, mode);
+            fde = create_dirent(dirfi, path, dde, mode);
             if (!fde) {
                 err = errno_t::EIO;
                 return nullptr;
@@ -1428,7 +1432,7 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
     if (fat32_mounts.empty())
         fat32_fs_t::handles.create(510);
 
-    std::unique_ptr<fat32_fs_t> self(new (std::nothrow) fat32_fs_t);
+    std::unique_ptr<fat32_fs_t> self(new (std::nothrow) fat32_fs_t());
     if (self->mount(conn)) {
         if (unlikely(!fat32_mounts.push_back(self)))
             panic_oom();
@@ -1453,13 +1457,15 @@ bool fat32_fs_t::is_boot() const
 //
 // Scan directories
 
-int fat32_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
+int fat32_fs_t::opendirat(fs_file_info_t **fi,
+                          fs_file_info_t *dirfi, fs_cpath_t path)
 {
     read_lock lock(rwlock);
 
     errno_t err = errno_t::OK;
 
-    file_handle_t *file = create_handle(path, O_RDONLY | O_DIRECTORY, 0, err);
+    file_handle_t *file = create_handle(dirfi, path,
+                                        O_RDONLY | O_DIRECTORY, 0, err);
 
     if (!file)
         return -int(err);
@@ -1569,10 +1575,17 @@ int fat32_fs_t::releasedir(fs_file_info_t *fi)
     return 0;
 }
 
+int fat32_fs_t::resolve(fs_file_info_t *dirfi, fs_cpath_t path,
+                        size_t &consumed)
+{
+    return -1;
+}
+
 //
 // Read directory entry information
 
-int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
+int fat32_fs_t::getattrat(fs_file_info_t *dirfi, fs_cpath_t path,
+                          fs_stat_t* stbuf)
 {
     read_lock lock(rwlock);
 
@@ -1581,7 +1594,8 @@ int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::access(fs_cpath_t path, int mask)
+int fat32_fs_t::accessat(fs_file_info_t *dirfi, fs_cpath_t path,
+                         int mask)
 {
     read_lock lock(rwlock);
 
@@ -1590,7 +1604,8 @@ int fat32_fs_t::access(fs_cpath_t path, int mask)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
+int fat32_fs_t::readlinkat(fs_file_info_t *dirfi, fs_cpath_t path,
+                           char* buf, size_t size)
 {
     read_lock lock(rwlock);
 
@@ -1603,8 +1618,8 @@ int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 //
 // Modify directories
 
-int fat32_fs_t::mknod(fs_cpath_t path,
-                       fs_mode_t mode, fs_dev_t rdev)
+int fat32_fs_t::mknodat(fs_file_info_t *dirfi, fs_cpath_t path,
+                        fs_mode_t mode, fs_dev_t rdev)
 {
     write_lock lock(rwlock);
 
@@ -1614,7 +1629,8 @@ int fat32_fs_t::mknod(fs_cpath_t path,
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
+int fat32_fs_t::mkdirat(fs_file_info_t *dirfi, fs_cpath_t path,
+                        fs_mode_t mode)
 {
     write_lock lock(rwlock);
 
@@ -1623,7 +1639,7 @@ int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::rmdir(fs_cpath_t path)
+int fat32_fs_t::rmdirat(fs_file_info_t *dirfi, fs_cpath_t path)
 {
     write_lock lock(rwlock);
 
@@ -1631,7 +1647,8 @@ int fat32_fs_t::rmdir(fs_cpath_t path)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
+int fat32_fs_t::symlinkat(fs_file_info_t *dirtofi, fs_cpath_t to,
+                          fs_file_info_t *dirfromfi, fs_cpath_t from)
 {
     write_lock lock(rwlock);
 
@@ -1640,7 +1657,8 @@ int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
+int fat32_fs_t::renameat(fs_file_info_t *dirfromfi, fs_cpath_t from,
+                         fs_file_info_t *dirtofi, fs_cpath_t to)
 {
     write_lock lock(rwlock);
 
@@ -1649,7 +1667,8 @@ int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
+int fat32_fs_t::linkat(fs_file_info_t *dirfromfi, fs_cpath_t from,
+                       fs_file_info_t *dirtofi, fs_cpath_t to)
 {
     write_lock lock(rwlock);
 
@@ -1658,7 +1677,7 @@ int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::unlink(fs_cpath_t path)
+int fat32_fs_t::unlinkat(fs_file_info_t *dirfi, fs_cpath_t path)
 {
     write_lock lock(rwlock);
 
@@ -1688,7 +1707,8 @@ int fat32_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
+int fat32_fs_t::truncateat(fs_file_info_t *dirfi, fs_cpath_t path,
+                           off_t size)
 {
     write_lock lock(rwlock);
 
@@ -1697,8 +1717,8 @@ int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::utimens(fs_cpath_t path,
-                         fs_timespec_t const *ts)
+int fat32_fs_t::utimensat(fs_file_info_t *dirfi, fs_cpath_t path,
+                          fs_timespec_t const *ts)
 {
     write_lock lock(rwlock);
 
@@ -1710,8 +1730,9 @@ int fat32_fs_t::utimens(fs_cpath_t path,
 //
 // Open/close files
 
-int fat32_fs_t::open(fs_file_info_t **fi,
-                      fs_cpath_t path, int flags, mode_t mode)
+int fat32_fs_t::openat(fs_file_info_t **fi,
+                       fs_file_info_t *dirfi, fs_cpath_t path,
+                       int flags, mode_t mode)
 {
     file_handle_t *file;
 
@@ -1719,10 +1740,10 @@ int fat32_fs_t::open(fs_file_info_t **fi,
 
     if (!(flags & O_CREAT)) {
         read_lock lock(rwlock);
-        file = create_handle(path, flags, mode, err);
+        file = create_handle(dirfi, path, flags, mode, err);
     } else {
         write_lock lock(rwlock);
-        file = create_handle(path, flags, mode, err);
+        file = create_handle(dirfi, path, flags, mode, err);
     }
 
     if (!file)
@@ -1864,9 +1885,8 @@ int fat32_fs_t::lock(fs_file_info_t *fi,
 //
 // Get block map
 
-int fat32_fs_t::bmap(fs_cpath_t path,
-                      size_t blocksize,
-                      uint64_t* blockno)
+int fat32_fs_t::bmapat(fs_file_info_t *dirfi, fs_cpath_t path,
+                       size_t blocksize, uint64_t* blockno)
 {
     read_lock lock(rwlock);
 
@@ -1890,10 +1910,9 @@ int fat32_fs_t::statfs(fs_statvfs_t* stbuf)
 //
 // Read/Write/Enumerate extended attributes
 
-int fat32_fs_t::setxattr(fs_cpath_t path,
-                          char const* name,
-                          char const* value,
-                          size_t size, int flags)
+int fat32_fs_t::setxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
+                           char const* name, char const* value,
+                           size_t size, int flags)
 {
     write_lock lock(rwlock);
 
@@ -1905,10 +1924,8 @@ int fat32_fs_t::setxattr(fs_cpath_t path,
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::getxattr(fs_cpath_t path,
-                          char const* name,
-                          char* value,
-                          size_t size)
+int fat32_fs_t::getxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
+                           char const* name, char* value, size_t size)
 {
     read_lock lock(rwlock);
 
@@ -1919,9 +1936,8 @@ int fat32_fs_t::getxattr(fs_cpath_t path,
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::listxattr(fs_cpath_t path,
-                           char const* list,
-                           size_t size)
+int fat32_fs_t::listxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
+                            char const* list, size_t size)
 {
     read_lock lock(rwlock);
 

@@ -83,6 +83,19 @@ enum struct usb_desctype_t : uint8_t {
     SS_EP_COMPANION            = 48,
     SSPLUS_ISOCH_EP_COMPANION  = 49,
 
+    CS                              = 0x20,
+    CS_DEVICE                       = 0x20 |  1,
+    CS_CONFIGURATION                = 0x20 |  2,
+    CS_STRING                       = 0x20 |  3,
+    CS_INTERFACE                    = 0x20 |  4,
+    CS_ENDPOINT                     = 0x20 |  5,
+    CS_INTERFACE_POWER              = 0x20 |  8,
+    CS_OTG                          = 0x20 |  9,
+    CS_DEBUG                        = 0x20 | 10,
+    CS_INTERFACE_ASSOCIATION        = 0x20 | 11,
+    CS_BOS                          = 0x20 | 15,
+    CS_DEVICE_CAPABILITY            = 0x20 | 16,
+
     // Class types
 
     HUB_SS = 0x2A
@@ -126,7 +139,9 @@ struct usb_desc_hdr_t {
 
     // USB_DESCTYPE_*
     usb_desctype_t desc_type;
-} _packed;
+};
+
+C_ASSERT(sizeof(usb_desc_hdr_t) == 2);
 
 struct usb_desc_device {
     usb_desc_hdr_t hdr;
@@ -154,7 +169,7 @@ struct usb_desc_device {
 
     // Number of possible configurations
     uint8_t num_config;
-} _packed;
+};
 
 C_ASSERT(sizeof(usb_desc_device) == 18);
 
@@ -171,6 +186,8 @@ struct usb_desc_config {
     uint8_t attr;
     uint8_t max_power;
 } _packed;
+
+C_ASSERT(sizeof(usb_desc_config) == 9);
 
 //
 // Interface descriptor
@@ -377,11 +394,11 @@ public:
 
     int slot() const;
     usb_desc_device const& device() const;
-    usb_desc_config const *find_config(int cfg_index) const;
+    usb_desc_config const *find_config(size_t cfg_index) const;
     static usb_desc_iface const *find_iface(
             usb_desc_config const *cfg, int iface_index);
     static usb_desc_ep const *find_ep(
-            usb_desc_iface const *iface, int ep_index);
+            usb_desc_iface const *iface, size_t ep_index);
 
     static usb_desc_iface const *match_iface(
             usb_desc_config const *cfg, int protocol);
@@ -393,6 +410,11 @@ public:
 
     static char const *class_code_text(uint8_t cls);
     static char const *ep_attr_text(usb_ep_attr attr);
+
+    static inline constexpr usb_desctype_t
+    mask_desctype_cs(usb_desctype_t t) {
+        return usb_desctype_t(uint8_t(t) & ~uint8_t(usb_desctype_t::CS));
+    }
 
     template<usb_dev_cap_type cap_type>
     typename usb_dev_cap<cap_type>::pod const *get_bos(int index) const
@@ -407,7 +429,7 @@ private:
     usb_desc_device const dev_desc;
     void const * const data;
     usb_desc_bos *bos;
-    int len;
+    size_t len;
     int slotid;
 };
 

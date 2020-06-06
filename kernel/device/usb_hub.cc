@@ -79,24 +79,24 @@ usb_hub_t::usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status)
 
 bool usb_hub_t::init(usb_config_helper const* cfg_hlp)
 {
-    control.send_default_control(
+    int reply_sz = control.send_default_control(
                 uint8_t(usb_dir_t::IN) |
                 (uint8_t(usb_req_type::CLASS) << 5) |
                 uint8_t(usb_req_recip_t::DEVICE),
                 uint8_t(usb_rqcode_t::GET_DESCRIPTOR),
                 0, 0, sizeof(hub_desc), &hub_desc);
 
-    control.set_hub_port_config(hub_desc, cfg_hlp);
+    bool config_success = control.set_hub_port_config(hub_desc, cfg_hlp);
 
-    for (int port = 1; port <= hub_desc.num_ports; ++port) {
+    for (size_t port = 1; port <= hub_desc.num_ports; ++port) {
         uint32_t status = get_port_status(port);
-        USBHUB_TRACE("Port %d status == %#x\n", port, status);
+        USBHUB_TRACE("Port %zu status == %#x\n", port, status);
 
         if (status & 1) {
             if (control.add_hub_port(port)) {
-                USBHUB_TRACE("-- Configured port %d hub device\n", port);
+                USBHUB_TRACE("-- Configured port %zu hub device\n", port);
             } else {
-                USBHUB_TRACE("-- FAILED to configure hub port %d\n", port);
+                USBHUB_TRACE("-- FAILED to configure hub port %zu\n", port);
             }
         }
     }
@@ -110,12 +110,15 @@ int usb_hub_t::get_port_status(int port)
 {
     uint32_t port_status = 0;
 
-    control.send_default_control(
+    int err = control.send_default_control(
             uint8_t(usb_dir_t::IN) |
             (uint8_t(usb_req_type::CLASS) << 5) |
             uint8_t(usb_req_recip_t::ENDPOINT),
             uint8_t(usb_rqcode_t::GET_STATUS),
             0, port, sizeof(port_status), &port_status);
+
+    if (unlikely(err))
+        return err;
 
     return port_status;
 }

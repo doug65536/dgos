@@ -80,7 +80,13 @@ struct EFI_TABLE_HEADER {
 
 typedef struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL SIMPLE_TEXT_OUTPUT_INTERFACE;
 
-struct SIMPLE_INPUT_INTERFACE;
+typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL  EFI_SIMPLE_TEXT_INPUT_PROTOCOL;
+
+///
+/// Protocol name in EFI1.1 for backward-compatible.
+///
+typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL  SIMPLE_INPUT_INTERFACE;
+
 struct EFI_RUNTIME_SERVICES;
 struct EFI_BOOT_SERVICES;
 struct EFI_CONFIGURATION_TABLE;
@@ -4597,5 +4603,5 @@ struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
 
 extern EFI_GUID gEfiSimplePointerProtocolGuid;
 
-extern "C" EFI_HANDLE efi_image_handle;
-extern "C" EFI_SYSTEM_TABLE *efi_systab;
+extern "C" EFI_HANDLE const efi_image_handle;
+extern "C" EFI_SYSTEM_TABLE * const efi_systab;

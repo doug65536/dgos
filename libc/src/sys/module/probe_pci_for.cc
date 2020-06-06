@@ -12,11 +12,8 @@ int probe_pci_for(
         int32_t prog_if)
 {
     long result = syscall5(
-                long(vendor),
-                long(device),
-                long(devclass),
-                long(subclass),
-                long(prog_if),
+                vendor, device,
+                devclass, subclass, prog_if,
                 SYS_probe_pci_for);
 
     if (likely(result >= 0))

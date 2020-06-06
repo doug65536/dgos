@@ -14,7 +14,7 @@ public:
     {
     }
 
-    array_list(array_list&& rhs)
+    array_list(array_list&& rhs) noexcept
         : items(rhs.items)
         , count(rhs.count)
         , capacity(rhs.capacity)

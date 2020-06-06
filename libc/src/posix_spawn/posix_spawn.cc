@@ -11,9 +11,11 @@ int posix_spawn(pid_t *restrict pid,
                 char const * * restrict argv,
                 char const * * restrict envp)
 {
-    long result = syscall6(long(pid), long(path), long(file_actions),
-                           long(attr), long(argv), long(envp),
-                           SYS_posix_spawn);
+    scp_t result = syscall6(uintptr_t(pid), uintptr_t(path),
+                            uintptr_t(file_actions),
+                            uintptr_t(attr),
+                            uintptr_t(argv), uintptr_t(envp),
+                            SYS_posix_spawn);
 
     if (likely(result >= 0))
         return 0;

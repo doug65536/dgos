@@ -6,7 +6,7 @@
 
 int access(char const *path, int mode)
 {
-    long status = syscall2(long(path), long(mode), SYS_access);
+    long status = syscall2(uintptr_t(path), unsigned(mode), SYS_access);
 
     if (status >= 0)
         return status;

@@ -1,5 +1,6 @@
 #include "cpu/halt.h"
 #include "control_regs.h"
+#include "thread.h"
 
 void halt_forever(void)
 {

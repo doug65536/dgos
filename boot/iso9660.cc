@@ -297,8 +297,8 @@ static uint32_t find_file_by_name(char const *filename,
     size_t filename_len = strlen(filename);
 
     for (uint32_t ofs = 0; ofs < (dir_size >> 11); ++ofs) {
-        if (!disk_read_lba(uint64_t(iso9660_sector_buffer),
-                              dir_lba + ofs, 11, 1))
+        if (unlikely(!disk_read_lba(uint64_t(iso9660_sector_buffer),
+                                    dir_lba + ofs, 11, 1)))
             return 0;
 
         iso9660_dir_ent_t *de = (iso9660_dir_ent_t*)iso9660_sector_buffer;
@@ -416,7 +416,7 @@ static ssize_t iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     int total = 0;
     for (;;) {
         // Error?
-        if (!ok)
+        if (unlikely(!ok))
             return -1;
 
         // EOF?
@@ -503,6 +503,7 @@ void iso9660_boot_partition(uint32_t pvd_lba)
                           (iso9660_serial >> 56)) ^ (uint8_t)c;
     }
 
+    fs_api.name = "direct_iso9660";
     fs_api.boot_open = iso9660_boot_open;
     fs_api.boot_filesize = iso9660_boot_filesize;
     fs_api.boot_close = iso9660_boot_close;

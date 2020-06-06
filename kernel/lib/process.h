@@ -8,9 +8,10 @@
 #include "thread.h"
 #include "cpu/except_asm.h"
 #include "cxxstring.h"
+#include "fileio.h"
+#include "cpu/except_asm.h"
 
-struct fd_table_t
-{
+struct fd_table_t {
     static constexpr ssize_t max_file = 4096;
 
     desc_alloc_t desc_alloc;
@@ -146,10 +147,21 @@ struct file_mapping_t {
     int fd;
 };
 
+struct process_t;
+
+__BEGIN_DECLS
+
+void *process_get_allocator();
+void process_set_allocator(process_t *process, void *allocator);
+
+__exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);
+
+__END_DECLS
+
 struct process_t
 {
     static constexpr uintptr_t min_addr = 0x400000;
-    static constexpr uintptr_t max_addr = 0x7fc000000000;
+    static constexpr uintptr_t max_addr = 0x7fffffc00000;
 
     process_t() = default;
 
@@ -163,6 +175,14 @@ struct process_t
     int fd_to_id(int fd)
     {
         return valid_fd(fd) ? ids.ids[fd].id : -1;
+    }
+
+    int dirfd_to_id(int dirfd)
+    {
+        if (dirfd == AT_FDCWD)
+            return cwd;
+
+        return fd_to_id(dirfd);
     }
 
     enum struct state_t {
@@ -183,13 +203,17 @@ struct process_t
     pid_t pid = 0;
     int uid = 0;
     int gid = 0;
-    using lock_type = ext::mcslock;
+    using lock_type = std::mutex;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type process_lock;
     std::condition_variable cond;
     int exitcode = -1;
+    int cwd = -1;
+    bool use64 = true;
 
-    __exception_jmp_buf_t exit_jmpbuf = {};
+    using jmpbuf_ptr_t = std::unique_ptr<__exception_jmp_buf_t>;
+    using jmpbuf_list_t = std::vector<jmpbuf_ptr_t>;
+    jmpbuf_list_t exit_jmpbufs;
 
     fd_table_t ids;
     state_t state = state_t::unused;
@@ -212,11 +236,36 @@ struct process_t
 
     static int wait_for_exit(int pid);
 
-    int enter_user(uintptr_t ip, uintptr_t sp);
+    int enter_user(uintptr_t ip, uintptr_t sp, bool use64,
+                   __exception_jmp_buf_t *buf);
 
     bool is_main_thread(thread_t tid);
 
+    int clone(int (*fn)(void *), void *child_stack, int flags, void *arg);
+
+    struct clone_data_t {
+        process_t *process;
+        int (*fn)(void *arg);
+        void *arg;
+        void *sp;
+        uintptr_t tid;
+        uintptr_t rsi;
+    };
+
+    size_t thread_index(thread_t tid) const noexcept
+    {
+        size_t i, e = threads.size();
+        for (i = 0; i < e; ++i) {
+            if (threads[i] == tid)
+                break;
+        }
+
+        return i < e ? i : ~0;
+    }
+
 private:
+    friend __exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);
+
     using thread_list = std::vector<thread_t>;
     thread_list threads;
 
@@ -224,17 +273,18 @@ private:
 
     static process_t *lookup(pid_t pid);
 
+    template<typename P>
+    intptr_t load_elf_with_policy(int fd);
+
     static process_t *add_locked(scoped_lock const&);
     void remove();
     static process_t *add();
     static int run(void *process_arg);
 
+    static int start_clone_thunk(void *clone_data);
+    int start_clone(clone_data_t clone_data);
+
     int run();
 };
 
-__BEGIN_DECLS
-
-void *process_get_allocator();
-void process_set_allocator(process_t *process, void *allocator);
-
-__END_DECLS
+__exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);

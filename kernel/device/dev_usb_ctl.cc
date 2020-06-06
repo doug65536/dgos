@@ -18,7 +18,7 @@ EXPORT usb_class_drv_t::usb_class_drv_t()
 }
 
 EXPORT usb_class_drv_t::match_result
-usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
+usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, size_t index,
                               int dev_class, int dev_subclass, int dev_proto,
                               int iface_proto,
                               int vendor_id, int product_id)
@@ -36,7 +36,7 @@ usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
 
         if (vendor_id == dev_desc.vendor_id &&
             product_id == dev_desc.vendor_id) {
-            if (++match_index == index)
+            if (size_t(++match_index) == index)
                 return result;
         }
 
@@ -57,7 +57,7 @@ usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
                              dev_subclass == result.iface->iface_subclass) &&
                             ((iface_proto < 0 ||
                               iface_proto == result.iface->iface_proto))) {
-                        if (++match_index == index)
+                        if (size_t(++match_index) == index)
                             return result;
                     }
                 }
@@ -101,7 +101,8 @@ EXPORT int usb_pipe_t::recv(void *data, uint32_t length) const
     return bus->xfer(slotid, epid, 0, length, data, 1);
 }
 
-EXPORT int usb_pipe_t::recv_async(void *data, uint32_t length, usb_iocp_t *iocp) const
+EXPORT int usb_pipe_t::recv_async(void *data, uint32_t length,
+                                  usb_iocp_t *iocp) const
 {
     return bus->xfer_async(slotid, epid, 0, length, data, 1, iocp);
 }

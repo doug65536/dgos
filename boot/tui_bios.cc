@@ -24,7 +24,7 @@ __asm__(
 ".section .text, \"ax\", @progbits\n"
 );
 
-_constructor(ctor_console) void init_console()
+_constructor(ctor_console) static void init_console()
 {
     // Hook idle interrupt
     far_ptr_t *int15_vec = (far_ptr_t*)(0x15 * 4);

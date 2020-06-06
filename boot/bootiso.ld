@@ -7,8 +7,8 @@ ENTRY(entry)
 SECTIONS {
 	.text 0x1000 : AT(0x1000) {
 		___text_st = .;
-		*(.head)
-		*(.early)
+		KEEP(*(.head))
+		KEEP(*(.early))
 
 		. = ALIGN(4096);
 
@@ -25,26 +25,29 @@ SECTIONS {
 
 		. = ALIGN(16);
 		PROVIDE(__init_array_start = .);
-		*(.ctors)
-		*(.ctors.*)
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
 		PROVIDE(__init_array_end = .);
+
+		PROVIDE(__init_array_early_start = .);
+		KEEP(*(.ctors))
+		KEEP(*(.init_array))
+		PROVIDE(__init_array_early_end = .);
 
 		. = ALIGN(16);
 		___dtors_st = .;
-		*(.dtors)
-		*(.dtors.*)
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		KEEP(*(.dtors))
+		KEEP(*(.dtors.*))
+		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
 		___dtors_en = .;
 
 		. = ALIGN(16);
 		___smp_st = .;
-		*(.smp.entry)
-		*(.smp.text)
+		KEEP(*(.smp.entry))
+		KEEP(*(.smp.text))
 		. = ALIGN(64);
-		*(.smp.data)
+		KEEP(*(.smp.data))
 		___smp_en = .;
 
 		/* sector align end */
@@ -83,10 +86,6 @@ SECTIONS {
 	.debug_str		0 : { *(.debug_str)     }
 	.debug_loc		0 : { *(.debug_loc)     }
 	.comment        0 : { *(.comment)       }
-	.got            0 : { *(.got*)          }
-	.rel            0 : { *(.rel*)          }
-	.iplt           0 : { *(.iplt*)         }
-	.igot           0 : { *(.igot*)         }
 
 	/DISCARD/		0 : { *(.interp)               }
 	/DISCARD/		0 : { *(.comment)              }

@@ -6,7 +6,7 @@
 
 int creat(char const *path, mode_t mode)
 {
-    long status = syscall2(long(path), mode, SYS_creat);
+    long status = syscall2(uintptr_t(path), mode, SYS_creat);
 
     if (status >= 0)
         return status;

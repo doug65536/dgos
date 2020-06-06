@@ -5,7 +5,7 @@
 constexpr static _always_inline uint32_t hash_32(
         void const* k, size_t length)
 {
-    uint8_t const* key = (uint8_t const *)k;
+    uint8_t const* key = reinterpret_cast<uint8_t const *>(k);
 
     size_t i = 0;
     uint32_t hash = 0;
@@ -23,3 +23,10 @@ constexpr static _always_inline uint32_t hash_32(
     return hash;
 }
 
+constexpr static _always_inline uint32_t hash_bernstein(char const *s)
+{
+    uint32_t hash = 1;
+    for (size_t i = 0; s[i]; ++i)
+        hash = 33 * hash + s[i];
+    return hash;
+}

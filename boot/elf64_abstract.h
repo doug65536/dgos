@@ -12,8 +12,13 @@
 #endif
 
 struct elf64_context_t {
-    uint64_t done_bytes;
-    uint64_t total_bytes;
+    int64_t start_time;
+    int64_t last_time;
+    uint64_t last_file_bytes;
+    uint64_t done_file_bytes;
+    uint64_t total_file_bytes;
+    uint64_t done_mem_bytes;
+    uint64_t total_mem_bytes;
     uintptr_t address_window;
     uint64_t page_flags;
 };

@@ -6,12 +6,7 @@
 class usb_bus_t;
 
 struct usb_iocp_result_t {
-    usb_iocp_result_t()
-        : ccp(0)
-        , cc(usb_cc_t::invalid)
-        , slotid(0)
-    {
-    }
+    usb_iocp_result_t() = default;
 
     operator bool() const
     {
@@ -30,10 +25,10 @@ struct usb_iocp_result_t {
         return cc == usb_cc_t::success ? slotid : -int(cc);
     }
 
-    uint32_t ccp;
-    //uint32_t xfer_len;
-    usb_cc_t cc;
-    uint8_t slotid;
+    uint32_t ccp = 0;
+    uint32_t xfer_len = 0;
+    usb_cc_t cc = usb_cc_t::invalid;
+    uint8_t slotid = 0;
 
     static bool succeeded(usb_iocp_result_t const& status)
     {
@@ -100,7 +95,7 @@ public:
     virtual int get_max_ports() = 0;
 
     // Get port current connect status
-    virtual bool port_device_present(int port) = 0;
+    virtual bool port_device_present(size_t port) = 0;
 
     // Returns slot number on success, or negated completion code on error
     virtual int enable_slot(int port) = 0;
@@ -143,11 +138,8 @@ public:
 
     virtual bool configure_hub_port(int slotid, int port) = 0;
 
-    virtual bool set_hub_port_count(int slotid,
-                                    usb_hub_desc const& hub_desc) = 0;
-
-private:
-
+    virtual bool set_hub_port_count(
+            int slotid, usb_hub_desc const& hub_desc) = 0;
 };
 
 class usb_class_drv_t {
@@ -161,14 +153,14 @@ public:
 
 protected:
     struct match_result {
-        usb_desc_device const* dev;
-        usb_desc_config const* cfg;
-        usb_desc_iface const* iface;
-        int cfg_idx;
-        int iface_idx;
+        usb_desc_device const* dev = nullptr;
+        usb_desc_config const* cfg = nullptr;
+        usb_desc_iface const* iface = nullptr;
+        int cfg_idx = 0;
+        int iface_idx = 0;
     };
 
-    static match_result match_config(usb_config_helper *cfg_hlp, int index,
+    static match_result match_config(usb_config_helper *cfg_hlp, size_t index,
             int dev_class, int dev_subclass, int dev_proto, int iface_proto,
             int vendor_id, int product_id);
 

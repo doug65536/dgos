@@ -25,6 +25,7 @@
 #include "cxxexcept.h"
 #include "basic_set.h"
 #include "engunit.h"
+#include "idt.h"
 
 // Implements platform independent thread.h
 
@@ -81,16 +82,16 @@ enum thread_state_t : uint32_t {
 //  THREAD_IS_UNINITIALIZED
 //
 
-struct link_t {
-    link_t *next;
-    link_t *prev;
+//struct link_t {
+//    link_t *next;
+//    link_t *prev;
 
-    template<typename T, size_t offset = offsetof(T, link)>
-    T *container(link_t *link)
-    {
-        return (T*)((char*)link - offset);
-    }
-};
+//    template<typename T, size_t offset = offsetof(T, link)>
+//    T *container(link_t *link)
+//    {
+//        return (T*)((char*)link - offset);
+//    }
+//};
 
 // Keeps them sorted and second member deduplicates in case
 // of identical timestamps, the lower address thread runs first
@@ -123,12 +124,14 @@ struct alignas(256) thread_info_t {
     // When used_time >= preempt_time, get a new timestamp
     uint64_t preempt_time;
 
-    uint64_t reserved[1];
+    uint32_t last_cpu;
+    uint32_t reserved[1];
 
     // --- cache line --- shared line
 
     // 2 64-bit pointers
-    link_t link;
+    //link_t link;
+    uint64_t reserved3[2];
 
     // Owning process
     process_t *process;
@@ -154,7 +157,7 @@ struct alignas(256) thread_info_t {
     // --- cache line ---
 
     // 4 64-bit values
-    using lock_type = std::mutex;   // 32 bytes
+    using lock_type = ext::irq_mutex;   // 32 bytes
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 
@@ -206,14 +209,12 @@ struct alignas(256) thread_info_t {
 
     thread_cpu_mask_t cpu_affinity;
 
-    std::vector<__exception_jmp_buf_t> exit_jmpbuf;
-
     char const *name;
 
     bool closed;
 
-    // Iterator points to the node we inserted into the
-    // ready list, otherwise default constructed
+    // Iterator points to the node we inserted into
+    // scheduler list, otherwise default constructed
     ready_set_t::const_iterator schedule_node;
 };
 
@@ -230,6 +231,7 @@ C_ASSERT(offsetof(thread_info_t, priv_chg_stack) == THREAD_PRIV_CHG_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
 C_ASSERT(offsetof(thread_info_t, syscall_mxcsr) == THREAD_SC_MXCSR_OFS);
 C_ASSERT(offsetof(thread_info_t, syscall_fcw87) == THREAD_SC_FCW87_OFS);
+C_ASSERT(sizeof(thread_info_t) == THREAD_INFO_SIZE);
 
 // Save FPU context when interrupted in user mode
 // (always on for threads that execute user programs)
@@ -243,22 +245,25 @@ C_ASSERT(offsetof(thread_info_t, syscall_fcw87) == THREAD_SC_FCW87_OFS);
     THREAD_FLAGS_USER_FPU)
 
 // Store in a big array, for now
-#define MAX_THREADS 512
-static thread_info_t threads[MAX_THREADS];
+#define MAX_THREADS 4096
+HIDDEN thread_info_t threads[MAX_THREADS];
 
 // Separate to avoid constantly sharing dirty lines
 static uint8_t run_cpu[MAX_THREADS];
 
 static size_t volatile thread_count;
 
-uint32_t volatile thread_smp_running;
+uint32_t volatile thread_aps_running;
+uint32_t volatile thread_booting_ap_index;
 int thread_idle_ready;
 int spincount_mask;
 int use_mwait;
 size_t storage_next_slot;
 bool thread_cls_ready;
 
-static size_t constexpr xsave_stack_size = (size_t(64) << 10);
+static size_t constexpr xsave_stack_size = (size_t(8) << 10);
+
+void dump_scheduler_list(const char *prefix, ready_set_t &list);
 
 enum fpu_state_t : uint8_t {
     // FPU is discarded at entry to syscall
@@ -335,9 +340,13 @@ struct alignas(256) cpu_info_t {
     };
 
     resume_ent_t resume_ring[4];
-    uint32_t resume_head;
-    uint32_t resume_tail;
-    uint64_t resume_reserved;
+    std::atomic_uint8_t resume_head;
+    std::atomic_uint8_t resume_tail;
+    bool should_reschedule;
+    uint8_t reserved5[5];
+    ext::irq_spinlock resume_lock;
+
+    // --- ^ 2 cache lines ---
 
     static inline constexpr uint32_t resume_next(uint32_t curr)
     {
@@ -346,18 +355,18 @@ struct alignas(256) cpu_info_t {
 
     bool enqueue_resume(thread_t tid, uintptr_t value)
     {
-        size_t head = atomic_ld_acq(&resume_head);
+        size_t head = resume_head;
 
-        if (resume_next(head) == atomic_ld_acq(&resume_tail)) {
+        if (resume_next(head) == resume_tail) {
             printdbg("Resume ring was full!");
             return false;
         }
 
-        resume_ring[resume_head].tid = tid;
-        resume_ring[resume_head].ret_lo = uint32_t(value & 0xFFFFFFFFU);
-        resume_ring[resume_head].ret_hi = uint32_t((value >> 32) & 0xFFFFFFFFU);
+        resume_ring[head].tid = tid;
+        resume_ring[head].ret_lo = uint32_t(value & 0xFFFFFFFFU);
+        resume_ring[head].ret_hi = uint32_t((value >> 32) & 0xFFFFFFFFU);
 
-        atomic_st_rel(&resume_head, resume_next(resume_head));
+        resume_head = resume_next(resume_head);
 
         return true;
     }
@@ -385,12 +394,14 @@ struct alignas(256) cpu_info_t {
 
     uint64_t volatile tlb_shootdown_count = 0;
 };
+
 // Make sure pointer arithmetic would never do a divide
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
 // Verify asm_constants.h values
 C_ASSERT(offsetof(cpu_info_t, self) == CPU_INFO_SELF_OFS);
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
+C_ASSERT(offsetof(cpu_info_t, apic_id) == CPU_INFO_APIC_ID_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, syscall_flags) == CPU_INFO_SYSCALL_FLAGS_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
@@ -403,12 +414,14 @@ C_ASSERT((offsetof(cpu_info_t, apic_id) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, storage) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, resume_ring) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, queue_lock) & ~-64) == 0);
+C_ASSERT(sizeof(cpu_info_t) == CPU_INFO_SIZE);
 
+_section(".data.cpus")
 cpu_info_t cpus[MAX_CPUS];
+size_t const cpus_sizeof = sizeof(*cpus);
 cpu_info_t *cpus_end = cpus + MAX_CPUS;
 
-_constructor(ctor_cpu_init_cpus)
-static void cpus_init_t()
+_constructor(ctor_cpu_init_cpus) static void cpus_init_ctor()
 {
     // Do some basic initializations on the first CPU
     // without having a big initializer list of unreadable
@@ -428,7 +441,7 @@ void thread_destruct(thread_info_t *thread);
 static void thread_signal_completion(thread_info_t *thread);
 
 // Get executing APIC ID (the slow expensive way, for early initialization)
-static uint32_t get_apic_id()
+static uint32_t get_apic_id_slow()
 {
     cpuid_t cpuid_info;
     cpuid(&cpuid_info, CPUID_INFO_FEATURES, 0);
@@ -439,10 +452,13 @@ static uint32_t get_apic_id()
 // Get executing CPU by APIC ID (slow, only used in early init)
 cpu_info_t *this_cpu_by_apic_id_slow()
 {
-    uint32_t apic_id = get_apic_id();
-    for (size_t i = 0, e = total_cpus; i != e; ++i)
+    uint32_t apic_id = get_apic_id_slow();
+    printdbg("Searching for apic ID %x\n", apic_id);
+    for (size_t i = 0, e = total_cpus; i != e; ++i) {
+        printdbg("...checking against %x\n", cpus[i].apic_id);
         if (cpus[i].apic_id == apic_id)
             return cpus + i;
+    }
     return nullptr;
 }
 
@@ -482,7 +498,7 @@ void thread_startup(thread_fn_t fn, void *p, thread_t id)
     thread_cleanup();
 }
 
-static constexpr size_t stack_guard_size = (64<<10);
+static constexpr size_t stack_guard_size = (8<<10);
 
 // Allocate a stack with a large guard region at both ends and
 // return a pointer to the end of the middle committed part
@@ -501,7 +517,7 @@ static char *thread_allocate_stack(
     THREAD_STK_TRACE("Allocated %s stack"
                      ", size=%#zx"
                      ", tid=%d"
-                     ", filled=%d\n",
+                     ", filled=%#x\n",
                      noun, stack_size, tid, fill);
 
     //
@@ -535,8 +551,8 @@ static thread_t thread_create_with_state(
         thread_priority_t priority, bool user, bool is_float)
 {
     if (stack_size == 0)
-        stack_size = 65536;
-    else if (stack_size < 16384)
+        stack_size = 16 << 10;
+    else if (stack_size < (16 << 10))
         return -1;
 
     thread_info_t *thread = nullptr;
@@ -569,11 +585,20 @@ static thread_t thread_create_with_state(
     thread->name = name;
 
     // Pick CPU based on thread id for now
-    size_t cpu_nr = i % cpu_count;
+    size_t cpu_nr;
+
+    cpu_nr = i % apic_cpu_count();
+
+    thread->cpu_affinity = affinity;
+
+    if (!thread->cpu_affinity) {
+        thread->cpu_affinity += cpu_nr;
+    } else {
+        if (!thread->cpu_affinity[cpu_nr])
+            cpu_nr = thread->cpu_affinity.lsb_set();
+    }
 
     run_cpu[i] = cpu_nr;
-
-    atomic_barrier();
 
     thread->thread_flags = 0;
 
@@ -581,8 +606,15 @@ static thread_t thread_create_with_state(
 
     thread->ref_count = 1;
 
-    char *stack = thread_allocate_stack(
-                i, stack_size, "create_with_state", 0xF0);
+    char *stack;
+
+    if (i) {
+        stack = thread_allocate_stack(i, stack_size,
+                                      "create_with_state", 0xF0);
+    } else {
+        stack = kernel_stack + kernel_stack_size;
+        stack_size = kernel_stack_size;
+    }
 
     if (unlikely(stack == nullptr))
         panic_oom();
@@ -609,8 +641,10 @@ static thread_t thread_create_with_state(
 
 //    thread_info_t *creator_thread = this_thread();
 
+    // Empty affinity mask selects
+
     thread->priority = priority;
-    thread->cpu_affinity = affinity;
+
     thread->preempt_time = 16000000;
     thread->fsbase = nullptr;
     thread->gsbase = nullptr;
@@ -628,7 +662,8 @@ static thread_t thread_create_with_state(
 
     isr_context_t *ctx = (isr_context_t*)ctx_addr;
     memset(ctx, 0, ctx_size);
-    ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
+
+    ISR_CTX_FPU(ctx) = (isr_xsave_context_t*)thread->xsave_ptr;
 
     ISR_CTX_REG_RSP(ctx) = stack_end;
 
@@ -652,18 +687,39 @@ static thread_t thread_create_with_state(
     ISR_CTX_REG_CR3(ctx) = cpu_page_directory_get();
 
     if (thread->thread_flags & THREAD_FLAGS_ANY_FPU) {
-        ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
-                CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
-                default_mxcsr_mask;
-        ISR_CTX_SSE_MXCSR_MASK(ctx) = default_mxcsr_mask;
-
         // All FPU registers empty
         ISR_CTX_FPU_FSW(ctx) = CPU_FPUSW_TOP_n(7);
 
-        // 53 bit FPU precision
-        ISR_CTX_FPU_FCW(ctx) = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
-                CPU_FPUCW_DM | CPU_FPUCW_ZM | CPU_FPUCW_OM |
-                CPU_FPUCW_UM | CPU_FPUCW_PM;
+        // SSE initial config (init optimization possible)
+        ISR_CTX_SSE_MXCSR(ctx) = CPU_MXCSR_ELF_INIT &
+                default_mxcsr_mask;
+
+        // x87 initial config (init optimization possible)
+        ISR_CTX_SSE_MXCSR_MASK(ctx) = default_mxcsr_mask;
+
+        // 64 bit FPU precision (because x87 is used for long double)
+        ISR_CTX_FPU_FCW(ctx) = CPU_FPUCW_ELF_INIT;
+
+        if (cpuid_has_xsave()) {
+            isr_xsave_context_t *xsave_ctx = ISR_CTX_FPU(ctx);
+
+            // If the x87 is not in its initial configuration
+            // Data registers cannot be initialized on thread creation
+            if (unlikely(xsave_ctx->legacy_area.fcw != 0x37F))
+                xsave_ctx->xstate_bv = CPU_XCOMPBV_X87;
+
+            // Restore SSE state if initial MXCSR
+            // is not the initial configuration
+            // Data registers cannot be initialized on thread creation
+            if (unlikely(ISR_CTX_SSE_MXCSR(ctx) != 0x1F80))
+                xsave_ctx->xstate_bv |= CPU_XCOMPBV_SSE;
+
+            // Enable compact format if supported
+            if (cpuid_has_xsavec())
+                xsave_ctx->xcomp_bv = CPU_XCOMPBV_COMPACT;
+
+            //xsave_ctx->xcomp_bv |= xsave_ctx->xstate_bv;
+        }
     }
 
     thread->ctx = ctx;
@@ -676,14 +732,14 @@ static thread_t thread_create_with_state(
     // See if outrageously low or high priority is wanted
     uint64_t now;
 
-    if (i >= cpu_count * 2)
+    if (likely(i >= cpu_count * 2))
         // Normal thread
         now = time_ns();
-    else if (i >= cpu_count)
-        // IRQ worker
+    else if (likely(i >= cpu_count))
+        // IRQ worker, highest possible priority
         now = 1;
     else
-        // Idle, always ready
+        // Idle, lowest possible priority
         now = UINT64_MAX;
 
     cpu_info_t& cpu = cpus[cpu_nr];
@@ -696,18 +752,21 @@ static thread_t thread_create_with_state(
             .emplace(thread->timeslice_timestamp,
                      ready_set_t::value_type::second_type(thread))
             .first;
+    dump_scheduler_list("ready list:", cpu.ready_list);
     lock.unlock();
 
     // Kick other cpu if not this cpu
     if (thread_cpu_number() != cpu_nr)
         apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
+    else if (thread->thread_id >= thread_cpu_count())
+        thread_yield();
 
     return i;
 }
 
-
 EXPORT thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
-                              size_t stack_size, bool user, bool is_float)
+                              size_t stack_size, bool user, bool is_float,
+                              thread_cpu_mask_t const& affinity)
 {
     thread_create_info_t info{};
     info.fn = fn;
@@ -716,6 +775,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
     info.stack_size = stack_size;
     info.user = user;
     info.is_float = is_float;
+    info.affinity = affinity;
 
     return thread_create_with_info(&info);
 }
@@ -725,7 +785,7 @@ EXPORT thread_t thread_create_with_info(thread_create_info_t const* info)
     return thread_create_with_state(
                 info->fn, info->userdata, info->name, info->stack_size,
                 info->suspended ? THREAD_IS_SLEEPING : THREAD_IS_READY,
-                thread_cpu_mask_t(-1), 0, info->user, info->is_float);
+                info->affinity, 0, info->user, info->is_float);
 }
 
 #if 0
@@ -751,8 +811,8 @@ static int smp_idle_thread(void *)
     apic_config_cpu();
 
     printdbg("SMP thread running\n");
-    atomic_inc(&thread_smp_running);
-    thread_check_stack();
+    atomic_inc(&thread_aps_running);
+    thread_check_stack(-1);
 
     cpu_irq_enable();
 
@@ -785,7 +845,8 @@ static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
     for (i = 0; i < resumed_count; i += 3) {
         uint32_t exitcode = resumed_data[i].ret_lo |
                 (uint64_t(resumed_data[i].ret_hi) << 32);
-        thread_resume(resumed_data[i].tid, exitcode);
+        thread_t tid = resumed_data[i].tid;
+        thread_resume(tid, exitcode);
     }
     assert(i == resumed_count);
 
@@ -800,8 +861,7 @@ void thread_set_timer(uint8_t& apic_dcr, uint64_t ns)
 //             ns, ticks, actual);
 }
 
-_constructor(ctor_thread_init_bsp)
-static void thread_init_bsp()
+_constructor(ctor_thread_init_bsp) static void thread_init_bsp()
 {
     thread_init(0);
 }
@@ -811,13 +871,13 @@ void thread_set_cpu_count(size_t new_cpu_count)
     total_cpus = new_cpu_count;
 }
 
-void dump_ready_list(cpu_info_t& cpu)
+void dump_scheduler_list(char const *prefix, ready_set_t &list)
 {
     char ready_list_debug[64];
     size_t ready_used = 0;
     ready_list_debug[ready_used] = 0;
 
-    for (ready_set_t::value_type const& item: cpu.ready_list) {
+    for (ready_set_t::value_type const& item: list) {
         if (unlikely(ready_used + 6 >= sizeof(ready_list_debug))) {
             strcpy(ready_list_debug + ready_used, "...");
             break;
@@ -825,12 +885,13 @@ void dump_ready_list(cpu_info_t& cpu)
 
         thread_info_t *thread = (thread_info_t*)item.second;
 
-        ready_used += snprintf(ready_list_debug + ready_used,
-                               sizeof(ready_list_debug) - ready_used,
-                               " %u", thread->thread_id);
+        int emitted = snprintf(ready_list_debug + ready_used,
+                       sizeof(ready_list_debug) - ready_used,
+                       " %u", thread->thread_id);
+        ready_used += emitted >= 0 ? emitted : 0;
     }
 
-    printdbg("Ready list:%s\n", ready_list_debug);
+    printdbg("%s %s\n", prefix, ready_list_debug);
 }
 
 void thread_init(int ap)
@@ -855,8 +916,8 @@ void thread_init(int ap)
     thread_info_t *thread = threads + cpu_nr;
 
     cpu->self = cpu;
-    cpu->apic_id = get_apic_id();
-    cpu->online = 1;
+    cpu->apic_id = get_apic_id_slow();
+    cpu->online = true;
 
     // Initialize kernel gsbase and other gsbase
     cpu_gsbase_set(cpu);
@@ -871,7 +932,7 @@ void thread_init(int ap)
 
         thread->process = process_t::init(cpu_page_directory_get());
 
-        for (unsigned i = 0; i < countof(threads); ++i) {
+        for (size_t i = 0; i < countof(threads); ++i) {
             // Initialize every thread ID so pointer tricks aren't needed
             threads[i].thread_id = i;
 
@@ -887,7 +948,7 @@ void thread_init(int ap)
         // The current thread for this CPU is this thread
         cpu->cur_thread = thread;
 
-        mm_init_process(thread->process);
+        mm_init_process(thread->process, true);
 
         thread->sched_timestamp = time_ns();
         thread->used_time = 0;
@@ -896,12 +957,14 @@ void thread_init(int ap)
         thread->priority = -256;
 
         // BSP stack (grows down)
-        thread->stack = thread_allocate_stack(
-                    0, kernel_stack_size, "idle", 0xFE);
+        thread->stack = kernel_stack + kernel_stack_size;
+        thread->stack_size = kernel_stack_size;
+//        thread->stack = thread_allocate_stack(
+//                    0, kernel_stack_size, "idle", 0xFE);
 
         thread->xsave_stack = nullptr;
         thread->xsave_ptr = nullptr;
-        thread->cpu_affinity = thread_cpu_mask_t(1);
+        thread->cpu_affinity = thread_cpu_mask_t(0);
         thread->name = "Idle(BSP)";
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
@@ -909,15 +972,18 @@ void thread_init(int ap)
         size_t cpu_nr = run_cpu[thread->thread_id];
         cpu_info_t& cpu = cpus[cpu_nr];
         cpu_info_t::scoped_lock cpu_lock(cpu.queue_lock);
+
         printdbg("cpu %zu initially scheduling idle thread %u\n",
                  cpu_nr, thread->thread_id);
+
         thread->preempt_time = UINT64_MAX;
         thread->timeslice_timestamp = UINT64_MAX;
         thread->schedule_node = cpu.ready_list
                 .emplace(thread->timeslice_timestamp,
                          ready_set_t::value_type::second_type(thread))
                 .first;
-        //dump_ready_list(cpu);
+
+        dump_scheduler_list("ready list:", cpu.ready_list);
         cpu_lock.unlock();
 
         thread_count = 1;
@@ -1105,10 +1171,35 @@ isr_context_t *bootstrap_idle_thread(cpu_info_t *cpu, thread_info_t *thread,
     return ctx;
 }
 
+void accumulate_time(cpu_info_t *cpu, thread_info_t *thread, uint64_t elapsed)
+{
+    thread->used_time += elapsed;
+
+    if (uint32_t(thread->thread_id) > cpu_count)
+        cpu->busy_ratio += elapsed;
+    cpu->time_ratio += elapsed;
+
+    // Normalize ratio to < 32768
+    uint8_t time_scale = bit_msb_set(cpu->time_ratio);
+    if (time_scale > 14) {
+        time_scale -= 14;
+        cpu->time_ratio >>= time_scale;
+        cpu->busy_ratio >>= time_scale;
+    }
+
+    if (likely(cpu->time_ratio)) {
+        // 1032 == 1.032%
+        int busy_percent = 100000 * cpu->busy_ratio / cpu->time_ratio;
+        cpu->busy_percent_x1k = busy_percent;
+    } else {
+        cpu->busy_percent_x1k = 0;
+    }
+}
+
 _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 {
     //need this if ISRs run with IRQ enabled:
-    //cpu_scoped_irq_disable intr_dis;
+    cpu_scoped_irq_disable intr_dis;
 
     cpu_info_t *cpu = this_cpu();
 
@@ -1141,39 +1232,46 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 //             thread->thread_id, engineering_t(elapsed, -3).ptr(),
 //             thread->preempt_time, thread->used_time);
 
-    thread->used_time += elapsed;
-
     //
     // Accumulate used and busy time on this CPU
 
-    if (uint32_t(thread->thread_id) > cpu_count)
-        cpu->busy_ratio += elapsed;
-    cpu->time_ratio += elapsed;
+    accumulate_time(cpu, thread, elapsed);
 
-    // Normalize ratio to < 32768
-    uint8_t time_scale = bit_msb_set(cpu->time_ratio);
-    if (time_scale > 14) {
-        time_scale -= 14;
-        cpu->time_ratio >>= time_scale;
-        cpu->busy_ratio >>= time_scale;
-    }
+    // If the thread moved to a different CPU
+    if (unlikely(thread_cpu_count() > 1 &&
+                 !thread->cpu_affinity[cpu->cpu_nr])) {
+        cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
 
-    if (likely(cpu->time_ratio)) {
-        // 1032 == 1.032%
-        int busy_percent = 100000 * cpu->busy_ratio / cpu->time_ratio;
-        cpu->busy_percent_x1k = busy_percent;
-    } else {
-        cpu->busy_percent_x1k = 0;
-    }
+        ready_set_t::node_type node = cpu->ready_list
+                .extract(thread->schedule_node);
 
-    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
+        cpu_lock.unlock();
 
-    // If a new timeslice is needed
-    // and the thread is eligible for timestamp changes
-    if ((thread->state != THREAD_IS_RUNNING) ||
+        size_t first_enabled = thread->cpu_affinity.lsb_set();
+
+        cpu_info_t *other_cpu = cpus + first_enabled;
+
+        cpu_info_t::scoped_lock other_cpu_lock(other_cpu->queue_lock);
+
+        thread->state = THREAD_IS_SLEEPING_BUSY;
+        thread->wake_time = 0;
+
+        thread->schedule_node = other_cpu->sleep_list
+                .insert(std::move(node)).first;
+
+        other_cpu_lock.unlock();
+
+        apic_send_ipi(other_cpu->apic_id, INTR_IPI_RESCHED);
+    } else if ((thread->state != THREAD_IS_RUNNING) ||
             (thread->used_time >= thread->preempt_time &&
-            thread->thread_id >= thread_t(cpu_count * 2))) {
+             thread->thread_id >= thread_t(cpu_count * 2))) {
+        // A new timeslice is needed
+        // and the thread is eligible for timestamp changes
         assert(thread->schedule_node != ready_set_t::const_iterator());
+
+        cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
+
+        // Remove, modify, reinsert tree node
 
         ready_set_t::node_type sched_node = cpu->ready_list
                 .extract(thread->schedule_node);
@@ -1184,8 +1282,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
             thread->state = THREAD_IS_READY_BUSY;
             thread->preempt_time = thread->used_time + 64000000;
             thread->timeslice_timestamp = now;
-            sched_node.value().first = thread->timeslice_timestamp;
-            thread->state = THREAD_IS_READY;
+            sched_node.value().first = now;
             thread->schedule_node = cpu->ready_list
                     .insert(std::move(sched_node)).first;
         } else if (thread->state == THREAD_IS_SLEEPING_BUSY) {
@@ -1200,7 +1297,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
             assert(!"?");
         }
     }
-    cpu_lock.unlock();
 
     now = time_ns();
 
@@ -1250,7 +1346,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 
     // If only idle thread or only one thread in addition to idle thread
     // then grant infinite timeslice
-    if (cpu->ready_list.size() <= 2)
+    if (cpu->ready_list.size() <= 2 && thread_idle_ready)
         timeslice = UINT64_MAX;
 
     // Infinite if nothing sleeping
@@ -1382,7 +1478,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 
             if (ISR_CTX_FPU(thread->ctx)) {
                 // Use the correct one
-                if (to_cs64)
+                if (likely(to_cs64))
                     isr_restore_fpu_ctx64(thread);
                 else
                     isr_restore_fpu_ctx32(thread);
@@ -1446,6 +1542,9 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     }
 
     assert(ctx);
+    assert((outgoing->state == THREAD_IS_RUNNING && thread == outgoing) ||
+           (outgoing->state & THREAD_BUSY));
+    thread->last_cpu = cpu->cpu_nr;
 
     return ctx;
 }
@@ -1512,15 +1611,25 @@ EXPORT uintptr_t thread_sleep_release(
     return result;
 }
 
-_hot
-EXPORT bool thread_resume(thread_t tid, intptr_t exit_code)
+void thread_request_reschedule_noirq()
 {
-    bool need_resched = false;
+    cpu_info_t *cpu = this_cpu();
+    cpu->should_reschedule = true;
+}
 
+void thread_request_reschedule()
+{
+    cpu_scoped_irq_disable irq_dis;
+    thread_request_reschedule_noirq();
+}
+
+_hot
+EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
+{
     thread_info_t *resumed_thread = threads + tid;
 
     for (;;) {
-        //THREAD_TRACE("Resuming %d\n", tid);
+        thread_info_t::scoped_lock lock(resumed_thread->lock);
 
         if (resumed_thread->state != THREAD_IS_SLEEPING) {
             uint64_t wait_sleeping_st = time_ns();
@@ -1540,8 +1649,7 @@ EXPORT bool thread_resume(thread_t tid, intptr_t exit_code)
             cpu_info_t& cpu = cpus[cpu_nr];
             cpu_info_t::scoped_lock cpu_lock(cpu.queue_lock);
 
-
-            size_t this_cpu_nr = thread_cpu_number();
+            uint32_t this_cpu_nr = thread_cpu_number();
 
             if (this_cpu_nr != cpu_nr) {
                 uint64_t wait_st = 0;
@@ -1552,12 +1660,13 @@ EXPORT bool thread_resume(thread_t tid, intptr_t exit_code)
                     pause();
                 }
                 // tattletale
-                if (wait_st) {
+                if (unlikely(wait_st)) {
                     uint64_t wait_en = time_ns();
 
                     printdbg("Waited %ss for resume ring"
-                             " of cpu %zu from cpu %zu\n",
-                             engineering_t(wait_en - wait_st, -3).ptr(),
+                             " of cpu %zu from cpu %u\n",
+                             engineering_t<uint64_t>(
+                                 wait_en - wait_st, -3).ptr(),
                              cpu_nr, this_cpu_nr);
                 }
                 apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
@@ -1574,9 +1683,7 @@ EXPORT bool thread_resume(thread_t tid, intptr_t exit_code)
                 resumed_thread->schedule_node = cpu.ready_list
                         .insert(std::move(node)).first;
 
-                // True if the resumed thread should run immediately
-                need_resched = (resumed_thread->schedule_node ==
-                                cpu.ready_list.cbegin());
+                dump_scheduler_list("ready list:", cpu.ready_list);
 
                 // Should be a fast, voluntarily yielded context
                 assert(ISR_CTX_CTX_FLAGS(resumed_thread->ctx) &
@@ -1588,17 +1695,23 @@ EXPORT bool thread_resume(thread_t tid, intptr_t exit_code)
                 // Done manipulating it, mark it ready
                 resumed_thread->state = THREAD_IS_READY;
 
+                // True if the resumed thread should run immediately
+                bool need_resched = (resumed_thread->schedule_node ==
+                                cpu.ready_list.cbegin());
+
+                if (need_resched)
+                    thread_request_reschedule_noirq();
+
                 cpu_lock.unlock();
             }
 
-            return need_resched;
+            return;
         }
 
         if (resumed_thread->state == THREAD_IS_SLEEPING_BUSY &&
                 atomic_cmpxchg(&resumed_thread->state, THREAD_IS_SLEEPING_BUSY,
-                               THREAD_IS_READY_BUSY)) {
-            return need_resched;
-        }
+                               THREAD_IS_READY_BUSY) == THREAD_IS_SLEEPING_BUSY)
+            return;
 
         THREAD_TRACE("Did not resume %d! Retrying I guess\n", tid);
     }
@@ -1615,7 +1728,7 @@ EXPORT int thread_wait(thread_t thread_id)
 
 uint32_t thread_cpus_started()
 {
-    return thread_smp_running + 1;
+    return thread_aps_running + 1;
 }
 
 EXPORT thread_t thread_get_id()
@@ -1669,8 +1782,9 @@ EXPORT void thread_set_affinity(int id, thread_cpu_mask_t const &affinity)
     cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
     size_t cpu_nr = cpu->cpu_nr;
+    thread_info_t *thread = threads + (id >= 0 ? id : thread_get_id());
 
-    threads[id].cpu_affinity = affinity;
+    thread->cpu_affinity = affinity;
 
     if ((affinity[run_cpu[id]]) == false) {
         // Home CPU is not in the affinity mask
@@ -1703,15 +1817,44 @@ EXPORT void thread_set_priority(thread_t thread_id,
     threads[thread_id].priority = priority;
 }
 
-void thread_check_stack()
+void thread_check_stack(int intr)
 {
-    thread_info_t *thread = this_thread();
-
     char *sp = (char*)cpu_stack_ptr_get();
 
-    if (sp > thread->stack ||
-        sp < thread->stack - thread->stack_size)
-    {
+    size_t ist_slot = 0;
+
+    switch (intr) {
+    case INTR_EX_STACK:
+        ist_slot = IDT_IST_SLOT_STACK;
+        break;
+
+    case INTR_EX_DBLFAULT:
+        ist_slot = IDT_IST_SLOT_DBLFAULT;
+        break;
+
+    case INTR_IPI_FL_TRACE:
+        ist_slot = IDT_IST_SLOT_FLUSH_TRACE;
+        break;
+
+    case INTR_EX_NMI:
+        ist_slot = IDT_IST_SLOT_NMI;
+        break;
+
+    }
+
+    cpu_scoped_irq_disable irq_dis;
+    cpu_info_t *cpu = this_cpu();
+
+    std::pair<void *, void *> stk;
+
+    if (ist_slot) {
+        stk = idt_get_ist_stack(cpu->cpu_nr, ist_slot);
+    } else {
+        stk.first = cpu->cur_thread->stack - cpu->cur_thread->stack_size;
+        stk.second = cpu->cur_thread->stack;
+    }
+
+    if (sp > stk.second || sp < stk.first) {
         cpu_debug_break();
         cpu_crash();
     }
@@ -1821,7 +1964,7 @@ EXPORT unsigned thread_current_cpu(thread_t tid)
     return cpu->cpu_nr;
 }
 
-uint32_t thread_get_cpu_apic_id(int cpu)
+uint32_t thread_get_cpu_apic_id(uint32_t cpu)
 {
     return cpus[cpu].apic_id;
 }
@@ -1886,7 +2029,9 @@ void thread_exit(int exit_code)
 cpu_info_t *thread_set_cpu_gsbase(int ap)
 {
     cpu_info_t *cpu = ap ? this_cpu_by_apic_id_slow() : cpus;
-    cpu_gsbase_set(cpu);
+    // Assert that the startup code setup gsbase correctly
+    assert((cpu_info_t*)cpu_gsbase_get() == cpu);
+    //cpu_gsbase_set(cpu);
     return cpu;
 }
 
@@ -1982,3 +2127,94 @@ __cxa_eh_globals *thread_cxa_get_globals()
 {
     return &this_thread()->cxx_exception_info;
 }
+
+void thread_panic_other_cpus()
+{
+    if (thread_cpu_count() > 1)
+        apic_send_ipi(-1, INTR_IPI_PANIC);
+}
+
+// =========
+
+
+//int __gthread_active_p(void)
+//{
+//  return 0;
+//}
+//
+//int __gthread_once(__gthread_once_t *__once, void(*__func)(void))
+//{
+//  return 0;
+//}
+//
+//static inline int
+//__gthread_key_create(__gthread_key_t *__key, void(*__func)(void *))
+//{
+//  return 0;
+//}
+//
+//static int
+//__gthread_key_delete(__gthread_key_t __key)
+//{
+//  return 0;
+//}
+//
+//static inline void *
+//__gthread_getspecific(__gthread_key_t __key)
+//{
+//  return 0;
+//}
+//
+//static inline int
+//__gthread_setspecific(__gthread_key_t __key, const void *__v)
+//{
+//  return 0;
+//}
+//
+//static inline int
+//__gthread_mutex_destroy(__gthread_mutex_t *__mutex)
+//{
+//  return 0;
+//}
+//
+//static inline int
+//__gthread_mutex_lock(__gthread_mutex_t *__mutex)
+//{
+//  return 0;
+//}
+//
+//static inline int
+//__gthread_mutex_trylock(__gthread_mutex_t *__mutex)
+//{
+//  return 0;
+//}
+//
+//static inline int
+//__gthread_mutex_unlock(__gthread_mutex_t *__mutex)
+//{
+//  return 0;
+//}
+//
+//static inline int
+//__gthread_recursive_mutex_lock(__gthread_recursive_mutex_t *__mutex)
+//{
+//  return __gthread_mutex_lock(__mutex);
+//}
+//
+//static inline int
+//__gthread_recursive_mutex_trylock(__gthread_recursive_mutex_t *__mutex)
+//{
+//  return __gthread_mutex_trylock(__mutex);
+//}
+//
+//static inline int
+//__gthread_recursive_mutex_unlock(__gthread_recursive_mutex_t *__mutex)
+//{
+//  return __gthread_mutex_unlock(__mutex);
+//}
+//
+//static inline int
+//__gthread_recursive_mutex_destroy(__gthread_recursive_mutex_t *__mutex)
+//{
+//  return __gthread_mutex_destroy(__mutex);
+//}

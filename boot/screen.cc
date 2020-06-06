@@ -3,21 +3,33 @@
 #include "debug.h"
 #include "bioscall.h"
 #include "malloc.h"
-#include "screen_abstract.h"
 #include "likely.h"
 
-static void buffer_char(tchar *buf, tchar **pptr, tchar c)
+#define clamp(v, minv, maxv) \
+    ((v) < (maxv) \
+    ? (v) >= (minv) ? (v) \
+    : (minv) \
+    : (maxv))
+
+static void buffer_char(tchar *buf, tchar **pptr, tchar c, void *arg)
 {
-    if (unlikely(*pptr - buf == 80 || c == '\n'))
+    int *info = (int *)arg;
+    size_t len = *pptr - buf;
+    if (unlikely(c == tchar(-1) || len + info[1] >= 80 || c == '\n'))
     {
-        scroll_screen(0x07);
         *(*pptr) = 0;
-        print_at(24, 0, 0x07, *pptr - buf, buf);
-        debug_out(buf, *pptr - buf);
+
+        print_at(info[0], info[1], info[2], len, buf);
+        debug_out(buf, len);
         *pptr = buf;
     }
     if (likely(c >= 32))
         *(*pptr)++ = c;
+}
+
+static void debug_out_writer(tchar const *s, size_t sz, void *)
+{
+    debug_out(s, sz);
 }
 
 #define FLAG_SIGNED     0x01
@@ -27,11 +39,12 @@ static void buffer_char(tchar *buf, tchar **pptr, tchar c)
 
 char const hexlookup[] = "0123456789ABCDEF";
 
-void print_line(tchar const *format, ...)
+void formatter(tchar const *format, va_list ap,
+               void (*write_char)(tchar *buf, tchar **pptr, tchar c, void *),
+               void *write_char_arg,
+               void (*write_debug)(tchar const *s, size_t sz, void *),
+               void *write_debug_arg)
 {
-    va_list ap;
-    va_start(ap, format);
-
     tchar buf[81];
     tchar digit[22];
     tchar *dp;
@@ -45,7 +58,7 @@ void print_line(tchar const *format, ...)
     for (p = format; *p; ++p) {
         switch (*p) {
         default:
-            buffer_char(buf, &out, *p);
+            write_char(buf, &out, *p, write_char_arg);
             continue;
 
         case '%':
@@ -79,18 +92,18 @@ void print_line(tchar const *format, ...)
                 base = 0;
                 break;
             case '%':
-                buffer_char(buf, &out, p[1]);
+                write_char(buf, &out, p[1], write_char_arg);
                 continue;
             case 0:
                 // Strange % at end of format string
                 // Emit it
-                buffer_char(buf, &out, p[0]);
+                write_char(buf, &out, p[0], write_char_arg);
                 continue;
             default:
                 // Strange unrecognized placeholder
                 // Emit it
-                buffer_char(buf, &out, p[0]);
-                buffer_char(buf, &out, p[1]);
+                write_char(buf, &out, p[0], write_char_arg);
+                write_char(buf, &out, p[1], write_char_arg);
                 ++p;
                 continue;
             }
@@ -128,7 +141,7 @@ void print_line(tchar const *format, ...)
                 // then emit '-' and make it positive
                 if ((flags & FLAG_SIGNED) && ((long long)n < 0)) {
                     // Emit negative sign
-                    buffer_char(buf, &out, '-');
+                    write_char(buf, &out, '-', write_char_arg);
 
                     // Get absolute value
                     n = (unsigned long long)-(long long)n;
@@ -160,19 +173,40 @@ void print_line(tchar const *format, ...)
             }
 
             while (*s)
-                buffer_char(buf, &out, *s++);
+                write_char(buf, &out, *s++, write_char_arg);
 
             break;
         }
     }
-    if (out != buf) {
-        scroll_screen(0x07);
 
-        *out = 0;
-        print_at(24, 0, 0x07, out - buf, buf);
-        debug_out(buf, out - buf);
-    }
+    write_char(buf, &out, tchar(-1), write_char_arg);
+}
 
+void vprint_line_at(int x, int y, int attr, tchar const *format, va_list ap)
+{
+    int const pos[] = { x, y, attr };
+
+    formatter(format, ap, buffer_char, (void*)pos, debug_out_writer, nullptr);
+}
+
+void print_line_at(int x, int y, int attr, tchar const *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vprint_line_at(x, y, attr, format, ap);
+    va_end(ap);
+}
+
+void vprint_line(int attr, tchar const *format, va_list ap)
+{
+    vprint_line_at(0, 24, attr, format, ap);
+}
+
+void print_line(tchar const *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vprint_line(0x7, format, ap);
     va_end(ap);
 }
 
@@ -187,7 +221,7 @@ void print_xy(int x, int y, tchar ch, uint16_t attr, size_t count)
     for (size_t ofs = 0; ofs < count; ++ofs)
         buf[ofs] = ch;
     buf[count] = 0;
-    print_at(y, x, attr, count, buf);
+    print_at(x, y, attr, count, buf);
 
     if (fbuf)
         free(fbuf);
@@ -208,7 +242,7 @@ void print_str_xy(int x, int y, tchar const *s, size_t len,
     while (ofs < min_len)
         buf[ofs++] = ' ';
     buf[ofs] = 0;
-    print_at(y, x, attr, ofs, buf);
+    print_at(x, y, attr, ofs, buf);
 
     if (fbuf)
         free(fbuf);
@@ -239,16 +273,61 @@ void print_lba(uint32_t lba)
 
 void print_box(int left, int top, int right, int bottom, int attr, bool clear)
 {
-    print_xy(left, top, boxchars[TL], attr, 1);
-    print_xy(left + 1, top, boxchars[H], attr, right - left - 1);
-    print_xy(right, top, boxchars[TR], attr, 1);
-    for (int y = top + 1; y < bottom; ++y) {
-        print_xy(left, y, boxchars[V], attr, 1);
-        if (clear)
-            print_xy(left + 1, y, ' ', attr, right - left - 1);
-        print_xy(right, y, boxchars[V], attr, 1);
+    int sx = clamp(left, 0, 80);
+    int sy = clamp(top, 0, 25);
+    int ex = clamp(right, sx, 80);
+    int ey = clamp(bottom, sy, 25);
+
+    // If clipped away to nothing, then return
+    if (unlikely(sx == ex || sy == ey))
+        return;
+
+    // If top was not clipped off
+    if (top == sy) {
+        // If the left was not clipped off
+        if (left == sx)
+            print_xy(sx, sy, boxchars[TL], attr, 1);
+
+        // Adjust the beginning and end of the horizontal line to account
+        // for whether the left and/or right were clipped off
+        print_xy(sx + (sx == left), top, boxchars[H], attr, (ex - sx + 1) -
+                 (sx == left) - (ex == right));
+
+        // If the right was not clipped off
+        if (right == ex)
+            print_xy(ex, sy, boxchars[TR], attr, 1);
     }
-    print_xy(left, bottom, boxchars[BL], attr, 1);
-    print_xy(left + 1, bottom, boxchars[H], attr, right - left - 1);
-    print_xy(right, bottom, boxchars[BR], attr, 1);
+
+    for (int y = sy + (top == sy); y <= (ey - (bottom == ey)); ++y) {
+        // If left was not clipped off
+        if (left == sx)
+            print_xy(left, y, boxchars[V], attr, 1);
+
+        if (clear) {
+            // Adjust the beginning and end of the clearing spaces to account
+            // for whether the left and/or right were clipped off
+            print_xy(sx + (left == sx), y, ' ', attr, (ex - sx + 1) -
+                     (left == sx) - (right == ex));
+        }
+
+        // If right was not clipped off
+        if (right == ex)
+            print_xy(right, y, boxchars[V], attr, 1);
+    }
+
+    // If bottom was not clipped off
+    if (bottom == ey) {
+        // If left was not clipped off
+        if (left == sx)
+            print_xy(sx, ey, boxchars[BL], attr, 1);
+
+        // Adjust the beginning and end of the horizontal line to account
+        // for whether the left and/or right were clipped off
+        print_xy(sx + (left == sx), bottom, boxchars[H], attr,
+                 (ex - sx + 1) - (left == sx) - (right == ex));
+
+        // If right was not clipped off
+        if (right == ex)
+            print_xy(ex, ey, boxchars[BR], attr, 1);
+    }
 }

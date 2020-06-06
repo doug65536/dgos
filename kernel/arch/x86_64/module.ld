@@ -22,16 +22,16 @@ SECTIONS {
 		PROVIDE_HIDDEN(___rodata_st = .);
 
 		PROVIDE_HIDDEN(___callout_array_st = .);
-		*(SORT(.callout_array.*))
+		KEEP(*(SORT(.callout_array.*)))
 		PROVIDE_HIDDEN(___callout_array_en = .);
 
 		. = ALIGN(8);
 		PROVIDE_HIDDEN(___rodata_fixup_insn_st = .);
-		*(.rodata.fixup.insn)
+		KEEP(*(.rodata.fixup.insn))
 		PROVIDE_HIDDEN(___rodata_fixup_insn_en = .);
 
 		PROVIDE_HIDDEN(___rodata_fixup_swapgs_st = .);
-		*(.rodata.fixup.swapgs)
+		KEEP(*(.rodata.fixup.swapgs))
 		PROVIDE_HIDDEN(___rodata_fixup_swapgs_en = .);
 
 		. = ALIGN(64);
@@ -47,7 +47,7 @@ SECTIONS {
 	} :read
 
 	.driver ALIGN(8) : {
-		*(.driver)
+		KEEP(*(.driver))
 	} :read :driv
 
 	.gnu.version ALIGN(8) : {
@@ -65,7 +65,7 @@ SECTIONS {
 	.eh_frame ALIGN(8) : {
 		PROVIDE_HIDDEN(___eh_frame_st = .);
 		KEEP(*(.eh_frame))
-		*(.eh_frame.*)
+		KEEP(*(.eh_frame.*))
 		PROVIDE_HIDDEN(___eh_frame_en = .);
 	} :read :ehfr
 
@@ -159,17 +159,17 @@ SECTIONS {
 
 	. = ALIGN(4K);
 
-	.got ALIGN(8) : {
-		PROVIDE_HIDDEN(___got = .);
-		*(.got)
-	} :data
-
 	.got.plt ALIGN(8) : {
 		*(.got.plt)
 	} :data
 
 	.igot.plt ALIGN(8) : {
 		*(.igot.plt)
+	} :data
+
+	.got ALIGN(8) : {
+		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
+		*(.got)
 	} :data
 
 	.dynamic ALIGN(8) : {
@@ -180,15 +180,20 @@ SECTIONS {
 
 	.init_array ALIGN(8) : {
 		PROVIDE_HIDDEN(__init_array_start = .);
-		*(.init_array)
+		*(SORT_BY_INIT_PRIORITY(.ctors.*))
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		PROVIDE_HIDDEN(__init_array_end = .);
+
+		PROVIDE_HIDDEN(__init_array_early_start = .);
+		KEEP(*(.ctors))
+		KEEP(*(.init_array))
+		PROVIDE_HIDDEN(__init_array_early_end = .);
 	} :data
 
 	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(___fini_st = .);
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
 		PROVIDE_HIDDEN(___fini_en = .);
 	} :data
 

@@ -51,7 +51,7 @@ struct allocator
 
     value_type *allocate(size_t __n) const
     {
-        return (value_type*)malloc(__n * sizeof(value_type));
+        return reinterpret_cast<value_type*>(malloc(__n * sizeof(value_type)));
     }
 
     void deallocate(value_type * __p, size_t) const
@@ -114,7 +114,8 @@ struct page_allocator : public page_allocator_base
 
     value_type *allocate(size_t __n) const
     {
-        return (value_type*)allocate_impl(__n * sizeof(value_type));
+        return reinterpret_cast<value_type*>(
+                    allocate_impl(__n * sizeof(value_type)));
     }
 
     void deallocate(value_type * p, size_t n) const
@@ -177,7 +178,8 @@ public:
     void destroy() override final
     {
         reinterpret_cast<T*>(this)->~T();
-        alloc.deallocate((char*)this, sizeof(bump_allocator_impl));
+        alloc.deallocate(reinterpret_cast<char*>(this),
+                         sizeof(bump_allocator_impl));
     }
 
     T *allocate(size_t __n)
@@ -224,11 +226,13 @@ public:
         item_t *prev_page = current_page;
 
         // Allocate a new page
-        current_page = (item_t*)alloc.allocate(chunk_size);
+        current_page = reinterpret_cast<item_t*>(alloc.allocate(chunk_size));
 
         // Pointer sized bytes at the end of the page
         // are reserved for previous page chain
-        *(void**)((char*)current_page + chunk_size - sizeof(void*)) = prev_page;
+        char *prev_page_ptr = reinterpret_cast<char*>(current_page) +
+                chunk_size - sizeof(prev_page);
+        memcpy(prev_page_ptr, &prev_page, sizeof(prev_page));
 
         // Reset index to start of freshly allocated page
         bump_index = 0;
@@ -250,15 +254,15 @@ public:
         // Either write next pointer into last block, or,
         // write that into first_free instead
         item_t **adj = last_free ? &last_free->next_free : &first_free;
-        *adj = (item_t*)__p;
+        *adj = reinterpret_cast<item_t*>(__p);
 
         // Newly deallocated block is reused last
         // after all previously freed blocks
         // This should reduce temporal locality but increase spacial locality
-        last_free = (item_t*)__p;
+        last_free = reinterpret_cast<item_t*>(__p);
 
         // Null out next pointer in free block chain
-        *(void**)__p = nullptr;
+        *reinterpret_cast<void**>(__p) = nullptr;
     }
 
 private:
@@ -295,7 +299,7 @@ public:
     }
 
     bump_allocator(bump_allocator const&) = default;
-    bump_allocator(bump_allocator&&) = default;
+    bump_allocator(bump_allocator&&) noexcept = default;
     bump_allocator& operator=(bump_allocator const&) = default;
 
     template<typename _U>
@@ -316,7 +320,8 @@ public:
 
 #if HEAP_DEBUG
         if (mem)
-            memset((void*)mem, 0xf0, sizeof(value_type) * __n);
+            memset(reinterpret_cast<void*>(mem),
+                   0xf0, sizeof(value_type) * __n);
 #endif
 
         return mem;
@@ -325,7 +330,8 @@ public:
     void deallocate(value_type * __p, size_t __n)
     {
 #if HEAP_DEBUG
-        memset((void*)__p, 0xfe, sizeof(value_type) * __n);
+        memset(reinterpret_cast<void*>(__p),
+               0xfe, sizeof(value_type) * __n);
 #endif
         return impl->deallocate(__p, __n);
     }
@@ -400,19 +406,19 @@ public:
     using pointer = _T*;
     using const_pointer = _T const*;
 
-    unique_ptr()
+    unique_ptr() noexcept
         : __ptr(nullptr)
     {
     }
 
-    unique_ptr(unique_ptr&& __rhs)
+    unique_ptr(unique_ptr&& __rhs) noexcept
         : __ptr(__rhs.release())
     {
     }
 
     unique_ptr(unique_ptr const &) = delete;
 
-    unique_ptr(_T* __value)
+    unique_ptr(_T* __value) noexcept
         : __ptr(__value)
     {
     }
@@ -423,37 +429,37 @@ public:
             ((Tdeleter()))(__ptr);
     }
 
-    operator _T*()
+    operator _T*() noexcept
     {
         return __ptr;
     }
 
-    operator _T const*() const
+    operator _T const*() const noexcept
     {
         return __ptr;
     }
 
-    _T* operator->()
+    _T* operator->() noexcept
     {
         return __ptr;
     }
 
-    _T const* operator->() const
+    _T const* operator->() const noexcept
     {
         return __ptr;
     }
 
-    _T* get()
+    _T* get() noexcept
     {
         return __ptr;
     }
 
-    _T const* get() const
+    _T const* get() const noexcept
     {
         return __ptr;
     }
 
-    unique_ptr &operator=(_T* __rhs)
+    unique_ptr &operator=(_T* __rhs) noexcept
     {
         if (__ptr)
             ((Tdeleter()))(__ptr);
@@ -466,7 +472,7 @@ public:
         return Tdeleter();
     }
 
-    _T* release()
+    _T* release() noexcept
     {
         _T* __p = __ptr;
         __ptr = nullptr;
@@ -477,6 +483,7 @@ public:
     {
         _T* __old = __ptr;
         __ptr = p;
+
         if (__old)
             ((Tdeleter()))(__old);
 
@@ -495,19 +502,19 @@ public:
     using pointer = _T*;
     using const_pointer = _T const*;
 
-    unique_ptr()
+    unique_ptr() noexcept
         : __ptr(nullptr)
     {
     }
 
-    unique_ptr(unique_ptr&& rhs)
+    unique_ptr(unique_ptr&& rhs) noexcept
         : __ptr(rhs.release())
     {
     }
 
     unique_ptr(unique_ptr const &) = delete;
 
-    unique_ptr(_T* __value)
+    unique_ptr(_T* __value) noexcept
         : __ptr(__value)
     {
     }
@@ -518,42 +525,42 @@ public:
             ((Tdeleter()))(__ptr);
     }
 
-    operator _T*()
+    operator _T*() noexcept
     {
         return __ptr;
     }
 
-    operator _T const*() const
+    operator _T const*() const noexcept
     {
         return __ptr;
     }
 
-    _T& operator[](size_t i)
+    _T& operator[](size_t i) noexcept
     {
         return __ptr[i];
     }
 
-    _T const& operator[](size_t __i) const
+    _T const& operator[](size_t __i) const noexcept
     {
         return __ptr[__i];
     }
 
-    _T* operator->()
+    _T* operator->() noexcept
     {
         return __ptr;
     }
 
-    _T const* operator->() const
+    _T const* operator->() const noexcept
     {
         return __ptr;
     }
 
-    _T* get()
+    _T* get() noexcept
     {
         return __ptr;
     }
 
-    _T const* get() const
+    _T const* get() const noexcept
     {
         return __ptr;
     }
@@ -571,19 +578,22 @@ public:
         return Tdeleter();
     }
 
-    _T* release()
+    _T* release() noexcept
     {
         _T* __p = __ptr;
         __ptr = nullptr;
         return __p;
     }
 
-    void reset(_T* __p = pointer())
+    bool reset(_T* __p = pointer())
     {
         _T* __old = __ptr;
         __ptr = __p;
+
         if (__old)
             ((Tdeleter()))(__old);
+
+        return __ptr != nullptr;
     }
 
 private:

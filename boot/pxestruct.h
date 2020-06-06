@@ -37,8 +37,8 @@
 #define PXENV_STATUS_BIS_BAD_CKSUM         0x28
 
 /* TFTP/MTFTP errors (0x30 to 0x3F) */
-#define PXENV_STATUS_TFTP_CANNOT_ARP_ADDRESS 0x30 
-#define PXENV_STATUS_TFTP_OPEN_TIMEOUT       0x32 
+#define PXENV_STATUS_TFTP_CANNOT_ARP_ADDRESS 0x30
+#define PXENV_STATUS_TFTP_OPEN_TIMEOUT       0x32
 
 #define PXENV_STATUS_TFTP_UNKNOWN_OPCODE                0x33
 #define PXENV_STATUS_TFTP_READ_TIMEOUT                  0x35
@@ -111,7 +111,7 @@
 // Offsets used in assembly
 //
 
-#define PXE_ENTRY_SP_OFS 0x10
+#define PXE_ENTRY_IP_OFS 0x10
 
 #ifndef __ASSEMBLER__
 
@@ -124,51 +124,51 @@ typedef uint16_t seg16_t;
 struct pxe_segdesc_t {
     // Real mode segment or protected mode selector
     seg16_t seg;
-    
+
     // Offset within the segment
     uint32_t ofs;
-    
+
     // Size of the segment
     uint16_t size;
 } _packed;
 
 struct bangpxe_t {
     char sig[4];
-    
+
     // Length of this structure
     uint8_t StructLength;
-    
+
     // Checksum value set to make sum of bytes in this structure equal zero
     uint8_t StructCksum;
-    
+
     // Revision
     uint8_t StructRev;
-        
+
     uint8_t reserved;
-    
+
     // Real mode seg:ofs of UNDI ROM ID structure
     ofs16_t UNDIROMID_ofs;
     seg16_t UNDIROMID_seg;
-    
+
     // Real mode seg:ofs of BC ROM ID structure
     ofs16_t BaseROMID_ofs;
     seg16_t BaseROMID_seg;
-    
-    ofs16_t EntryPointSP_ofs;
-    seg16_t EntryPointSP_seg;
-    
+
+    ofs16_t EntryPointIP_ofs;
+    seg16_t EntryPointIP_seg;
+
     ofs16_t EntryPointESP_ofs;
     seg16_t EntryPointESP_seg;
-    
+
     // Real mode far pointer to status call-out handler function
     // Must be filled in before making any base-code API calls in PM
     ofs16_t StatusCallout_ofs;
     seg16_t StatusCallout_seg;
-    
+
     uint8_t reserved2;
     uint8_t SegDescCnt;
     uint16_t FirstSelector;
-    
+
     pxe_segdesc_t Stack;
     pxe_segdesc_t UNDIData;
     pxe_segdesc_t UNDICode;
@@ -179,7 +179,7 @@ struct bangpxe_t {
 };
 
 C_ASSERT(sizeof(bangpxe_t) == 0x58);
-C_ASSERT(offsetof(bangpxe_t, EntryPointSP_ofs) == PXE_ENTRY_SP_OFS);
+C_ASSERT(offsetof(bangpxe_t, EntryPointIP_ofs) == PXE_ENTRY_IP_OFS);
 
 typedef uint16_t pxenv_status_t;
 
@@ -191,28 +191,28 @@ struct pxenv_plus_t {
     uint16_t version;
     uint8_t length;
     uint8_t checksum;
-    
+
     ofs16_t rm_entry_ofs;
     seg16_t rm_entry_seg;
-    
+
     uint32_t pm32_ofs;
     seg16_t pm32_sel;
-    
+
     seg16_t stack_seg;
     uint16_t stack_size;
-    
+
     seg16_t bc_code_seg;
     uint16_t bc_code_size;
-    
+
     seg16_t bc_data_seg;
     uint16_t bc_data_size;
-    
+
     seg16_t undi_data_seg;
     uint16_t undi_data_size;
-    
+
     seg16_t undi_code_seg;
     uint16_t undi_code_size;
-    
+
     ofs16_t pxe_ptr_ofs;
     seg16_t pxe_ptr_seg;
 } _packed;
@@ -304,5 +304,19 @@ struct pxenv_tftp_read_t : public pxenv_base_t {
 } _packed;
 
 PXE_DEFINE_OPCODE(pxenv_tftp_read_t, PXENV_TFTP_READ);
+
+//
+// OP: TFTP get file size
+
+#define PXENV_TFTP_GET_FSIZE    0x25
+
+struct pxenv_tftp_get_fsize_t : public pxenv_base_t {
+    uint8_t server_ip[4];
+    uint8_t gateway_ip[4];
+    char filename[128];
+    uint32_t file_size;
+} _packed;
+
+PXE_DEFINE_OPCODE(pxenv_tftp_get_fsize_t, PXENV_TFTP_GET_FSIZE);
 
 #endif

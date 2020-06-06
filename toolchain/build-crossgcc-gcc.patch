@@ -1,7 +1,7 @@
 diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf
 --- gcc-6.2.0/gcc/config/i386/t-x86_64-elf	1969-12-31 16:00:00.000000000 -0800
 +++ gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf	2016-09-30 11:55:53.602700086 -0700
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,21 @@
 +# Add redzoneless libgcc
 +MULTILIB_OPTIONS  += mno-red-zone
 +MULTILIB_DIRNAMES += no-red-zone
@@ -10,11 +10,8 @@ diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i
 +MULTILIB_OPTIONS  += m32
 +MULTILIB_DIRNAMES  += 32
 +
-+MULTILIB_OPTIONS  += fPIE
-+MULTILIB_DIRNAMES  += PIE
-+
-+MULTILIB_OPTIONS  += fPIC
-+MULTILIB_DIRNAMES  += PIC
++MULTILIB_OPTIONS  += fPIE/fPIC shared
++MULTILIB_DIRNAMES  += PIE PIC shared
 +
 +MULTILIB_OPTIONS  += mrtd
 +MULTILIB_DIRNAMES  += rtd
@@ -22,10 +19,9 @@ diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i
 +MULTILIB_OPTIONS  += mregparm=3
 +MULTILIB_DIRNAMES  += regparm3
 +
-+MULTILIB_OPTIONS  += ffreestanding
-+MULTILIB_DIRNAMES  += freestanding
-+
-+MULTILIB_EXCEPTIONS += *m32/*mno-red-zone *fPIE/*fPIC
++MULTILIB_EXCEPTIONS += *fPIE*/*fPIC*
++MULTILIB_EXCEPTIONS += *m64*/*mregparm*/*mrtd*
++MULTILIB_EXCEPTIONS += *m32*/*mno-red-zone*
 +
 diff -durN gcc-6.2.0/gcc/config.gcc gcc-6.2.0.patched/gcc/config.gcc
 --- gcc-6.2.0/gcc/config.gcc	2016-06-08 06:34:25.000000000 -0700

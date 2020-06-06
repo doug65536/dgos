@@ -5,37 +5,17 @@
 // RTL8139_IDR_HI: MAC address (must be 32-bit I/O)
 #define RTL8139_IDR_HI 0x00
 
-
-
-
-
-
 //
 // RTL8139_IDR_LO: MAC address (must be 32-bit I/O)
 #define RTL8139_IDR_LO 0x04
-
-
-
-
-
 
 //
 // RTL8139_MAR_LO: Multicast Address Register (must be 32-bit I/O)
 #define RTL8139_MAR_LO 0x08
 
-
-
-
-
-
 //
 // RTL8139_MAR_HI: Multicast Address Register (must be 32-bit I/O)
 #define RTL8139_MAR_HI 0x0C
-
-
-
-
-
 
 //
 // RTL8139_CR: Command register
@@ -97,11 +77,6 @@
 //
 // RTL8139_TSD_n(n): Tx status descriptor 0-3 (32-bit)
 #define RTL8139_TSD_n(n) (0x10+((n)<<2))
-
-
-
-
-
 
 // RTL8139_TSD
 
@@ -233,82 +208,37 @@
 // RTL8139_TSD_SIZE_MAX
 #define RTL8139_TSD_SIZE_MAX 1792
 
-
-
-
-
-
 //
 // RTL8139_TSAD_n(n): Tx start address descriptor 0-3 (32-bit)
 #define RTL8139_TSAD_n(n) (0x20+((n)<<2))
-
-
-
-
-
 
 //
 // RTL8139_RBSTART: Rx buffer address descriptor (32-bit)
 #define RTL8139_RBSTART 0x30
 
-
-
-
-
-
 //
 // RTL8139_ERBCR: Early rx byte count (16-bit)
 #define RTL8139_ERBCR 0x34
-
-
-
-
-
 
 //
 // RTL8139_ERSR: Early rx status register (8-bit)
 #define RTL8139_ERSR 0x36
 
-
-
-
-
-
 //
 // RTL8139_CAPR: Current address of packet read (16-bit)
 #define RTL8139_CAPR 0x38
-
-
-
-
-
 
 //
 // RTL8139_CBR: Current rx buffer address (16-bit)
 #define RTL8139_CBR 0x3A
 
-
-
-
-
-
 //
 // RTL8139_IMR: Interrupt Mask Register (16-bit)
 #define RTL8139_IMR 0x3C
 
-
-
-
-
-
 //
 // RTL8139_ISR: Interrupt Status Register (16-bit)
 #define RTL8139_ISR 0x3E
-
-
-
-
-
 
 //
 // RTL8139_IxR: RTL8139_IMR and RTL8139_ISR: Interrupt Mask/Status Registers
@@ -442,278 +372,123 @@
 // RTL8139_TCR: Tx Configuration Register (32-bit)
 #define RTL8139_TCR 0x40
 
-
-
-
-
-
 //
 // RTL8139_RCR: Rx Configuration Register (32-bit)
 #define RTL8139_RCR 0x44
-
-
-
-
-
 
 //
 // RTL8139_TCTR: Timer Count Register (32-bit)
 #define RTL8139_TCTR 0x48
 
-
-
-
-
-
 //
 // RTL8139_MPC: Missed Packet Counter (32-bit)
 #define RTL8139_MPC 0x4C
-
-
-
-
-
 
 //
 // RTL8139_9346CR: 93C46 Command Register (8-bit)
 #define RTL8139_9346CR 0x50
 
-
-
-
-
-
 //
 // RTL8139_CONFIG0: Configuration Register 0 (8-bit)
 #define RTL8139_CONFIG0 0x51
-
-
-
-
-
 
 //
 // RTL8139_CONFIG1: Configuration Register 1 (8-bit)
 #define RTL8139_CONFIG1 0x52
 
-
-
-
-
-
 //
 // RTL8139_TIMERINT: Timer Interrupt Register (32-bit)
 #define RTL8139_TIMERINT 0x54
-
-
-
-
-
 
 //
 // RTL8139_MSR: Media Status Register (8-bit)
 #define RTL8139_MSR 0x58
 
-
-
-
-
-
 //
 // RTL8139_CONFIG3: Configuration Register 3 (8-bit)
 #define RTL8139_CONFIG3 0x59
-
-
-
-
-
 
 //
 // RTL8139_CONFIG4: Configuration Register 4 (8-bit)
 #define RTL8139_CONFIG4 0x5A
 
-
-
-
-
-
 //
 // RTL8139_MULINT: Multiple Interrupt Select (16-bit)
 #define RTL8139_MULINT 0x5C
-
-
-
-
-
 
 //
 // RTL8139_RERID: PCI Revision ID (8-bit)
 #define RTL8139_RERID 0x5E
 
-
-
-
-
-
 //
 // RTL8139_TSAD: Tx Status of All Descriptors (16-bit)
 #define RTL8139_TSAD 0x60
-
-
-
-
-
 
 //
 // RTL8139_BMCR: Basic Mode Control Register (16-bit)
 #define RTL8139_BMCR 0x62
 
-
-
-
-
-
 //
 // RTL8139_BMSR: Basic Mode Status Register (16-bit)
 #define RTL8139_BMSR 0x64
-
-
-
-
-
 
 //
 // RTL8139_ANAR: Auto-Negotiation Address Register (16-bit)
 #define RTL8139_ANAR 0x66
 
-
-
-
-
-
 //
 // RTL8139_ANLPAR: Auto-Negotiation Link Partner Register (16-bit)
 #define RTL8139_ANLPAR 0x68
-
-
-
-
-
 
 //
 // RTL8139_ANER: Auto-Negotiation Expansion Register (16-bit)
 #define RTL8139_ANER 0x6A
 
-
-
-
-
-
 //
 // RTL8139_DIS: Disconnect counter (16-bit)
 #define RTL8139_DIS 0x6C
-
-
-
-
-
 
 //
 // RTL8139_FCSC: False Carrier Sense Counter (16-bit)
 #define RTL8139_FCSC 0x6E
 
-
-
-
-
-
 //
 // RTL8139_NWAYTR: N-Way Test Register (16-bit)
 #define RTL8139_NWAYTR 0x70
-
-
-
-
-
 
 //
 // RTL8139_REC: RX_ER Counter (16-bit)
 #define RTL8139_REC 0x72
 
-
-
-
-
-
 //
 // RTL8139_CSCR: CS Configuration Register (16-bit)
 #define RTL8139_CSCR 0x74
-
-
-
-
-
 
 //
 // RTL8139_PHY1_PARM: PHY Parameter 1 (32-bit)
 #define RTL8139_PHY1_PARM 0x78
 
-
-
-
-
-
 //
 // RTL8139_TW_PARM: Twister Parameter (32-bit)
 #define RTL8139_TW_PARM 0x7C
-
-
-
-
-
 
 //
 // RTL8139_PHY2_PARM: PHY Parameter 2 (8-bit)
 #define RTL8139_PHY2_PARM 0x80
 
-
-
-
-
-
 //
 // RTL8139_CRC_n(n): PM CRC register for wakeup frame n (8-bit)
 #define RTL8139_CRC_n(n) (0x84+(n))
-
-
-
-
-
 
 //
 // RTL8139_WAKELO_n(n): PM wakeup frame0 (64-bit)
 #define RTL8139_WAKELO_n(n) (0x8C+((n)<<2))
 
-
-
-
-
-
 //
 // RTL8139_WAKEHI_n(n): PM wakeup frame0 (64-bit)
 #define RTL8139_WAKEHI_n(n) (0x90+((n)<<2))
 
-
-
-
-
-
 //
 // RTL8139_LSBCRC0_n(n): LSB of mask byte of wakeup frame 12 to 75 (8-bit)
 #define RTL8139_LSBCRC0_n(n) (0xCC+(n))
-
-
-
-
-
 

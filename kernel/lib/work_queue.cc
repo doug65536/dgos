@@ -17,10 +17,10 @@ EXPORT workq_impl* workq::percpu;
 
 void workq::init(int cpu_count)
 {
-    percpu = new (std::nothrow) workq_impl[cpu_count]();
+    percpu = (workq_impl*)malloc(sizeof(*percpu) * cpu_count);
 
     for (int i = 0; i < cpu_count; ++i)
-        percpu[i].set_affinity(i);
+        new (percpu + i) workq_impl(i);
 }
 
 EXPORT void workq_impl::enqueue(workq_work *work)
@@ -189,9 +189,10 @@ void workq_alloc::free_slot(size_t i)
     top &= ~(UINT64_C(1) << word);
 }
 
-workq_impl::workq_impl()
+workq_impl::workq_impl(uint32_t cpu_nr)
 {
-    tid = thread_create(worker, this, "workq", 0, false, false);
+    tid = thread_create(worker, this, "workq", 0, false, false,
+                        thread_cpu_mask_t(cpu_nr));
 }
 
 workq_impl::~workq_impl()

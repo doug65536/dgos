@@ -40,7 +40,8 @@ public:
             clock::time_point timeout = clock::time_point::max()) = 0;
     virtual bool wait_dsr_until(timeout_t timeout) = 0;
 
-    virtual void route_irq(int) {}
+    // Success because there is no IRQ to route
+    virtual bool route_irq(int) { return true; }
 
     ssize_t write(char c)
     {

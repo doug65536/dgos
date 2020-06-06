@@ -621,6 +621,8 @@ EXPORT void condvar_wake_n(condition_var_t *var, size_t n)
 {
     spinlock_lock(&var->lock);
 
+    bool should_reschedule = false;
+
     thread_wait_t *next_wait;
     for (thread_wait_t *wait = (thread_wait_t*)var->link.next;
          wait != (void*)&var->link && n--;

@@ -7,9 +7,36 @@
 #include <spawn.h>
 #include <dirent.h>
 #include <string.h>
+#include <inttypes.h>
+
+template<typename T, size_t hw_vec_sz = 64>
+struct aosoa_t {
+    typedef T vector_t __attribute__((__vector_size__(hw_vec_sz / sizeof(T)),
+                                      __aligned__(16)));
+    static constexpr const size_t row_count = hw_vec_sz / sizeof(vector_t);
+};
+
+using aosoa_int_t = aosoa_t<int>;
+using aosoa_float_t = aosoa_t<float>;
+
+extern "C"
+__attribute__((__target_clones__("default,avx2"),
+               __visibility__("default"),
+               __used__,
+               __optimize__("-O3")))
+void do_aosoa(aosoa_int_t::vector_t * restrict c,
+              aosoa_int_t::vector_t const * restrict a,
+              aosoa_int_t::vector_t const * restrict b,
+              size_t n)
+{
+    for (size_t i = 0; i < n; i += aosoa_float_t::row_count) {
+        for (size_t vec = 0; vec < aosoa_float_t::row_count; ++vec)
+            c[i+vec] = a[i+vec] + b[i+vec];
+    }
+}
 
 __BEGIN_DECLS
-
+#include <stddef.h>
 __attribute__((__format__(__printf__, 1, 0), __noreturn__))
 void verr(char const *format, va_list ap)
 {
@@ -45,10 +72,10 @@ void load_module(char const *path, char const *parameters = nullptr)
 
     void *mem = mmap(nullptr, sz, PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
     if (unlikely(mem == MAP_FAILED))
-        err("Cannot allocate %zd bytes\n", sz);
+        err("Cannot allocate %" PRIu64 "d bytes\n", sz);
 
     if (unlikely(sz != read(fd, mem, sz)))
-        err("Cannot read %zd bytes\n", sz);
+        err("Cannot read %" PRIu64 " bytes\n", sz);
 
     int status;
     char *needed = (char*)malloc(NAME_MAX);
@@ -71,6 +98,15 @@ void load_module(char const *path, char const *parameters = nullptr)
 
 int main(int argc, char **argv, char **envp)
 {
+    aosoa_int_t::vector_t *c = new aosoa_int_t::vector_t[
+            64 / sizeof(aosoa_int_t::vector_t)];
+    aosoa_int_t::vector_t *a = new aosoa_int_t::vector_t[
+            64 / sizeof(aosoa_int_t::vector_t)];
+    aosoa_int_t::vector_t *b = new aosoa_int_t::vector_t[
+            64 / sizeof(aosoa_int_t::vector_t)];
+    __asm__ __volatile__ ("" : : : "memory");
+    do_aosoa(c, a, b, 64 / sizeof(aosoa_int_t::vector_t));
+
     DIR *dir = opendir("/");
 
     dirent *ent;
@@ -89,6 +125,7 @@ int main(int argc, char **argv, char **envp)
     // fixme: check ACPI
     load_module("keyb8042.km");
 
+    load_module("ext4.km");
     load_module("fat32.km");
     load_module("iso9660.km");
 
@@ -117,6 +154,12 @@ int main(int argc, char **argv, char **envp)
                       -1,
                       -1) > 0)
         load_module("virtio-blk.km");
+
+    if (probe_pci_for(0x1AF4, -1,
+                      PCI_DEV_CLASS_DISPLAY,
+                      -1,
+                      -1) > 0)
+        load_module("virtio-gpu.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_STORAGE,

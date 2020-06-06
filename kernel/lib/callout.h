@@ -4,12 +4,12 @@
 enum constructor_order_t {
     ctor_asan_init = 1000,
     ctor_ctors_ran,
-    ctor_cpu_init_cpus,
-    ctor_cpu_init_bsp,
-    ctor_text_dev,
-    ctor_mmu_init,
-    ctor_thread_init_bsp,
-    ctor_cpu_hw_init
+    ctor_cpu_init_cpus, ctor_cpu_init_cpus_done,
+    ctor_cpu_init_bsp, ctor_cpu_init_bsp_done,
+    ctor_text_dev, ctor_text_dev_done,
+    ctor_mmu_init, ctor_mmu_init_done,
+    ctor_thread_init_bsp, ctor_thread_init_bsp_done,
+    ctor_cpu_hw_init, ctor_cpu_hw_init_done
 };
 
 // Types:

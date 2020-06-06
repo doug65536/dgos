@@ -18,7 +18,6 @@ PCI_DRIVER_BY_CLASS(
 #include "assert.h"
 #include "thread.h"
 #include "string.h"
-#include "cpu/atomic.h"
 #include "time.h"
 #include "threadsync.h"
 #include "unique_ptr.h"
@@ -885,7 +884,8 @@ public:
 
     bool init(const pci_dev_iterator_t &pci_dev);
 
-    unsigned io(unsigned port_num, slot_request_t &request);
+    unsigned io(size_t port_num, slot_request_t &request);
+    errno_t cancel_io(size_t port_num, iocp_t *iocp);
 
     int port_flush(unsigned port_num, iocp_t *iocp);
     int port_trim(unsigned port_num, void *data, size_t size, iocp_t *iocp);
@@ -1083,17 +1083,18 @@ void ahci_if_t::handle_port_irq(unsigned port_num)
 
             slot_request_t &request = pi->slot_requests[slot];
 
-            request.callback->set_result(
-                       !error ? dgos::err_sz_pair_t{
-                                 errno_t::OK, request.count }
-                               : dgos::err_sz_pair_t{
-                                 errno_t::EIO, request.count });
+            if (likely(request.callback)) {
+                request.callback->set_result(
+                            !error ? dgos::err_sz_pair_t{
+                                     errno_t::OK, request.count }
+                                   : dgos::err_sz_pair_t{
+                                     errno_t::EIO, request.count });
 
-            // Invoke completion callback
-            assert(request.callback);
-            assert(callback_count < countof(pending_callbacks));
-            pending_callbacks[callback_count++] = request.callback;
-            request.callback = nullptr;
+                // Invoke completion callback
+                assert(callback_count < countof(pending_callbacks));
+                pending_callbacks[callback_count++] = request.callback;
+                request.callback = nullptr;
+            }
 
             slot_release(port_num, slot);
         }
@@ -1120,7 +1121,8 @@ void ahci_if_t::handle_port_irq(unsigned port_num)
             // Take a snapshot of all pending commands
             slot_request_t pending[32];
             C_ASSERT(sizeof(pending) == sizeof(pi->slot_requests));
-            memcpy(pending, pi->slot_requests, sizeof(pending));
+            std::copy(std::begin(pi->slot_requests),
+                      std::end(pi->slot_requests), pending);
 
             // Reissue each command in order
             for (uint8_t reissue = 0; reissue < num_cmd_slots; ++reissue) {
@@ -1165,17 +1167,18 @@ void ahci_if_t::handle_port_irq(unsigned port_num)
                            error, (void*)this, pi - port_info);
             }
 
-            request.callback->set_result(
-                        !error ? dgos::err_sz_pair_t{
-                                 errno_t::OK, request.count }
-                               : dgos::err_sz_pair_t{
-                                 errno_t::EIO, request.count });
+            if (likely(request.callback)) {
+                request.callback->set_result(
+                            !error ? dgos::err_sz_pair_t{
+                                     errno_t::OK, request.count }
+                                   : dgos::err_sz_pair_t{
+                                     errno_t::EIO, request.count });
 
-            // Invoke completion callback
-            assert(request.callback);
-            assert(callback_count < countof(pending_callbacks));
-            pending_callbacks[callback_count++] = request.callback;
-            request.callback = nullptr;
+                // Invoke completion callback
+                assert(callback_count < countof(pending_callbacks));
+                pending_callbacks[callback_count++] = request.callback;
+                request.callback = nullptr;
+            }
 
             slot_release(port_num, slot);
 
@@ -1187,7 +1190,7 @@ void ahci_if_t::handle_port_irq(unsigned port_num)
     }
 
     // Acknowledge slot interrupt
-    port->intr_status |= port_intr_status;
+    port->intr_status = port_intr_status;
 
     hold_port_lock.unlock();
 
@@ -1226,9 +1229,15 @@ uint32_t ahci_if_t::mmio_read_intr_status()
     return intr_status;
 }
 
+// Measured KVM 3950X 340ns-390ns
 void ahci_if_t::mmio_irq_acknowledge_port(unsigned port_num)
 {
+//    uint64_t st = time_ns();
     mmio_base->intr_status = (UINT32_C(1) << port_num);
+//    uint64_t en = time_ns();
+//    uint64_t el = en - st;
+//    printdbg("AHCI irq acknowledge port %d %ss\n",
+//             port_num, engineering_t(el, -3).ptr());
 }
 
 void ahci_if_t::irq_handler(int irq_ofs)
@@ -1304,25 +1313,38 @@ unsigned ahci_if_t::get_sector_size(unsigned port)
 
 void ahci_if_t::configure_trim(unsigned port_num, bool enable)
 {
+    AHCI_TRACE("port[%u]: Trim support: %s\n", port_num,
+               enable ? "yes" : "no");
+
     port_info[port_num].use_trim = enable;
 
     // 512 bytes worth. 512 / 8 = 64
-    queued_trim_ranges.reserve(512 / sizeof(acs_lba_range_t));
+    if (enable) {
+        if (unlikely(!queued_trim_ranges.reserve(
+                         512 / sizeof(acs_lba_range_t))))
+            panic_oom();
+    }
 }
 
 void ahci_if_t::configure_48bit(unsigned port_num, bool enable)
 {
+    AHCI_TRACE("port[%u]: 48-bit support: %s\n", port_num,
+               enable ? "yes" : "no");
     port_info[port_num].use_48bit = enable;
 }
 
 void ahci_if_t::configure_fua(unsigned port_num, bool enable)
 {
+    AHCI_TRACE("port[%u]: FUA support: %s\n", port_num,
+               enable ? "yes" : "no");
     port_info[port_num].use_fua = enable;
 }
 
 void ahci_if_t::configure_ncq(unsigned port_num, bool enable,
                               uint8_t queue_depth)
 {
+    AHCI_TRACE("port[%u]: NCQ support: %s\n", port_num,
+               enable ? "yes" : "no");
     port_info[port_num].use_ncq = enable && support_ncq;
     port_info[port_num].queue_depth = queue_depth;
 
@@ -1429,7 +1451,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
     return true;
 }
 
-unsigned ahci_if_t::io(unsigned port_num, slot_request_t &request)
+unsigned ahci_if_t::io(size_t port_num, slot_request_t &request)
 {
     unsigned expect_count;
 
@@ -1438,6 +1460,24 @@ unsigned ahci_if_t::io(unsigned port_num, slot_request_t &request)
     expect_count = io_locked(port_num, request, hold_port_lock);
 
     return expect_count;
+}
+
+errno_t ahci_if_t::cancel_io(size_t port_num, iocp_t *iocp)
+{
+    hba_port_info_t& port = port_info[port_num];
+    scoped_port_lock hold_port_lock(port.lock);
+
+    // Scan the requests
+    for (slot_request_t& request : port.slot_requests) {
+        if (request.callback == iocp) {
+            // Found it, cancel the call back
+            request.callback = nullptr;
+
+            // But keep looking!
+        }
+    }
+
+    return errno_t::ENOSYS;
 }
 
 bool ahci_if_t::port_stall_ncq(hba_port_info_t &pi,
@@ -1558,9 +1598,11 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     // Make sure phy state is established
     if (unlikely(port_is_offline(port_num))) {
         // Not established
-        request.callback->set_result(dgos::err_sz_pair_t{
-                                         errno_t::ENODEV, 0});
-        request.callback->invoke();
+        if (likely(request.callback)) {
+            request.callback->set_result(dgos::err_sz_pair_t{
+                                             errno_t::ENODEV, 0});
+            request.callback->invoke();
+        }
         return 0;
     }
 
@@ -1695,8 +1737,6 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
             cfis.h2d.device = request.fua ? AHCI_FIS_FUA_LBA : 0;
         }
 
-        atomic_barrier();
-
         pi.slot_requests[slot] = request;
 
         cmd_issue(port_num, slot, &cfis,
@@ -1726,7 +1766,8 @@ void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
     slot_request_t &request = pi->slot_requests[slot];
 
     if (likely(prdts != nullptr))
-        memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
+        std::copy(prdts, prdts + countof(cmd_tbl_ent->prdts),
+                  cmd_tbl_ent->prdts);
     else
         memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
 
@@ -1752,7 +1793,7 @@ void ahci_if_t::mmio_write_sata_act(
         hba_port_t volatile *port, unsigned slot)
 {
 //    uint64_t st = time_ns();
-    atomic_st_rel(&port->sata_act, (UINT32_C(1) << slot));
+    mm_wr(port->sata_act, (UINT32_C(1) << slot));
 //    uint64_t en = time_ns();
 //    uint64_t el = en - st;
 //    printdbg("Write sata-act %ss\n", engineering_t(el, -3).ptr());
@@ -1763,7 +1804,7 @@ void ahci_if_t::mmio_write_command_issue(
         hba_port_t volatile *port, unsigned slot)
 {
 //    uint64_t st = time_ns();
-    atomic_st_rel(&port->cmd_issue, (UINT32_C(1) << slot));
+    mm_wr(port->cmd_issue, (UINT32_C(1) << slot));
 //    uint64_t en = time_ns();
 //    uint64_t el = en - st;
 //    printdbg("AHCI write command issue %ss\n", engineering_t(el, -3).ptr());
@@ -1886,10 +1927,8 @@ void ahci_if_t::rebase()
 
         AHCI_TRACE("Setting cmd/FIS buffer addresses\n");
 
-        atomic_barrier();
         port->cmd_list_base = mphysaddr(cmd_hdr);
         port->fis_base = mphysaddr(fis);
-        atomic_barrier();
 
         // Set command table base addresses (physical)
         for (uint8_t slot = 0; slot < num_cmd_slots; ++slot)
@@ -1945,11 +1984,10 @@ void ahci_if_t::bios_handoff()
             (mmio_base->bios_handoff & ~AHCI_HC_BOH_OOC) |
             AHCI_HC_BOH_OOS;
 
-    atomic_barrier();
     while ((mmio_base->bios_handoff &
             (AHCI_HC_BOH_BOS | AHCI_HC_BOH_OOS)) !=
            AHCI_HC_BOH_OOS)
-        thread_yield();
+        thread_sleep_for(64);//ms
 }
 
 ahci_if_factory_t::ahci_if_factory_t()
@@ -2151,6 +2189,11 @@ errno_t ahci_dev_t::io(
     iocp->set_expect(expect);
 
     return errno_t::OK;
+}
+
+errno_t ahci_dev_t::cancel_io(iocp_t *iocp)
+{
+    return iface->cancel_io(port, iocp);
 }
 
 errno_t ahci_dev_t::read_async(

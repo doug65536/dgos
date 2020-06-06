@@ -38,10 +38,12 @@
 #include "fs/tmpfs.h"
 #include "bootloader.h"
 #include "engunit.h"
+#include "stacktrace.h"
+#include "bootinfo.h"
 
 kernel_params_t *kernel_params;
 
-size_t constexpr kernel_stack_size = 65536;
+size_t const kernel_stack_size = (16 << 10);
 char kernel_stack[kernel_stack_size] _section(".bspstk");
 
 #define TEST_FORMAT(f, t, v) \
@@ -49,7 +51,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         0
-#define ENABLE_READ_STRESS_THREAD   1
+#define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0 // no affinity or moving across cpus yet
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -446,8 +448,8 @@ static int stress_mmap_thread(void *p)
                    ", sz: %4sB"
                    ", time: %4ss\n",
                    id,
-                   engineering_t(total_sz, 0, true).ptr(),
-                   engineering_t(time_el, -3).ptr());
+                   engineering_t<uint64_t>(total_sz, 0, true).ptr(),
+                   engineering_t<uint64_t>(time_el, -3).ptr());
         }
     }
 
@@ -766,6 +768,9 @@ void test_spawn()
 
 static int init_thread(void *)
 {
+    if (bootinfo_parameter(bootparam_t::boot_debugger))
+        cpu_breakpoint();
+
 #if ENABLE_UNWIND
     printk("Testing exception unwind\n");
     test_unwind();
@@ -781,11 +786,9 @@ static int init_thread(void *)
     printk("Initializing keyboard event queue\n");
     keybd_init();
 
-    tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
-
-    callout_call(callout_type_t::tmpfs_up);
-
     modload_init();
+
+    printk("Spawning init\n");
 
     pid_t init_pid = -1;
     if (unlikely(process_t::spawn(&init_pid, "init", {}, {}) != 0))
@@ -888,7 +891,8 @@ int debugger_thread(void *)
 {
     printk("Starting GDB stub\n");
     gdb_init();
-    thread_create(init_thread, nullptr, "init_thread", 0, false, true);
+    thread_create(init_thread, nullptr, "init_thread", 0, false, true,
+                  thread_cpu_mask_t(0));
 
     return 0;
 }
@@ -988,7 +992,193 @@ void test_cxx_except()
     }
 }
 
-//int fixme_waste_bloat[4 << 18] = {1};
+struct symbols_t {
+    struct linenum_entry_t {
+        uint32_t filename_index;
+        uint32_t line_nr;
+    };
+
+    std::map<uintptr_t, linenum_entry_t> line_lookup;
+    std::map<uintptr_t, size_t> func_lookup;
+    std::vector<char> tokens;
+
+    char const *token(size_t n) const noexcept
+    {
+        return tokens.data() + n;
+    }
+
+    using name_lookup_t = std::map<std::string, size_t>;
+
+    void load()
+    {
+        // Load symbols from the initrd
+        file_t symfd;
+
+        symfd = file_openat(AT_FDCWD, "sym/kernel-generic-klinesyms",
+                            O_EXCL | O_RDONLY);
+        if (unlikely(!symfd))
+            return;
+
+        off_t len = file_seek(symfd, 0, SEEK_END);
+        if (unlikely(len < 0))
+            return;
+
+        std::unique_ptr<char[]> buf = new (std::nothrow) char[len];
+        if (unlikely(!buf))
+            return;
+
+        ssize_t sz = file_pread(symfd, buf, len, 0);
+        if (unlikely(sz != len))
+            return;
+
+        if (unlikely(symfd.close()))
+            return;
+
+        // Destroyed after loading is complete
+        name_lookup_t name_lookup;
+        tokens.push_back(0);
+        name_lookup.insert({"", 0});
+
+        std::string name;
+
+        char *src = buf;
+        for (char *line_end, *end = buf + len; src < end; src = line_end + 1) {
+            line_end = static_cast<char*>(memchr(src, '\n', end - src));
+
+            if (unlikely(!line_end))
+                line_end = end;
+
+            // Get filename
+            char *filename = src;
+
+            while (src < end && *src != ' ')
+                ++src;
+
+            char *filename_end = src;
+
+            while (src < end && (*src == ' ' || *src == '\t'))
+                ++src;
+
+            // Get line number
+            uint32_t line_nr_value = parse_number(src, end);
+
+            while (src < end && (*src == ' ' || *src == '\t'))
+                ++src;
+
+            // Get address
+            uintptr_t addr_value = parse_address(src, end);
+
+            if (unlikely(!name.assign_noexcept(filename, filename_end)))
+                return;
+
+            // Try to insert in name lookup, or find existing one
+            name_lookup_t::iterator ins = name_insert(name_lookup, name);
+
+            linenum_entry_t entry;
+            entry.filename_index = ins->second;
+            entry.line_nr = line_nr_value;
+
+            // Insert the file/line lookup entry by address
+            line_lookup.insert({ addr_value, entry });
+        }
+
+        symfd = file_openat(AT_FDCWD, "kernel-generic-kallsyms",
+                            O_EXCL | O_RDONLY);
+
+        if (unlikely(!symfd))
+            return;
+
+        len = file_seek(symfd, 0, SEEK_END);
+
+        if (unlikely(len < 0))
+            return;
+
+        buf.reset(new (std::nothrow) char[len]);
+
+        if (unlikely(!buf))
+            return;
+
+        sz = file_pread(symfd, buf, len, 0);
+
+        if (unlikely(sz != len))
+            return;
+
+        for (char *line_end, *end = buf + len; src < end; src = line_end) {
+            line_end = static_cast<char*>(memchr(src, '\n', end - src));
+
+            line_end = line_end ? line_end : end;
+
+            uintptr_t addr_value = parse_address(src, end);
+
+            while (src < end && (*src == ' ' || *src == '\t'))
+                ++src;
+
+            while (src < end && (*src != ' ' && *src != '\t'))
+                ++src;
+
+            while (src < end && (*src == ' ' || *src == '\t'))
+                ++src;
+
+            char *symbol_name = src;
+
+            if (!name.assign_noexcept(symbol_name, line_end))
+                return;
+
+            name_lookup_t::iterator ins = name_insert(name_lookup, name);
+
+            func_lookup.insert({ addr_value, ins->second });
+        }
+    }
+
+    name_lookup_t::iterator name_insert(
+            name_lookup_t &name_lookup,
+            std::string const& entry)
+    {
+        std::pair<name_lookup_t::iterator, bool> ins =
+                name_lookup.insert({ entry, tokens.size() });
+
+        if (ins.second) {
+            // It got inserted, append the string to the token vector
+            for (char const& c : ins.first->first)
+                tokens.push_back(c);
+            tokens.push_back(0);
+        }
+
+        return ins.first;
+    }
+
+    static uintptr_t parse_address(char *&src, char *end)
+    {
+        uintptr_t addr_value;
+        for (addr_value = 0; src < end; ++src) {
+            if (*src >= '0' && *src <= '9')
+                addr_value = (addr_value << 4) | (*src - '0');
+            else if (*src >= 'a' && *src <= 'f')
+                addr_value = (addr_value << 4) | (*src + 0xA - 'a');
+            else if (*src >= 'A' && *src <= 'F')
+                addr_value = (addr_value << 4) | (*src + 0xA - 'A');
+            else if (*src == 'x')
+                addr_value = 0;
+            else
+                break;
+        }
+        return addr_value;
+    }
+
+    static uint32_t parse_number(char *&src, char *end)
+    {
+        uint32_t value;
+        for (value = 0; src < end; ++src) {
+            if (*src >= '0' && *src <= '9')
+                value = value * 10 + (*src - '0');
+            else
+                break;
+        }
+        return value;
+    }
+};
+
+static symbols_t symbols;
 
 extern "C" _noreturn int main(void)
 {
@@ -997,37 +1187,32 @@ extern "C" _noreturn int main(void)
                                     kernel_params->phys_mapping_sz);
 #endif
 
-    //test_cxx_except();
+    test_cxx_except();
 
-//    bool caught = false;
-//    try {
-//        throw something();
-//    } catch (something const& e) {
-//        caught = true;
-//    }
+    tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
 
-//    assert(caught);
+    callout_call(callout_type_t::tmpfs_up);
 
-//    caught = false;
-//    try {
-//        locked thing;
-//        thing.do_thing();
-//    } catch (something const& e) {
-//        caught = true;
-//    }
+    symbols.load();
 
-//    assert(caught);
+    void *warmup[16];
+    stacktrace(warmup, 16);
 
-    if (!kernel_params->wait_gdb)
+    // Become the idle thread for the boot processor
+
+    if (likely(!kernel_params->wait_gdb))
         thread_create(init_thread, nullptr,
                       "init_thread", 0, false, false);
     else
         thread_create(debugger_thread, nullptr,
-                      "debugger_thread", 0, false, false);
+                      "debugger_thread", 0, false, false,
+                      thread_cpu_mask_t(thread_cpu_count() - 1));
 
     thread_idle_set_ready();
 
     cpu_irq_enable();
+
+    thread_yield();
 
     thread_idle();
 }
