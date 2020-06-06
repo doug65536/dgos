@@ -78,6 +78,8 @@ device/usb.cc
 device/usb_hid.bits
 device/usb_hid.cc
 device/usb_hid.h
+device/usb_hid_keybd_lookup.cc
+device/usb_hid_keybd_lookup.h
 device/usb_hub.cc
 device/usb_hub.h
 device/usb_storage.cc

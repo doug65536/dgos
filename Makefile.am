@@ -889,6 +889,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/dev_usb_ctl.cc \
 	kernel/device/usb_hid.h \
 	kernel/device/usb_hid.cc \
+	kernel/device/usb_hid_keybd_lookup.h \
+	kernel/device/usb_hid_keybd_lookup.cc \
 	kernel/device/usb_audio.h \
 	kernel/device/usb_audio.cc \
 	kernel/device/usb_hub.h \
