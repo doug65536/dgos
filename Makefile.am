@@ -2599,10 +2599,11 @@ BITFIELD_FILES = \
 define bitfield_gen =
 $(1).h: $(1)
 	rm -f "$$@"
-	$$(top_srcdir)/genregs.py "$$<" > "$$@"
-endef
+	$$(top_srcdir)/genregs.py "$$<" "$$(top_srcdir)" > "$$@"
 
 $(1).h: $$(top_srcdir)/genregs.py
+
+endef
 
 $(foreach bitsfile,$(BITFIELD_FILES), \
 	$(eval $(call bitfield_gen,$(bitsfile))) \
