@@ -1829,7 +1829,7 @@ int fat32_fs_t::fstat(fs_file_info_t *fi,
 
     st->st_blksize = blksize_t(1) << (sector_shift + fat_block_shift);
 
-    st->st_blocks = file->dirent->size + (block_size - 1) / block_size;
+    st->st_blocks = (file->dirent->size + (block_size - 1)) / block_size;
 
     st->st_nlink = 1;
 
