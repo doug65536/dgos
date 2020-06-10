@@ -2662,7 +2662,7 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 //    if (intr != INTR_APIC_TIMER && ctx == orig_ctx)
 //        ctx = thread_schedule_postirq(ctx);
 
-    return ctx;
+    return thread_schedule_if_requested_noirq(ctx);
 }
 
 static void ioapic_setmask(int irq, bool unmask)

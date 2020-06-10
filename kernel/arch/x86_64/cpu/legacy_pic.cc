@@ -149,7 +149,7 @@ isr_context_t *pic8259_dispatcher(
         pic8259_eoi(is_slave);
     }
 
-    return returned_stack_ctx;
+    return thread_schedule_if_requested_noirq(returned_stack_ctx);
 }
 
 void pic8259_disable(void)

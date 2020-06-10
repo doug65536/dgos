@@ -23,6 +23,9 @@ void thread_init_cpu_count(int count);
 void thread_init_cpu(size_t cpu_nr, uint32_t apic_id);
 uint32_t thread_cpus_started(void);
 
+isr_context_t *thread_reschedule_if_requested(isr_context_t *ctx);
+isr_context_t *thread_reschedule_if_requested_noirq(isr_context_t *ctx);
+
 _pure
 uint32_t thread_get_cpu_apic_id(uint32_t cpu);
 

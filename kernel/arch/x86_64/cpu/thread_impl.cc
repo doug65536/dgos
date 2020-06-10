@@ -636,10 +636,8 @@ static thread_t thread_create_with_state(
     } else {
         thread->xsave_ptr = nullptr;
     }
-    //thread->syscall_stack = syscall_stack;
-    thread->xsave_stack = xsave_stack;
 
-//    thread_info_t *creator_thread = this_thread();
+    thread->xsave_stack = xsave_stack;
 
     // Empty affinity mask selects
 
@@ -717,8 +715,6 @@ static thread_t thread_create_with_state(
             // Enable compact format if supported
             if (cpuid_has_xsavec())
                 xsave_ctx->xcomp_bv = CPU_XCOMPBV_COMPACT;
-
-            //xsave_ctx->xcomp_bv |= xsave_ctx->xstate_bv;
         }
     }
 
@@ -1196,6 +1192,32 @@ void accumulate_time(cpu_info_t *cpu, thread_info_t *thread, uint64_t elapsed)
     }
 }
 
+void thread_move_to_other_cpu(cpu_info_t *cpu, thread_info_t *thread)
+{
+    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
+
+    ready_set_t::node_type node = cpu->ready_list
+            .extract(thread->schedule_node);
+
+    cpu_lock.unlock();
+
+    size_t first_enabled = thread->cpu_affinity.lsb_set();
+
+    cpu_info_t *other_cpu = cpus + first_enabled;
+
+    cpu_info_t::scoped_lock other_cpu_lock(other_cpu->queue_lock);
+
+    thread->state = THREAD_IS_SLEEPING_BUSY;
+    thread->wake_time = 0;
+
+    thread->schedule_node = other_cpu->sleep_list
+            .insert(std::move(node)).first;
+
+    other_cpu_lock.unlock();
+
+    apic_send_ipi(other_cpu->apic_id, INTR_IPI_RESCHED);
+}
+
 _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 {
     //need this if ISRs run with IRQ enabled:
@@ -1240,28 +1262,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     // If the thread moved to a different CPU
     if (unlikely(thread_cpu_count() > 1 &&
                  !thread->cpu_affinity[cpu->cpu_nr])) {
-        cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
-
-        ready_set_t::node_type node = cpu->ready_list
-                .extract(thread->schedule_node);
-
-        cpu_lock.unlock();
-
-        size_t first_enabled = thread->cpu_affinity.lsb_set();
-
-        cpu_info_t *other_cpu = cpus + first_enabled;
-
-        cpu_info_t::scoped_lock other_cpu_lock(other_cpu->queue_lock);
-
-        thread->state = THREAD_IS_SLEEPING_BUSY;
-        thread->wake_time = 0;
-
-        thread->schedule_node = other_cpu->sleep_list
-                .insert(std::move(node)).first;
-
-        other_cpu_lock.unlock();
-
-        apic_send_ipi(other_cpu->apic_id, INTR_IPI_RESCHED);
+        thread_move_to_other_cpu(cpu, thread);
     } else if ((thread->state != THREAD_IS_RUNNING) ||
             (thread->used_time >= thread->preempt_time &&
              thread->thread_id >= thread_t(cpu_count * 2))) {
@@ -1623,6 +1624,22 @@ void thread_request_reschedule()
     thread_request_reschedule_noirq();
 }
 
+isr_context_t *thread_reschedule_if_requested_noirq(isr_context_t *ctx)
+{
+    cpu_info_t *cpu = this_cpu();
+    if (cpu->should_reschedule) {
+        cpu->should_reschedule = false;
+        return thread_schedule(ctx);
+    }
+    return ctx;
+}
+
+isr_context_t *thread_reschedule_if_requested(isr_context_t *ctx)
+{
+    cpu_scoped_irq_disable irq_dis;
+    return thread_reschedule_if_requested_noirq(ctx);
+}
+
 _hot
 EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
 {
@@ -1947,6 +1964,22 @@ EXPORT isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
     if ((thread_idle_ready && tid < cpu_count) ||
             ((threads[cpu_count + cur_cpu->cpu_nr].state == THREAD_IS_READY) &&
              tid != cpu_count + cur_cpu->cpu_nr))
+        return thread_schedule(ctx);
+
+    return ctx;
+}
+
+EXPORT isr_context_t *thread_schedule_if_requested(isr_context_t *ctx)
+{
+    cpu_scoped_irq_disable irq_dis;
+    return thread_schedule_if_requested_noirq(ctx);
+}
+
+EXPORT isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx)
+{
+    cpu_info_t *cpu = this_cpu();
+
+    if (cpu->should_reschedule)
         return thread_schedule(ctx);
 
     return ctx;

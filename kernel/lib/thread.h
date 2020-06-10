@@ -10,6 +10,7 @@ __BEGIN_DECLS
 
 struct process_t;
 struct cpu_info_t;
+struct isr_context_t;
 
 // Platform independent thread API
 
@@ -211,6 +212,8 @@ uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
 
 void thread_request_reschedule_noirq();
 void thread_request_reschedule();
+isr_context_t *thread_schedule_if_requested(isr_context_t *ctx);
+isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx);
 
 // Returns true if you should reschedule
 void thread_resume(thread_t thread, intptr_t exit_code);
