@@ -35,18 +35,16 @@ struct pci_ids_t {
     char name[32];
 };
 
-#define PCI_DRIVER_BY_CLASS(name, dev_class, sub_class, prog_if) \
-    _used _section(".driver") static pci_ids_t __##name##pci_ids = { \
-        -1, -1, (dev_class), (sub_class), (prog_if), (#name) \
-        }
-
-#define PCI_DRIVER_BY_DEVICE(name, vendor, device) \
-    _used _section(".driver") static pci_ids_t __##name##pci_ids = { \
-            (vendor), (device), -1, -1, -1, (#name) \
-        }
-
 #define PCI_DRIVER(name, vendor, device, dev_class, sub_class, prog_if) \
-    _used _section(".driver") static pci_ids_t __##name##pci_ids = { \
+     static _used _section(".driver") pci_ids_t __##name##pci_ids = { \
             (vendor), (device), (dev_class), (sub_class), (prog_if), (#name) \
         }
 
+#define PCI_DRIVER_BY_CLASS(name, dev_class, sub_class, prog_if) \
+    PCI_DRIVER(name, -1, -1, dev_class, sub_class, prog_if)
+
+#define PCI_DRIVER_BY_DEVICE(name, vendor, device) \
+    PCI_DRIVER(name, vendor, device, -1, -1, -1)
+
+#define USB_DRIVER(name, vendor, device, dev_class, sub_class) \
+    PCI_DRIVER(name, vendor, device, dev_class, sub_class, -2)
