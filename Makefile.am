@@ -2395,7 +2395,7 @@ $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 	$$(CP) "$$<" "$$@"
 
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
-		$(SYMBOL_FILES_INSTALLED) \
+		$(generate_symbols_outputs) \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
 		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
 	$$(BOCHS) \
