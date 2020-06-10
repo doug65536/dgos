@@ -1503,7 +1503,7 @@ static int parse_mp_tables(void)
     acpi_info = (boottbl_acpi_info_t const *)bootinfo_parameter(
                 bootparam_t::boot_acpi_rsdp);
 
-    if (acpi_info) {
+    if (acpi_info && bootinfo_parameter(bootparam_t::acpi_enable)) {
         acpi_rsdt_addr = acpi_info->rsdt_addr;
         acpi_rsdt_len = acpi_info->rsdt_size;
         acpi_rsdt_ptrsz = acpi_info->ptrsz;
@@ -1513,11 +1513,10 @@ static int parse_mp_tables(void)
     mps_info = (boottbl_mptables_info_t *)bootinfo_parameter(
                 bootparam_t::boot_mptables);
 
-    if (mps_info) {
+    if (mps_info && bootinfo_parameter(bootparam_t::mps_enable))
         mp_tables = (char const *)mps_info->mp_addr;
-    }
 
-    if (acpi_rsdt_addr && bootinfo_parameter(bootparam_t::acpi_enable))
+    if (acpi_rsdt_addr)
         acpi_parse_rsdt();
     else if (mp_tables && bootinfo_parameter(bootparam_t::mps_enable))
         mp_parse_fps();
