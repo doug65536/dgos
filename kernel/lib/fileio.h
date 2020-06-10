@@ -346,3 +346,5 @@ private:
 
     typename std::aligned_storage<path_buf_sz, sizeof(char const*)>::type data;
 };
+
+int file_create_socket();

@@ -581,3 +581,188 @@ fs_base_t::~fs_base_t()
 {
 }
 
+//==
+
+void fs_nosys_t::unmount()
+{
+}
+
+bool fs_nosys_t::is_boot() const
+{
+    return false;
+}
+
+int fs_nosys_t::resolve(fs_file_info_t *dirfi, fs_cpath_t path, size_t &consumed)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::opendirat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+ssize_t fs_nosys_t::readdir(fs_file_info_t *fi, dirent_t *buf, off_t offset)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::releasedir(fs_file_info_t *fi)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::getattrat(fs_file_info_t *dirfi, fs_cpath_t path, fs_stat_t *stbuf)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::accessat(fs_file_info_t *dirfi, fs_cpath_t path, int mask)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::readlinkat(fs_file_info_t *dirfi, fs_cpath_t path, char *buf, size_t size)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::mknodat(fs_file_info_t *dirfi, fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::mkdirat(fs_file_info_t *dirfi, fs_cpath_t path, fs_mode_t mode)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::rmdirat(fs_file_info_t *dirfi, fs_cpath_t path)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::symlinkat(fs_file_info_t *dirtofi, fs_cpath_t to, fs_file_info_t *dirfromfi, fs_cpath_t from)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::renameat(fs_file_info_t *dirfromfi, fs_cpath_t from, fs_file_info_t *dirtofi, fs_cpath_t to)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::linkat(fs_file_info_t *dirfromfi, fs_cpath_t from, fs_file_info_t *dirtofi, fs_cpath_t to)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::unlinkat(fs_file_info_t *dirfi, fs_cpath_t path)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::fchmod(fs_file_info_t *fi, fs_mode_t mode)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::truncateat(fs_file_info_t *dirfi, fs_cpath_t path, off_t size)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::utimensat(fs_file_info_t *dirfi, fs_cpath_t path, const fs_timespec_t *ts)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::openat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path, int flags, mode_t mode)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::release(fs_file_info_t *fi)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+ssize_t fs_nosys_t::read(fs_file_info_t *fi, char *buf, size_t size, off_t offset)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+ssize_t fs_nosys_t::write(fs_file_info_t *fi, const char *buf, size_t size, off_t offset)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::ftruncate(fs_file_info_t *fi, off_t offset)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::fstat(fs_file_info_t *fi, fs_stat_t *st)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::fsync(fs_file_info_t *fi, int isdatasync)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::fsyncdir(fs_file_info_t *fi, int isdatasync)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::flush(fs_file_info_t *fi)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::lock(fs_file_info_t *fi, int cmd, fs_flock_t *locks)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::bmapat(fs_file_info_t *dirfi, fs_cpath_t path, size_t blocksize, uint64_t *blockno)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::statfs(fs_statvfs_t *stbuf)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::setxattrat(fs_file_info_t *dirfi, fs_cpath_t path, const char *name, const char *value, size_t size, int flags)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::getxattrat(fs_file_info_t *dirfi, fs_cpath_t path, const char *name, char *value, size_t size)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::listxattrat(fs_file_info_t *dirfi, fs_cpath_t path, const char *list, size_t size)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::ioctl(fs_file_info_t *fi, int cmd, void *arg, unsigned int flags, void *data)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int fs_nosys_t::poll(fs_file_info_t *fi, fs_pollhandle_t *ph, unsigned *reventsp)
+{
+    return -int(errno_t::ENOSYS);
+}

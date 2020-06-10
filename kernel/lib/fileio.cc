@@ -758,3 +758,55 @@ user_str_t::user_str_t(const char *user_str)
         return;
     }
 }
+
+// =======================================================================
+
+class socket_fs_t final : public fs_nosys_t {
+    //FS_BASE_RW_IMPL
+
+    // fs_base_t interface
+public:
+    int openat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path, int flags, mode_t mode) override;
+    int release(fs_file_info_t *fi) override;
+    ssize_t read(fs_file_info_t *fi, char *buf, size_t size, off_t offset) override;
+    ssize_t write(fs_file_info_t *fi, const char *buf, size_t size, off_t offset) override;
+};
+
+int socket_fs_t::openat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path, int flags, mode_t mode)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int socket_fs_t::release(fs_file_info_t *fi)
+{
+    return 0;
+}
+
+ssize_t socket_fs_t::read(fs_file_info_t *fi, char *buf, size_t size, off_t offset)
+{
+    return 0;
+}
+
+ssize_t socket_fs_t::write(fs_file_info_t *fi, const char *buf, size_t size, off_t offset)
+{
+    return 0;
+}
+
+socket_fs_t socket_fs;
+
+int file_create_socket()
+{
+    filetab_t *fh = file_new_filetab();
+
+    if (unlikely(!fh))
+        return -int(errno_t::ENFILE);
+
+    fh->fs = &socket_fs;
+    fh->pos = 0;
+
+    int id = fh - file_table.data();
+
+    FILEHANDLE_TRACE("opened socket, fd=%d\n", id);
+
+    return id;
+}

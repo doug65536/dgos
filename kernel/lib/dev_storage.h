@@ -560,6 +560,51 @@ class EXPORT fs_base_ro_t : public fs_base_t {
 
 #define FS_DEV_PTR(type, p) type *self = (type*)(p)
 
+class EXPORT fs_nosys_t : public fs_base_t {
+
+
+    // fs_base_t interface
+public:
+    void unmount() override;
+    bool is_boot() const override;
+    int resolve(fs_file_info_t *dirfi, fs_cpath_t path, size_t &consumed) override;
+    int opendirat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path) override;
+    ssize_t readdir(fs_file_info_t *fi, dirent_t *buf, off_t offset) override;
+    int releasedir(fs_file_info_t *fi) override;
+    int getattrat(fs_file_info_t *dirfi, fs_cpath_t path, fs_stat_t *stbuf) override;
+    int accessat(fs_file_info_t *dirfi, fs_cpath_t path, int mask) override;
+    int readlinkat(fs_file_info_t *dirfi, fs_cpath_t path, char *buf, size_t size) override;
+    int mknodat(fs_file_info_t *dirfi, fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev) override;
+    int mkdirat(fs_file_info_t *dirfi, fs_cpath_t path, fs_mode_t mode) override;
+    int rmdirat(fs_file_info_t *dirfi, fs_cpath_t path) override;
+    int symlinkat(fs_file_info_t *dirtofi, fs_cpath_t to, fs_file_info_t *dirfromfi, fs_cpath_t from) override;
+    int renameat(fs_file_info_t *dirfromfi, fs_cpath_t from, fs_file_info_t *dirtofi, fs_cpath_t to) override;
+    int linkat(fs_file_info_t *dirfromfi, fs_cpath_t from, fs_file_info_t *dirtofi, fs_cpath_t to) override;
+    int unlinkat(fs_file_info_t *dirfi, fs_cpath_t path) override;
+    int fchmod(fs_file_info_t *fi, fs_mode_t mode) override;
+    int fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid) override;
+    int truncateat(fs_file_info_t *dirfi, fs_cpath_t path, off_t size) override;
+    int utimensat(fs_file_info_t *dirfi, fs_cpath_t path, const fs_timespec_t *ts) override;
+    int openat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path, int flags, mode_t mode) override;
+    int release(fs_file_info_t *fi) override;
+    ssize_t read(fs_file_info_t *fi, char *buf, size_t size, off_t offset) override;
+    ssize_t write(fs_file_info_t *fi, const char *buf, size_t size, off_t offset) override;
+    int ftruncate(fs_file_info_t *fi, off_t offset) override;
+    int fstat(fs_file_info_t *fi, fs_stat_t *st) override;
+    int fsync(fs_file_info_t *fi, int isdatasync) override;
+    int fsyncdir(fs_file_info_t *fi, int isdatasync) override;
+    int flush(fs_file_info_t *fi) override;
+    int lock(fs_file_info_t *fi, int cmd, fs_flock_t *locks) override;
+    int bmapat(fs_file_info_t *dirfi, fs_cpath_t path, size_t blocksize, uint64_t *blockno) override;
+    int statfs(fs_statvfs_t *stbuf) override;
+    int setxattrat(fs_file_info_t *dirfi, fs_cpath_t path, const char *name, const char *value, size_t size, int flags) override;
+    int getxattrat(fs_file_info_t *dirfi, fs_cpath_t path, const char *name, char *value, size_t size) override;
+    int listxattrat(fs_file_info_t *dirfi, fs_cpath_t path, const char *list, size_t size) override;
+    int ioctl(fs_file_info_t *fi, int cmd, void *arg, unsigned int flags, void *data) override;
+    int poll(fs_file_info_t *fi, fs_pollhandle_t *ph, unsigned *reventsp) override;
+};
+
+
 void fs_register_factory(fs_factory_t *fs);
 
 //

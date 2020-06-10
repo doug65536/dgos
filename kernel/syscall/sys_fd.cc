@@ -700,8 +700,30 @@ int sys_readlinkat(int dirfd, char const *path,
 
 int sys_socket(int domain, int type, int protocol)
 {
-    // FIXME: implement me
-    return nosys_err();
+    process_t *p = fast_cur_process();
+
+    int fd = p->ids.desc_alloc.alloc();
+
+    if (unlikely(fd < 0))
+        return toomany_err();
+
+    // Must be Internet
+    if (unlikely(domain != AF_INET))
+        return -int(errno_t::EPROTONOSUPPORT);
+
+    // Datagram socket must be UDP
+    if (unlikely(type == SOCK_DGRAM && protocol != IPPROTO_UDP))
+        return -int(errno_t::EPROTONOSUPPORT);
+
+    // Stream socket must be TCP
+    if (unlikely(type == SOCK_STREAM && protocol != IPPROTO_TCP))
+        return -int(errno_t::EPROTONOSUPPORT);
+
+    // hack for now, only UDP
+    if (unlikely(type != SOCK_DGRAM))
+        return -int(errno_t::ENOSYS);
+
+    return file_create_socket();
 }
 
 int sys_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)

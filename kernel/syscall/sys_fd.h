@@ -5,7 +5,22 @@
 
 extern "C" {
 
+#define AF_INET 2
+
+#define SOCK_STREAM 1
+#define SOCK_DGRAM 2
+
+#define IPPROTO_IP  0
+#define IPPROTO_TCP 6
+#define IPPROTO_UDP 17
+
 typedef uint32_t socklen_t;
+typedef uint32_t sa_family_t;
+
+struct sockaddr {
+    sa_family_t sa_family;
+    char        sa_data[14];
+};
 
 ssize_t sys_read(int fd, void *bufaddr, size_t count);
 ssize_t sys_write(int fd, void const *bufaddr, size_t count);
