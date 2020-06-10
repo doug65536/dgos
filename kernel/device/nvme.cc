@@ -5,7 +5,8 @@
 
 PCI_DRIVER_BY_CLASS(
         nvme,
-        PCI_DEV_CLASS_STORAGE, PCI_SUBCLASS_STORAGE_NVM,
+        PCI_DEV_CLASS_STORAGE,
+        PCI_SUBCLASS_STORAGE_NVM,
         PCI_PROGIF_STORAGE_NVM_NVME);
 
 #include "dev_storage.h"

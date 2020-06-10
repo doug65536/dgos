@@ -4,8 +4,9 @@
 #include "pci.h"
 
 PCI_DRIVER_BY_CLASS(
-        usbxhci,
-        PCI_DEV_CLASS_SERIAL, PCI_SUBCLASS_SERIAL_USB,
+        usb_xhci,
+        PCI_DEV_CLASS_SERIAL,
+        PCI_SUBCLASS_SERIAL_USB,
         PCI_PROGIF_SERIAL_USB_XHCI);
 
 #include "callout.h"

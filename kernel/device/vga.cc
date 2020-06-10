@@ -5,7 +5,8 @@
 
 PCI_DRIVER_BY_CLASS(
         vga,
-        PCI_DEV_CLASS_DISPLAY, PCI_SUBCLASS_DISPLAY_VGA, -1);
+        PCI_DEV_CLASS_DISPLAY,
+        PCI_SUBCLASS_DISPLAY_VGA, -1);
 
 #include "dev_text.h"
 #include "fs/devfs.h"

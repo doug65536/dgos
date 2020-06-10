@@ -2,6 +2,7 @@
 
 #include "kmodule.h"
 #include "pci.h"
+
 PCI_DRIVER_BY_CLASS(
         ahci,
         PCI_DEV_CLASS_STORAGE, PCI_SUBCLASS_STORAGE_SATA,

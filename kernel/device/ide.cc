@@ -5,7 +5,8 @@
 
 PCI_DRIVER_BY_CLASS(
         ide,
-        PCI_DEV_CLASS_STORAGE, PCI_SUBCLASS_STORAGE_ATA, -1);
+        PCI_DEV_CLASS_STORAGE,
+        PCI_SUBCLASS_STORAGE_ATA, -1);
 
 #include "dev_storage.h"
 #include "ata.h"
