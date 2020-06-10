@@ -845,7 +845,7 @@ static _always_inline void cpu_irq_toggle(bool enable)
         "popfq\n\t"
         :
         : [enable] "ir" (uintptr_t(enable) << CPU_EFLAGS_IF_BIT)
-        , [not_eflags_if] "i" (~uint64_t(CPU_EFLAGS_IF))
+        , [not_eflags_if] "ir" (~uint64_t(CPU_EFLAGS_IF))
         : "cc"
     );
 }
