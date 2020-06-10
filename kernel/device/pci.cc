@@ -807,7 +807,7 @@ static uint64_t pci_setup_bar(pci_addr_t addr, int bir)
     if (use32)
         bar &= 0xFFFFFFFF;
 
-    int bar_width = use32 ? sizeof(uint32_t) : sizeof(uint64_t);
+    size_t bar_width = use32 ? sizeof(uint32_t) : sizeof(uint64_t);
 
     // Autodetect address space needed by writing all bits one in BAR
     uint64_t new_bar = bar;
@@ -821,19 +821,32 @@ static uint64_t pci_setup_bar(pci_addr_t addr, int bir)
 
     uint32_t alloc_sz = 1U << log2_sz;
 
-    // Allocate twice as much to align
-    uint32_t bar_addr = mm_alloc_hole(alloc_sz << 1);
+    // Allocate twice as much to align (unused portion(s) freed later)
+    uint32_t bar_alloc = mm_alloc_hole(alloc_sz << 1);
 
     // Naturally align
-    bar_addr = (bar_addr + alloc_sz) & -(alloc_sz);
+    uint32_t aligned_addr = (bar_alloc + alloc_sz) & -alloc_sz;
 
     // Update base address
-    PCI_BAR_BA_SET(new_bar, bar_addr);
+    PCI_BAR_BA_SET(new_bar, aligned_addr);
+
+    // Give back extra unused space that may open up after alignment
+
+    uint32_t unused_before = aligned_addr - bar_alloc;
+    uint32_t kept_end = aligned_addr + alloc_sz;
+    uint32_t alloc_end = bar_alloc + (alloc_sz << 1);
+    uint32_t unused_after = alloc_end - kept_end;
+
+    if (unused_before)
+        mm_free_hole(bar_alloc, unused_before);
+
+    if (unused_after)
+        mm_free_hole(kept_end, unused_after);
 
     // Write back BAR
     pci_config_write(addr, bar_ofs, &new_bar, bar_width);
 
-    return bar_addr;
+    return bar_alloc;
 }
 
 static int pci_enum_capabilities_match(
