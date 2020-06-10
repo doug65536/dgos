@@ -1,3 +1,4 @@
+../Make-modules.inc.mk
 ../README.md
 ../emu/bochs/bochs-debugger-gpt-bios-boot-commands
 ../emu/bochs/bochs-debugger-gpt-bios-kernel-commands
