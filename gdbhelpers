@@ -264,7 +264,7 @@ end
 
 define stkusage
 	set $tidx = 0
-	while $tidx < thread_count
+	while $tidx < cpu_count
 		if threads[$tidx].ctx != 0
 			set $stkst = threads[$tidx].stack
 			set $stsz = threads[$tidx].stack_size
