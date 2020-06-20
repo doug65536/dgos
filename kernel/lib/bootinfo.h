@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "bootloader.h"
 
 enum struct bootparam_t {
     ap_entry_point,

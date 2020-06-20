@@ -14,6 +14,7 @@ static spinlock_t e9debug_lock;
 
 static uart_dev_t *uart;
 static bool uart_ready;
+static bool use_port_e9;
 
 static char vt102_reset[] = "\x1B" "c";
 
@@ -32,6 +33,8 @@ _constructor(ctor_ctors_ran) static void e9debug_serial_ready(void*)
     } else {
         uart_ready = false;
     }
+
+    use_port_e9 = bootinfo_parameter(bootparam_t::port_e9_debug);
 }
 
 static int e9debug_write_debug_str(char const *str, intptr_t len)
@@ -41,7 +44,7 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
     if (!len)
         len = strlen(str);
 
-    if (bootinfo_parameter(bootparam_t::port_e9_debug)) {
+    if (use_port_e9) {
         if (len > 1 && str) {
             outsb(0xE9, str, len);
             n = len;

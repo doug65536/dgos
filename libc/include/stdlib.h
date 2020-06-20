@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sys/cdefs.h>
+#define __need_size_t
 #include <stddef.h>
 #include <sys/wait.h>
 

@@ -376,22 +376,22 @@ static uint8_t idt_vector_type(size_t vec)
     case INTR_EX_OVF:
     case INTR_EX_BOUND:
     case INTR_EX_OPCODE:
-    case INTR_EX_DEV_NOT_AV:
     //case INTR_EX_DBLFAULT:
-    case INTR_EX_COPR_SEG:
-    case INTR_EX_TSS:
-    case INTR_EX_SEGMENT:
-    case INTR_EX_STACK:
-    case INTR_EX_GPF:
     case INTR_EX_PAGE:
-    case INTR_EX_MATH:
     case INTR_EX_ALIGNMENT:
     //case INTR_EX_MACHINE:
-    case INTR_EX_SIMD:
     //case INTR_EX_VIRTUALIZE:
-    case INTR_THREAD_YIELD:
         // Don't mask IRQs
         return IDT_TRAP;
+    case INTR_EX_DEV_NOT_AV:
+    case INTR_EX_COPR_SEG:
+    case INTR_EX_SEGMENT:
+    case INTR_EX_TSS:
+    case INTR_EX_STACK:
+    case INTR_EX_GPF:
+    case INTR_EX_MATH:
+    case INTR_EX_SIMD:
+    case INTR_THREAD_YIELD:
     default:
         // Mask IRQs
         return IDT_INTR;
@@ -405,6 +405,10 @@ int idt_init(int ap)
     if (!ap) {
         for (size_t i = 0; i < 256; ++i) {
             addr = isr_entry_point(i);
+
+            // Sanity check
+            assert(*(uint8_t*)addr == 0x6a);
+
             idt[i].offset_lo = uint16_t(addr & 0xFFFF);
             idt[i].offset_hi = uint16_t((addr >> 16) & 0xFFFF);
             idt[i].offset_64_31 = uint32_t((addr >> 32) & 0xFFFFFFFF);

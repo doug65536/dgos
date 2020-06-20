@@ -173,6 +173,8 @@ syscall/sys_process.cc
 syscall/sys_process.h
 syscall/sys_render.cc
 syscall/sys_render.h
+syscall/sys_framebuffer.cc
+syscall/sys_framebuffer.h
 syscall/sys_sys.cc
 syscall/sys_sys.h
 syscall/sys_time.cc
@@ -350,7 +352,6 @@ module.mk
 kernel.files
 kernel.includes
 lib/main.h
-lib/png.h
 lib/fileio.cc
 lib/framebuffer.h
 lib/thread.cc
@@ -422,7 +423,6 @@ lib/string.h
 lib/process.cc
 lib/stdlib.h
 lib/keyboard.cc
-lib/png.cc
 lib/intrin_compat.h
 lib/conio.cc
 lib/printk.h

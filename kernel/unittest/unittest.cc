@@ -181,7 +181,7 @@ int unittest::unit::get_line() const
 void unittest::unit::run_all(unit_ctx *ctx)
 {
     for (unit *it = list_st; it; it = it->next) {
-        if (!it->enabled()) {
+        if (unlikely(!it->enabled())) {
             ctx->skip(it);
             continue;
         }

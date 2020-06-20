@@ -781,8 +781,6 @@ errno_t module_t::apply_relocs()
 
             char const *name = strs + sym.st_name;
 
-            //assert(!name ^ !sym.st_value);
-
             if (sym.st_name) {
                 // Lookup name in kernel
                 ELF64_TRACE("%s lookup %s\n", module_name.c_str(), name);

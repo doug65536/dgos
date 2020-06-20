@@ -22,6 +22,18 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;
 typedef __INTMAX_TYPE__ intmax_t;
 typedef __UINTMAX_TYPE__ uintmax_t;
 
+#define UINT8_C(n) __UINT8_C(n)
+#define UINT16_C(n) __UINT16_C(n)
+#define UINT32_C(n) __UINT32_C(n)
+#define UINT64_C(n) __UINT64_C(n)
+
+#define INT8_C(n) __INT8_C(n)
+#define INT16_C(n) __INT16_C(n)
+#define INT32_C(n) __INT32_C(n)
+#define INT64_C(n) __INT64_C(n)
+
+#define _MALLOC_OVERHEAD 0
+
 #ifdef __WCHAR_MAX__
 #define __WCHAR_MAX__ __INT32_MAX__
 #endif

@@ -139,11 +139,65 @@ template<typename _OutputIt, typename _Size, typename _T>
 constexpr _OutputIt fill_n(_OutputIt __first, _Size __count, _T const& __value)
 {
     static_assert(is_integral<_Size>::value, "Must pass integral count");
+
+    while (__count >= 16) {
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        *__first = __value;
+        ++__first;
+
+        __count -= 16;
+    }
+
     while (__count > 0) {
         *__first = __value;
         ++__first;
         --__count;
     }
+
     return __first;
 }
 

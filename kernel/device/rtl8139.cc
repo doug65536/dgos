@@ -95,27 +95,23 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     _always_inline void rtl8139_mm_out_32(uint32_t reg, uint32_t val)
     {
         RTL8139_MMIO(uint32_t, reg) = val;
-        atomic_barrier();
     }
 
     _used
     _always_inline uint8_t rtl8139_mm_in_8(uint32_t reg)
     {
-        atomic_barrier();
         return RTL8139_MMIO(uint8_t, reg);
     }
 
     _used
     _always_inline uint16_t rtl8139_mm_in_16(uint32_t reg)
     {
-        atomic_barrier();
         return RTL8139_MMIO(uint16_t, reg);
     }
 
     _used
     _always_inline uint32_t rtl8139_mm_in_32(uint32_t reg)
     {
-        atomic_barrier();
         return RTL8139_MMIO(uint32_t, reg);
     }
 
@@ -867,24 +863,24 @@ static void rtl8139_startup()
         { IPV4_ADDR32(255U,255U,255U,255U), 68, 0 }
     };
 
-    int handle = udp_bind(&bind);
+    int handle = udp_bind(&bind, 1);
 
     (void)handle;
 
-    rtl8139_dev_t *self = rtl8139_devices[0];
-
-    // Send a DHCP discover
-    for (size_t i = 0; i < 2; ++i) {
-        ethq_pkt_t *pkt = ethq_pkt_acquire();
-        dhcp_pkt_t *discover = (dhcp_pkt_t*)&pkt->pkt;
-
-        pkt->size = dhcp_build_discover(discover, self->mac_addr);
-
-        RTL8139_TRACE("Sending pkt %p\n", (void*)pkt);
-
-        sleep(100);
-        self->send(pkt);
-    }
+//    rtl8139_dev_t *self = rtl8139_devices[0];
+//
+//    // Send a DHCP discover
+//    for (size_t i = 0; i < 2; ++i) {
+//        ethq_pkt_t *pkt = ethq_pkt_acquire();
+//        dhcp_pkt_t *discover = (dhcp_pkt_t*)&pkt->pkt;
+//
+//        pkt->size = dhcp_build_discover(discover, self->mac_addr);
+//
+//        RTL8139_TRACE("Sending pkt %p\n", (void*)pkt);
+//
+//        sleep(100);
+//        self->send(pkt);
+//    }
 }
 #endif
 

@@ -719,7 +719,7 @@ int pci_init(void)
             // Save original base
             uint64_t orig = pci_iter.config.get_bar(bar);
 
-            if (pci_iter.config.is_bar_mmio(bar)) {
+            if (!pci_iter.config.is_bar_mmio(bar)) {
                 any_io = true;
             } else {
                 any_mmio = true;
@@ -740,7 +740,7 @@ int pci_init(void)
                 readback &= -16;
 
                 // Ignore BAR if it resulted in zero
-                if (!readback)
+                if (!readback || (orig & -16))
                     continue;
 
                 // Get size
@@ -1336,6 +1336,7 @@ EXPORT uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
         if (is_bar_64bit(bar))
             addr |= uint64_t(base_addr[bar + 1]) << 32;
     } else {
+        // Mask off low 2 bits
         addr = base_addr[bar] & -4;
     }
 
@@ -1501,12 +1502,14 @@ EXPORT bool pci_config_hdr_t::is_bar_portio(ptrdiff_t bar) const
 
 EXPORT bool pci_config_hdr_t::is_bar_prefetchable(ptrdiff_t bar) const
 {
-    return PCI_BAR_PF_GET(base_addr[bar]);
+    return (PCI_BAR_RTE_GET(base_addr[bar]) == 0) &&
+            PCI_BAR_PF_GET(base_addr[bar]);
 }
 
 EXPORT bool pci_config_hdr_t::is_bar_64bit(ptrdiff_t bar) const
 {
-    return PCI_BAR_TYPE_GET(base_addr[bar]) == PCI_BAR_TYPE_64BIT;
+    return (PCI_BAR_RTE_GET(base_addr[bar]) == 0) &&
+            (PCI_BAR_TYPE_GET(base_addr[bar]) == PCI_BAR_TYPE_64BIT);
 }
 
 EXPORT pci_dev_t::pci_dev_t()

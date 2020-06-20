@@ -59,12 +59,12 @@ struct cpuid_cache_t {
     bool has_x2apic     :1;
     bool has_aes        :1;
     bool has_xsave      :1;
-    bool has_xsaves     :1;
-    bool has_xsaveopt   :1;
-    bool has_xsavec     :1;
     bool has_avx        :1;
     bool has_rdrand     :1;
     bool is_hypervisor  :1;
+    bool has_xsaves     :1;
+    bool has_xsaveopt   :1;
+    bool has_xsavec     :1;
     bool has_2mpage     :1;
     bool has_1gpage     :1;
     bool has_nx         :1;

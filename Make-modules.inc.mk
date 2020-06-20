@@ -3,6 +3,7 @@
 # Common module declarations
 
 KERNEL_MODULE_CXXFLAGS_SHARED = \
+	$(COMPILER_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	-D__DGOS_KERNEL__ \
@@ -20,7 +21,6 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	$(COMPILER_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(SANITIZE_UNDEFINED_FLAGS) \
 	$(WARN_STACK_USAGE_FLAGS)
@@ -511,12 +511,12 @@ init_CFLAGS = \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
 
-init_LDFLAGS =
+init_LDFLAGS = -L$(top_builddir)/sysroot/lib
 #-Wl,-Bdynamic $(USER64_LDFLAGS) $(ELF64_FLAGS) -nostdlib
 #-Wl,--no-eh-frame-hdr
 
 init_LDADD = \
-	-lgcc
+	-lgcc -lpng -lz
 
 #$(top_builddir)/sysroot/lib/64/crt0.o
 #$(top_builddir)/sysroot/lib/64/libc.a
@@ -531,6 +531,7 @@ init_CCASFLAGS = \
 EXTRA_init_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
 	$(ALL_STDLIB_INSTALLED) \
+	$(ALL_USRLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 #===========
@@ -561,9 +562,11 @@ init_shared_SOURCES = \
 init_shared_LDFLAGS = -static
 #-Wl,--no-eh-frame-hdr
 
-if userspace_so
-init_shared_LDADD =  libc.so
-endif
+#if userspace_so
+#init_shared_LDADD = libc.so -lpng -lz
+#endif
+
+init_shared_LDADD = -lpng -lz
 
 init_shared_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \

@@ -21,7 +21,7 @@ bioscall:
     // Save interrupt vector (read from real mode IDT) on the stack
     pushl (,%edx,4)
 
-    // Copy bios_regs_t to the stack, in case eax is outside first 64KB
+    // Copy bios_regs_t to the stack, in case eax is outside first 1MB
     pushl 36(%eax)
     pushl 32(%eax)
     pushl 28(%eax)

@@ -44,9 +44,7 @@ typedef long sigset_t;
 
 // The <signal.h> header shall define the pthread_attr_t type as
 // described in <sys/types.h>.
-struct __pthread_attr_t {
-    // ...
-};
+struct __pthread_attr_t;
 
 union sigval {
     int    sival_int;

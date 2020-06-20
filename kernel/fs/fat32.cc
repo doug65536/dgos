@@ -339,7 +339,7 @@ void fat32_fs_t::fcbname_from_lfn(
 
     any_upper = false;
     any_lower = false;
-    any_long = false;
+    //any_long = false;
 
     out = 8;
     for (i = last_dot + 1; i < lfn_len && out < 11; ++i) {
@@ -682,6 +682,11 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
 
     auto iterate_callback = [&](fat32_dir_union_t *de,
             cluster_t, bool) -> bool {
+        if (unlikely(de->long_entry.attr == 0)) {
+            match_index = 0;
+            return true;
+        }
+
         // If this is a short filename entry
         if (de->long_entry.attr != FAT_LONGNAME) {
             uint8_t checksum = lfn_checksum(de->short_entry.name);

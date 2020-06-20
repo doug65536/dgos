@@ -329,3 +329,5 @@
 #define SYS_opendir                 318
 #define SYS_readdir_r               319
 #define SYS_closedir                320
+#define SYS_framebuffer_enum        321
+#define SYS_framebuffer_map         322

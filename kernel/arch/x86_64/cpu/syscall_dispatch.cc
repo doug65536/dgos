@@ -12,6 +12,7 @@
 #include "syscall/sys_module.h"
 #include "syscall/sys_sys.h"
 #include "syscall/sys_render.h"
+#include "syscall/sys_framebuffer.h"
 
 long sys_unimplemented()
 {
@@ -362,6 +363,8 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_opendirat,
     (syscall_handler_t*)(void*)sys_readdir_r,
     (syscall_handler_t*)(void*)sys_closedir,
+    (syscall_handler_t*)(void*)sys_framebuffer_enum,
+    (syscall_handler_t*)(void*)sys_framebuffer_map
     //(syscall_handler_t*)(void*)sys_,
 };
 

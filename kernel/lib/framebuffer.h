@@ -22,6 +22,7 @@ void fb_update(void);
 
 void fb_draw_char(int x, int y, char32_t codepoint, uint32_t fg, uint32_t bg);
 
+// 2D int vector
 struct vec2_t {
     int32_t x;
     int32_t y;
@@ -29,6 +30,7 @@ struct vec2_t {
     vec2_t() : x(0), y(0) {}
     vec2_t(int32_t x, int32_t y) : x(x), y(y) {}
     vec2_t(vec2_t const&) = default;
+    vec2_t& operator=(vec2_t const&) = default;
 
     vec2_t operator+(vec2_t const& rhs) const
     {

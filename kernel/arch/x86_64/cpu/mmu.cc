@@ -1731,7 +1731,7 @@ static pte_t *mm_create_pagetables_aligned(
 }
 
 template<typename T>
-static _always_inline T zero_if_false(bool cond, T bits)
+static _always_inline constexpr T zero_if_false(bool cond, T bits)
 {
     return bits & -cond;
 }
@@ -1743,18 +1743,8 @@ static _always_inline T select_mask(bool cond, T true_val, T false_val)
     return (true_val & mask) | (false_val & ~mask);
 }
 
-//static void *mm_alloc_address_space(size_t len, bool user)
-//{
-//    contiguous_allocator_t *allocator =
-//            user ? (contiguous_allocator_t*)
-//                thread_current_process()->get_allocator()
-//            : &linear_allocator;
-//    return (void*)allocator->alloc_linear(round_up(len));
-//}
-
 EXPORT void *mm_alloc_space(size_t size)
 {
-    //linear_allocator.dump("mm_alloc_space\n");
     return (void*)linear_allocator.alloc_linear(round_up(size));
 }
 
@@ -1763,12 +1753,6 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 {
     (void)offset;
     assert(offset == 0);
-
-    // Special case PROT_NONE, MAP_NOCOMMIT
-//    if (unlikely(addr == nullptr &&
-//                 prot == PROT_NONE &&
-//                 (flags & MAP_NOCOMMIT) == MAP_NOCOMMIT))
-//        return mm_alloc_address_space(len, flags & MAP_USER);
 
     // Fail on invalid protection mask
     if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC))))
@@ -1780,8 +1764,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
     static constexpr int user_prohibited =
             MAP_NEAR | MAP_DEVICE | MAP_GLOBAL |
-            MAP_UNINITIALIZED | MAP_WEAKORDER |
-            MAP_NOCACHE | MAP_WRITETHRU;
+            MAP_UNINITIALIZED;
 
     if (unlikely((flags & MAP_USER) && (flags & user_prohibited)))
         return MAP_FAILED;
@@ -1790,9 +1773,6 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
         return nullptr;
 
     PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
-
-    // Must pass MAP_DEVICE if passing a device registration index
-    //assert((flags & MAP_DEVICE) || (fd < 0));
 
 #if DEBUG_PAGE_TABLES
     printdbg("Mapping len=%#zx prot=%#x flags=%#x addr=%#" PRIx64 "\n",
@@ -1807,11 +1787,6 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     // Populate kernel stacks
     flags |= zero_if_false((flags & (MAP_STACK | MAP_USER)) == MAP_STACK,
                            MAP_POPULATE);
-
-    // No-commit user stacks
-//    flags |= zero_if_false((flags & (MAP_STACK | MAP_USER)) ==
-//                           (MAP_STACK | MAP_USER),
-//                           MAP_NOCOMMIT);
 
     // Set physical and present flag on physical memory mapping
     page_flags |= zero_if_false(flags & MAP_PHYSICAL,
@@ -1853,7 +1828,9 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
             : &linear_allocator;
 
     PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
+
     linaddr_t linear_addr;
+
     if (likely(!addr || (flags & MAP_PHYSICAL))) {
         linear_addr = allocator->alloc_linear(len);
     } else {
@@ -1879,8 +1856,10 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
     if (likely(!usable_early_mem_ranges)) {
-        pte_t *base_pte = mm_create_pagetables_aligned(linear_addr, len,
-                                                       free_batch);
+        // Normal operation
+
+        pte_t *base_pte = mm_create_pagetables_aligned(
+                    linear_addr, len, free_batch);
 
         if (unlikely(!base_pte)) {
             mm_destroy_pagetables_aligned(linear_addr, len);

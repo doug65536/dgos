@@ -12,22 +12,22 @@ UNITTEST(test_condition_variable_wait_timeout)
     std::mutex m;
     std::condition_variable v;
     std::unique_lock<std::mutex> lock(m);
-    uint64_t st_ns = time_ns();
+
     std::chrono::steady_clock::time_point st_tp =
             std::chrono::steady_clock::now();
-    v.wait_until(lock, st_tp + std::chrono::seconds(1));
-    uint64_t en_ns = time_ns();
+
+    std::cv_status status = v.wait_until(lock, st_tp +
+                                         std::chrono::seconds(1));
+    eq(true, std::cv_status::timeout == status);
+
     std::chrono::steady_clock::time_point en_tp =
             std::chrono::steady_clock::now();
 
     std::chrono::milliseconds elap = en_tp - st_tp;
-    uint64_t elap_ns = en_ns - st_ns;
 
-}
-
-UNITTEST(test_framebuffer)
-{
-    printk("To framebuffer?\n");
+    // Wide 50ms tolerance to avoid spurious test failures
+    le(true, 950 <= elap.count());
+    le(true, 1050 >= elap.count());
 }
 
 static int test_thread_worker(void *variation)

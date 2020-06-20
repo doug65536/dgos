@@ -807,9 +807,14 @@ static bool acpi_foreach_record(H const *hdr, E const *ent_type,
                                 F callback, int type)
 {
     char const *st = (char const *)hdr;
+
     H aligned_hdr;
     memcpy(&aligned_hdr, hdr, sizeof(aligned_hdr));
-    char const *ent = (st + sizeof(H));
+
+    printdbg("header at %zx\n", uintptr_t(hdr));
+    printdbg("ACPI each record len=%" PRIu32 "\n", aligned_hdr.hdr.len);
+
+    char const *ent = st + sizeof(H);
     char const *end = ent + aligned_hdr.hdr.len;
 
     E aligned_ent;
@@ -817,21 +822,19 @@ static bool acpi_foreach_record(H const *hdr, E const *ent_type,
         memcpy(&aligned_ent, ent, sizeof(aligned_ent));
         ent += aligned_ent.hdr.record_len;
 
-        if (aligned_ent.hdr.entry_type == type || type == -1)
+        if (type == -1 || aligned_ent.hdr.entry_type == type)
            callback(&aligned_ent);
     }
+
     return true;
 }
 
 static void acpi_process_madt(acpi_madt_t *madt_hdr, char const *hdr)
 {
-    acpi_madt_t aligned_madt_hdr;
-    memcpy(&aligned_madt_hdr, madt_hdr, sizeof(aligned_madt_hdr));
-
     apic_base = madt_hdr->lapic_address;
     acpi_madt_flags = madt_hdr->flags & 1;
 
-    if (!memcmp(aligned_madt_hdr.hdr.sig, "APIC", 4)) {
+    if (!memcmp(madt_hdr->hdr.sig, "APIC", 4)) {
         // Scan for APIC ID records
         acpi_foreach_record((acpi_madt_t const *)hdr,
                             (acpi_madt_ent_t const*)nullptr,
@@ -843,7 +846,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr, char const *hdr)
 
                 // If processor is enabled
                 if (lapic.flags != 0) {
-                    assert(lapic.flags == 1);  // check for weird value
+                    assert(lapic.flags & 1);  // check for weird value
                     apic_id_list[apic_id_count++] = ent->lapic.apic_id;
                 } else {
                     ACPI_TRACE("Disabled processor detected\n");
@@ -1580,10 +1583,11 @@ void apic_send_ipi(int32_t target_apic_id, uint8_t intr)
     if (unlikely(!apic))
         return;
 
+    uint32_t source_apic_id = thread_get_cpu_apic_id(thread_current_cpu(-1));
+
     APIC_TRACE("Sending IPI intr %" PRIu32 " to apic %#" PRIx32
                " from apic %#" PRIx32 "\n",
-               intr, target_apic_id, thread_get_cpu_apic_id(
-                   thread_current_cpu(-1)));
+               intr, target_apic_id, source_apic_id);
 
     uint32_t dest_type = (target_apic_id < -1)
             ? APIC_CMD_DEST_TYPE_ALL
@@ -2534,8 +2538,8 @@ static bool ioapic_set_flags(mp_ioapic_t *ioapic,
 
     uint32_t reg = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
 
-    uint16_t polarity = ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_GET(intr_flags);
-    uint16_t trigger = ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_GET(intr_flags);
+    uint_fast16_t polarity = ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_GET(intr_flags);
+    uint_fast16_t trigger = ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_GET(intr_flags);
 
     if (polarity == ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_DEFAULT)
         polarity = isa ? ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI
@@ -2657,9 +2661,6 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     en -= st;
 
     thread_add_cpu_irq_time(en);
-
-//    if (intr != INTR_APIC_TIMER && ctx == orig_ctx)
-//        ctx = thread_schedule_postirq(ctx);
 
     return thread_schedule_if_requested_noirq(ctx);
 }

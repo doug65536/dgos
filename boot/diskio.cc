@@ -8,7 +8,7 @@
 
 extern uint8_t boot_drive;
 
-static bool disk_64bit;
+static int disk_64bit;
 
 static bool disk_support_64bit_addr_bioscall()
 {

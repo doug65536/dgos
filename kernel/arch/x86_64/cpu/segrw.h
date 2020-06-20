@@ -32,7 +32,7 @@ static _always_inline T *cpu_gs_ptr(void)
     __asm__ __volatile__ (
         "mov %%gs:0,%[value]\n\t"
         : [value] "=r" (value)
-        : [ofs] "i" (ofs)
+        :
         : "memory"
     );
     // Do the addition outside asm to allow constant folding optimization

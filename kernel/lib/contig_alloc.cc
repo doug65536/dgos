@@ -232,8 +232,8 @@ EXPORT bool contiguous_allocator_t::take_linear(
 {
     scoped_lock lock(free_addr_lock);
 
-    dump_locked(lock, "---- Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
 #if DEBUG_ADDR_ALLOC
+    dump_locked(lock, "---- Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
 #endif
 
     assert(size > 0);
@@ -395,8 +395,8 @@ EXPORT bool contiguous_allocator_t::take_linear(
 
     assert(free_addr_by_addr.size() == free_addr_by_size.size());
 
-    dump_locked(lock, "---- After Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
 #if DEBUG_ADDR_ALLOC
+    dump_locked(lock, "---- After Take %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
 #endif
 
     return true;

@@ -20,7 +20,6 @@
 //#include "zlib/zlib.h"
 //#include "zlib_helper.h"
 #include "stdlib.h"
-#include "png.h"
 #include "framebuffer.h"
 #include "math.h"
 #include "dev_storage.h"

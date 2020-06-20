@@ -1,15 +1,18 @@
 cxx/abi/cxa_allocate_exception.cc
 cxx/terminate.cc
+include/byteswap.h
+include/disabled_limits.h
 include/disabled_stdint.h
+include/disabled_limits.h
 include/new.h
 include/stdint.h
 include/sys/cpu_bug.h
 include/sys/ioctl.h
 include/sys/likely.h
-include/sys/limits.h
-include/sys/module.h
+nclude/sys/module.h
 include/sys/socket.h
 include/sys/syscall_num.h
+include/sys/framebuffer.h
 include/sys/tls.h
 libg/debug.cc
 math/cos.cc
@@ -96,6 +99,8 @@ src/sys/mman/munmap.cc
 src/sys/module/init_module.cc
 src/sys/module/probe_pci_for.cc
 src/sys/socket/socket.cc
+src/sys/framebuffer/framebuffer_enum.cc
+src/sys/framebuffer/framebuffer_map.cc
 src/sys/syscall0.S
 src/sys/syscall1.S
 src/sys/syscall2.S
@@ -322,7 +327,6 @@ include/signal.h
 include/unistd.h
 include/stropts.h
 include/search.h
-include/limits.h
 include/libgen.h
 include/glob.h
 include/ulimit.h

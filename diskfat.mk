@@ -46,7 +46,7 @@ $(top_builddir)/fatpart.img: \
 			$(top_builddir)/mbrdisk.img \
 			$(top_builddir)/gptdisk.img && \
 		\
-		$(TRUNCATE) --size="$(DISK_SIZE_MB)M" $(top_builddir)/fatpart.img && \
+		$(TRUNCATE) --size="$(DISK_SIZE_MB)M" "$(top_builddir)/fatpart.img" && \
 		\
 		$(MKFS_VFAT) \
 			-F 32 \
@@ -89,15 +89,15 @@ $(top_builddir)/fatpart.img: \
 			$(top_srcdir)/populate_fat.sh \
 				$(top_builddir)/fatpart.img "$(top_srcdir)"
 
+DGOS_MBRID=0x0615151f
 DGOS_UUID=0615151f-d802-4edf-914a-734dc4f03687
 
-$(top_builddir)/mbrdisk.img: \
-		fatpart.img
+$(top_builddir)/mbrdisk.img: fatpart.img
 	$(TRUNCATE) --size="$(DISK_SIZE_MB)M" $(top_builddir)/mbrdisk.img && \
 		\
-		printf 'label: dos\nlength=2048, uuid=%s, name=DGOS, bootable\n' \
-				$(DGOS_GUID) | \
-			$(SFDISK) $(top_builddir)/mbrdisk.img && \
+		printf 'label: dos\nlabel: dos\nlabel-id: %s\n2048,,U,*' \
+				"$(DGOS_MBRID)" | \
+			$(SFDISK) --no-tell-kernel $(top_builddir)/mbrdisk.img && \
 			\
 		$(DD) if=$(top_builddir)/fatpart.img \
 			of=$(top_builddir)/mbrdisk.img \
@@ -122,7 +122,7 @@ $(top_builddir)/gptdisk.img: fatpart.img
 	$(TRUNCATE) --size=256M $(top_builddir)/gptdisk.img && \
 	\
 		printf 'label: gpt\n2048,,U,*' | \
-			sfdisk $(top_builddir)/gptdisk.img && \
+			$(SFDISK) $(top_builddir)/gptdisk.img && \
 			\
 		$(SGDISK) -A 1:set:2 -h 1 $(top_builddir)/gptdisk.img && \
 		\

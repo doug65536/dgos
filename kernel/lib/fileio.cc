@@ -199,6 +199,7 @@ EXPORT int file_openat(int dirid, char const *path, int flags, mode_t mode)
 
     int status = fs->openat(&fh->fi, dirfh ? dirfh->fi : nullptr,
                             path + consumed, flags, mode);
+
     if (unlikely(status < 0)) {
         FILEHANDLE_TRACE("open failed on %s, status=%d\n", path, status);
         file_del_filetab(fh);
@@ -766,28 +767,52 @@ class socket_fs_t final : public fs_nosys_t {
 
     // fs_base_t interface
 public:
-    int openat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path, int flags, mode_t mode) override;
+    int openat(fs_file_info_t **fi, fs_file_info_t *dirfi,
+               fs_cpath_t path, int flags, mode_t mode) override;
     int release(fs_file_info_t *fi) override;
-    ssize_t read(fs_file_info_t *fi, char *buf, size_t size, off_t offset) override;
-    ssize_t write(fs_file_info_t *fi, const char *buf, size_t size, off_t offset) override;
+    ssize_t read(fs_file_info_t *fi, char *buf,
+                 size_t size, off_t offset) override;
+    ssize_t write(fs_file_info_t *fi, const char *buf,
+                  size_t size, off_t offset) override;
 };
 
-int socket_fs_t::openat(fs_file_info_t **fi, fs_file_info_t *dirfi, fs_cpath_t path, int flags, mode_t mode)
+class socket_file_t : public fs_file_info_t {
+public:
+
+
+public:// fs_file_info_t interface
+    ino_t get_inode() const override;
+};
+
+ino_t socket_file_t::get_inode() const
 {
-    return -int(errno_t::ENOSYS);
+    return -ino_t(errno_t::ENOSYS);
+}
+
+int socket_fs_t::openat(fs_file_info_t **fi, fs_file_info_t *dirfi,
+                        fs_cpath_t path, int flags, mode_t mode)
+{
+    socket_file_t *file = new (std::nothrow) socket_file_t();
+    *fi = file;
+
+    return 0;
 }
 
 int socket_fs_t::release(fs_file_info_t *fi)
 {
+    socket_file_t *file = static_cast<socket_file_t*>(fi);
+    delete file;
     return 0;
 }
 
-ssize_t socket_fs_t::read(fs_file_info_t *fi, char *buf, size_t size, off_t offset)
+ssize_t socket_fs_t::read(fs_file_info_t *fi,
+                          char *buf, size_t size, off_t offset)
 {
     return 0;
 }
 
-ssize_t socket_fs_t::write(fs_file_info_t *fi, const char *buf, size_t size, off_t offset)
+ssize_t socket_fs_t::write(fs_file_info_t *fi,
+                           const char *buf, size_t size, off_t offset)
 {
     return 0;
 }

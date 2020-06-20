@@ -16,7 +16,7 @@ int openat(int dirfd, char const *path, int flags, ...)
         va_end(ap);
     }
 
-    scp_t status = syscall4(dirfd, uintptr_t(path), unsigned(flags),
+    int status = syscall4(dirfd, uintptr_t(path), unsigned(flags),
                             mode, SYS_openat);
 
     if (likely(status >= 0))

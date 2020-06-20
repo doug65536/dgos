@@ -119,7 +119,7 @@ ssize_t sys_read(int fd, void *bufaddr, size_t count)
     if (unlikely(id < 0))
         return badf_err();
 
-    unique_memlock memlock(bufaddr, count);
+    //unique_memlock memlock(bufaddr, count);
 
     ssize_t sz = file_read(id, bufaddr, count);
 
@@ -461,7 +461,7 @@ int sys_openat(int dirfd, char const* pathname, int flags, mode_t mode)
 
     if (unlikely(id < 0)) {
         p->ids.desc_alloc.free(fd);
-        return err(-id);
+        return err(id);
     }
 
     p->ids.ids[fd] = id;

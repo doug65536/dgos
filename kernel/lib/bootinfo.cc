@@ -22,6 +22,11 @@ static void bootinfo_remap(void*)
                 PROT_READ | PROT_WRITE, MAP_PHYSICAL);
     if (unlikely(kernel_params == MAP_FAILED))
         panic_oom();
+
+    vbe_selected_mode_t *mode = kernel_params->vbe_selected_mode;
+
+    kernel_params->vbe_selected_mode = (vbe_selected_mode_t*)
+            mmap((void*)mode, sizeof(*mode), PROT_READ, MAP_PHYSICAL);
 }
 REGISTER_CALLOUT(bootinfo_remap, nullptr, callout_type_t::vmm_ready, "000");
 

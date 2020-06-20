@@ -164,24 +164,22 @@ static kernel_params_t *prompt_kernel_param(
         vbe_set_mode(mode);
 
         // Place framebuffer at -2TB
-        uint64_t linear_addr = (-UINT64_C(2) << 40);
+        //uint64_t linear_addr = (-UINT64_C(2) << 40);
 
-        PRINT("Mapping framebuffer"
-              " vaddr=%" PRIx64
+        PRINT("Got framebuffer"
               ", paddr=%" PRIx64
               ", size=%" PRIx64 "\n",
-              linear_addr,
               mode.framebuffer_addr,
               mode.framebuffer_bytes);
 
-        paging_map_physical(mode.framebuffer_addr,
-                            linear_addr,
-                            mode.framebuffer_bytes, PTE_EX_PHYSICAL |
-                            PTE_PRESENT | PTE_WRITABLE |
-                            PTE_ACCESSED | PTE_DIRTY |
-                            PTE_NX | PTE_PTPAT);
+//        paging_map_physical(mode.framebuffer_addr,
+//                            linear_addr,
+//                            mode.framebuffer_bytes, PTE_EX_PHYSICAL |
+//                            PTE_PRESENT | PTE_WRITABLE |
+//                            PTE_ACCESSED | PTE_DIRTY |
+//                            PTE_NX | PTE_PTPAT);
 
-        mode.framebuffer_addr = linear_addr;
+        //mode.framebuffer_addr = linear_addr;
     }
 
     return params;

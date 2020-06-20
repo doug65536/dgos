@@ -165,10 +165,10 @@ __BEGIN_DECLS
 
 // Open directory for search only. The result is unspecified if this flag is
 // applied to a non-directory file.
-#define O_SEARCH
+//#define O_SEARCH
 
 // Open for writing only.
-#define O_WRONLY
+//#define O_WRONLY
 
 // The <fcntl.h> header shall define the symbolic constants for file modes
 // for use as values of mode_t as described in <sys/stat.h>.

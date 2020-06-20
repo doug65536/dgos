@@ -8,6 +8,9 @@
 #include <dirent.h>
 #include <string.h>
 #include <inttypes.h>
+#include <sys/framebuffer.h>
+#include <pthread.h>
+#include <png.h>
 
 template<typename T, size_t hw_vec_sz = 64>
 struct aosoa_t {
@@ -96,7 +99,7 @@ void load_module(char const *path, char const *parameters = nullptr)
     close(fd);
 }
 
-int main(int argc, char **argv, char **envp)
+void test_aosoa_ifunc()
 {
     aosoa_int_t::vector_t *c = new aosoa_int_t::vector_t[
             64 / sizeof(aosoa_int_t::vector_t)];
@@ -106,6 +109,138 @@ int main(int argc, char **argv, char **envp)
             64 / sizeof(aosoa_int_t::vector_t)];
     __asm__ __volatile__ ("" : : : "memory");
     do_aosoa(c, a, b, 64 / sizeof(aosoa_int_t::vector_t));
+}
+
+static uint32_t translate_pixel(fb_info_t *info, uint32_t pixel)
+{
+    uint32_t r = (pixel >> 16) & 0xFF;
+    uint32_t g = (pixel >> 8) & 0xFF;
+    uint32_t b = pixel & 0xFF;
+    uint32_t a = 0xFF;// (pixel >> 24) & 0xFF;
+
+    r >>= 8 - info->fmt.mask_size_r;
+    g >>= 8 - info->fmt.mask_size_g;
+    b >>= 8 - info->fmt.mask_size_b;
+    a >>= 8 - info->fmt.mask_size_a;
+
+    r <<= info->fmt.mask_pos_r;
+    g <<= info->fmt.mask_pos_g;
+    b <<= info->fmt.mask_pos_b;
+    a <<= info->fmt.mask_pos_a;
+
+    r |= g;
+    b |= a;
+    r |= b;
+
+    return r;
+}
+
+void png_draw_noclip(int dx, int dy,
+                     int dw, int dh,
+                     int sx, int sy,
+                     png_image_t *img, fb_info_t *info)
+{
+    // Calculate a pointer to the first image pixel
+    uint32_t const * restrict src = png_pixels(img) + img->width * sy + sx;
+
+    if (info->pixel_sz == 4) {
+        uint32_t * restrict dst;
+        dst = (uint32_t*)(uintptr_t(info->vmem) + dy * info->pitch) + dx;
+        for (size_t y = 0; y < unsigned(dh); ++y) {
+            for (size_t x = 0; x < unsigned(dw); ++x) {
+                uint32_t pixel = translate_pixel(info, src[x]);
+                dst[x] = pixel;
+            }
+            src += img->width;
+            dst = (uint32_t*)(uintptr_t(dst) + info->pitch);
+        }
+    } else if (info->pixel_sz == 3) {
+        uint8_t * restrict dst;
+        dst = (uint8_t*)(uintptr_t(info->vmem) + dy * info->pitch) + dx * 3;
+        for (size_t y = 0; y < unsigned(dh); ++y) {
+            for (size_t x = 0; x < unsigned(dw); ++x) {
+                uint32_t pixel = translate_pixel(info, src[x]);
+                memcpy(dst + x * 3, &pixel, 3);
+            }
+            src += img->width;
+            dst = (uint8_t*)(uintptr_t(dst) + info->pitch);
+        }
+    } else if (info->pixel_sz == 2) {
+        uint16_t * restrict dst;
+        dst = (uint16_t*)(uintptr_t(info->vmem) + dy * info->pitch) + dx;
+        for (size_t y = 0; y < unsigned(dh); ++y) {
+            for (size_t x = 0; x < unsigned(dw); ++x) {
+                uint32_t pixel = translate_pixel(info, src[x]);
+                dst[x] = pixel;
+            }
+            src += img->width;
+            dst = (uint16_t*)(uintptr_t(dst) + info->pitch);
+        }
+    } else {
+        // Palette mode not supported
+    }
+}
+
+
+void png_draw(int dx, int dy,
+              int dw, int dh,
+              int sx, int sy,
+              png_image_t *img, fb_info_t *info)
+{
+    int hclip, vclip;
+
+    // Calculate amount clipped off left and top
+    hclip = -dx;
+    vclip = -dy;
+
+    // Zero out negative clip amount
+    hclip &= -(hclip >= 0);
+    vclip &= -(vclip >= 0);
+
+    // Adjust left and width and source left
+    dx += hclip;
+    dw -= hclip;
+    sx += hclip;
+
+    // Adjust top and height and source top
+    dy += vclip;
+    dh -= vclip;
+    sy += vclip;
+
+    // Calculate amount clipped off right and bottom
+    hclip = (dx + dw) - info->w;
+    vclip = (dy + dh) - info->h;
+
+    // Zero out negative clip amount
+    hclip &= -(hclip >= 0);
+    vclip &= -(vclip >= 0);
+
+    // Adjust bottom of destination to handle clip
+    dw -= hclip;
+    dh -= vclip;
+
+    // Clamp right and bottom of destination
+    // to right and bottom edge of source
+    hclip = (sx + dw) - img->width;
+    vclip = (sy + dh) - img->height;
+
+    // Zero out negative clip amount
+    hclip &= -(hclip >= 0);
+    vclip &= -(vclip >= 0);
+
+    // Adjust bottom of destination to handle clip
+    dw -= hclip;
+    dh -= vclip;
+
+    if (unlikely((dw <= 0) | (dh <= 0)))
+        return;
+
+    png_draw_noclip(dx, dy, dw, dh, sx, sy, img, info);
+}
+
+int main(int argc, char **argv, char **envp)
+{
+    test_aosoa_ifunc();
 
     DIR *dir = opendir("/");
 
@@ -174,5 +309,30 @@ int main(int argc, char **argv, char **envp)
                       PCI_SUBCLASS_NETWORK_ETHERNET, -1))
         load_module("rtl8139.km");
 
+    fb_info_t info;
+    int err = framebuffer_enum(0, 0, &info);
+
+    if (err < 0) {
+        errno_t save_errno = errno;
+        printf("Unable to map framebuffer!\n");
+        errno = save_errno;
+        return -1;
+    }
+
+    png_image_t *img = png_load("background.png");
+    int x = 0;
+    int direction = 1;
+    for (;;) {
+        x += direction;
+        if (x == 0)
+            direction = 1;
+        if (x == 500)
+            direction = -1;
+
+        png_draw(0, 0, img->width, img->height, x, 0, img, &info);
+    }
+    png_free(img);
+
+    return 0;
 }
 __END_DECLS

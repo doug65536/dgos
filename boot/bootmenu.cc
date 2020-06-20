@@ -56,7 +56,7 @@ static tui_menu_item_t tui_menu[] = {
     { TSTR "serial baud rate", tui_baud_rates, 0 },
     { TSTR "display resolution", {}, 0 },
     { TSTR "port 0xe9 debug output", tui_dis_ena, 1 },
-    { TSTR "SMP", tui_dis_ena, 0 },
+    { TSTR "SMP", tui_dis_ena, 1 },
     { TSTR "ACPI", tui_dis_ena, 1 },
     { TSTR "MPS", tui_dis_ena, 1 },
     { TSTR "MSI", tui_dis_ena, 1 },
@@ -186,7 +186,11 @@ void boot_menu_show(kernel_params_t &params)
     auto mode_index = tui_menu[display_resolution].index;
     auto const* mode = &vbe_modes.modes[mode_index];
 
-    params.vbe_selected_mode = uintptr_t(mode);
+    vbe_selected_mode_t *aligned_mode = (vbe_selected_mode_t*)
+            malloc(sizeof(vbe_selected_mode_t));
+    memcpy(aligned_mode, mode, sizeof(*aligned_mode));
+
+    params.vbe_selected_mode = uintptr_t(aligned_mode);
     params.wait_gdb = tui_menu[kernel_debugger].index != 0;
     params.serial_debugout = tui_menu[serial_output].index != 0;
     params.serial_baud = tui_menu[serial_baud].index;

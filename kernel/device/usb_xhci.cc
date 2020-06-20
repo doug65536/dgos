@@ -336,7 +336,7 @@ struct usbxhci_inpctlctx_t {
     uint8_t rsvd2;
 };
 
-C_ASSERT(sizeof(usbxhci_inpctlctx_t) == 32);
+C_ASSERT(sizeof(usbxhci_inpctlctx_t) == 0x20);
 
 // 6.2.5 Input Context
 
@@ -346,7 +346,9 @@ struct usbxhci_inpctx_small_t {
     usbxhci_slotctx_t slotctx;
 
     usbxhci_ep_ctx_t epctx[32];
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_inpctx_small_t) == 1024 + 64);
 
 struct usbxhci_inpctx_large_t {
     usbxhci_inpctlctx_t inpctl;
@@ -355,7 +357,9 @@ struct usbxhci_inpctx_large_t {
     uint8_t rsvd[32];
 
     usbxhci_ep_ctx_t epctx[32];
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_inpctx_large_t) == 1024 + 96);
 
 union usbxhci_inpctx_t {
     void *any;
@@ -363,18 +367,24 @@ union usbxhci_inpctx_t {
     usbxhci_inpctx_large_t *large;
 };
 
+C_ASSERT(sizeof(usbxhci_inpctx_t) == sizeof(void*));
+
 // 6.4.3 Command TRB
 
 struct usbxhci_cmd_trb_t {
     uint32_t data[4];
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_cmd_trb_t) == 0x10);
 
 struct usbxhci_cmd_trb_noop_t {
     uint32_t rsvd1[3];
     uint8_t cycle;
     uint8_t trb_type;
     uint16_t rsvd2;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_cmd_trb_noop_t) == 0x10);
 
 struct usbxhci_cmd_trb_reset_ep_t {
     uint32_t rsvd1[3];
@@ -382,7 +392,9 @@ struct usbxhci_cmd_trb_reset_ep_t {
     uint8_t trb_type_tsp;
     uint8_t epid;
     uint8_t slotid;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_cmd_trb_reset_ep_t) == 0x10);
 
 struct usbxhci_cmd_trb_setaddr_t {
     uint64_t input_ctx_physaddr;
@@ -391,9 +403,9 @@ struct usbxhci_cmd_trb_setaddr_t {
     uint8_t trb_type;
     uint8_t rsvd2;
     uint8_t slotid;
-} _packed;
+};
 
-C_ASSERT(sizeof(usbxhci_cmd_trb_setaddr_t) == 16);
+C_ASSERT(sizeof(usbxhci_cmd_trb_setaddr_t) == 0x10);
 
 // 6.4.4.1 Link TRB
 struct usbxhci_cmd_trb_link_t {
@@ -403,9 +415,9 @@ struct usbxhci_cmd_trb_link_t {
     uint8_t c_tc_ch_ioc;
     uint8_t trb_type;
     uint16_t rsvd2;
-} _packed;
+};
 
-C_ASSERT(sizeof(usbxhci_cmd_trb_link_t) == 16);
+C_ASSERT(sizeof(usbxhci_cmd_trb_link_t) == 0x10);
 
 // 6.5 Event Ring Segment Table
 
@@ -418,7 +430,7 @@ struct usbxhci_evtring_seg_t {
 
     uint16_t resvd;
     uint32_t resvd2;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_evtring_seg_t) == 0x10);
 
@@ -432,7 +444,7 @@ struct usbxhci_evt_t {
     uint16_t flags;
     uint8_t id;
     uint8_t slotid;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_evt_t) == 0x10);
 
@@ -457,7 +469,7 @@ struct usbxhci_evt_cmdcomp_t {
     uint16_t flags;
     uint8_t id;
     uint8_t slotid;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_evt_cmdcomp_t) == 0x10);
 
@@ -513,7 +525,9 @@ struct usbxhci_evt_xfer_t {
     uint8_t trb_type;
     uint8_t ep_id;
     uint8_t slotid;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_evt_xfer_t) == 0x10);
 
 //
 // 6.4.2.2 Command Completion Event TRB
@@ -527,7 +541,9 @@ struct usbxhci_evt_completion_t {
     uint8_t trb_type;
     uint8_t ep_id;
     uint8_t slotid;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_evt_completion_t) == 0x10);
 
 //
 // 6.4.2.3 Port Status Change Event TRB
@@ -537,11 +553,13 @@ struct usbxhci_evt_portstchg_t {
     uint8_t rsvd2;
     uint8_t portid;
     uint32_t rsvd3;
-    uint16_t rsvd4;
+    uint8_t rsvd4[3];
     uint8_t cc;
     uint16_t flags;
     uint16_t rsvd5;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_evt_portstchg_t) == 0x10);
 
 //
 // 6.4.2.4 Bandwidth Request Event TRB
@@ -555,7 +573,9 @@ struct usbxhci_evt_bwreq_t {
     uint16_t flags;
     uint8_t rsvd5;
     uint8_t slotid;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_evt_bwreq_t) == 0x10);
 
 //
 // 6.4.2.5 Doorbell Event TRB
@@ -567,7 +587,9 @@ struct usbxhci_evt_db_t {
     uint16_t flags;
     uint8_t vf_id;
     uint8_t slotid;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_evt_db_t) == 0x10);
 
 //
 // 6.4.1.2 Control TRBs
@@ -576,7 +598,7 @@ struct usbxhci_ctl_trb_generic_t {
     uint32_t data[3];
     uint16_t flags;
     uint16_t trt;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_generic_t) == 0x10);
 C_ASSERT(offsetof(usbxhci_ctl_trb_generic_t, flags) == 0x0c);
@@ -603,7 +625,7 @@ struct usbxhci_ctl_trb_setup_t {
     uint32_t xferlen_intr;
     uint16_t flags;
     uint16_t trt;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_setup_t) == 0x10);
 C_ASSERT(offsetof(usbxhci_ctl_trb_setup_t, flags) == 0x0c);
@@ -613,7 +635,7 @@ struct usbxhci_ctl_trb_data_t {
     uint32_t xfer_td_intr;
     uint16_t flags;
     uint16_t dir;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_data_t) == 0x10);
 C_ASSERT(offsetof(usbxhci_ctl_trb_data_t, flags) == 0x0c);
@@ -624,7 +646,7 @@ struct usbxhci_ctl_trb_status_t {
     uint16_t intr;
     uint16_t flags;
     uint16_t dir;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_status_t) == 0x10);
 C_ASSERT(offsetof(usbxhci_ctl_trb_status_t, flags) == 0x0c);
@@ -634,7 +656,7 @@ union usbxhci_ctl_trb_t {
     usbxhci_ctl_trb_setup_t setup;
     usbxhci_ctl_trb_data_t data;
     usbxhci_ctl_trb_status_t status;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 
@@ -646,7 +668,9 @@ struct usbxhci_ctl_trb_evalctx_t {
     uint32_t rsvd[1];
     uint16_t flags;
     uint16_t trt;
-} _packed;
+};
+
+C_ASSERT(sizeof(usbxhci_ctl_trb_evalctx_t) == 0x10);
 
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_STD         0
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_CLASS       1
@@ -844,7 +868,7 @@ private:
                        uint16_t stream_id, size_t count, int dir,
                        void *trbs, usb_iocp_t *iocp);
 
-    void insert_pending_command(usbxhci_pending_cmd_t *pc,
+    bool insert_pending_command(usbxhci_pending_cmd_t *pc,
                                 uint64_t cmd_physaddr,
                                 usbxhci_evt_handler_t *handler,
                                 usb_iocp_t *iocp);
@@ -988,7 +1012,7 @@ void usbxhci::ring_doorbell(uint32_t doorbell, uint8_t value,
     mm_wr(mmio_db[doorbell], value | (stream_id << 16));
 }
 
-void usbxhci::insert_pending_command(usbxhci_pending_cmd_t *pc,
+bool usbxhci::insert_pending_command(usbxhci_pending_cmd_t *pc,
                                      uint64_t cmd_physaddr,
                                      usbxhci_evt_handler_t *handler,
                                      usb_iocp_t *iocp)
@@ -996,7 +1020,7 @@ void usbxhci::insert_pending_command(usbxhci_pending_cmd_t *pc,
     pc->cmd_physaddr = cmd_physaddr;
     pc->iocp = iocp;
     pc->handler = handler;
-    usbxhci_pending_ht.insert(pc);
+    return usbxhci_pending_ht.insert(pc);
 }
 
 usbxhci_pending_cmd_t *usbxhci::issue_cmd(
@@ -1254,7 +1278,7 @@ bool usbxhci::add_device(int parent_slot, size_t port, int route)
     if (unlikely(err < 0))
         return false;
 
-    size_t cfg_buf_sz = 4096;
+    size_t cfg_buf_sz = 1024;
     ext::unique_ptr_free<usb_desc_config> cfg_buf(
                 (usb_desc_config*)calloc(1, cfg_buf_sz));
 
@@ -1777,14 +1801,16 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     usbxhci_ep_ctx_t *inpepctx;
 
     if (!dev_ctx_large) {
-        inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_small_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE);
+        inp.small = (usbxhci_inpctx_small_t*)mmap(
+                    nullptr, sizeof(usbxhci_inpctx_small_t),
+                    PROT_READ | PROT_WRITE, MAP_POPULATE);
         ctlctx = &inp.small->inpctl;
         inpslotctx = &inp.small->slotctx;
         inpepctx = inp.small->epctx;
     } else {
-        inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_large_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE);
+        inp.large = (usbxhci_inpctx_large_t*)mmap(
+                    nullptr, sizeof(usbxhci_inpctx_large_t),
+                    PROT_READ | PROT_WRITE, MAP_POPULATE);
         ctlctx = &inp.large->inpctl;
         inpslotctx = &inp.large->slotctx;
         inpepctx = inp.large->epctx;

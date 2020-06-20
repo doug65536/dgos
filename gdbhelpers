@@ -7,6 +7,10 @@ define startupbreakpoints
 	#set scheduler-locking step
 	set range-stepping off
 	#set may-call-functions off
+
+	#good for TCG
+	set breakpoint always-inserted on
+
 	thbreak entry
 	commands
 		#b isr_entry_13

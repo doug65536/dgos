@@ -407,17 +407,17 @@ isr_entry 0 INTR_PIC2_SPURIOUS
 .section .text.isr, "ax", @progbits
 
 .macro isr_common_init_cfa
-     // Initial CFA using raw stack pointer
-     // CFA
-     // index
-     //  0    7*8(%rsp) <-- CFA
-     // -1    6*8(%rsp) ss
-     // -2    5*8(%rsp) rsp
-     // -3    4*8(%rsp) rflags
-     // -4    3*8(%rsp) cs
-     // -5    2*8(%rsp) rip
-     // -6    1*8(%rsp) error code
-     // -7    0*8(%rsp) interrupt number and ctx_flags
+    // Initial CFA using raw stack pointer
+    // CFA
+    // index
+    //  0    7*8(%rsp) <-- CFA
+    // -1    6*8(%rsp) ss
+    // -2    5*8(%rsp) rsp
+    // -3    4*8(%rsp) rflags
+    // -4    3*8(%rsp) cs
+    // -5    2*8(%rsp) rip
+    // -6    1*8(%rsp) error code
+    // -7    0*8(%rsp) interrupt number and ctx_flags
 
     .cfi_startproc
     .cfi_signal_frame
@@ -478,7 +478,7 @@ isr_common:
     // -22  -14*8(%rbp)  3*8(%rsp) -> rdi           ┘
     // -23  -15*8(%rbp)  2*8(%rsp) -> cr3
     // -24  -16*8(%rbp)  1*8(%rsp) -> segments
-    // -25  -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr   < Saved thread rsp
+    // -25  -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr     <- Saved thread rsp
 
     /// Register usage:
     ///  r15 accumulates segment registers
@@ -570,7 +570,7 @@ isr_common:
     testl $ 3,frame_cs(%rbp)
     jnz .Lneed_swap
 
-    // Absolute so cloning works
+    // Get valid range for cpu pointer
     lea cpus(%rip),%rax
     lea cpus_end(%rip),%rdx
 
@@ -650,18 +650,27 @@ isr_common:
     // Infer pointer to incoming thread's interrupt frame from ctx pointer
     lea ISR_CTX_OFS_RBP(%rax),%rbp
 
+    // rcx = this_cpu()
+    movq %gs:(%rcx),%rcx
+
     cmpb $ INTR_EX_NMI,frame_intr(%rbp)
     jz .Lno_cleanup_call
 
+    xor %edx,%edx
+
     // Run cpu-local outgoing cleanup after stack switch (now)
     // Used to adjust outgoing thread state after switching stack
-    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
+    mov CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
+    mov %rdx,CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+
     test %rax,%rax
     jz .Lno_cleanup_call
-    movq %rcx,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
-    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
-    mov %rcx,%gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
+
+    mov CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
+    mov %rdx,CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
+
     indirect_call rax
+
 .Lno_cleanup_call:
     xor %eax,%eax
 
@@ -675,17 +684,11 @@ isr_common:
     movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r13
 
     // See if we're not returning to user code
-    // Branch past swapgs and restoration of segments if not
+    // Branch past restoration of segments if not
     testl $ 3,frame_cs(%rbp)
     jz .Lreturning_to_kernel
 
     // ...returning to user code
-
-    // Fetch pointer to this CPU's TSS for TSS.RSP0 update
-    movq %gs:CPU_INFO_TSS_PTR_OFS(%rax),%rcx
-    leaq frame_end(%rbp),%rax
-    movq THREAD_PRIV_CHG_STACK_OFS(%r13),%rax
-    movq %rax,TSS_RSP0_OFS(%rcx)
 
     // If segments are not changing, avoid 136*4 cycles
     cmpq %r15,%rdx
@@ -726,13 +729,14 @@ isr_common:
     call cpu_debug_break
 .Lgood_flags2:
 
+    .cfi_remember_state
+
     // Restore CR3
-    mov %cr3,%rbx
-    cmpq %rbx,(%rsp)
+    mov %cr3,%rdi
     popq %rbx
-    je .Lskip_cr3
-    movq %rbx,%cr3
-.Lskip_cr3:
+    cmpq %rdi,%rbx
+    jne .Lcr3_changed
+.Lcr3_done:
 
     popq %rdi
     .cfi_same_value rdi
@@ -800,6 +804,17 @@ isr_common:
     fn_trace isr_common,exit
 
     iretq
+
+    .cfi_restore_state
+
+.balign 16
+.Lcr3_changed:
+    mov %rbx,%cr3
+    jmp .Lcr3_done
+
+.Lcr3_changed_fast:
+    mov %rdi,%cr3
+    jmp .Lcr3_done_fast
 
 .balign 16
 .Lsegments_changed:
@@ -932,6 +947,15 @@ thread_yield:
 
     // Uninitialized call clobbered save area
     sub $ 9*8,%rsp
+    .cfi_undefined r11
+    .cfi_undefined r10
+    .cfi_undefined rax
+    .cfi_undefined r9
+    .cfi_undefined r8
+    .cfi_undefined rcx
+    .cfi_undefined rdx
+    .cfi_undefined rsi
+    .cfi_undefined rdi
 
     // Save CR3
     push %rcx
@@ -948,8 +972,8 @@ thread_yield:
     call thread_schedule
 
     // See if we are restoring a fast context
-    testl $ (1 << ISR_CTX_CTX_FLAGS_FAST_QWBIT),ISR_CTX_OFS_INTERRUPT(%rax)
-    jz .Lrestore_slow_ctx
+    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,ISR_CTX_OFS_INTERRUPT(%rax)
+    jnc .Lrestore_slow_ctx
 
     // Could branch here from full interrupt handler to restore a fast context
 .Lrestore_fast_ctx:
@@ -975,12 +999,11 @@ thread_yield:
     add $ 2*8,%rsp
 
     // Pop CR3
-    movq %cr3,%rax
-    cmpq %rax,(%rsp)
-    popq %rax
-    jz .Lskip_cr3_fast
-    movq %rax,%cr3
-.Lskip_cr3_fast:
+    movq %cr3,%rbx
+    popq %rdi
+    cmpq %rbx,%rdi
+    jne .Lcr3_changed_fast
+.Lcr3_done_fast:
 
     // Throw away call clobbered registers
     addq $ 9*8,%rsp
@@ -1032,13 +1055,14 @@ thread_yield:
     popfq_cfi
 
     // Zero all clobbered registers
-    movl %ecx,%edx
-    movl %ecx,%esi
-    movl %ecx,%edi
-    movl %ecx,%r8d
-    movl %ecx,%r9d
-    movl %ecx,%r10d
-    movl %ecx,%r11d
+    xorl %ecx,%ecx
+    xorl %edx,%edx
+    xorl %esi,%esi
+    xorl %edi,%edi
+    xorl %r8d,%r8d
+    xorl %r9d,%r9d
+    xorl %r10d,%r10d
+    xorl %r11d,%r11d
 
     adj_rsp_cfi 16
 
@@ -1503,8 +1527,11 @@ isr_sysret:
 
     // Initialize kernel stack pointer for this thread
     // cpu_info_t *rbx = this_cpu()
-    movq %gs:CPU_INFO_SELF_OFS(%rax),%rbx
+    movq %gs:(%rax),%rbx
     .cfi_undefined rbx
+
+    // Protect kernel gs before loading user gs
+    swapgs
 
     // tss_t *r10 = rbx->tss_ptr
     movq CPU_INFO_TSS_PTR_OFS(%rbx),%r10
@@ -1525,9 +1552,6 @@ isr_sysret:
 
     // rdx->rsp0 = kernel_rsp
     movq %rdx,TSS_RSP0_OFS(%r10)
-
-    // Protect kernel gs before loading user gs
-    swapgs
 
     insn_fixup
     wrfsbase %r13

@@ -16,37 +16,61 @@ STARTUP_FILE_NAMES_32 = crt032 crt0pc8032 crt0pc6432 crt0pc3232
 STDLIB_FILE_NAMES = c g m stdc++
 STDLIB_FILE_NAMES_32 = c32 g32 m32 stdc++32
 
+USRLIB_FILE_NAMES =  png z
+USRLIB_FILE_NAMES_32 = png32
+
 STARTUP_FILES_INSTALLED = \
-	$(patsubst %,$(top_builddir)/sysroot/lib/%.o,$(STARTUP_FILE_NAMES))
+	$(patsubst %,$(top_builddir)/sysroot/lib/%.o,\
+	$(STARTUP_FILE_NAMES))
 
 STARTUP_FILES_INSTALLED_32 = \
-	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.o,$(STARTUP_FILE_NAMES_32))
+	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.o,\
+	$(STARTUP_FILE_NAMES_32))
 
 STDLIB_STATIC_FILES_INSTALLED = \
-	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,$(STDLIB_FILE_NAMES))
+	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,\
+	$(STDLIB_FILE_NAMES))
 
 STDLIB_STATIC_FILES_INSTALLED_32 = \
-	$(patsubst %32,$(top_builddir)/sysroot/lib/32/lib%.a,$(STDLIB_FILE_NAMES_32))
+	$(patsubst %32,$(top_builddir)/sysroot/lib/32/lib%.a,\
+	$(STDLIB_FILE_NAMES_32))
+
+USRLIB_STATIC_FILES_INSTALLED = \
+	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,\
+	$(USRLIB_FILE_NAMES))
+
+USRLIB_STATIC_FILES_INSTALLED_32 = \
+	$(patsubst %32,$(top_builddir)/sysroot/lib/32/lib%.a,\
+	$(USRLIB_FILE_NAMES_32))
 
 if userspace_so
 STDLIB_SHARED_FILES_INSTALLED = \
-	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.so,$(STDLIB_FILE_NAMES))
+	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.so,\
+	$(STDLIB_FILE_NAMES))
 
 STDLIB_SHARED_FILES_INSTALLED_32 = \
-	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.so,$(STDLIB_FILE_NAMES_32))
+	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.so,\
+	$(STDLIB_FILE_NAMES_32))
 endif
 
 ALL_STDLIB_INSTALLED = \
 	$(STARTUP_FILES_INSTALLED) \
 	$(STARTUP_FILES_INSTALLED_32) \
 	$(STDLIB_STATIC_FILES_INSTALLED) \
-	$(STDLIB_STATIC_FILES_INSTALLED_32)
+	$(STDLIB_STATIC_FILES_INSTALLED_32) \
+	$(USRLIB_STATIC_FILES_INSTALLED) \
+	$(USRLIB_STATIC_FILES_INSTALLED_32)
+
+ALL_USRLIB_INSTALLED = \
+	$(USRLIB_STATIC_FILES_INSTALLED) \
+	$(USRLIB_STATIC_FILES_INSTALLED_32)
 
 BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
 	$(generated_headers) \
-	$(ALL_STDLIB_INSTALLED)
+	$(ALL_STDLIB_INSTALLED) \
+	$(ALL_USRLIB_INSTALLED)
 
 BOOTLOADER_COMMON_FLAGS = \
 	-D__DGOS__
@@ -255,6 +279,7 @@ libbootsect_a_INCLUDES = \
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
 	$(NOSTDLIB_FLAGS) \
+	$(COMPILER_FLAGS) \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -270,7 +295,6 @@ libbootsect_a_CXXFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
-	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
 #$(RETPOLINE_FLAGS)
@@ -519,7 +543,7 @@ bootefi_amd64_SOURCES = \
 
 bootefi_amd64_CFLAGS = \
 	-DFROM_CFLAGS \
-	-nostartfiles \
+	-nostdlib \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
@@ -533,6 +557,7 @@ bootefi_amd64_CFLAGS = \
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	-nostartfiles \
+	$(COMPILER_FLAGS) \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
@@ -719,8 +744,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/mm.h \
 	kernel/lib/mouse.cc \
 	kernel/lib/mouse.h \
-	kernel/lib/png.cc \
-	kernel/lib/png.h \
 	kernel/lib/pool.cc \
 	kernel/lib/pool.h \
 	kernel/lib/printk.cc \
@@ -864,6 +887,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_module.cc \
 	kernel/syscall/sys_sys.cc \
 	kernel/syscall/sys_render.cc \
+	kernel/syscall/sys_framebuffer.cc \
 	kernel/device/acpigas.cc \
 	kernel/device/acpigas.h \
 	kernel/device/acpihw.cc \
@@ -1133,11 +1157,19 @@ endif
 # ----------------------------------------------------------------------------
 # crt0
 
-INCLUDES_NAMES = $(shell \
+STDLIB_INCLUDES_NAMES = $(shell \
 	cd $(top_srcdir)/libc/include && \
 	$(FIND) -type f)
-INCLUDES_DEPLOYED = \
-	$(patsubst %,$(top_builddir)/sysroot/include/%,$(INCLUDES_NAMES))
+
+STDLIB_INCLUDES_DEPLOYED = \
+	$(patsubst %,$(top_builddir)/sysroot/include/%,$(STDLIB_INCLUDES_NAMES))
+
+USRLIB_INCLUDES_NAMES = $(shell \
+	cd $(top_srcdir)/user/include && \
+	$(FIND) -type f) zconf.h zlib.h
+
+USRLIB_INCLUDES_DEPLOYED = \
+	$(patsubst %,$(top_builddir)/sysroot/include/%,$(USRLIB_INCLUDES_NAMES))
 
 sysroot/lib/:
 	$(MKDIR) -p "$@"
@@ -1151,7 +1183,8 @@ STARTUPFILES += $(top_builddir)/sysroot/lib/$(1)
 $(top_builddir)/sysroot/lib/$(1): \
 		$(2) \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
-		$(INCLUDES_DEPLOYED)
+		$(STDLIB_INCLUDES_DEPLOYED) \
+		$(USRLIB_INCLUDES_DEPLOYED)
 	$$(MKDIR) -p "$$(@D)" && \
 		$$(CXX) \
 			-g \
@@ -1212,16 +1245,27 @@ $(top_builddir)/sysroot/lib/32/lib$(1).a: $(top_builddir)/lib$(1)32.a
 endef
 
 $(foreach name,$(STDLIB_FILE_NAMES),$(eval $(call deploy_stdlib,$(name))))
+$(foreach name,$(USRLIB_FILE_NAMES),$(eval $(call deploy_stdlib,$(name))))
 
-define deploy_sysroot_header =
+define deploy_stdlib_header =
 $$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
 	$(MKDIR) -p $$(@D)
 	$(CP) -f "$$<" "$$@"
 
 endef
 
-$(foreach header,$(INCLUDES_NAMES),$(eval \
-	$(call deploy_sysroot_header,$(header)) \
+define deploy_usrlib_header =
+$$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/user/include/$(1)
+	$(MKDIR) -p $$(@D)
+	$(CP) -f "$$<" "$$@"
+
+endef
+
+$(foreach header,$(STDLIB_INCLUDES_NAMES),$(eval \
+	$(call deploy_stdlib_header,$(header)) \
+))
+$(foreach header,$(USRLIB_INCLUDES_NAMES),$(eval \
+	$(call deploy_usrlib_header,$(header)) \
 ))
 
 startupcode: $(STARTUPFILES)
@@ -1262,12 +1306,15 @@ shell_LDADD =
 
 #-v -Wl,-verbose
 
-$(top_srcdir)/user/shell/grammar.c \
-	$(top_srcdir)/user/shell/grammar.h \
-	$(top_srcdir)/user/shell/grammar.out: \
-	$(top_srcdir)/user/shell/grammar.y
+$(top_srcdir)/user/shell/grammar.c: $(top_srcdir)/user/shell/grammar.y
 	$(RM) -rf "$@"
 	$(LEMON) "$<"
+
+$(top_srcdir)/user/shell/grammar.h: $(top_srcdir)/user/shell/grammar.c
+
+
+$(top_srcdir)/user/shell/grammar.out: $(top_srcdir)/user/shell/grammar.c
+
 
 EXTRA_shell_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
@@ -1300,7 +1347,6 @@ libc_a_HEADERS = \
 	libc/include/unistd.h \
 	libc/include/stropts.h \
 	libc/include/search.h \
-	libc/include/limits.h \
 	libc/include/libgen.h \
 	libc/include/glob.h \
 	libc/include/ulimit.h \
@@ -1332,6 +1378,7 @@ libc_a_HEADERS = \
 	libc/include/sys/cdefs.h \
 	libc/include/sys/mman.h \
 	libc/include/sys/uio.h \
+	libc/include/sys/framebuffer.h \
 	libc/include/semaphore.h \
 	libc/include/arpa/inet.h \
 	libc/include/fmtmsg.h \
@@ -1629,6 +1676,7 @@ libc_a_SOURCES = \
 	libc/src/sys/socket/socket.cc \
 	libc/src/sys/module/init_module.cc \
 	libc/src/sys/module/probe_pci_for.cc \
+	libc/src/sys/framebuffer/framebuffer_enum.cc \
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
 	libc/src/sys/syscall2.S \
@@ -1740,17 +1788,21 @@ bin_PROGRAMS += libm32.so
 
 libm32_so_SOURCES = $(libm_so_SOURCES) $(LIB_SO_FLAGS)
 libm32_so_CXXFLAGS = $(libm_so_CXXFLAGS) $(LIB_SO_FLAGS) \
+	$(COMPILER_FLAGS) \
 	$(USER32_FLAGS) \
 	$(USERLIB32_FLAGS)
 
 libm32_so_CFLAGS = $(libm_so_CFLAGS) $(LIB_SO_FLAGS) \
+	$(COMPILER_FLAGS) \
 	$(USER32_FLAGS) \
 	$(USERLIB32_FLAGS)
 
 libm32_so_CCASFLAGS = $(libm_so_CCASFLAGS) $(LIB_SO_FLAGS) \
+	$(COMPILER_FLAGS) \
 	$(USER32_FLAGS) \
 	$(USERLIB32_FLAGS)
 libm32_so_LDFLAGS = $(libm_so_LDFLAGS) $(LIB_SO_FLAGS) \
+	$(COMPILER_FLAGS) \
 	$(USER32_LDFLAGS) \
 	$(USERLIB32_LDFLAGS)
 
@@ -1841,6 +1893,7 @@ LIBC_TESTS = \
 	$(top_srcdir)/libc/tests/test_string.cc
 
 LIBC_CXXFLAGS = \
+	$(COMPILER_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -1916,7 +1969,7 @@ bin_PROGRAMS += dhcpclient
 generate_symbols_list += dhcpclient
 
 dhcpclient_SOURCES = \
-	user/bin/dhcpclient/main.cc
+	user/bin/dhcpclient/dhcpclient.cc
 
 dhcpclient_CXXFLAGS = -isystem sysroot/include
 
@@ -1930,7 +1983,7 @@ generate_symbols_list += ls
 ls_SOURCES = \
 	user/bin/ls/ls.cc
 
-ls_CXXFLAGS = -isystem sysroot/include
+ls_CXXFLAGS = -isystem $(top_builddir)/sysroot/include
 
 EXTRA_ls_DEPENDENCIES = \
 	$(ALL_STDLIB_INSTALLED) \
@@ -1940,12 +1993,118 @@ include Make-modules.inc.mk
 
 #===========
 
+noinst_LIBRARIES += libpng.a
+
+libpng_a_SOURCES = \
+	user/libpng/png.cc \
+	user/libpng/png.h
+
+libpng_a_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
+
+libpng_a_CFLAGS = \
+	-DFROMCFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
+
+libpng_a_CCASFLAGS = \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(COMPILER_FLAGS) \
+	-isystem $(top_builddir)/sysroot/include
+
+EXTRA_libpng_a_DEPENDENCIES = \
+	$(INCLUDES_DEPLOYED)
+
+#===========
+
+noinst_LIBRARIES += libpng32.a
+
+libpng32_a_SOURCES = \
+	user/libpng/png.cc \
+	user/libpng/png.h
+
+libpng32_a_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER32_FLAGS) \
+	$(USER32_EXE_FLAGS)
+
+libpng32_a_CFLAGS = \
+	-DFROMCFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER32_FLAGS) \
+	$(USER32_EXE_FLAGS)
+
+libpng32_a_CCASFLAGS = \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(COMPILER_FLAGS) \
+	-isystem $(top_builddir)/sysroot/include
+
+EXTRA_libpng32_a_DEPENDENCIES = \
+	$(INCLUDES_DEPLOYED)
+
+#===========
+
+noinst_LIBRARIES += libz.a
+
+libz_a_SOURCES = \
+	user/zlib/adler32.c   \
+	user/zlib/crc32.c     \
+	user/zlib/gzclose.c   \
+	user/zlib/gzread.c    \
+	user/zlib/infback.c   \
+	user/zlib/inflate.c   \
+	user/zlib/trees.c     \
+	user/zlib/zutil.c	  \
+	user/zlib/compress.c  \
+	user/zlib/deflate.c   \
+	user/zlib/gzlib.c     \
+	user/zlib/gzwrite.c   \
+	user/zlib/inffast.c   \
+	user/zlib/inftrees.c  \
+	user/zlib/uncompr.c
+
+libz_a_CFLAGS = \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS) \
+	--sysroot $(top_builddir)/sysroot \
+	-isystem=/include
+
+libz_a_CXXFLAGS = $(libz_a_CFLAGS)
+
+#libz_a_HEADERS = \
+#	user/zlib/zlib.h \
+#	user/zlib/zconf.h
+
+#$(top_builddir)/sysroot/include/zconf.h: $(top_srcdir)/user/zlib/zconf.h
+#	$(CP) "$<" "$@"
+#
+#$(top_builddir)/sysroot/include/zlib.h: $(top_srcdir)/user/zlib/zlib.h
+#	$(CP) "$<" "$@"
+
+#===========
+
 MODULE_FILENAMES = $(filter %.km,$(bin_PROGRAMS)) init
 MODULE_LIST = $(subst %,$(top_builddir)/%,$(MODULE_FILENAMES))
 
 SYMBOL_FILE = sym/$(1).sym
 
-CPIO_LIST = $(MODULE_LIST) $(generate_symbols_outputs)
+CPIO_LIST = $(MODULE_LIST) \
+	$(generate_symbols_outputs) \
+	background.png
 
 all-kernel: kernel-generic $(MODULE_LIST)
 
@@ -1953,6 +2112,9 @@ all-kernel: kernel-generic $(MODULE_LIST)
 
 $(top_builddir)/sym/:
 	$(MKDIR) -p "$@"
+
+$(top_builddir)/background.png: $(top_srcdir)/user/background.png
+	$(CP) "$<" "$@"
 
 $(top_builddir)/initrd: $(CPIO_LIST)
 	$(CPIO) -o --device-independent -H bin \
@@ -2427,11 +2589,11 @@ debug-smp: all debug-smp-efi-hd-iso-ahci-vga-tcg
 
 .PHONY: debug-smp
 
-debug-bios: all debug-smp-bios-hd-iso-ahci-vga-tcg
+debug-bios: all debug-up-bios-hd-iso-ahci-vga-tcg
 
 .PHONY: debug-bios
 
-debug-kvm: all debug-smp-bios-hd-iso-ahci-vga-kvm
+debug-kvm: all debug-up-bios-hd-iso-ahci-vga-kvm
 
 .PHONY: debug-kvm
 
@@ -2443,7 +2605,7 @@ run-smp: all run-smp-efi-hd-gpt-ahci-vga-tcg
 
 .PHONY: run-smp
 
-run-bios: all run-smp-bios-hd-gpt-ahci-vga-tcg
+run-bios: all run-up-bios-hd-gpt-ahci-vga-tcg
 
 .PHONY: run-bios
 
@@ -2451,7 +2613,7 @@ run-pxe: all run-up-bios-pxe-gpt-ahci-vga-tcg
 
 .PHONY: run-pxe
 
-run-kvm: all run-smp-bios-hd-iso-ahci-vga-kvm
+run-kvm: all run-up-bios-hd-iso-ahci-vga-kvm
 
 .PHONY: run-kvm
 

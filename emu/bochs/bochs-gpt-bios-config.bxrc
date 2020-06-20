@@ -15,7 +15,7 @@ plugin_ctrl: unmapped=1, biosdev=1, speaker=1, extfpuirq=0
 plugin_ctrl: parallel=1, serial=1, gameport=1
 config_interface: textconfig
 display_library: x
-memory: host=1024, guest=1024
+memory: host=256, guest=256
 romimage: file="/usr/local/share/bochs/BIOS-bochs-latest"
 optromimage1: file=none
 optromimage2: file=none

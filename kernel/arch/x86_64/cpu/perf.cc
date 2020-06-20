@@ -368,8 +368,10 @@ static void stacktrace_xlat(void * const *ips, size_t count)
         perf_symbol_table_t::const_iterator sym_it =
                 lookup_symbol(uintptr_t(ips[i]));
 
-        if (unlikely(sym_it == perf_symbol_table_t::const_iterator()))
+        if (unlikely(sym_it == perf_symbol_table_t::const_iterator())) {
             printdbg("??? (%#" PRIx64 ")\n", uint64_t(ips[i]));
+            continue;
+        }
 
         size_t sym_token = sym_it->second;
 

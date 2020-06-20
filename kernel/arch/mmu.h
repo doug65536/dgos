@@ -298,14 +298,14 @@ typedef uintptr_t pte_t;
 #define PT1_PTR         ((pte_t*)PT1_ADDR)
 #define PT0_PTR         ((pte_t*)PT0_ADDR)
 
-static inline size_t round_up(size_t n)
+static inline constexpr size_t round_up(size_t n)
 {
     return (n + PAGE_MASK) & -PAGE_SIZE;
 }
 
-static inline size_t round_down(size_t n)
+static inline constexpr size_t round_down(size_t n)
 {
-    return n & (int)-PAGE_MASK;
+    return n & ~PAGE_MASK;
 }
 
 static _always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)

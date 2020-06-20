@@ -44,7 +44,7 @@
 #endif
 
 enum thread_state_t : uint32_t {
-    THREAD_IS_UNINITIALIZED = 0,
+    THREAD_IS_UNINITIALIZED = 0U,
     THREAD_IS_INITIALIZING,
     THREAD_IS_SLEEPING,
     THREAD_IS_READY,
@@ -55,7 +55,7 @@ enum thread_state_t : uint32_t {
 
     // Flag keeps other cpus from taking thread
     // until after stack switch
-    THREAD_BUSY = 0x00000010U,
+    THREAD_BUSY = 0x10U,
     THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
     THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
     THREAD_IS_EXITING_BUSY = THREAD_IS_EXITING | THREAD_BUSY,
@@ -831,6 +831,7 @@ static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
 
     cpu_info_t *cpu = this_cpu();
     cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
+
     while (cpu->resume_tail != cpu->resume_head) {
         resumed_data[resumed_count++] = cpu->resume_ring[cpu->resume_tail];
         cpu->resume_tail = cpu_info_t::resume_next(cpu->resume_tail);
@@ -838,7 +839,7 @@ static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
     cpu_lock.unlock();
 
     size_t i;
-    for (i = 0; i < resumed_count; i += 3) {
+    for (i = 0; i < resumed_count; ++i) {
         uint32_t exitcode = resumed_data[i].ret_lo |
                 (uint64_t(resumed_data[i].ret_hi) << 32);
         thread_t tid = resumed_data[i].tid;
@@ -1221,7 +1222,9 @@ void thread_move_to_other_cpu(cpu_info_t *cpu, thread_info_t *thread)
 _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 {
     //need this if ISRs run with IRQ enabled:
-    cpu_scoped_irq_disable intr_dis;
+
+    assert(!(cpu_eflags_get() & CPU_EFLAGS_IF));
+    //cpu_scoped_irq_disable intr_dis;
 
     cpu_info_t *cpu = this_cpu();
 
@@ -1524,6 +1527,8 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 
     assert(thread->state == THREAD_IS_RUNNING);
 
+    cpu->tss_ptr->rsp[0] = uintptr_t(thread->priv_chg_stack);
+
     ctx = thread->ctx;
     thread->ctx = nullptr;
     assert(ctx != nullptr);
@@ -1686,6 +1691,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
                                  wait_en - wait_st, -3).ptr(),
                              cpu_nr, this_cpu_nr);
                 }
+                resumed_thread->state = THREAD_IS_SLEEPING;
                 apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
                 cpu_lock.unlock();
             } else {
@@ -1775,13 +1781,13 @@ EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
 EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
 {
     cpu_info_t *cpu = this_cpu();
-    int cur_tid = cpu->cur_thread->thread_id;
     if (tid < 0)
         tid = cpu->cur_thread->thread_id;
     if (uintptr_t(tid) < countof(threads))
         threads[tid].fsbase = (void*)fsbase;
-    if (cur_tid == tid)
-        cpu_fsbase_set((void*)fsbase);
+//    int cur_tid = cpu->cur_thread->thread_id;
+//    if (cur_tid == tid)
+//        cpu_fsbase_set((void*)fsbase);
 }
 
 EXPORT thread_cpu_mask_t const* thread_get_affinity(int id)

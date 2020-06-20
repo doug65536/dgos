@@ -72,9 +72,9 @@ function extract_tool() {
 	local base="$1"
 	local ext="$2"
 	local config="$3"
-	local arch="$4"
 
-	local input=$(fullpath "$base$ext")
+	local input
+	input=$(fullpath "$base$ext")
 
 	local name=${base#$archives/}
 
@@ -93,7 +93,7 @@ function extract_tool() {
 		tar xf "$input" || exit
 
 		if [[ -f "$patchname" ]]; then
-			log echo Applying patch $patchname
+			log echo Applying patch "$patchname"
 			cd "$name" || exit
 			patch -p1 < "$patchname" || exit
 		else
@@ -108,7 +108,6 @@ function make_tool() {
 	local ext="$2"
 	local target="$3"
 	local config="$4"
-	local arch="$5"
 
 	local name=${base#$archives/}
 
@@ -121,7 +120,7 @@ function make_tool() {
 	mkdir -p "$build/$name" || exit
 	pushd "$build/$name" || exit
 	log echo Making "$target" with config "$config" \
-		and prefix "$prefixdir" in $(pwd)...
+		and prefix "$prefixdir" in cwd "$(pwd)"...
 	if ! [[ -z "${@:6}" ]]
 	then
 		log echo "...with extra configure options: ${@:6}"
@@ -132,7 +131,7 @@ function make_tool() {
 	set -x
 		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:6}" || exit
 	fi
-	log make $parallel $target || exit
+	log make "$parallel" "$target" || exit
 	popd || exit
 }
 
@@ -294,6 +293,7 @@ gcc_config="--target=$arches \
 --enable-shared \
 --without-headers \
 --with-long-double-128 \
+--with-readline \
 --disable-nls \
 --enable-system-zlib \
 --enable-multiarch \

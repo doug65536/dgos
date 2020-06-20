@@ -1,20 +1,34 @@
-#if 0
-#include "png.h"
-#include "zlib_helper.h"
-#include "fileio.h"
-#include "stdlib.h"
-#include "bswap.h"
-#include "string.h"
-#include "likely.h"
-#include "assert.h"
-#include "printk.h"
-#include "unique_ptr.h"
+#include <png.h>
+#include <byteswap.h>
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <zlib.h>
+//#include "zlib_helper.h"
+//#include "fileio.h"
+//#include "stdlib.h"
+//#include "bswap.h"
+//#include "string.h"
+//#include "likely.h"
+//#include "assert.h"
+//#include "printk.h"
+//#include "unique_ptr.h"
+
+#define C_ASSERT(expr) static_assert((expr), #expr)
+
+#include <string.h>
+#include <sys/likely.h>
+#include <assert.h>
 
 #define PNG_DEBUG 0
 #if PNG_DEBUG
 #define PNG_TRACE(...) printdbg("png: " __VA_ARGS__)
 #else
 #define PNG_TRACE(...) ((void)0)
+#endif
+
+#ifndef _packed
+#define _packed __attribute__((__packed__))
 #endif
 
 static uint8_t png_sig[] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
@@ -81,7 +95,7 @@ struct png_hdr_ihdr_t {
 // Color and alpha, no palette
 #define PNG_IHDR_COLOR_RGBA (PNG_IHDR_COLORTYPE_C|PNG_IHDR_COLORTYPE_A)
 
-C_ASSERT((sizeof(png_image_t) & 0xF) == 0);
+//C_ASSERT((sizeof(png_image_t) & 0xF) == 0);
 
 enum struct png_filter_type_t {
     NONE,
@@ -98,6 +112,30 @@ struct png_read_state_t {
     png_filter_type_t cur_filter;
     intptr_t pixel_bytes;
     intptr_t scanline_bytes;
+};
+
+template<typename T, size_t N> inline
+constexpr size_t countof(T const (&)[N]) noexcept
+{
+    return N;
+}
+
+class file_t {
+public:
+    file_t() = default;
+    file_t(int fd) : fd(fd) {}
+    file_t(file_t&& rhs) { close(); fd = rhs.fd; rhs.fd = -1; }
+    file_t(file_t const&) = delete;
+    ~file_t() { close(); }
+    file_t& operator=(file_t const&) = delete;
+    file_t& operator=(int new_fd) { close(); fd = new_fd; return *this; }
+    void close() { if (fd >= 0) ::close(fd); fd = -1; }
+    int detach() noexcept { int r = fd; fd = -1; return r; }
+    operator int() const noexcept { return fd; }
+    operator bool() const noexcept { return is_open(); }
+    bool is_open() const noexcept { return fd >= 0; }
+
+    int fd = -1;
 };
 
 static png_type_t png_hdr_type(png_chunk_hdr_t *hdr)
@@ -247,52 +285,69 @@ static uint32_t png_process_idata(
     return ofs;
 }
 
+static void *zlib_malloc(void *opaque, unsigned items, unsigned size)
+{
+    (void)opaque;
+    return malloc(items * size);
+}
+
+static void zlib_free(void *opaque, void *p)
+{
+    (void)opaque;
+    free(p);
+}
+
 png_image_t *png_load(char const *path)
 {
     // Allocate read buffer
-    std::unique_ptr<uint8_t> buf = new uint8_t[PNG_BUFSIZE]();
-    if (!buf)
+    // fixme, was unique_ptr
+    uint8_t *buf = new uint8_t[PNG_BUFSIZE]();
+    if (unlikely(!buf))
         return nullptr;
 
     uint8_t * const read_buf = buf;
     uint8_t * const decomp_buf = buf + (PNG_BUFSIZE >> 1);
 
     // Open PNG file
-    file_t fd = file_openat(AT_FDCWD, path, O_RDONLY);
+    file_t fd = openat(AT_FDCWD, path, O_RDONLY);
 
-    if (!fd.is_open())
-        return 0;
+    if (unlikely(!fd.is_open()))
+        return nullptr;
 
     z_stream inf;
-    zlib_init(&inf);
+    memset(&inf, 0, sizeof(inf));
+    inf.zalloc = zlib_malloc;
+    inf.zfree = zlib_free;
+
     inflateInit2(&inf, 15);
 
     // Read header
-    if (sizeof(png_sig) != file_read(fd, buf, sizeof(png_sig)))
-        return 0;
+    if (unlikely(sizeof(png_sig) != read(fd, buf, sizeof(png_sig))))
+        return nullptr;
 
     // Check signature
-    if (memcmp(buf, png_sig, sizeof(png_sig)))
-        return 0;
+    if (unlikely(memcmp(buf, png_sig, sizeof(png_sig))))
+        return nullptr;
 
     uint32_t input_level = 0;
     uint32_t decomp_level = 0;
     uint32_t consumed;
-    uint32_t read_size;
+    int32_t read_size;
 
-    std::unique_ptr_free<png_image_t> img;
+    // fixme, was unique_ptr
+    png_image_t *img;
     png_read_state_t state;
     state.cur_row = 0;
     state.cur_filter = png_filter_type_t::UNSET;
     state.scanline_bytes = 0;
     state.pixel_bytes = 0;
-    state.img = 0;
+    state.img = nullptr;
 
     for (int done = 0; !done; ) {
         png_chunk_hdr_t hdr;
 
-        if (sizeof(hdr) != file_read(fd, &hdr, sizeof(hdr)))
-            return 0;
+        if (sizeof(hdr) != read(fd, &hdr, sizeof(hdr)))
+            return nullptr;
 
         PNG_TRACE("Encountered %4.4s chunk\n", hdr.type);
 
@@ -304,33 +359,33 @@ png_image_t *png_load(char const *path)
 
         switch (type) {
         case PNG_IHDR:
-            if (sizeof(ihdr) != file_read(fd, &ihdr, sizeof(ihdr)))
-                return 0;
+            if (unlikely(sizeof(ihdr) != read(fd, &ihdr, sizeof(ihdr))))
+                return nullptr;
 
             ihdr.width = htonl(ihdr.width);
             ihdr.height = htonl(ihdr.height);
 
-            file_seek(fd, sizeof(png_crc_t), SEEK_CUR);
+            lseek(fd, sizeof(png_crc_t), SEEK_CUR);
 
             // Only method 0 is defined
             if (unlikely(ihdr.compr_method != 0))
-                return 0;
+                return nullptr;
 
             // Only filter 0 is defined
             if (unlikely(ihdr.filter_method != 0))
-                return 0;
+                return nullptr;
 
             // Only uninterlaced is supported
             if (unlikely(ihdr.interlace_method != 0))
-                return 0;
+                return nullptr;
 
             // Palette not supported (yet)
             if (unlikely(ihdr.color_type & PNG_IHDR_COLORTYPE_P))
-                return 0;
+                return nullptr;
 
             // Only 8, 16, 24, and 32 bit Y, YA, RGB, RGBA supported
             if (unlikely(ihdr.bit_depth != 8))
-                return 0;
+                return nullptr;
 
             state.pixel_bytes = ((3 & -!!(ihdr.color_type &
                                           PNG_IHDR_COLORTYPE_C)) +
@@ -338,7 +393,7 @@ png_image_t *png_load(char const *path)
                     (ihdr.bit_depth >> 3);
             state.scanline_bytes = state.pixel_bytes * ihdr.width;
 
-            img.reset((png_image_t*)malloc(sizeof(*img) +
+            img = /*.reset*/((png_image_t*)malloc(sizeof(*img) +
                          ihdr.width * ihdr.height * sizeof(uint32_t)));
 
             img->width = ihdr.width;
@@ -366,9 +421,9 @@ png_image_t *png_load(char const *path)
                     PNG_TRACE("Reading %u bytes from disk"
                               " to buffer offset %u\n",
                               read_size, input_level);
-                    if (file_read(fd, read_buf + input_level,
-                                  read_size) != read_size)
-                        return 0;
+                    if (read(fd, read_buf + input_level,
+                             read_size) != read_size)
+                        return nullptr;
 
                     input_level += read_size;
                 }
@@ -384,7 +439,7 @@ png_image_t *png_load(char const *path)
 
                     assert(inf_status != Z_DATA_ERROR);
                     if (inf_status == Z_DATA_ERROR)
-                        return 0;
+                        return nullptr;
 
                     // Slide input buffer
                     if (inf.avail_in > 0)
@@ -399,7 +454,7 @@ png_image_t *png_load(char const *path)
                             &state, decomp_buf, decomp_level);
 
                 if (consumed == ~0U)
-                    return 0;
+                    return nullptr;
 
                 decomp_level -= consumed;
                 if (decomp_level) {
@@ -408,7 +463,7 @@ png_image_t *png_load(char const *path)
                 }
             }
 
-            file_seek(fd, sizeof(png_crc_t), SEEK_CUR);
+            lseek(fd, sizeof(png_crc_t), SEEK_CUR);
 
             break;
 
@@ -421,18 +476,19 @@ png_image_t *png_load(char const *path)
         case PNG_OTHER:
         default:
             PNG_TRACE("Ignoring %4.4s chunk\n", hdr.type);
-            file_seek(fd, hdr.len + sizeof(png_crc_t), SEEK_CUR);
+            lseek(fd, hdr.len + sizeof(png_crc_t), SEEK_CUR);
             break;
         }
     }
 
     png_fixup_bgra(img + 1, img->width * img->height);
 
-    return img.release();
+    return img;//.release();
 }
 
-uint32_t const *png_pixels(png_image_t const *img)
+
+
+void png_free(png_image_t *pp)
 {
-    return (uint32_t const*)(img + 1);
+    free(pp);
 }
-#endif

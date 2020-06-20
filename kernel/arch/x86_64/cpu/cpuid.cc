@@ -156,7 +156,7 @@ void cpuid_init()
 
     char *brand = cpuid_cache.brand;
     for (size_t i = CPUID_BRANDSTR1; i <= CPUID_BRANDSTR3; ++i) {
-        if (cpuid(&info, i, 0)) {
+        if (likely(cpuid(&info, i, 0))) {
             memcpy(brand + sizeof(uint32_t) * 0, &info.eax, sizeof(info.eax));
             memcpy(brand + sizeof(uint32_t) * 1, &info.ebx, sizeof(info.ebx));
             memcpy(brand + sizeof(uint32_t) * 2, &info.ecx, sizeof(info.ecx));
@@ -165,7 +165,7 @@ void cpuid_init()
         }
     }
 
-    if (brand != cpuid_cache.brand + sizeof(cpuid_cache.brand))
+    if (unlikely(brand != cpuid_cache.brand + sizeof(cpuid_cache.brand)))
         memset(cpuid_cache.brand, 0, sizeof(cpuid_cache.brand));
 }
 
