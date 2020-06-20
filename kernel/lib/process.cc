@@ -495,7 +495,7 @@ int process_t::run()
     if (unlikely(!mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr))))
         return -1;
 
-    // Point fs at it
+    // Point appropriate tls selector register at it
     if (use64)
         thread_set_fsbase(thread_get_id(), tls_ptr);
     else

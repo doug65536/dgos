@@ -210,12 +210,14 @@ thread_t thread_get_id(void);
 uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
                                uint64_t timeout_time);
 
+// Request a reschedule on this cpu
 void thread_request_reschedule_noirq();
 void thread_request_reschedule();
+
+// Perform a reschedule if one was requested
 isr_context_t *thread_schedule_if_requested(isr_context_t *ctx);
 isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx);
 
-// Returns true if you should reschedule
 void thread_resume(thread_t thread, intptr_t exit_code);
 
 thread_priority_t thread_get_priority(thread_t thread_id);
