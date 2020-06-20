@@ -387,7 +387,7 @@ void  pthread_testcancel(void);
 
 // ---
 
-int __clone(int (*fn)(void *), void *child_stack,
+int __clone(void *(*fn)(void *), void *child_stack,
             int flags, void *arg);
 
 int __futex(int *uaddr, int futex_op, int val,
@@ -418,3 +418,5 @@ int __futex(int *uaddr, int futex_op, int val,
     (((cmp) & 0xf) << 24) | \
     (((oparg) & 0xfff) << 12) | \
     ((cmparg) & 0xfff))
+
+int __clone(int (*fn)(void *arg), void *child_stack, int flags, void *arg);
