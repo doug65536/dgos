@@ -1037,8 +1037,10 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
         if (likely(!((err_code & CTX_ERRCODE_PF_R) ||
                      (err_code & CTX_ERRCODE_PF_PK) ||
                      (err_code & CTX_ERRCODE_PF_SGX) ||
-                     ((err_code & CTX_ERRCODE_PF_W) && !(pte & PTE_WRITABLE)) ||
-                     ((err_code & CTX_ERRCODE_PF_I) && (pte & PTE_NX)))))
+                     ((err_code & CTX_ERRCODE_PF_W) &&
+                      !(pte & PTE_WRITABLE)) ||
+                     ((err_code & CTX_ERRCODE_PF_I) &&
+                      (pte & PTE_NX)))))
             return ctx;
     }
 
