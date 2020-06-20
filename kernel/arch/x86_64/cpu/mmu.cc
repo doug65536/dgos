@@ -1418,6 +1418,8 @@ void mmu_init()
         physmem_range_t range = early_mem_ranges[usable_early_mem_ranges-1];
 
         if (range.base >= 0x100000 && range.size > 0) {
+            printdbg("...Adding base=%#zx, size=%#zx\n",
+                     range.base, range.size);
             phys_allocator.add_free_space(range.base, range.size);
             free_count += range.size >> PAGE_SCALE;
         }
