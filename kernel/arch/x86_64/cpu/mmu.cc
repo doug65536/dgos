@@ -226,11 +226,11 @@ static mm_dev_mapping_lock_type mm_dev_mapping_lock;
 /// allocation map at 4 bytes per 4KB.
 
 // Original memory map
-physmem_range_t phys_mem_map[64];
+physmem_range_t phys_mem_map[128];
 size_t phys_mem_map_count;
 
 // Memory map
-static physmem_range_t early_mem_ranges[64];
+static physmem_range_t early_mem_ranges[128];
 static size_t usable_early_mem_ranges;
 
 physaddr_t root_physaddr;
