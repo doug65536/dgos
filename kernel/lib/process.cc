@@ -42,7 +42,7 @@ process_t *process_t::add_locked(processes_scoped_lock const&)
     pid_t pid;
     size_t realloc_count = 0;
 
-    process_t *process = new (std::nothrow) process_t();
+    process_t *process = new (ext::nothrow) process_t();
     if (unlikely(!process))
         return nullptr;
 
@@ -168,7 +168,7 @@ int process_t::start_clone(clone_data_t data)
 int process_t::clone(int (*fn)(void *), void *child_stack,
                      int flags, void *arg)
 {
-    clone_data_t *kernel_thread_arg = new (std::nothrow) clone_data_t();
+    clone_data_t *kernel_thread_arg = new (ext::nothrow) clone_data_t();
 
     if (unlikely(!kernel_thread_arg))
         return -int(errno_t::ENOMEM);
@@ -613,7 +613,7 @@ int process_t::run()
 
     // Add new jmpbuf to find kernel stack
 
-    jmpbuf_list_t::value_type ptr{new  (std::nothrow) __exception_jmp_buf_t()};
+    jmpbuf_list_t::value_type ptr{new  (ext::nothrow) __exception_jmp_buf_t()};
     if (unlikely(!ptr))
         return -1;
 

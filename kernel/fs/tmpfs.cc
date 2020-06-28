@@ -243,7 +243,7 @@ int tmpfs_fs_t::readlinkat(fs_file_info_t *dirfi, fs_cpath_t path,
 int tmpfs_fs_t::opendirat(fs_file_info_t **fi,
                           fs_file_info_t *dirfi, fs_cpath_t path)
 {
-    *fi = new (std::nothrow) tmpfs_file_t();
+    *fi = new (ext::nothrow) tmpfs_file_t();
 
     return 0;
 }
@@ -383,7 +383,7 @@ int tmpfs_fs_t::openat(fs_file_info_t **fi,
         if (file.name_hash == name_hash &&
                 file.name_sz == path_len + 1 &&
                 !memcmp(name, path, path_len)) {
-            std::unique_ptr<tmpfs_file_t> file(new (std::nothrow)
+            std::unique_ptr<tmpfs_file_t> file(new (ext::nothrow)
                                                tmpfs_file_t{});
             file->file_index = index;
             *fi = file.release();
@@ -615,7 +615,7 @@ bool tmpfs_startup(void *st, size_t sz)
     initrd_st = st;
     initrd_sz = sz;
 
-    std::unique_ptr<tmpfs_fs_t> fs(new (std::nothrow) tmpfs_fs_t);
+    std::unique_ptr<tmpfs_fs_t> fs(new (ext::nothrow) tmpfs_fs_t);
     fs_init_info_t info{};
     info.part_st = (uint64_t)st;
     info.part_len = sz;

@@ -60,7 +60,7 @@ public:
     // dev_fs_file_reg_t interface
     dev_fs_file_t *open(int flags, mode_t mode) override final
     {
-        return new (std::nothrow) vga_conout_file_t;
+        return new (ext::nothrow) vga_conout_file_t;
     }
 };
 
@@ -71,7 +71,7 @@ public:
     // dev_fs_file_reg_t interface
     dev_fs_file_t *open(int flags, mode_t mode) override final
     {
-        return new (std::nothrow) vga_conout_file_t;
+        return new (ext::nothrow) vga_conout_file_t;
     }
 };
 
@@ -158,7 +158,7 @@ public:
     // This starts up extremely early, statically allocate
     static vga_display_t instances[1];
 
-    void *operator new(size_t, std::nothrow_t const&) noexcept
+    void *operator new(size_t, ext::nothrow_t const&) noexcept
     {
         if (likely(instance_count < countof(instances)))
             return instances + instance_count++;
@@ -189,7 +189,7 @@ class framebuffer_display_t : public text_display_t {
     static framebuffer_display_t instances[1];
 
 public:
-    void *operator new(size_t, std::nothrow_t const&) noexcept;
+    void *operator new(size_t, ext::nothrow_t const&) noexcept;
 
     void operator delete(void *p) noexcept;
 
@@ -886,7 +886,7 @@ void vga_display_t::put_char_at(int x, int y, char32_t ch, int attr)
 }
 
 void *
-framebuffer_display_t::operator new(size_t, std::nothrow_t const&) noexcept
+framebuffer_display_t::operator new(size_t, ext::nothrow_t const&) noexcept
 {
     if (likely(instance_count < countof(instances)))
         return instances + instance_count++;

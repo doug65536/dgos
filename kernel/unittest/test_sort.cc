@@ -35,7 +35,7 @@ UNITTEST(test_stress_sort)
     static int const item_count = 5113;
     static uint32_t const rand_cap =
             ((uint64_t(1) << 32) - (uint64_t(1) << 32) % shuffle_count) - 1;
-    std::unique_ptr<int[]> items(new (std::nothrow) int[item_count]);
+    std::unique_ptr<int[]> items(new (ext::nothrow) int[item_count]);
 
     for (int i = 0; i < item_count; ++i)
         items[i] = i;

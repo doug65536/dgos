@@ -1366,7 +1366,7 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
     std::unique_ptr<char[]> sector_buffer =
-            new (std::nothrow) char[sector_size];
+            new (ext::nothrow) char[sector_size];
 
     if (!sector_buffer)
         return false;
@@ -1437,7 +1437,7 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
     if (fat32_mounts.empty())
         fat32_fs_t::handles.create(510);
 
-    std::unique_ptr<fat32_fs_t> self(new (std::nothrow) fat32_fs_t());
+    std::unique_ptr<fat32_fs_t> self(new (ext::nothrow) fat32_fs_t());
     if (self->mount(conn)) {
         if (unlikely(!fat32_mounts.push_back(self)))
             panic_oom();

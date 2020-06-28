@@ -134,10 +134,10 @@ bool usb_audio_class_drv_t::probe(usb_config_helper *cfg, usb_bus_t *bus)
     int iface = match.iface->iface_proto;
 
 //    if (match.iface->iface_proto == 1) {
-//        dev = new (std::nothrow)
+//        dev = new (ext::nothrow)
 //                usb_hid_keybd_t(control, in, out, match.iface_idx);
 //    } else if (match.iface->iface_proto == 2) {
-//        dev = new (std::nothrow)
+//        dev = new (ext::nothrow)
 //                usb_hid_mouse_t(control, in, out, match.iface_idx);
 //    } else {
 //        USBHID_TRACE("Unhandled interface protocol: 0x%02x\n",

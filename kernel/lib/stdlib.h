@@ -70,7 +70,20 @@ struct nothrow_t {
     explicit nothrow_t() = default;
 };
 enum class align_val_t : size_t {};
+extern nothrow_t const nothrow;
+
+__END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+
+struct nothrow_t {
+    explicit nothrow_t() = default;
+};
 extern EXPORT nothrow_t const nothrow;
+
+__END_NAMESPACE_EXT
+
+__BEGIN_NAMESPACE_STD
 
 template<typename _T>
 constexpr _T abs(_T __rhs)
@@ -83,15 +96,15 @@ __END_NAMESPACE_STD
 void* operator new[](size_t count, std::align_val_t alignment);
 void* operator new[](size_t count, std::align_val_t alignment,
     std::nothrow_t const&);
-void *operator new(size_t size, std::nothrow_t const&) noexcept;
-void *operator new[](size_t size, std::nothrow_t const&) noexcept;
+void *operator new(size_t size, ext::nothrow_t const&) noexcept;
+void *operator new[](size_t size, ext::nothrow_t const&) noexcept;
 
 void operator delete(void *block, unsigned long size) noexcept;
 
 class zero_init_t
 {
 public:
-    void *operator new(size_t size, std::nothrow_t const&) noexcept
+    void *operator new(size_t size, ext::nothrow_t const&) noexcept
     {
         return calloc(1, size);
     }

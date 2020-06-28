@@ -556,7 +556,7 @@ fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
     if (iso9660_mounts.empty())
         iso9660_fs_t::handles.create(512);
 
-    std::unique_ptr<iso9660_fs_t> self(new (std::nothrow) iso9660_fs_t);
+    std::unique_ptr<iso9660_fs_t> self(new (ext::nothrow) iso9660_fs_t);
     if (self->mount(conn)) {
         if (!iso9660_mounts.push_back(self))
             return nullptr;

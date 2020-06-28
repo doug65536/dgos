@@ -39,7 +39,7 @@ elf64_context_t *load_kernel_begin()
 {
     ELF64_TRACE("constructing new context\n");
 
-    elf64_context_t *ctx = new (std::nothrow) elf64_context_t();
+    elf64_context_t *ctx = new (ext::nothrow) elf64_context_t();
     return ctx;
 }
 
@@ -134,7 +134,7 @@ tchar const *cpu_choose_kernel()
 static kernel_params_t *prompt_kernel_param(
         void *phys_mem_table, void *ap_entry_ptr, int phys_mem_table_size)
 {
-    kernel_params_t *params = new (std::nothrow) kernel_params_t();
+    kernel_params_t *params = new (ext::nothrow) kernel_params_t();
 
     PRINT("Preparing kernel parameter structure at %p\n", (void*)params);
 

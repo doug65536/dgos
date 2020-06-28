@@ -2747,7 +2747,7 @@ EXPORT void *mmap_register_device(void *context,
 
     size_t sz = block_size * block_count;
 
-    mmap_device_mapping_t *mapping = new (std::nothrow) mmap_device_mapping_t();
+    mmap_device_mapping_t *mapping = new (ext::nothrow) mmap_device_mapping_t();
 
     if (!mapping)
         return nullptr;
@@ -3016,7 +3016,7 @@ void mm_destroy_process()
 void mm_init_process(process_t *process, bool use64)
 {
     contiguous_allocator_t *allocator =
-            new (std::nothrow) contiguous_allocator_t{};
+            new (ext::nothrow) contiguous_allocator_t{};
 
     uintptr_t user_mem_st;
     uintptr_t user_mem_en;

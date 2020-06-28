@@ -102,10 +102,10 @@ vbe_mode_list_t const& vbe_enumerate_modes()
     if (mode_list.count != 0)
         return mode_list;
 
-    vbe_info_t *info = new (std::nothrow) vbe_info_t();
+    vbe_info_t *info = new (ext::nothrow) vbe_info_t();
 
     if (vbe_detect(info)) {
-        vbe_mode_info_t *mode_info = new (std::nothrow) vbe_mode_info_t();
+        vbe_mode_info_t *mode_info = new (ext::nothrow) vbe_mode_info_t();
 
         mode_list.count = 0;
 
@@ -122,7 +122,7 @@ vbe_mode_list_t const& vbe_enumerate_modes()
             ++mode_list.count;
         }
 
-        mode_list.modes = new (std::nothrow)
+        mode_list.modes = new (ext::nothrow)
                 vbe_selected_mode_t[mode_list.count]();
 
         size_t out = 0;

@@ -2044,7 +2044,7 @@ std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 
         //sleep(3000);
 
-        std::unique_ptr<ahci_if_t> self(new (std::nothrow) ahci_if_t{});
+        std::unique_ptr<ahci_if_t> self(new (ext::nothrow) ahci_if_t{});
 
         if (likely(self->init(pci_iter))) {
             if (likely(list.push_back(self.get()))) {
@@ -2083,7 +2083,7 @@ std::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 
         if (port->sig == ahci_sig_t::SATA_SIG_ATA ||
                 port->sig == ahci_sig_t::SATA_SIG_ATAPI) {
-            std::unique_ptr<ahci_dev_t> drive(new (std::nothrow) ahci_dev_t{});
+            std::unique_ptr<ahci_dev_t> drive(new (ext::nothrow) ahci_dev_t{});
 
             if (drive->init(this, port_num,
                             port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
@@ -2116,7 +2116,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
     is_atapi = dev_is_atapi;
 
     std::unique_ptr<ata_identify_t> identify =
-            new (std::nothrow) ata_identify_t;
+            new (ext::nothrow) ata_identify_t;
 
     blocking_iocp_t block;
 

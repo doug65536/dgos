@@ -241,7 +241,7 @@ static dev_fs_t *devfs_instance;
 
 dev_fs_t *devfs_create()
 {
-    devfs_instance = new (std::nothrow) dev_fs_t();
+    devfs_instance = new (ext::nothrow) dev_fs_t();
     callout_call(callout_type_t::devfs_ready);
     return devfs_instance;
 }

@@ -22,7 +22,7 @@
 #define MALLOC_CHECK() ((void)0)
 #endif
 
-std::nothrow_t const std::nothrow;
+ext::nothrow_t const ext::nothrow;
 
 struct blk_hdr_t {
     // Size including this header, in bytes
@@ -379,7 +379,7 @@ bool malloc_validate()
 //}
 
 void* operator new[](size_t count, std::align_val_t alignment,
-    std::nothrow_t const&) noexcept
+    ext::nothrow_t const&) noexcept
 {
     return malloc_aligned(count, size_t(alignment));
 }
@@ -390,12 +390,12 @@ void* operator new[](size_t count, std::align_val_t alignment,
 //    return malloc(size);
 //}
 
-void *operator new(size_t size, std::nothrow_t const&) noexcept
+void *operator new(size_t size, ext::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
 
-void *operator new[](size_t size, std::nothrow_t const&) noexcept
+void *operator new[](size_t size, ext::nothrow_t const&) noexcept
 {
     return malloc(size);
 }

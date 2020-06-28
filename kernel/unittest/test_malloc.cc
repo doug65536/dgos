@@ -430,7 +430,7 @@ DISABLED_UNITTEST(test_mmap_oom)
 
     constexpr size_t max_items = 256;
 
-    std::unique_ptr<item[]> items(new (std::nothrow) item[max_items]());
+    std::unique_ptr<item[]> items(new (ext::nothrow) item[max_items]());
     size_t item_count;
 
     for (size_t pass = 0; pass < 2; ++pass) {

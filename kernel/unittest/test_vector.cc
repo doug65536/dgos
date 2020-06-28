@@ -441,7 +441,7 @@ UNITTEST(test_vector_random_malloc)
         size_t& stored_sz = ptrs[i].second;
 
         int sz = rand_r(&seed) % 65536;
-        uint8_t *p = new (std::nothrow) uint8_t[sz]();
+        uint8_t *p = new (ext::nothrow) uint8_t[sz]();
         ne(nullptr, p);
 
         uint8_t expect = byte_from_sz(stored_sz);

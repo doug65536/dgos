@@ -152,7 +152,7 @@ void boot_menu_show(kernel_params_t &params)
     //
     // allocate enough for that "mode" times
 
-    tchar *mode_text_buf = new (std::nothrow) tchar[vbe_modes.count * 64]();
+    tchar *mode_text_buf = new (ext::nothrow) tchar[vbe_modes.count * 64]();
 
     for (size_t i = 0; i < vbe_modes.count; ++i) {
         tchar *res = mode_text_buf + i * 64;
@@ -215,7 +215,7 @@ void boot_menu_show(kernel_params_t &params)
 
     tui_list_t<tui_str_t> mode_list;
     mode_list.count = vbe_modes.count;
-    mode_list.items = new (std::nothrow) tui_str_t[vbe_modes.count]();
+    mode_list.items = new (ext::nothrow) tui_str_t[vbe_modes.count]();
 
     for (size_t i = 0; i < vbe_modes.count; ++i) {
         auto str = mode_text_buf + i * 64;

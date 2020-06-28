@@ -787,7 +787,7 @@ public:
     template<typename T>
     friend class usbxhci_ring_data_t;
 
-    void *operator new(size_t sz, std::nothrow_t const&) noexcept;
+    void *operator new(size_t sz, ext::nothrow_t const&) noexcept;
     void operator delete(void *p) noexcept;
 
     void legacy_handoff(const volatile uint32_t *cap);
@@ -1128,7 +1128,7 @@ void usbxhci::cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp)
 usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 {
     std::unique_ptr<usbxhci_endpoint_data_t> newepd(
-            new (std::nothrow) usbxhci_endpoint_data_t);
+            new (ext::nothrow) usbxhci_endpoint_data_t);
 
     if (!newepd)
         return nullptr;
@@ -1305,7 +1305,7 @@ bool usbxhci::add_device(int parent_slot, size_t port, int route)
             if (unlikely(err < 0))
                 break;
 
-            bos.reset(new (std::nothrow) usb_desc_bos{});
+            bos.reset(new (ext::nothrow) usb_desc_bos{});
 
             if (unlikely(!bos))
                 break;
@@ -1333,7 +1333,7 @@ bool usbxhci::add_device(int parent_slot, size_t port, int route)
     return true;
 }
 
-void *usbxhci::operator new(size_t sz, std::nothrow_t const&) noexcept
+void *usbxhci::operator new(size_t sz, ext::nothrow_t const&) noexcept
 {
     return calloc(1, sz);
 }
@@ -1662,7 +1662,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
                 nullptr, sizeof(*dev_evt_segs) * maxintr * 4,
                 PROT_READ | PROT_WRITE, MAP_POPULATE);
 
-    if (unlikely(!interrupters.reset(new (std::nothrow)
+    if (unlikely(!interrupters.reset(new (ext::nothrow)
                                      usbxhci_interrupter_info_t[maxintr])))
         panic_oom();
 
@@ -2464,7 +2464,7 @@ void usbxhci::detect()
         if (pci_iter.config.prog_if != PCI_PROGIF_SERIAL_USB_XHCI)
             continue;
 
-        std::unique_ptr<usbxhci> self(new (std::nothrow) usbxhci);
+        std::unique_ptr<usbxhci> self(new (ext::nothrow) usbxhci);
 
         if (!usbxhci_devices.emplace_back(self.get())) {
             USBXHCI_TRACE("Out of memory!");

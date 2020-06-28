@@ -74,7 +74,7 @@ static long futex_wait(int *uptr, int expect, uint64_t timeout_time)
     if (!fent) {
         // Create a new one
 
-        if (unlikely(!new_ent.reset(new (std::nothrow) futex_tab_ent_t())))
+        if (unlikely(!new_ent.reset(new (ext::nothrow) futex_tab_ent_t())))
             return -int(errno_t::ENOMEM);
 
         new_ent->addr = uphysaddr;

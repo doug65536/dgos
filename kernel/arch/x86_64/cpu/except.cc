@@ -5,7 +5,7 @@
 
 __exception_jmp_buf_t *__exception_handler_add(void)
 {
-    __exception_context_t *ctx = new (std::nothrow) __exception_context_t();
+    __exception_context_t *ctx = new (ext::nothrow) __exception_context_t();
     ctx->flags = 1;
     ctx->__next = (__exception_context_t *)thread_set_exception_top(ctx);
     ctx->__exception_code = -1;

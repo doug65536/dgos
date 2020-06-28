@@ -87,7 +87,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
         return list;
 
     // Create sector-sized buffer to look at partition header
-    std::unique_ptr<uint8_t[]> buffer(new (std::nothrow)
+    std::unique_ptr<uint8_t[]> buffer(new (ext::nothrow)
                                       uint8_t[sector_size]());
 
     if (unlikely(!buffer))
@@ -108,7 +108,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     gpt_part_tbl_ent_t ptent;
 
     buffer.reset();
-    buffer.reset(new (std::nothrow) uint8_t[sector_size * hdr.part_ent_count]);
+    buffer.reset(new (ext::nothrow) uint8_t[sector_size * hdr.part_ent_count]);
 
     if (unlikely(!buffer))
         panic_oom();
@@ -127,7 +127,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
         memcpy(&ptent, &buffer.get()[i * sector_size], sizeof(ptent));
 
         if (ptent.type_guid == efi_part) {
-            part.reset(new (std::nothrow) part_dev_t{});
+            part.reset(new (ext::nothrow) part_dev_t{});
             part->drive = drive;
             part->lba_st = ptent.lba_st;
             part->lba_len = ptent.lba_en - ptent.lba_st + 1;

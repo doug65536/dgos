@@ -259,7 +259,7 @@ void test_read_stress()
 {
     int dev_cnt = storage_dev_count();
     std::vector<read_stress_thread_t*> *read_stress_threads =
-            new (std::nothrow) std::vector<read_stress_thread_t*>();
+            new (ext::nothrow) std::vector<read_stress_thread_t*>();
     if (unlikely(!read_stress_threads->reserve(
                      dev_cnt * ENABLE_READ_STRESS_THREAD)))
         panic("Out of memory");
@@ -270,7 +270,7 @@ void test_read_stress()
                    " Running block read stress\n",
                      devid, i);
             read_stress_thread_t *thread =
-                    new (std::nothrow) read_stress_thread_t();
+                    new (ext::nothrow) read_stress_thread_t();
             if (unlikely(!read_stress_threads->push_back(thread)))
                 panic_oom();
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
@@ -397,7 +397,7 @@ static int stress_mmap_thread(void *p)
 
     size_t block_count = 16;
     std::unique_ptr<std::pair<uintptr_t, uintptr_t>[]> blocks(
-                new (std::nothrow)
+                new (ext::nothrow)
                 std::pair<uintptr_t, uintptr_t>[block_count]);
     size_t current = 0;
 
@@ -1063,7 +1063,7 @@ struct symbols_t {
         if (unlikely(len < 0))
             return;
 
-        std::unique_ptr<char[]> buf = new (std::nothrow) char[len];
+        std::unique_ptr<char[]> buf = new (ext::nothrow) char[len];
         if (unlikely(!buf))
             return;
 
@@ -1137,7 +1137,7 @@ struct symbols_t {
         if (unlikely(len < 0))
             return;
 
-        buf.reset(new (std::nothrow) char[len]);
+        buf.reset(new (ext::nothrow) char[len]);
 
         if (unlikely(!buf))
             return;

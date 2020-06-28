@@ -182,7 +182,7 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     assert(status);
 
-    usb_hub_t *hub = new (std::nothrow) usb_hub_t(control, status);
+    usb_hub_t *hub = new (ext::nothrow) usb_hub_t(control, status);
     if (!hubs.push_back(hub))
         return false;
 

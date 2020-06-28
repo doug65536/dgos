@@ -232,7 +232,7 @@ public:
     _noreturn
     void run();
 
-    void *operator new(size_t, std::nothrow_t const&) noexcept
+    void *operator new(size_t, ext::nothrow_t const&) noexcept
     {
         return calloc(1, sizeof(gdbstub_t));
     }
@@ -1427,7 +1427,7 @@ bool gdbstub_t::get_target_desc(
 
     result_sz += (countof(x86_64_target_footer) - 1);
 
-    result.reset(new (std::nothrow) char[result_sz + 1]);
+    result.reset(new (ext::nothrow) char[result_sz + 1]);
 
     char *output = result;
 
@@ -2541,7 +2541,7 @@ void gdb_cpu_ctrl_t::gdb_thread()
     // Set GDB stub to time critical priority
     thread_set_priority(stub_tid, 32767);
 
-    std::unique_ptr<gdbstub_t> stub(new (std::nothrow) gdbstub_t);
+    std::unique_ptr<gdbstub_t> stub(new (ext::nothrow) gdbstub_t);
 
     freeze_all(1);
 

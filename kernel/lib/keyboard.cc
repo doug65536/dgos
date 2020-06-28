@@ -391,7 +391,7 @@ class keybd_file_reg_t : public dev_fs_file_reg_t {
 public:
     static keybd_file_reg_t *get_registration()
     {
-        return new (std::nothrow) keybd_file_reg_t("conin");
+        return new (ext::nothrow) keybd_file_reg_t("conin");
     }
 
     keybd_file_reg_t(char const *name)
@@ -430,7 +430,7 @@ public:
     // dev_fs_file_reg_t interface
     dev_fs_file_t *open(int flags, mode_t mode) override
     {
-        return new (std::nothrow) keybd_file_t();
+        return new (ext::nothrow) keybd_file_t();
     }
 };
 

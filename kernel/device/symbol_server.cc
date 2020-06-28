@@ -56,7 +56,7 @@ class symbol_server_t {
         if (sz < 0)
             return false;
 
-        std::unique_ptr<char[]> buf(new (std::nothrow) char[sz]);
+        std::unique_ptr<char[]> buf(new (ext::nothrow) char[sz]);
         if (!buf)
             return false;
 

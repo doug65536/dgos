@@ -2917,7 +2917,7 @@ lapic_kvm_t::lapic_kvm_t()
 
 void lapic_kvm_t::set_cpu_count(size_t cpu_count) noexcept
 {
-    cpus.reset(new (std::nothrow) cacheline_t[cpu_count]);
+    cpus.reset(new (ext::nothrow) cacheline_t[cpu_count]);
     if (unlikely(!cpus))
         panic_oom();
 }

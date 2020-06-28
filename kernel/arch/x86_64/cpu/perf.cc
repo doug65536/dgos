@@ -103,7 +103,7 @@ static bool perf_add_symbols(char const *filename,
     if (unlikely(sz < 0))
         return false;
 
-    std::unique_ptr<char[]> buf(new (std::nothrow) char[sz]);
+    std::unique_ptr<char[]> buf(new (ext::nothrow) char[sz]);
     if (unlikely(!buf))
         return false;
 

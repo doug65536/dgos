@@ -39,7 +39,7 @@ void aspect_ratio(uint16_t *n, uint16_t *d, uint16_t w, uint16_t h)
 }
 
 vbe_mode_list_t::vbe_mode_list_t(size_t count)
-    : modes{new (std::nothrow) vbe_selected_mode_t[count]}
+    : modes{new (ext::nothrow) vbe_selected_mode_t[count]}
     , count(count)
 {
 }

@@ -645,7 +645,7 @@ std::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 
         NVME_TRACE("found device!\n");
 
-        std::unique_ptr<nvme_if_t> self(new (std::nothrow) nvme_if_t{});
+        std::unique_ptr<nvme_if_t> self(new (ext::nothrow) nvme_if_t{});
 
         nvme_devices.push_back(self);
         if (self->init(pci_iter)) {
@@ -797,7 +797,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     nvme_cmp_t *cmp_queue_ptr = (nvme_cmp_t*)
             (sub_queue_ptr + requested_queue_count * queue_slots);
 
-    queues.reset(new (std::nothrow) nvme_queue_state_t[requested_queue_count]);
+    queues.reset(new (ext::nothrow) nvme_queue_state_t[requested_queue_count]);
 
     nvme_queue_state_t& admin_queue = queues[0];
 
@@ -919,7 +919,7 @@ void nvme_if_t::identify_ns_handler(
     uint32_t lba_format = ns_ident->lbaf[cur_format_index];
     uint8_t log2_sectorsize = NVME_NS_IDENT_LBAF_LBADS_GET(lba_format);
 
-    std::unique_ptr<nvme_dev_t> drive(new (std::nothrow) nvme_dev_t{});
+    std::unique_ptr<nvme_dev_t> drive(new (ext::nothrow) nvme_dev_t{});
 
     drive->init(this, namespaces[ctx->cur_ns], log2_sectorsize);
 

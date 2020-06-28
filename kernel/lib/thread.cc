@@ -40,25 +40,25 @@ static int thread_run_start(void *p)
 
 thread_t thread_proc_0(void (*fn)())
 {
-    auto data = new (std::nothrow) thread_run_data_t(fn);
+    auto data = new (ext::nothrow) thread_run_data_t(fn);
     return data->spawn_thread(data);
 }
 
 thread_t thread_proc_1(void (*fn)(void *), void *arg)
 {
-    auto data = new (std::nothrow) thread_run_data_t(fn, arg);
+    auto data = new (ext::nothrow) thread_run_data_t(fn, arg);
     return data->spawn_thread(data);
 }
 
 thread_t thread_func_0(int (*fn)())
 {
-    auto data = new (std::nothrow) thread_run_data_t(fn);
+    auto data = new (ext::nothrow) thread_run_data_t(fn);
     return data->spawn_thread(data);
 }
 
 thread_t thread_func_1(int (*fn)(void*), void *arg)
 {
-    auto data = new (std::nothrow) thread_run_data_t(fn, arg);
+    auto data = new (ext::nothrow) thread_run_data_t(fn, arg);
     return data->spawn_thread(data);
 }
 

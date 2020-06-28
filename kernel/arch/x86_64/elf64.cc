@@ -246,7 +246,7 @@ private:
 // Shared module loader
 module_t *modload_load(char const *path, bool run)
 {
-    std::unique_ptr<module_t> module(new (std::nothrow) module_t{});
+    std::unique_ptr<module_t> module(new (ext::nothrow) module_t{});
     if (likely(module->load(path)))
         return module.release();
     return nullptr;
@@ -259,7 +259,7 @@ module_t *modload_load_image(void const *image, size_t image_sz,
                              char *ret_needed,
                              errno_t *ret_errno)
 {
-    std::unique_ptr<module_t> module(new (std::nothrow) module_t());
+    std::unique_ptr<module_t> module(new (ext::nothrow) module_t());
 
     if (unlikely(!module)) {
         if (ret_errno)

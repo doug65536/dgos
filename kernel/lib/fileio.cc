@@ -792,7 +792,7 @@ ino_t socket_file_t::get_inode() const
 int socket_fs_t::openat(fs_file_info_t **fi, fs_file_info_t *dirfi,
                         fs_cpath_t path, int flags, mode_t mode)
 {
-    socket_file_t *file = new (std::nothrow) socket_file_t();
+    socket_file_t *file = new (ext::nothrow) socket_file_t();
     *fi = file;
 
     return 0;

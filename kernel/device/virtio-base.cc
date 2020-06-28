@@ -167,7 +167,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             queue_count = common_cfg->num_queues;
 
             // Allocate number of queues supported by device
-            queues.reset(new (std::nothrow) virtio_virtqueue_t[queue_count]);
+            queues.reset(new (ext::nothrow) virtio_virtqueue_t[queue_count]);
 
             if (unlikely(!queues)) {
                 // Tell the device we gave up
@@ -382,7 +382,7 @@ bool virtio_virtqueue_t::init(
         used_ftr = (ring_ftr_t*)(used_ring + queue_count);
     }
 
-    completions.reset(new (std::nothrow) virtio_iocp_t*[queue_count]());
+    completions.reset(new (ext::nothrow) virtio_iocp_t*[queue_count]());
     if (!completions)
         return false;
 
