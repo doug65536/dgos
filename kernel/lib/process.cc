@@ -232,29 +232,24 @@ intptr_t process_t::load_elf_with_policy(int fd)
 
     uintptr_t first_exec = UINTPTR_MAX;
 
-    // Map every section, just in case any pages overlap
+    // Map every section first, just in case any pages overlap
     for (Phdr const& ph : program_hdrs) {
         // If it is not loaded, ignore
-        if (ph.p_type != PT_LOAD)
+        if (unlikely(ph.p_type != PT_LOAD))
             continue;
 
         // If it is not readable, writable or executable, ignore
-        if ((ph.p_flags & (PF_R | PF_W | PF_X)) == 0)
+        if (unlikely((ph.p_flags & (PF_R | PF_W | PF_X)) == 0))
             continue;
 
         // No memory size? Ignore
-        if (ph.p_memsz == 0)
+        if (unlikely(ph.p_memsz == 0))
             continue;
 
         // See if it begins in reserved space
-        if (unlikely(intptr_t(ph.p_vaddr) < 0x400000)) {
+        if (unlikely(!mm_is_user_range((void*)(uintptr_t)ph.p_vaddr,
+                                       ph.p_memsz))) {
             printdbg("The virtual address is not in user address space\n");
-            return -int(errno_t::EFAULT);
-        }
-
-        // See if it overflows into kernel space
-        if (unlikely(intptr_t(ph.p_vaddr + ph.p_memsz) < 0)) {
-            printdbg("The section overflows into user space\n");
             return -int(errno_t::EFAULT);
         }
 
@@ -273,8 +268,8 @@ intptr_t process_t::load_elf_with_policy(int fd)
 
         // Skip pointless calls to mmap for little regions that overlap
         // previously reserved regions
-        if (ph.p_vaddr >= last_region_st &&
-                ph.p_vaddr + ph.p_memsz <= last_region_en)
+        if (unlikely(ph.p_vaddr >= last_region_st &&
+                     ph.p_vaddr + ph.p_memsz <= last_region_en))
             continue;
 
         // Update region reserved by last mapping
@@ -298,8 +293,12 @@ intptr_t process_t::load_elf_with_policy(int fd)
     // Read everything after mapping the memory
     for (Phdr const& ph : program_hdrs) {
         // If it is not loaded, ignore
-        if (ph.p_type != PT_LOAD)
+        if (unlikely(ph.p_type != PT_LOAD))
             continue;
+
+        if (unlikely(!mm_is_user_range((void*)(intptr_t)ph.p_vaddr,
+                                       ph.p_memsz)))
+            return int(errno_t::EFAULT);
 
         read_size = ph.p_filesz;
         if (likely(ph.p_filesz > 0)) {
@@ -307,7 +306,7 @@ intptr_t process_t::load_elf_with_policy(int fd)
                              fd, (void*)uintptr_t(ph.p_vaddr),
                              read_size, ph.p_offset))) {
                 printdbg("Failed to read program headers!\n");
-                return int(errno_t(read_size));
+                return -int(errno_t::ENOEXEC);
             }
         }
     }
@@ -344,6 +343,9 @@ intptr_t process_t::load_elf_with_policy(int fd)
     for (Phdr const& ph : program_hdrs) {
         // If it is a TLS header, remember the range
         if (unlikely(ph.p_type == PT_TLS)) {
+            if (unlikely(tls_addr != 0))
+                printdbg("Strange, multiple TLS program headers!");
+
             tls_addr = ph.p_vaddr;
             tls_msize = ph.p_memsz;
             tls_fsize = ph.p_filesz;
@@ -365,15 +367,15 @@ int process_t::run()
     // Open a stdin, stdout, and stderr
     int fd_i = file_openat(AT_FDCWD, "/dev/conin", 0, 0);
     int fd_o = file_openat(AT_FDCWD, "/dev/conout", 0, 0);
-    int fd_e = file_openat(AT_FDCWD, "/dev/conerr", 0, 0);
+    //int fd_e = file_openat(AT_FDCWD, "/dev/conout", 0, 0);
 
     ids.desc_alloc.take({0, 1, 2});
     ids.ids[0].set(fd_i, 0);
     ids.ids[1].set(fd_o, 0);
-    ids.ids[2].set(fd_e, 0);
+    //ids.ids[2].set(fd_e, 0);
 
-//    assert(fd_i == 0);
-//    assert(fd_o == 1);
+    assert(fd_i == 0);
+    assert(fd_o == 1);
 //    assert(fd_e == 2);
 
     file_t fd{file_openat(AT_FDCWD, path.c_str(), O_RDONLY)};
@@ -634,6 +636,7 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp, bool use64,
     if (!__setjmp(buf)) {
         // When interrupts occur, use the stack space we have here
         // isr_sysret does not return
+        printdbg("Entering user process\n");
         isr_sysret(ip, sp, uint64_t(buf->rsp) & -16, use64,
                    thread_get_id(), 0);
     }

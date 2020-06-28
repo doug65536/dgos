@@ -43,9 +43,10 @@ static vbe_selected_mode_t *selected_mode_from_efi_mode(
         result->mask_size_g = 8;
         result->mask_size_b = 8;
         result->mask_size_a = 8;
-        result->bpp = 0;
-        result->byte_pp = 0;
+        result->bpp = 32;
+        result->byte_pp = 4;
         break;
+
     case PixelBlueGreenRedReserved8BitPerColor:
         result->mask_pos_r = 16;
         result->mask_pos_g = 8;
@@ -58,6 +59,7 @@ static vbe_selected_mode_t *selected_mode_from_efi_mode(
         result->bpp = 32;
         result->byte_pp = 4;
         break;
+
     case PixelBitMask:
     {
         auto const& pi = efi_mode->PixelInformation;
@@ -81,8 +83,9 @@ static vbe_selected_mode_t *selected_mode_from_efi_mode(
 
         break;
     }
+
     case PixelBltOnly:
-    case PixelFormatMax:
+    default:
         result->mask_pos_r = 0;
         result->mask_pos_g = 0;
         result->mask_pos_b = 0;

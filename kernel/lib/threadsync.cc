@@ -71,7 +71,76 @@ EXPORT bool mutex_try_lock(mutex_t *mutex)
 }
 
 _hot
-EXPORT bool mutex_lock(mutex_t *mutex, uint64_t timeout_time)
+EXPORT bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
+{
+    bool result = true;
+    assert(mutex->owner != thread_get_id());
+
+    for (int spin = 0; result; pause(), ++spin) {
+        // Spin outside lock until spin limit
+        if (spin < mutex->spin_count && mutex->owner >= 0)
+            continue;
+
+        // Lock the mutex to acquire it or manipulate wait chain
+        if (!spinlock_try_lock_until(&mutex->lock, timeout_time))
+            return false;
+
+        // Check again inside lock
+        if (spin < mutex->spin_count && mutex->owner >= 0) {
+            // Racing thread beat us, go back to spinning outside lock
+            spinlock_unlock(&mutex->lock);
+            continue;
+        }
+
+        if (mutex->owner < 0) {
+            // Take ownership
+            mutex->owner = thread_get_id();
+
+            MUTEX_DTRACE("Took ownership of %p, tid=%d\n",
+                         (void*)mutex, mutex->owner);
+
+            // Increase spin count
+            if (mutex->spin_count < SPINCOUNT_MAX)
+                mutex->spin_count -= spincount_mask;
+
+            break;
+        }
+
+        // Mutex is owned
+        thread_wait_t wait;
+
+        // Decrease spin count
+        if (mutex->spin_count > SPINCOUNT_MIN)
+            mutex->spin_count += spincount_mask;
+
+        MUTEX_DTRACE("Adding to waitchain of %p\n", (void*)mutex);
+
+        // Add state to mutex wait chain
+        thread_wait_add(&mutex->link, &wait.link);
+
+        MUTEX_DTRACE("Waitchain for %p\n", (void*)mutex);
+
+        // Wait
+        // note: returns with mutex->lock unlocked!
+        result = thread_sleep_release(&mutex->lock, &wait.thread, timeout_time);
+
+        if (result) {
+            assert(wait.link.next == nullptr);
+            assert(wait.link.prev == nullptr);
+            assert(mutex->owner == wait.thread);
+        }
+
+        return result;
+    }
+
+    // Release lock
+    spinlock_unlock(&mutex->lock);
+
+    return result;
+}
+
+_hot
+EXPORT bool mutex_lock(mutex_t *mutex)
 {
     bool result = true;
     assert(mutex->owner != thread_get_id());
@@ -121,7 +190,7 @@ EXPORT bool mutex_lock(mutex_t *mutex, uint64_t timeout_time)
 
         // Wait
         // note: returns with mutex->lock unlocked!
-        result = thread_sleep_release(&mutex->lock, &wait.thread, timeout_time);
+        result = thread_sleep_release(&mutex->lock, &wait.thread, UINT64_MAX);
 
         if (result) {
             assert(wait.link.next == nullptr);

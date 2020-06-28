@@ -402,7 +402,7 @@ public:
     uint8_t cur_ns;
 
 private:
-    using lock_t = ext::mcslock;
+    using lock_t = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = std::unique_lock<lock_t>;
     uint64_t identify_data_physaddr;
     lock_t lock;
@@ -502,7 +502,7 @@ public:
     nvme_cmp_t *cmp_queue_ptr();
 
 private:
-    using lock_type = ext::mcslock;
+    using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = std::unique_lock<lock_type>;
 
     sub_queue_t sub_queue;

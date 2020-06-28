@@ -103,7 +103,7 @@ static int service_keyboard()
     if (status == EFI_NOT_READY)
         return 0;
 
-    debug_out(TSTR "Got keypress\n", -1);
+    //debug_out(TSTR "Got keypress\n", -1);
 
     int translated = -1;
 

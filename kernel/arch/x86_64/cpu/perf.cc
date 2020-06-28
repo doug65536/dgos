@@ -13,6 +13,7 @@
 #include "control_regs_constants.h"
 
 static stacktrace_xlat_fn_t stacktrace_xlat_fn;
+static void *stacktrace_xlat_fn_arg;
 
 using perf_token_table_t = std::vector<std::string>;
 
@@ -311,7 +312,7 @@ static void perf_sample(int (*ip)(void*), size_t cpu_nr)
 }
 
 EXPORT uint64_t perf_gather_samples(
-        void (*callback)(int, int, char const *, void *), void *arg)
+        void (*callback)(void *, int, int, char const *), void *arg)
 {
     if (unlikely(perf_data.empty()))
         return 0;
@@ -346,8 +347,8 @@ EXPORT uint64_t perf_gather_samples(
         if (item.value == 0)
             break;
         uint64_t fixed = grand ? 100000 * item.value / grand : 0;
-        callback(int(fixed / 1000), int(fixed % 1000),
-                 perf_tokens[item.name_token].c_str(), arg);
+        callback(arg, int(fixed / 1000), int(fixed % 1000),
+                 perf_tokens[item.name_token].c_str());
     }
 
     return grand;
@@ -362,7 +363,7 @@ static isr_context_t *perf_nmi_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-static void stacktrace_xlat(void * const *ips, size_t count)
+static void stacktrace_xlat(void *arg, void * const *ips, size_t count)
 {
     for (size_t i = 0; i < count; ++i) {
         perf_symbol_table_t::const_iterator sym_it =
@@ -408,7 +409,7 @@ EXPORT void perf_init()
         perf_add_symbols(symname.c_str(), size, base);
     }
 
-    perf_set_stacktrace_xlat_fn(stacktrace_xlat);
+    perf_set_stacktrace_xlat_fn(stacktrace_xlat, nullptr);
 
 //    printdbg("Modules:\n");
 //    for (perf_module_table_t::value_type const& item: perf_module_syms) {
@@ -472,15 +473,14 @@ EXPORT void perf_set_event(uint32_t event, uint8_t event_scale)
     });
 }
 
-stacktrace_xlat_fn_t perf_set_stacktrace_xlat_fn(stacktrace_xlat_fn_t fn)
+void perf_set_stacktrace_xlat_fn(stacktrace_xlat_fn_t fn, void *arg)
 {
-    stacktrace_xlat_fn_t old = stacktrace_xlat_fn;
     stacktrace_xlat_fn = fn;
-    return old;
+    stacktrace_xlat_fn_arg = arg;
 }
 
 void perf_stacktrace_xlat(void * const *ips, size_t count)
 {
     if (stacktrace_xlat_fn)
-        stacktrace_xlat_fn(ips, count);
+        stacktrace_xlat_fn(stacktrace_xlat_fn_arg, ips, count);
 }

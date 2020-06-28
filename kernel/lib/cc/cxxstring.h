@@ -242,11 +242,14 @@ public:
     {
         __str.clear();
 
-        if (unlikely(!__str.reserve((__en - __st) + 1)))
+        size_t __sz = __en - __st;
+        if (unlikely(!__str.reserve(__sz + 1)))
             return false;
 
         while (__st != __en)
             __str.push_back(*__st++);
+
+        __str[__sz] = 0;
 
         return true;
     }

@@ -9,7 +9,7 @@ using linaddr_t = uintptr_t;
 
 class mmu_phys_allocator_t {
     typedef uint32_t entry_t;
-    using lock_type = ext::mcslock;
+    using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = std::unique_lock<lock_type>;
 public:
     static size_t size_from_highest_page(physaddr_t page_index);

@@ -2324,9 +2324,9 @@ isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
 
         if (irq_ofs >= 0 && irq_ofs < dev->irq_range.count) {
             //dev->irq_handler(irq_ofs);
-            workq::enqueue([=]() {
+            //workq::enqueue([=]() {
                 dev->irq_handler(irq_ofs);
-            });
+            //});
         }
     }
 

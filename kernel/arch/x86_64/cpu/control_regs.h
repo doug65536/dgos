@@ -438,9 +438,9 @@ static _always_inline void *cpu_gsbase_get()
     return (void*)cpu_msr_get(CPU_MSR_GSBASE);
 }
 
-static _always_inline void cpu_altgsbase_set(void *gs_base)
+static _always_inline void cpu_altgsbase_set(void *k_gs_base)
 {
-    cpu_msr_set(CPU_MSR_KGSBASE, (uintptr_t)gs_base);
+    cpu_msr_set(CPU_MSR_KGSBASE, (uintptr_t)k_gs_base);
 }
 
 static _always_inline table_register_64_t cpu_gdtr_get()

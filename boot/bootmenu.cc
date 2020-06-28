@@ -111,6 +111,17 @@ OutIt to_str(T n, OutIt out, size_t out_sz, OutT pad = OutT{})
     return out;
 }
 
+bool mode_is_bgrx32(vbe_selected_mode_t const& mode)
+{
+    return (mode.byte_pp) == 4 |
+            (mode.mask_pos_r) == 16 |
+            (mode.mask_pos_g) == 8 |
+            (mode.mask_pos_b) == 0 |
+            (mode.mask_size_r) == 8 |
+            (mode.mask_size_g) == 8 |
+            (mode.mask_size_b) == 8;
+}
+
 void boot_menu_show(kernel_params_t &params)
 {
     tui_list_t<tui_menu_item_t> boot_menu_items(tui_menu);
@@ -120,7 +131,7 @@ void boot_menu_show(kernel_params_t &params)
     vbe_mode_list_t const& vbe_modes =
             vbe_enumerate_modes();
 
-    // format is %dx%d-%d:%d:%d:%d-%dbpp
+    // format is %dx%d-%d:%d:%d:%d-%dbpp (fastest)
     //            ^  ^  ^  ^  ^  ^  ^
     //            |  |  |  |  |  |  |
     //            |  |  |  |  |  |  +- 5 total bits
@@ -137,33 +148,68 @@ void boot_menu_show(kernel_params_t &params)
     //            |
     //            +- 5 horz res
     //              ---
-    //               27+5=32
+    //               27+5+9=41
     //
     // allocate enough for that "mode" times
 
-    tchar *mode_text_buf = new (std::nothrow) tchar[vbe_modes.count * 32]();
+    tchar *mode_text_buf = new (std::nothrow) tchar[vbe_modes.count * 64]();
 
     for (size_t i = 0; i < vbe_modes.count; ++i) {
-        tchar *res = mode_text_buf + i * 32;
-        tchar *end = res + 32 - 1;
+        tchar *res = mode_text_buf + i * 64;
+        tchar *end = res + 64 - 1;
         auto& mode = vbe_modes.modes[i];
         *end = 0;
+
         res = to_str(mode.width, res, size_t(end - res));
+
         if (res < end) *res++ = 'x';\
+
         res = to_str(mode.height, res, size_t(end - res));
+
         if (res < end) *res++ = '-';
+
         res = to_str(mode.mask_size_r, res, size_t(end - res));
+
         if (res < end) *res++ = ':';
+
         res = to_str(mode.mask_size_g, res, size_t(end - res));
+
         if (res < end) *res++ = ':';
+
         res = to_str(mode.mask_size_b, res, size_t(end - res));
+
         if (res < end) *res++ = ':';
+
         res = to_str(mode.mask_size_a, res, size_t(end - res));
+
         if (res < end) *res++ = '-';
+
         res = to_str(mode.bpp, res, size_t(end - res));
-        if (res < end) *res++ = 'b';
-        if (res < end) *res++ = 'p';
-        if (res < end) *res++ = 'p';
+
+        if (res + 5 < end) {
+            strcpy(res, TSTR "bpp ");
+            res += 4;
+        }
+
+        if (mode_is_bgrx32(mode) &&
+                res + 6 < end) {
+            strcpy(res, TSTR "(fastest)");
+            res += 6;
+        } else if (mode.byte_pp == 4 &&
+                mode.mask_pos_r == 0 &&
+                mode.mask_pos_g == 8 &&
+                mode.mask_pos_b == 16 &&
+                mode.mask_size_r == 8 &&
+                mode.mask_size_g == 8 &&
+                mode.mask_size_b == 8 &&
+                res + 9 < end) {
+            strcpy(res, TSTR "(fast)");
+            res += 9;
+        } else if (res + 6 < end) {
+            strcpy(res, TSTR "(slow)");
+            res += 6;
+        }
+
         if (res < end) *res++ = 0;
     }
 
@@ -172,7 +218,7 @@ void boot_menu_show(kernel_params_t &params)
     mode_list.items = new (std::nothrow) tui_str_t[vbe_modes.count]();
 
     for (size_t i = 0; i < vbe_modes.count; ++i) {
-        auto str = mode_text_buf + i * 32;
+        auto str = mode_text_buf + i * 64;
         mode_list.items[i].len = strlen(str);
         mode_list.items[i].str = str;
     }

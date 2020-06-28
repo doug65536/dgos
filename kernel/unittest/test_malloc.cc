@@ -316,7 +316,7 @@ UNITTEST(test_contiguous_alloc_take_taken)
 
     uut.init(0x400000, 0x1000, "test");
     eq(true, uut.take_linear(0x4200, 0x1000, false));
-    uut.dump("took linear");
+    //uut.dump("took linear");
 
     size_t range_count = 0;
     uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
@@ -340,7 +340,7 @@ UNITTEST(test_contiguous_alloc_take_some_start)
 
     uut.init(0x400000, 0x1000, "test");
     eq(true, uut.take_linear(0x3ff000, 0x1800, false));
-    uut.dump("took linear");
+    //uut.dump("took linear");
 
     size_t range_count = 0;
     uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
@@ -364,7 +364,7 @@ UNITTEST(test_contiguous_alloc_take_some_mid)
 
     uut.init(0x400000, 0x2000, "test");
     eq(true, uut.take_linear(0x400400, 0x0800, false));
-    uut.dump("took linear");
+    //uut.dump("took linear");
 
     size_t range_count = 0;
     uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {
@@ -392,7 +392,7 @@ UNITTEST(test_contiguous_alloc_take_some_end)
 
     uut.init(0x400000, 0x1000, "test");
     eq(true, uut.take_linear(0x400800, 0x1000, false));
-    uut.dump("took linear");
+    //uut.dump("took linear");
 
     size_t range_count = 0;
     uut.each_fw([&](contiguous_allocator_t::mmu_range_t range) {

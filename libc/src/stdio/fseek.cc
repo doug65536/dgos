@@ -1,9 +1,16 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/likely.h>
 #include "bits/cfile.h"
 
 int fseek(FILE *stream, off_t offset, int origin)
 {
+    if (unlikely(!stream || origin < 0 || origin > SEEK_END)) {
+        errno = EINVAL;
+        return -1;
+    }
+
     // fseek undoes the effect of ungetc
     stream->unget = -1;
 
@@ -18,7 +25,7 @@ int fseek(FILE *stream, off_t offset, int origin)
 
         // Fail the seek if the write failed
         // Also, leave the dirty state alone so retry can work
-        if (written != write_sz)
+        if (unlikely(written != write_sz))
             return -1;
     }
 }

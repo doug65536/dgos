@@ -66,7 +66,8 @@ long _FILE::writebuf(void const *buffer, size_t size, size_t count)
 long _FILE::ensure_seek_pos(off_t pos)
 {
     if (fd_seek_pos != pos) {
-        if (lseek(fd, pos, SEEK_SET) != pos)
+        int seek_result = lseek(fd, pos, SEEK_SET);
+        if (seek_result != pos)
             return EOF;
         fd_seek_pos = pos;
     }

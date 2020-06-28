@@ -211,7 +211,7 @@ public:
     static constexpr uint32_t cmd_capacity =
             std::min(PAGE_SIZE / sizeof(pending_cmd_t), size_t(32U));
 
-    using lock_type = ext::mcslock;
+    using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type cmd_lock;
     std::condition_variable cmd_cond;

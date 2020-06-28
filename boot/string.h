@@ -25,6 +25,8 @@ extern "C" void *memcpy(void * restrict dest,
 extern "C" void *memmove(void *dest, void const *src, size_t n);
 
 extern "C" char *strcpy(char * restrict dest, char const * restrict src);
+char16_t *strcpy(char16_t *dest, char16_t const *src);
+
 extern "C" char *strcat(char * restrict dest, char const * restrict src);
 
 // Copies up to n bytes to the destination

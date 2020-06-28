@@ -163,9 +163,6 @@ static kernel_params_t *prompt_kernel_param(
 
         vbe_set_mode(mode);
 
-        // Place framebuffer at -2TB
-        //uint64_t linear_addr = (-UINT64_C(2) << 40);
-
         PRINT("Got framebuffer"
               ", paddr=%" PRIx64
               ", size=%" PRIx64 "\n",

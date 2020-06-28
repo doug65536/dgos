@@ -854,11 +854,12 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
     return 0;
 }
 
-static ext::mcslock cprintf_lock;
+static ext::noirq_lock<ext::spinlock> cprintf_lock;
 
 EXPORT int vcprintf(char const * restrict format, va_list ap)
 {
-    std::unique_lock<ext::mcslock> hold_cprintf_lock(cprintf_lock);
+    std::unique_lock<ext::noirq_lock<ext::spinlock>>
+            hold_cprintf_lock(cprintf_lock);
 
     int chars_written = 0;
     if (con_exists()) {

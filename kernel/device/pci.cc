@@ -80,7 +80,7 @@ static std::vector<pci_ecam_t> pci_ecam_list;
 static pci_config_pio pci_pio_accessor;
 static pci_config_mmio pci_mmio_accessor;
 
-using pci_lock_type = ext::mcslock;
+using pci_lock_type = ext::noirq_lock<ext::spinlock>;
 using pci_scoped_lock = std::unique_lock<pci_lock_type>;
 static pci_lock_type pci_lock;
 static pci_config_rw *pci_accessor = &pci_pio_accessor;

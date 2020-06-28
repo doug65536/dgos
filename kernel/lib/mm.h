@@ -234,7 +234,7 @@ int msync(void const *__addr, size_t __len, int __flags);
 
 /// Return the physical address for the specified linear address
 /// Page faults if the memory region is not mapped
-uintptr_t mphysaddr(volatile void *addr);
+uintptr_t mphysaddr(volatile void const *addr);
 
 struct mmphysrange_t {
     uintptr_t physaddr;

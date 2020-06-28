@@ -169,7 +169,7 @@ class noirq_lock
 public:
     using mutex_type = typename _L::mutex_type;
 
-    noirq_lock()
+    constexpr noirq_lock()
         : inner_lock()
     {
     }
@@ -284,6 +284,17 @@ public:
 
     void lock();
     bool try_lock();
+
+    template<typename _Clock, typename _Duration>
+    bool try_lock_until(chrono::time_point<_Clock, _Duration>
+                        const& timeout_time);
+
+    template<typename _Rep, typename _Period>
+    bool try_lock_for(chrono::duration<_Rep, _Period> const& duration)
+    {
+        return try_lock_until(chrono::steady_clock::now() + duration);
+    }
+
     void unlock();
 
     _always_inline mutex_type& native_handle()
@@ -294,6 +305,16 @@ public:
 private:
     mutex_t m;
 };
+
+template<typename _Clock, typename _Duration>
+bool mutex::try_lock_until(chrono::time_point<_Clock, _Duration>
+                           const &timeout_time)
+{
+    chrono::steady_clock::time_point sys_timeout_time = timeout_time;
+
+    uint64_t timeout_ns = sys_timeout_time.time_since_epoch().count();
+    return mutex_try_lock_until(&m, timeout_ns);
+}
 
 // Meets SharedMutex requirements
 class shared_mutex : public ext::base_lock<shared_mutex> {

@@ -117,8 +117,8 @@ class symbol_server_t {
         return true;
     }
 
-    static void perf_sample_callback(int percent, int millipercent,
-                                     char const *name, void *arg)
+    static void perf_sample_callback(void *arg, int percent, int millipercent,
+                                     char const *name)
     {
         symbol_server_t *self = (symbol_server_t*)arg;
         char buf[1024];
@@ -128,8 +128,8 @@ class symbol_server_t {
             self->port->write(buf, size_t(sz));
     }
 
-    static void perf_top_callback(int percent, int millipercent,
-                                  char const *name, void *arg)
+    static void perf_top_callback(void *arg, int percent, int millipercent,
+                                  char const *name)
     {
         symbol_server_t *self = (symbol_server_t*)arg;
         unsigned &scroll_left = self->scroll_left;
@@ -175,8 +175,7 @@ class symbol_server_t {
             port->wrstr("\x1b" "[16A");
 
             top_rows = 0;
-            total_samples = perf_gather_samples(
-                        perf_top_callback, this);
+            total_samples = perf_gather_samples(perf_top_callback, this);
 
             while (top_rows < 16) {
                 port->wrstr("\x1b" "[");
@@ -365,7 +364,7 @@ class symbol_server_t {
 public:
     symbol_server_t()
     {
-        perf_init();
+        //perf_init();
 
         port = uart_dev_t::open(0x2f8, 3, 115200, 8, 'N', 1, false);
 

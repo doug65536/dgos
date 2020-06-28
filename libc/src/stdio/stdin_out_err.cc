@@ -2,17 +2,10 @@
 #include <unistd.h>
 #include "bits/cfile.h"
 
-FILE *stdin = fdopen(STDIN_FILENO, "r");
-FILE *stdout = fdopen(STDOUT_FILENO, "w");
-FILE *stderr = fdopen(STDERR_FILENO, "w");
+static _FILE stdin_bits{STDIN_FILENO};
+static _FILE stdout_bits{STDIN_FILENO};
+static _FILE stderr_bits{STDIN_FILENO};
 
-//extern "C" __attribute__((__constructor__))
-//void __init_stdio()
-//{
-//    stdin = fdopen(STDIN_FILENO, "r");
-//    stdout = fdopen(STDOUT_FILENO, "w");
-//    stderr = fdopen(STDERR_FILENO, "w");
-
-//    if (!stdin || !stdout || !stderr)
-//        abort();
-//}
+FILE *stdin = &stdin_bits;
+FILE *stdout = &stdout_bits;
+FILE *stderr = &stderr_bits;

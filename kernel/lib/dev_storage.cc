@@ -24,7 +24,7 @@ struct fs_mount_t {
 using path_table_t = hashtbl_t<fs_mount_t, fs_factory_t*, &fs_mount_t::reg>;
 static path_table_t path_table;
 
-using lock_type = ext::mcslock;
+using lock_type = ext::noirq_lock<ext::spinlock>;
 using scoped_lock = std::unique_lock<lock_type>;
 static lock_type storage_lock;
 

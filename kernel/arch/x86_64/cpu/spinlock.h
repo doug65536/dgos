@@ -11,6 +11,7 @@ typedef spinlock_value_t volatile spinlock_t;
 
 void spinlock_lock(spinlock_t *lock);
 bool spinlock_try_lock(spinlock_t *lock);
+bool spinlock_try_lock_until(spinlock_t *lock, uint64_t timeout_time);
 void spinlock_unlock(spinlock_t *lock);
 
 //

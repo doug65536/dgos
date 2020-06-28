@@ -130,6 +130,7 @@ SECTIONS {
 		PROVIDE(__init_array_start) = .;
 		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
 		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
+		LONG(0);
 		PROVIDE(__init_array_end = .);
 
 		PROVIDE(__init_array_early_start) = .;

@@ -9,10 +9,5 @@ size_t fwrite(void const *restrict buffer, size_t size,
     if (unlikely(!(size | count)))
         return 0;
 
-    if (unlikely(!stream)) {
-        errno = EFAULT;
-        return 0;
-    }
-
     return stream->writebuf(buffer, size, count);
 }

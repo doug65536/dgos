@@ -39,6 +39,7 @@
 #include "engunit.h"
 #include "stacktrace.h"
 #include "bootinfo.h"
+#include "cpu/perf.h"
 
 kernel_params_t *kernel_params;
 
@@ -770,6 +771,8 @@ static int init_thread(void *)
     if (bootinfo_parameter(bootparam_t::boot_debugger))
         cpu_breakpoint();
 
+    perf_init();
+
 #if ENABLE_UNWIND
     printk("Testing exception unwind\n");
     test_unwind();
@@ -997,8 +1000,11 @@ struct symbols_t {
         uint32_t line_nr;
     };
 
-    std::map<uintptr_t, linenum_entry_t> line_lookup;
-    std::map<uintptr_t, size_t> func_lookup;
+    using linemap_t = std::map<uintptr_t, linenum_entry_t>;
+    using funcmap_t = std::map<uintptr_t, size_t>;
+
+    linemap_t line_lookup;
+    funcmap_t func_lookup;
     std::vector<char> tokens;
 
     char const *token(size_t n) const noexcept
@@ -1007,6 +1013,41 @@ struct symbols_t {
     }
 
     using name_lookup_t = std::map<std::string, size_t>;
+
+    static void symbol_xlat(void *arg, void * const *ips, size_t count)
+    {
+        reinterpret_cast<symbols_t*>(arg)->symbol_xlat(ips, count);
+    }
+
+    void symbol_xlat(void * const *ips, size_t count)
+    {
+        for (size_t i = 0; i < count; ++i) {
+            uintptr_t ip = uintptr_t(ips[i]);
+
+            funcmap_t::iterator fit = func_lookup.lower_bound(ip);
+            if (likely(fit != func_lookup.begin() &&
+                       fit != func_lookup.end() &&
+                       fit->first != ip))
+                --fit;
+
+            linemap_t::iterator lit = line_lookup.lower_bound(ip);
+            if (likely(lit != line_lookup.begin() &&
+                       lit != line_lookup.end() &&
+                       lit->first != ip))
+                --lit;
+
+            size_t ftok = fit->second;
+            size_t fofs = ip - fit->first;
+
+            linenum_entry_t line = lit->second;
+
+            char const *fname = token(ftok);
+            char const *file = token(line.filename_index);
+
+            printdbg("%#zx %s%+zd (%s:%u)\n", ip, fname,
+                     fofs, file, line.line_nr);
+        }
+    }
 
     void load()
     {
@@ -1035,7 +1076,11 @@ struct symbols_t {
 
         // Destroyed after loading is complete
         name_lookup_t name_lookup;
+
+        // Make 0 token an empty string
         tokens.push_back(0);
+
+        // Make empty string map to zero token
         name_lookup.insert({"", 0});
 
         std::string name;
@@ -1050,18 +1095,18 @@ struct symbols_t {
             // Get filename
             char *filename = src;
 
-            while (src < end && *src != ' ')
+            while (src < line_end && *src != ' ')
                 ++src;
 
             char *filename_end = src;
 
-            while (src < end && (*src == ' ' || *src == '\t'))
+            while (src < line_end && (*src == ' ' || *src == '\t'))
                 ++src;
 
             // Get line number
             uint32_t line_nr_value = parse_number(src, end);
 
-            while (src < end && (*src == ' ' || *src == '\t'))
+            while (src < line_end && (*src == ' ' || *src == '\t'))
                 ++src;
 
             // Get address
@@ -1081,7 +1126,7 @@ struct symbols_t {
             line_lookup.insert({ addr_value, entry });
         }
 
-        symfd = file_openat(AT_FDCWD, "kernel-generic-kallsyms",
+        symfd = file_openat(AT_FDCWD, "sym/kernel-generic-kallsyms",
                             O_EXCL | O_RDONLY);
 
         if (unlikely(!symfd))
@@ -1102,10 +1147,12 @@ struct symbols_t {
         if (unlikely(sz != len))
             return;
 
-        for (char *line_end, *end = buf + len; src < end; src = line_end) {
+        src = buf;
+        for (char *line_end, *end = buf + len; src < end; src = line_end + 1) {
             line_end = static_cast<char*>(memchr(src, '\n', end - src));
 
-            line_end = line_end ? line_end : end;
+            if (unlikely(!line_end))
+                line_end = end;
 
             uintptr_t addr_value = parse_address(src, end);
 
@@ -1127,6 +1174,8 @@ struct symbols_t {
 
             func_lookup.insert({ addr_value, ins->second });
         }
+
+        perf_set_stacktrace_xlat_fn(symbol_xlat, this);
     }
 
     name_lookup_t::iterator name_insert(
@@ -1138,8 +1187,10 @@ struct symbols_t {
 
         if (ins.second) {
             // It got inserted, append the string to the token vector
-            for (char const& c : ins.first->first)
+            for (char c : ins.first->first) {
+                assert(c != '\n');
                 tokens.push_back(c);
+            }
             tokens.push_back(0);
         }
 
@@ -1179,14 +1230,14 @@ struct symbols_t {
 
 static symbols_t symbols;
 
-extern "C" _noreturn int main(void)
+extern "C" _noreturn int kernel_main(void)
 {
 #ifdef _ASAN_ENABLED
     __builtin___asan_storeN_noabort((void*)kernel_params->phys_mapping,
                                     kernel_params->phys_mapping_sz);
 #endif
 
-    test_cxx_except();
+    //test_cxx_except();
 
     tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
 
@@ -1195,7 +1246,7 @@ extern "C" _noreturn int main(void)
     symbols.load();
 
     void *warmup[16];
-    stacktrace(warmup, 16);
+    perf_stacktrace_xlat(warmup, stacktrace(warmup, 16));
 
     // Become the idle thread for the boot processor
 

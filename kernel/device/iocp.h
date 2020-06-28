@@ -34,7 +34,7 @@ public:
     void reset(callback_t callback, uintptr_t arg);
 
 private:
-    using lock_type = ext::mcslock;
+    using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = std::unique_lock<lock_type>;
 
     void invoke_once(scoped_lock &hold);

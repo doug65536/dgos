@@ -107,7 +107,7 @@ enum struct png_filter_type_t {
 };
 
 struct png_read_state_t {
-    png_image_t const *img;
+    surface_t const *img;
     int32_t cur_row;
     png_filter_type_t cur_filter;
     intptr_t pixel_bytes;
@@ -162,7 +162,7 @@ static void png_fixup_bgra(void *p, size_t count)
 {
     uint32_t *p32 = (uint32_t*)p;
     while (count--) {
-        *p32 = (bswap_32(*p32) >> 8);
+        *p32 = (bswap_32(*p32) >> 8) | (*p32 & 0xFF000000U);
         ++p32;
     }
 }
@@ -297,7 +297,7 @@ static void zlib_free(void *opaque, void *p)
     free(p);
 }
 
-png_image_t *png_load(char const *path)
+surface_t *png_load(char const *path)
 {
     // Allocate read buffer
     // fixme, was unique_ptr
@@ -335,7 +335,7 @@ png_image_t *png_load(char const *path)
     int32_t read_size;
 
     // fixme, was unique_ptr
-    png_image_t *img;
+    surface_t *img;
     png_read_state_t state;
     state.cur_row = 0;
     state.cur_filter = png_filter_type_t::UNSET;
@@ -393,7 +393,7 @@ png_image_t *png_load(char const *path)
                     (ihdr.bit_depth >> 3);
             state.scanline_bytes = state.pixel_bytes * ihdr.width;
 
-            img = /*.reset*/((png_image_t*)malloc(sizeof(*img) +
+            img = /*.reset*/((surface_t*)malloc(sizeof(*img) +
                          ihdr.width * ihdr.height * sizeof(uint32_t)));
 
             img->width = ihdr.width;
@@ -488,7 +488,7 @@ png_image_t *png_load(char const *path)
 
 
 
-void png_free(png_image_t *pp)
+void png_free(surface_t *pp)
 {
     free(pp);
 }

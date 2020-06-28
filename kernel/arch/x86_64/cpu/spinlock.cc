@@ -5,6 +5,7 @@
 #include "printk.h"
 #include "export.h"
 #include "thread.h"
+#include "time.h"
 
 #define DEBUG_MCSLOCK 0
 #if DEBUG_MCSLOCK
@@ -41,6 +42,39 @@ EXPORT bool spinlock_try_lock(spinlock_t *lock)
     }
 
     return true;
+}
+
+// Returns 1 with interrupts disabled if lock was acquired
+// Returns 0 with interrupts preserved if lock was not acquired
+EXPORT bool spinlock_try_lock_until(spinlock_t *lock, uint64_t timeout_time)
+{
+    cs_enter();
+
+    bool timed_out = false;
+
+    do {
+        // Try to immediately acquire the lock
+        if (likely(atomic_cmpxchg(lock, 0, 1) == 0))
+            return true;
+
+        // Assert if spinning is futile
+        assert(spincount_mask);
+
+        while ((*lock != 0) && !(timed_out = (time_ns() >= timeout_time))) {
+            // Test many times
+            for (size_t spins = 10000; spins; --spins) {
+                if (*lock == 0)
+                    break;
+            }
+        }
+
+        // The lock appears to be unlocked...
+        // Try again if it looks unlocked, even if it timed out
+    } while ((*lock == 0) || !timed_out);
+
+    cs_leave();
+
+    return false;
 }
 
 _hot

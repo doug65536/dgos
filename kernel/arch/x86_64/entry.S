@@ -267,7 +267,7 @@ bsp_init:
 //.Ldone_perf:
 //    add $ 8*4,%rsp
 
-    call main
+    call kernel_main
 
     movq %rax,%rdi
     call exit

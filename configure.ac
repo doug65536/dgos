@@ -201,7 +201,7 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 fno-fat-lto-objects ggdb3 \
+		std=c++17 fno-fat-lto-objects ggdb3 \
 		fno-integrated-as W Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
 		Wstrict-overflow \
@@ -620,9 +620,9 @@ AS_IF([test x"$NO_FORCE_LIBGCC_GXX" == x""],
 
 AC_MSG_NOTICE([Using libgcc parameters: $REGPARM_FLAGS $BOOTLOADER_FLAGS])
 LIBGCC_ELF32=$($LIBGCC_CXX $REGPARM_FLAGS $ELF32_FLAGS -print-libgcc-file-name)
-LIBGCC_ELF64=$($LIBGCC_CXX $REGPARM_FLAGS $ELF64_FLAGS -print-libgcc-file-name)
+LIBGCC_ELF64=$($LIBGCC_CXX $ELF64_FLAGS -print-libgcc-file-name)
 LIBGCC_PE32=$($LIBGCC_CXX $REGPARM_FLAGS $PE32_FLAGS -print-libgcc-file-name)
-LIBGCC_PE64=$($LIBGCC_CXX $REGPARM_FLAGS $PE64_FLAGS -print-libgcc-file-name)
+LIBGCC_PE64=$($LIBGCC_CXX $PE64_FLAGS -print-libgcc-file-name)
 AC_MSG_NOTICE([Using elf32 libgcc: $LIBGCC_ELF32])
 AC_MSG_NOTICE([Using elf64 libgcc: $LIBGCC_ELF64])
 AC_MSG_NOTICE([Using pe32 libgcc: $LIBGCC_PE32])

@@ -5,7 +5,6 @@
 
 FILE *fdopen(int fd, char const *mode)
 {
-    FILE *f = new (std::nothrow) FILE();
-    f->fd = fd;
+    FILE *f = new (std::nothrow) FILE(fd);
     return f;
 }

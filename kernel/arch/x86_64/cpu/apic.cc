@@ -87,8 +87,8 @@ struct mp_ioapic_t {
     uint8_t irq_base;
     uint32_t addr;
     uint32_t volatile *ptr;
-    using lock_type = ext::mcslock;
-    using scoped_lock = std::unique_lock<ext::mcslock>;
+    using lock_type = ext::noirq_lock<ext::spinlock>;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 };
 
@@ -106,7 +106,7 @@ static uint64_t apic_ns_limit;
 static unsigned ioapic_count;
 static mp_ioapic_t ioapic_list[16];
 
-using ioapic_msi_alloc_lock_type = ext::mcslock;
+using ioapic_msi_alloc_lock_type = ext::noirq_lock<ext::spinlock>;
 using ioapic_msi_alloc_scoped_lock =
     std::unique_lock<ioapic_msi_alloc_lock_type>;
 static ioapic_msi_alloc_lock_type ioapic_msi_alloc_lock;
@@ -778,9 +778,9 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
     return result;
 }
 
-static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
+static void acpi_process_fadt(acpi_fadt_t *fadt)
 {
-    acpi_fadt = *fadt_hdr;
+    acpi_fadt = *fadt;
 
     // Map the firmware control structure if there is one
     if (acpi_fadt.fw_ctl) {
@@ -802,6 +802,12 @@ static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
     }
 }
 
+static void acpi_dump_hdr(acpi_sdt_hdr_t *hdr, char const *mem)
+{
+    printdbg(" acpi header: %4.4s\n", hdr->sig);
+    printdbg("oem table id: %8.8s\n", hdr->oem_table_id);
+}
+
 template<typename H, typename E, typename F>
 static bool acpi_foreach_record(H const *hdr, E const *ent_type,
                                 F callback, int type)
@@ -811,15 +817,24 @@ static bool acpi_foreach_record(H const *hdr, E const *ent_type,
     H aligned_hdr;
     memcpy(&aligned_hdr, hdr, sizeof(aligned_hdr));
 
-    printdbg("header at %zx\n", uintptr_t(hdr));
-    printdbg("ACPI each record len=%" PRIu32 "\n", aligned_hdr.hdr.len);
+//    printdbg("header at %#zx len=%#x\n", mphysaddr(hdr), aligned_hdr.hdr.len);
+//    hex_dump(hdr, aligned_hdr.hdr.len, mphysaddr(hdr));
+//    //acpi_dump_hdr(&aligned_hdr.hdr, st);
+//    printdbg("ACPI each record len=%" PRIu32 "\n", aligned_hdr.hdr.len);
 
     char const *ent = st + sizeof(H);
-    char const *end = ent + aligned_hdr.hdr.len;
+    char const *end = st + aligned_hdr.hdr.len;
 
     E aligned_ent;
     while (ent < end) {
         memcpy(&aligned_ent, ent, sizeof(aligned_ent));
+
+//        printdbg("record at %#zx type=%#x len=%#x\n", mphysaddr(ent),
+//                 aligned_ent.hdr.entry_type,
+//                 aligned_ent.hdr.record_len);
+
+//        hex_dump(ent, aligned_ent.hdr.record_len, mphysaddr(ent));
+
         ent += aligned_ent.hdr.record_len;
 
         if (type == -1 || aligned_ent.hdr.entry_type == type)
@@ -834,130 +849,128 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr, char const *hdr)
     apic_base = madt_hdr->lapic_address;
     acpi_madt_flags = madt_hdr->flags & 1;
 
-    if (!memcmp(madt_hdr->hdr.sig, "APIC", 4)) {
-        // Scan for APIC ID records
-        acpi_foreach_record((acpi_madt_t const *)hdr,
-                            (acpi_madt_ent_t const*)nullptr,
-                            [](acpi_madt_ent_t const* ent) noexcept {
-            acpi_madt_lapic_t const& lapic = ent->lapic;
+    // Scan for APIC ID records
+    acpi_foreach_record((acpi_madt_t const *)hdr,
+                        (acpi_madt_ent_t const*)nullptr,
+                        [](acpi_madt_ent_t const* ent) noexcept {
+        acpi_madt_lapic_t const& lapic = ent->lapic;
 
-            if (apic_id_count < countof(apic_id_list)) {
-                ACPI_TRACE("Found LAPIC, ID=%d\n", ent->lapic.apic_id);
+        if (apic_id_count < countof(apic_id_list)) {
+            ACPI_TRACE("Found LAPIC, ID=%d\n", ent->lapic.apic_id);
 
-                // If processor is enabled
-                if (lapic.flags != 0) {
-                    assert(lapic.flags & 1);  // check for weird value
-                    apic_id_list[apic_id_count++] = ent->lapic.apic_id;
-                } else {
-                    ACPI_TRACE("Disabled processor detected\n");
-                }
+            // If processor is enabled
+            if (lapic.flags != 0) {
+                assert(lapic.flags & 1);  // check for weird value
+                apic_id_list[apic_id_count++] = ent->lapic.apic_id;
             } else {
-                ACPI_ERROR("Too many CPUs! Dropped one\n");
+                ACPI_TRACE("Disabled processor detected\n");
             }
-        }, ACPI_MADT_REC_TYPE_LAPIC);
+        } else {
+            ACPI_ERROR("Too many CPUs! Dropped one\n");
+        }
+    }, ACPI_MADT_REC_TYPE_LAPIC);
 
-        // Scan for IOAPIC records
-        acpi_foreach_record((acpi_madt_t const *)hdr,
-                            (acpi_madt_ent_t const*)nullptr,
-                            [](acpi_madt_ent_t const* ent) noexcept {
-            ACPI_TRACE("IOAPIC found\n");
-            if (ioapic_count < countof(ioapic_list)) {
-                mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
-                ioapic->addr = ent->ioapic.addr;
-                ioapic->irq_base = ent->ioapic.irq_base;
-                ioapic->id = ent->ioapic.apic_id;
-                ioapic->ptr = (uint32_t*)mmap(
-                            (void*)(uintptr_t)ent->ioapic.addr, 12,
-                            PROT_READ | PROT_WRITE,
-                            MAP_PHYSICAL | MAP_NOCACHE |
-                            MAP_WRITETHRU);
-                if (unlikely(ioapic->ptr == MAP_FAILED))
-                    panic_oom();
+    // Scan for IOAPIC records
+    acpi_foreach_record((acpi_madt_t const *)hdr,
+                        (acpi_madt_ent_t const*)nullptr,
+                        [](acpi_madt_ent_t const* ent) noexcept {
+        ACPI_TRACE("IOAPIC found\n");
+        if (ioapic_count < countof(ioapic_list)) {
+            mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
+            ioapic->addr = ent->ioapic.addr;
+            ioapic->irq_base = ent->ioapic.irq_base;
+            ioapic->id = ent->ioapic.apic_id;
+            ioapic->ptr = (uint32_t*)mmap(
+                        (void*)(uintptr_t)ent->ioapic.addr, 12,
+                        PROT_READ | PROT_WRITE,
+                        MAP_PHYSICAL | MAP_NOCACHE |
+                        MAP_WRITETHRU);
+            if (unlikely(ioapic->ptr == MAP_FAILED))
+                panic_oom();
 
-                ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
-                uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
-                entries = IOAPIC_VER_ENTRIES_GET(entries) + 1;
+            ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
+            uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
+            entries = IOAPIC_VER_ENTRIES_GET(entries) + 1;
 
-                ioapic->vector_count = entries;
-                ioapic->base_intr = ioapic_alloc_vectors(entries);
+            ioapic->vector_count = entries;
+            ioapic->base_intr = ioapic_alloc_vectors(entries);
 
-                ioapic_reset(ioapic);
+            ioapic_reset(ioapic);
 
-                ACPI_TRACE("IOAPIC registered, id=%u, addr=%#x, irqbase=%d,"
-                           " entries=%u\n",
-                           ioapic->id, ioapic->addr, ioapic->irq_base,
-                           ioapic->vector_count);
-            } else {
-                ACPI_TRACE("Too many IOAPICs!\n");
-            }
-        }, ACPI_MADT_REC_TYPE_IOAPIC);
+            ACPI_TRACE("IOAPIC registered, id=%u, addr=%#x, irqbase=%d,"
+                       " entries=%u\n",
+                       ioapic->id, ioapic->addr, ioapic->irq_base,
+                       ioapic->vector_count);
+        } else {
+            ACPI_TRACE("Too many IOAPICs!\n");
+        }
+    }, ACPI_MADT_REC_TYPE_IOAPIC);
 
-        acpi_foreach_record((acpi_madt_t const *)hdr,
-                            (acpi_madt_ent_t const*)nullptr,
-                            [](acpi_madt_ent_t const* ent) noexcept {
-            ACPI_TRACE("Got Interrupt redirection record\n");
+    acpi_foreach_record((acpi_madt_t const *)hdr,
+                        (acpi_madt_ent_t const*)nullptr,
+                        [](acpi_madt_ent_t const* ent) noexcept {
+        ACPI_TRACE("Got Interrupt redirection record\n");
 
-            uint8_t gsi = ent->irq_src.gsi;
-            uint8_t intr = INTR_APIC_IRQ_BASE + gsi;
-            uint8_t irq = ent->irq_src.irq_src;
-            uint8_t bus = ent->irq_src.bus;
-            bool isa = (bus == 0);
+        uint8_t gsi = ent->irq_src.gsi;
+        uint8_t intr = INTR_APIC_IRQ_BASE + gsi;
+        uint8_t irq = ent->irq_src.irq_src;
+        uint8_t bus = ent->irq_src.bus;
+        bool isa = (bus == 0);
 
-            intr_to_irq[intr] = irq;
-            irq_to_intr[irq] = intr;
+        intr_to_irq[intr] = irq;
+        irq_to_intr[irq] = intr;
 
-            int ioapic_index = intr_to_ioapic[intr];
+        int ioapic_index = intr_to_ioapic[intr];
 
-            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u"
-                       ", flags=%#x vector=%u, ioapic_index=%d\n",
-                       irq, gsi, ent->irq_src.flags, intr, ioapic_index);
+        ACPI_TRACE("Applied redirection, irq=%u, gsi=%u"
+                   ", flags=%#x vector=%u, ioapic_index=%d\n",
+                   irq, gsi, ent->irq_src.flags, intr, ioapic_index);
 
-            mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
-            irq_is_level[irq] = ioapic_set_flags(
-                        ioapic, gsi, /*irq - ioapic->irq_base,*/
-                        ent->irq_src.flags, isa);
+        mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
+        irq_is_level[irq] = ioapic_set_flags(
+                    ioapic, gsi, /*irq - ioapic->irq_base,*/
+                    ent->irq_src.flags, isa);
 
-        }, ACPI_MADT_REC_TYPE_IRQ);
+    }, ACPI_MADT_REC_TYPE_IRQ);
 
-        acpi_foreach_record((acpi_madt_t const *)hdr,
-                            (acpi_madt_ent_t const*)nullptr,
-                            [](acpi_madt_ent_t const* ent) noexcept {
-            ACPI_TRACE("Got IOAPIC NMI mapping\n");
+    acpi_foreach_record((acpi_madt_t const *)hdr,
+                        (acpi_madt_ent_t const*)nullptr,
+                        [](acpi_madt_ent_t const* ent) noexcept {
+        ACPI_TRACE("Got IOAPIC NMI mapping\n");
 
-            uint8_t gsi = ent->nmi_src.gsi;
-            uint8_t intr = INTR_APIC_IRQ_BASE + gsi;
-            int ioapic_index = intr_to_ioapic[intr];
-            if (ioapic_index < 0) {
-                ACPI_TRACE("Got IOAPIC NMI mapping"
-                           " but failed to lookup IOAPIC\n");
-                return;
-            }
-            mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
-            // flags is delivery type?
-            ioapic_set_type(ioapic, gsi - ioapic->irq_base, ent->nmi_src.flags);
-        }, ACPI_MADT_REC_TYPE_NMI);
+        uint8_t gsi = ent->nmi_src.gsi;
+        uint8_t intr = INTR_APIC_IRQ_BASE + gsi;
+        int ioapic_index = intr_to_ioapic[intr];
+        if (ioapic_index < 0) {
+            ACPI_TRACE("Got IOAPIC NMI mapping"
+                       " but failed to lookup IOAPIC\n");
+            return;
+        }
+        mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
+        // flags is delivery type?
+        ioapic_set_type(ioapic, gsi - ioapic->irq_base, ent->nmi_src.flags);
+    }, ACPI_MADT_REC_TYPE_NMI);
 
-        acpi_foreach_record((acpi_madt_t const *)hdr,
-                            (acpi_madt_ent_t const*)nullptr,
-                            [](acpi_madt_ent_t const* ent) noexcept {
-            ACPI_TRACE("Got IOAPIC LNMI mapping\n");
+    acpi_foreach_record((acpi_madt_t const *)hdr,
+                        (acpi_madt_ent_t const*)nullptr,
+                        [](acpi_madt_ent_t const* ent) noexcept {
+        ACPI_TRACE("Got IOAPIC LNMI mapping\n");
 
-            lapic_lint_nmi.push_back(ent->lnmi);
-        }, ACPI_MADT_REC_TYPE_LNMI);
+        lapic_lint_nmi.push_back(ent->lnmi);
+    }, ACPI_MADT_REC_TYPE_LNMI);
 
-        acpi_foreach_record((acpi_madt_t const *)hdr,
-                            (acpi_madt_ent_t const*)nullptr,
-                            [](acpi_madt_ent_t const* ent) noexcept {
-            ACPI_TRACE("Got X2APIC\n");
+    acpi_foreach_record((acpi_madt_t const *)hdr,
+                        (acpi_madt_ent_t const*)nullptr,
+                        [](acpi_madt_ent_t const* ent) noexcept {
+        ACPI_TRACE("Got X2APIC\n");
 
-            if (apic_id_count < countof(apic_id_list)) {
-                if (ent->lapic.flags == 1)
-                    apic_id_list[apic_id_count++] = ent->x2apic.x2apic_id;
-            } else {
-                ACPI_ERROR("Too many CPUs! Dropped one\n");
-            }
-        }, ACPI_MADT_REC_TYPE_X2APIC);
-    }
+        if (apic_id_count < countof(apic_id_list)) {
+            if (ent->lapic.flags == 1)
+                apic_id_list[apic_id_count++] = ent->x2apic.x2apic_id;
+        } else {
+            ACPI_ERROR("Too many CPUs! Dropped one\n");
+        }
+    }, ACPI_MADT_REC_TYPE_X2APIC);
 }
 
 static void acpi_process_hpet(void *acpi_hdr)
@@ -1844,13 +1857,13 @@ int apic_init(int ap)
 
     if (cpuid_has_x2apic()) {
         if (!ap) {
-//            if (cpuid_is_kvm()) {
-//                APIC_TRACE("Using KVM paravirtualized x2APIC\n");
-//                apic = lapic_any_t::create_kvm(&apic_instance);
-//            } else {
+            if (cpuid_is_kvm()) {
+                APIC_TRACE("Using KVM paravirtualized x2APIC\n");
+                apic = lapic_any_t::create_kvm(&apic_instance);
+            } else {
                 APIC_TRACE("Using x2APIC\n");
                 apic = lapic_any_t::create_x2(&apic_instance);
-//            }
+            }
         }
 
         uint64_t new_apic_base_msr = apic_base_msr |

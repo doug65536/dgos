@@ -9,16 +9,27 @@
 
 .code64
 
-.struct 0
-    frame_rbp:  .struct frame_rbp+8
-    frame_intr: .struct frame_intr+8
-    frame_err:  .struct frame_err+8
-    frame_rip:  .struct frame_rip+8
-    frame_cs:   .struct frame_cs+8
-    frame_efl:  .struct frame_efl+8
-    frame_rsp:  .struct frame_rsp+8
-    frame_ss:   .struct frame_ss+8
-    frame_end:
+// .struct is horrible, better to use #define than create weirdo symbols at 0
+//.struct 0
+//    frame_rbp:  .struct frame_rbp+8
+//    frame_intr: .struct frame_intr+8
+//    frame_err:  .struct frame_err+8
+//    frame_rip:  .struct frame_rip+8
+//    frame_cs:   .struct frame_cs+8
+//    frame_efl:  .struct frame_efl+8
+//    frame_rsp:  .struct frame_rsp+8
+//    frame_ss:   .struct frame_ss+8
+//    frame_end:
+
+#define frame_rbp  0
+#define frame_intr 8
+#define frame_err  16
+#define frame_rip  24
+#define frame_cs   32
+#define frame_efl  40
+#define frame_rsp  48
+#define frame_ss   56
+#define frame_end  64
 
 .section .text.isr, "ax", @progbits
 
@@ -132,6 +143,8 @@ isr_section_name \int_num
 // in the order of vector number, the linker script and isr_entry
 // macro are working together to force them all to the correct order
 // anyway, so don't worry if it isn't perfect
+// Worry about not having all 256 entries specified when making edits,
+// that case can go unnoticed with severe problems
 
 // Exceptions
 isr_entry 0 INTR_EX_DIV
@@ -568,17 +581,9 @@ isr_common:
 
     // Guaranteed to swap if came from user mode
     testl $ 3,frame_cs(%rbp)
-    jnz .Lneed_swap
+    jz .Lmaybe_swap
 
-    // Get valid range for cpu pointer
-    lea cpus(%rip),%rax
-    lea cpus_end(%rip),%rdx
-
-    cmpq %r14,%rax
-    ja .Lneed_swap
-
-    cmpq %r14,%rdx
-    jnbe .Lno_swap
+    // No branch taken if interrupting user mode
 
 .Lneed_swap:
     // set flag bit indicating non-kernel gs context
@@ -708,18 +713,19 @@ isr_common:
     wrfsbase %r13
     wrgsbase %r14
 
-    jmp .Lreturning_to_user
+    //jmp .Lreturning_to_user
 
 .Lreturning_to_kernel:
-    testl $(1 << ISR_CTX_CTX_FLAGS_FIXGS_QWBIT),frame_intr(%rbp)
-    jz .Lno_restore_swap2
-    swapgs
-.Lno_restore_swap2:
+//    testl $(1 << ISR_CTX_CTX_FLAGS_FIXGS_QWBIT),frame_intr(%rbp)
+//    jz .Lno_restore_swap2
+//    swapgs
+//.Lno_restore_swap2:
 
-.Lreturning_to_user:
+//.Lreturning_to_user:
 
     .cfi_remember_state
 
+#ifdef ISR_VALIDATE_FLAGS
     // Read eflags, toggle always set flag (becomes 0 in valid case),
     // Mask out all bits that are allowed to be nonzero, make sure it is zero
     movq frame_efl(%rbp),%rdi
@@ -728,6 +734,7 @@ isr_common:
     jz .Lgood_flags2
     call cpu_debug_break
 .Lgood_flags2:
+#endif
 
     .cfi_remember_state
 
@@ -834,6 +841,13 @@ isr_common:
     mov %r13,THREAD_FSBASE_OFS(%r12)
     mov %r14,THREAD_GSBASE_OFS(%r12)
     jmp .Lthread_bases_done
+
+.balign 16
+.Lmaybe_swap:
+    // If bit 63 of gsbase is set, it must be the kernel gs
+    test %r14,%r14
+    js .Lno_swap
+    jmp .Lneed_swap
 
     .cfi_endproc
 
@@ -1241,7 +1255,7 @@ soft_rdgsbase_r14:
 
 // Pass thread_info_t pointer in rdi
 // Clobbers rsi,rdx,rax
-// Returns rdi=pointer to context
+// Returns passed thread_info_t pointer
 .macro xsave_ctx insn
     .cfi_startproc
 

@@ -49,7 +49,7 @@ struct filetab_t {
 // Make it fast to compute index from pointer difference
 C_ASSERT_ISPO2(sizeof(filetab_t));
 
-using file_table_lock_type = ext::mcslock;
+using file_table_lock_type = ext::noirq_lock<ext::spinlock>;
 using file_table_scoped_lock = std::unique_lock<file_table_lock_type>;
 
 static file_table_lock_type file_table_lock;

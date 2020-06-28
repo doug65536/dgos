@@ -40,7 +40,7 @@ public:
 
     ssize_t write(const char *buf, size_t size, off_t offset) override final
     {
-        // lie
+        writedbg(buf, size);
         return size;
     }
 

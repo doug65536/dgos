@@ -148,6 +148,8 @@ lib/engunit.h
 lib/kmodule.h
 lib/noirq_lock.cc
 lib/noirq_lock.h
+lib/pipe.cc
+lib/pipe.h
 lib/radix_tree.cc
 lib/radix_tree.h
 lib/refcount.cc

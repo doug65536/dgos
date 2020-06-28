@@ -35,6 +35,7 @@
 .balign 16
 .global syscall32_entry
 .hidden syscall32_entry
+.type syscall_entry,@function
 syscall32_entry:
     .cfi_startproc
     .cfi_signal_frame
@@ -172,6 +173,7 @@ syscall32_entry:
 .balign 16
 .global syscall_entry
 .hidden syscall_entry
+.type syscall_entry,@function
 syscall_entry:
     .cfi_startproc
     .cfi_signal_frame

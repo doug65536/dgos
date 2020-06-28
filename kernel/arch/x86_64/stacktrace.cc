@@ -23,10 +23,12 @@ static _Unwind_Reason_Code stacktrace_callback(_Unwind_Context *ctx, void *arg)
     _Unwind_Ptr ip = _Unwind_GetIP(ctx);
     _Unwind_Ptr cf = _Unwind_GetCFA(ctx);
 
-    if (trace_ctx->cb)
-        trace_ctx->cb(cf, ip);
-    else
-        trace_ctx->addresses[trace_ctx->index++] = (void*)ip;
+    if (ip) {
+        if (trace_ctx->cb)
+                trace_ctx->cb(cf, ip);
+        else
+            trace_ctx->addresses[trace_ctx->index++] = (void*)ip;
+    }
 
     return _URC_NO_REASON;
 }

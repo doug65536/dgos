@@ -34,7 +34,7 @@ struct _FILE {
     static constexpr int unget_size = 14;
 
     // Holds the ungetch values
-    unsigned char unget_data[unget_size];
+    unsigned char unget_data[unget_size] = {};
 
     // unget_data is a push down stack, this index points to the
     // most recently pushed/ungotten byte. When empty, holds unget_size.
@@ -44,6 +44,11 @@ struct _FILE {
 
     // Whether the buffer is owned (and subsequently freed) by the libc
     bool buf_owned = false;
+
+    explicit constexpr _FILE(int fd)
+        : fd(fd)
+    {
+    }
 
     int open(int new_fd);
 

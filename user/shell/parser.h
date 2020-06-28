@@ -7,19 +7,40 @@ extern "C" {
 
 typedef enum parser_op_t {
     Op_Null,
-    Op_Declarations,
+
+    Op_Empty,
+
+    // Primitives
     Op_Number,
     Op_Identifier,
     Op_String,
+    Op_Word,
+
+    // Unary
+    Op_Neg,
+    Op_BitNot,
+    Op_Call,
+
+    // Binary
     Op_Assign,
     Op_Add,
     Op_Sub,
     Op_Mul,
     Op_Div,
-    Op_Function,
+    Op_And,
+    Op_Or,
+    Op_Xor,
     Op_Comma,
+
+    // Complex
+    Op_Command,
+    Op_Words,
+    Op_Function,
+    Op_Arguments,
     Op_CallWithArgs,
-    Op_Call
+    Op_Assignments,
+    Op_Commands,
+    Op_Declarations
 } parser_op_t;
 
 typedef struct parser_token_t {

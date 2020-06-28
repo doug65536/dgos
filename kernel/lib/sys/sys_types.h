@@ -4,6 +4,7 @@
 typedef int64_t time_t;
 typedef uint64_t fsblkcnt_t;
 typedef uint64_t fsfilcnt_t;
+typedef size_t clockid_t;
 
 struct fs_statvfs_t {
     uint64_t   f_bsize;     /* file system block size */

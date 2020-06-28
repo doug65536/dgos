@@ -209,7 +209,7 @@ struct mmap_device_mapping_t {
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
 static std::vector<mmap_device_mapping_t*> mm_dev_mappings;
-using mm_dev_mapping_lock_type = ext::mcslock;
+using mm_dev_mapping_lock_type = ext::noirq_lock<ext::spinlock>;
 using mm_dev_mapping_scoped_lock = std::unique_lock<mm_dev_mapping_lock_type>;
 static mm_dev_mapping_lock_type mm_dev_mapping_lock;
 
@@ -736,7 +736,7 @@ static _always_inline constexpr T *init_phys(uint64_t addr)
 // Zero initialization
 
 struct clear_phys_state_t {
-    using lock_type = ext::mcslock;
+    using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type locks[64];
 
@@ -2559,7 +2559,7 @@ EXPORT int msync(void const *addr, size_t len, int flags)
     return result;
 }
 
-EXPORT uintptr_t mphysaddr(void volatile *addr)
+EXPORT uintptr_t mphysaddr(void volatile const *addr)
 {
     linaddr_t linaddr = linaddr_t(addr);
 

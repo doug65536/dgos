@@ -1,14 +1,2 @@
-#define TOKEN_EQ                               1
-#define TOKEN_PLUS                             2
-#define TOKEN_MINUS                            3
-#define TOKEN_TIMES                            4
-#define TOKEN_DIVIDE                           5
-#define TOKEN_COMMA                            6
-#define TOKEN_OPENPAREN                        7
-#define TOKEN_CLOSEPAREN                       8
-#define TOKEN_QUOTED_STRING                    9
-#define TOKEN_IDENTIFIER                      10
-#define TOKEN_FUNC                            11
-#define TOKEN_OPENBRACE                       12
-#define TOKEN_CLOSEBRACE                      13
-#define TOKEN_NUMBER                          14
+#define TOKEN_WORD                             1
+#define TOKEN_ASSIGNMENT_NAME                  2

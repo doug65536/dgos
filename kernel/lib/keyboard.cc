@@ -18,7 +18,7 @@ struct keyboard_buffer_t {
     size_t head;
     size_t tail;
 
-    using lock_type = ext::mcslock;
+    using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;

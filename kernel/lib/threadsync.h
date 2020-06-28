@@ -84,7 +84,8 @@ void mutex_init(mutex_t *mutex);
 void mutex_destroy(mutex_t *mutex);
 int mutex_held(mutex_t *mutex);
 bool mutex_try_lock(mutex_t *mutex);
-bool mutex_lock(mutex_t *mutex, uint64_t timeout_time = UINT64_MAX);
+bool mutex_lock(mutex_t *mutex);
+bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time);
 void mutex_unlock(mutex_t *mutex);
 
 void rwlock_init(rwlock_t *rwlock);

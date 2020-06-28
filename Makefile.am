@@ -688,6 +688,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/bsearch.h \
 	kernel/lib/bswap.cc \
 	kernel/lib/bswap.h \
+	kernel/lib/pipe.cc \
+	kernel/lib/pipe.h \
 	kernel/lib/callout.cc \
 	kernel/lib/callout.h \
 	kernel/lib/radix_tree.h \
@@ -2593,7 +2595,7 @@ debug-bios: all debug-up-bios-hd-iso-ahci-vga-tcg
 
 .PHONY: debug-bios
 
-debug-kvm: all debug-up-bios-hd-iso-ahci-vga-kvm
+debug-kvm: all debug-up-efi-hd-iso-ahci-vga-kvm
 
 .PHONY: debug-kvm
 
@@ -2613,11 +2615,11 @@ run-pxe: all run-up-bios-pxe-gpt-ahci-vga-tcg
 
 .PHONY: run-pxe
 
-run-kvm: all run-up-bios-hd-iso-ahci-vga-kvm
+run-kvm: all run-up-efi-hd-iso-ahci-vga-kvm
 
 .PHONY: run-kvm
 
-run-smp-kvm: all run-smp-bios-hd-iso-ahci-vga-kvm
+run-smp-kvm: all run-smp-efi-hd-iso-ahci-vga-kvm
 
 .PHONY: run-smp-kvm
 

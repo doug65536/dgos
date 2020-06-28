@@ -233,7 +233,7 @@ enum struct errno_t : int8_t {
     /// No medium found.
     ENOMEDIUM = 72,
 
-    /// Not enough space (POSIX.1).
+    /// Not enough memory (POSIX.1).
     ENOMEM = 73,
 
     /// No message of the desired type (POSIX.1).

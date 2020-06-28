@@ -33,6 +33,10 @@ define startupbreakpoints
 	set may-call-functions off
 end
 
+define qemu
+	target remote localhost:1234
+end
+
 define walkstack
 	set $addr = $arg0
 	set $depth = $arg1
