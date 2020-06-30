@@ -493,7 +493,9 @@ bin_PROGRAMS += init
 generate_symbols_list += init
 
 init_SOURCES = \
-	user/init/init.cc
+	user/init/init.cc \
+	user/init/frameserver.cc \
+	user/init/frameserver.h
 
 init_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
@@ -557,7 +559,7 @@ init_shared_CFLAGS = \
 	$(USER64_EXE_FLAGS)
 
 init_shared_SOURCES = \
-	user/init/init.cc
+	$(init_SOURCES)
 
 init_shared_LDFLAGS = -static
 #-Wl,--no-eh-frame-hdr

@@ -5,6 +5,8 @@ crt0/crt0pc80.S
 lib64.ld
 user64_phdrs.ld
 init/init.cc
+init/frameserver.cc
+init/frameserver.h
 user64.ld
 bin/ls/ls.cc
 crt0/crt0.S
