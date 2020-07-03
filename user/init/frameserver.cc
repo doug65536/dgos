@@ -26,8 +26,6 @@ static void translate_pixels_rgbx32_ssse3(
 {
     __m128i const shuf = _mm_cvtsi64x_si128(byte_reorder_shuffle(2, 1, 0, 3));
 
-    __m128i pixels;
-
     uint32_t * restrict output = (uint32_t*)output_p;
 
     // One pixel at a time until destination is 128-bit aligned (up to 3 loops)
@@ -36,7 +34,7 @@ static void translate_pixels_rgbx32_ssse3(
         // Destination is not 16-byte aligned
 
         // 32 bit integer load moved into xmm register
-        pixels = _mm_cvtsi32_si128(*input);
+        __m128i pixels = _mm_cvtsi32_si128(*input);
 
         pixels = _mm_shuffle_epi8(pixels, shuf);
 
@@ -52,7 +50,7 @@ static void translate_pixels_rgbx32_ssse3(
     // Either no pixels left, or destination is now 128-bit aligned
 
     while (count >= 16) {
-        pixels = _mm_loadu_si128(reinterpret_cast
+        __m128i pixels = _mm_loadu_si128(reinterpret_cast
                                  <__m128i_u const*>(input));
         pixels = _mm_shuffle_epi8(pixels, shuf);
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
@@ -79,7 +77,8 @@ static void translate_pixels_rgbx32_ssse3(
 
     // Copy blocks of 4 pixels
     while (count >= 4) {
-        pixels = _mm_loadu_si128(reinterpret_cast<__m128i_u const*>(input));
+        __m128i pixels = _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input));
         pixels = _mm_shuffle_epi8(pixels, shuf);
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
         input += 4;
@@ -89,7 +88,7 @@ static void translate_pixels_rgbx32_ssse3(
 
     // Copy remaining pixels
     while (count >= 1) {
-        pixels = _mm_cvtsi32_si128(*input);
+        __m128i pixels = _mm_cvtsi32_si128(*input);
         pixels = _mm_shuffle_epi8(pixels, shuf);
         _mm_stream_si32(reinterpret_cast<int*>(output++), *input++);
         ++input;
@@ -113,8 +112,6 @@ static void translate_pixels_rgbx32_avx2(
             ((UINT64_C(2) | (1U << 3) | (0U << 6) | (3U << 9)) << 12) |
             ((UINT64_C(2) | (1U << 3) | (0U << 6) | (3U << 9)) << 0)));
 
-    __m256i pixels;
-
     uint32_t * restrict output = (uint32_t*)output_p;
 
     // One pixel at a time until destination is 128-bit aligned (up to 3 loops)
@@ -122,7 +119,7 @@ static void translate_pixels_rgbx32_avx2(
     while ((count >= 1) && (uintptr_t(output) & 0x0F)) {
         // Destination is not 16-byte aligned
 
-        pixels = _mm256_castsi128_si256(_mm_cvtsi32_si128(*input));
+        __m256i pixels = _mm256_castsi128_si256(_mm_cvtsi32_si128(*input));
 
         pixels =  _mm256_castsi128_si256(
                     _mm_shuffle_epi8(_mm256_castsi256_si128(pixels),
@@ -157,7 +154,7 @@ static void translate_pixels_rgbx32_avx2(
     while (count >= 32) {
         // Copy 32 pixels
 
-        pixels = _mm256_loadu_si256(reinterpret_cast
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
                                     <__m256i_u const*>(input));
         pixels = _mm256_shuffle_epi8(pixels, shuf);
         _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
@@ -184,7 +181,8 @@ static void translate_pixels_rgbx32_avx2(
 
     // Copy blocks of 8 pixels (up to 3 loops)
     while (count >= 8) {
-        pixels = _mm256_loadu_si256(reinterpret_cast<__m256i_u const*>(input));
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
+                                            <__m256i_u const*>(input));
         pixels = _mm256_shuffle_epi8(pixels, shuf);
         _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
         input += 8;
@@ -227,7 +225,6 @@ void translate_pixels_bgrx32_avx2(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
 {
-    __m256i pixels;
     uint32_t * restrict output = (uint32_t*)output_p;
 
     // One pixel at a time until destination is 128-bit aligned (up to 3 loops)
@@ -257,7 +254,7 @@ void translate_pixels_bgrx32_avx2(
     while (count >= 32) {
         // Copy 32 pixels
 
-        pixels = _mm256_loadu_si256(reinterpret_cast
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
                                     <__m256i_u const*>(input));
         _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
 
@@ -280,7 +277,8 @@ void translate_pixels_bgrx32_avx2(
 
     // Copy blocks of 8 pixels (up to 3 loops)
     while (count >= 8) {
-        pixels = _mm256_loadu_si256(reinterpret_cast<__m256i_u const*>(input));
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
+                                            <__m256i_u const*>(input));
         _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
         input += 8;
         output += 8;
@@ -315,7 +313,6 @@ void translate_pixels_bgrx32_sse(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
 {
-    __m128i pixels;
     uint32_t * restrict output = (uint32_t*)output_p;
 
     // One pixel at a time until destination is 128-bit aligned (up to 3 loops)
@@ -329,7 +326,7 @@ void translate_pixels_bgrx32_sse(
     // Either no pixels left, or destination is now 128-bit aligned
 
     while (count >= 16) {
-        pixels = _mm_loadu_si128(reinterpret_cast
+        __m128i pixels = _mm_loadu_si128(reinterpret_cast
                                  <__m128i_u const*>(input));
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
 
@@ -352,7 +349,8 @@ void translate_pixels_bgrx32_sse(
 
     // Copy blocks of 4 pixels
     while (count >= 4) {
-        pixels = _mm_loadu_si128(reinterpret_cast<__m128i_u const*>(input));
+        __m128i pixels = _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input));
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
         input += 4;
         output += 4;
@@ -492,7 +490,7 @@ static __m256i translate_block_generic_avx2(fb_info_t *info, __m256i pixels)
 {
     __m256i mask = _mm256_set1_epi32(0xFF);
 
-    __m256i b= pixels;
+    __m256i b = pixels;
     __m256i g = _mm256_srli_epi32(pixels, 8);
     __m256i r = _mm256_srli_epi32(pixels, 16);
     __m256i a = _mm256_srli_epi32(pixels, 24);
@@ -851,10 +849,10 @@ static translate_pixels_fn translate_pixels_resolver(fb_info_t *info)
 }
 
 _optimized
-void png_draw_noclip(int dx, int dy,
-                     int dw, int dh,
-                     int sx, int sy,
-                     surface_t const *img, fb_info_t const *info)
+void surface_draw_noclip(int dx, int dy,
+                         int dw, int dh,
+                         int sx, int sy,
+                         surface_t const *img, fb_info_t const *info)
 {
     // Calculate a pointer to the first image pixel
     uint32_t const * restrict src = png_pixels(img) + img->width * sy + sx;
@@ -870,12 +868,18 @@ void png_draw_noclip(int dx, int dy,
 }
 
 _optimized
-void png_draw(int dx, int dy,
-              int dw, int dh,
-              int sx, int sy,
-              surface_t const *img, fb_info_t const *info)
+void surface_draw(int dx, int dy,
+                  int dw, int dh,
+                  int sx, int sy,
+                  surface_t const *img, fb_info_t const *info)
 {
     int hclip, vclip;
+
+    if (unlikely(__builtin_add_overflow_p(dx, dw, 0)))
+        goto overflow;
+
+    if (unlikely(__builtin_add_overflow_p(dy, dh, 0)))
+        goto overflow;
 
     // Calculate amount clipped off left and top
     hclip = -dx;
@@ -923,7 +927,10 @@ void png_draw(int dx, int dy,
     if (unlikely((dw <= 0) | (dh <= 0)))
         return;
 
-    png_draw_noclip(dx, dy, dw, dh, sx, sy, img, info);
+    surface_draw_noclip(dx, dy, dw, dh, sx, sy, img, info);
+
+overflow:
+    return;
 }
 
 static int stress(fb_info_t const& info)
@@ -933,6 +940,7 @@ static int stress(fb_info_t const& info)
     if (unlikely(!img))
         return -1;
 
+    uint64_t const ns_per_sec = UINT64_C(1000000000);
     int x = 0;
     int direction = 1;
     int divisor = 100;
@@ -944,16 +952,23 @@ static int stress(fb_info_t const& info)
             timespec now{};
             clock_gettime(CLOCK_MONOTONIC, &now);
 
-            int64_t since_time = since.tv_sec * UINT64_C(1000000000) +
+            int64_t since_time = since.tv_sec * ns_per_sec +
                     since.tv_nsec;
-            int64_t now_time = now.tv_sec * UINT64_C(1000000000) +
+
+            int64_t now_time = now.tv_sec * ns_per_sec +
                     now.tv_nsec;
             int64_t elap_time = now_time - since_time;
 
             int64_t ns_per_frame = elap_time / divisor;
-            int64_t fps = UINT64_C(1000000000) / ns_per_frame;
-            printf("blitter stress, fps=%zu\n", (size_t)fps);
 
+            int64_t fps = ns_per_sec / ns_per_frame;
+
+            printf("blitter stress, %u.%05u fps=%zu\n",
+                   (unsigned)now.tv_sec, unsigned(now.tv_nsec / 10000),
+                   (size_t)fps);
+
+            // Readjust divisor each update,
+            /// so we adaptively do this once per second
             divisor = fps;
             divisor_countdown = divisor;
 
@@ -966,7 +981,7 @@ static int stress(fb_info_t const& info)
         if (x >= img->width - info.w || x >= img->height - info.h)
             direction = -1;
 
-        png_draw(-x, -x, img->width, img->height, 0, 0, img, &info);
+        surface_draw(-x, -x, img->width, img->height, 0, 0, img, &info);
     }
 
     png_free(img);
