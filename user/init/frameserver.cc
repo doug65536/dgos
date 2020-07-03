@@ -449,7 +449,7 @@ static __m256i translate_block_specific_avx2(fb_info_t *, __m256i pixels)
     r = _mm256_or_si256(r, a);
     b = _mm256_or_si256(b, r);
 
-    return r;
+    return b;
 }
 
 _optimized static __m128i translate_block_generic_sse(
@@ -957,6 +957,7 @@ static int stress(fb_info_t const& info)
 
             int64_t now_time = now.tv_sec * ns_per_sec +
                     now.tv_nsec;
+
             int64_t elap_time = now_time - since_time;
 
             int64_t ns_per_frame = elap_time / divisor;
