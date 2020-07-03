@@ -1065,18 +1065,17 @@ thread_yield:
     xorl $ CPU_EFLAGS_ALWAYS,%edi
 #endif
 
-    push_cfi %rdi
-    popfq_cfi
-
     // Zero all clobbered registers
     xorl %ecx,%ecx
     xorl %edx,%edx
     xorl %esi,%esi
-    xorl %edi,%edi
     xorl %r8d,%r8d
     xorl %r9d,%r9d
     xorl %r10d,%r10d
     xorl %r11d,%r11d
+
+    push_cfi %rdi
+    popfq_cfi
 
     adj_rsp_cfi 16
 
