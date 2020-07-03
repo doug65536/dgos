@@ -6,6 +6,9 @@
 
 int sys_framebuffer_enum(size_t index, size_t count, fb_info_t *result_ptr)
 {
+    if (unlikely(!mm_is_user_range(result_ptr, sizeof(*result_ptr))))
+        return int(errno_t::EFAULT);
+
     vbe_selected_mode_t *mode = reinterpret_cast<vbe_selected_mode_t *>(
                 bootinfo_parameter(bootparam_t::vbe_mode_info));
 
@@ -37,11 +40,16 @@ int sys_framebuffer_enum(size_t index, size_t count, fb_info_t *result_ptr)
     result.x = 0;
     result.y = 0;
 
-    if (unlikely(!mm_is_user_range(result_ptr, sizeof(*result_ptr))))
-        return int(errno_t::EFAULT);
+    if (unlikely(!mm_copy_user(result_ptr, &result, sizeof(*result_ptr)))) {
+        // Failed, roll back
+        munmap(result.vmem, mode->framebuffer_bytes);
 
-    if (unlikely(!mm_copy_user(result_ptr, &result, sizeof(*result_ptr))))
+        // Try to clear result buffer
+        bool ok _unused = mm_copy_user(result_ptr,
+                                       nullptr, sizeof(*result_ptr));
+
         return int(errno_t::EFAULT);
+    }
 
     return 0;
 }

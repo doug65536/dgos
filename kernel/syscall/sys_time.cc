@@ -42,8 +42,8 @@ int sys_clock_gettime(clockid_t id, timespec *tm)
     uint64_t t = time_ns();
 
     timespec result{};
-    result.tv_sec = t / 1000000000;
-    result.tv_nsec = t % 1000000000;
+    result.tv_sec = int32_t(t / 1000000000);
+    result.tv_nsec = int32_t(t % 1000000000);
 
     return clock_copy_timespec_to_user(tm, result);
 }

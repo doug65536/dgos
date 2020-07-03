@@ -477,8 +477,8 @@ EXPORT bool pci_config_write(pci_addr_t addr, size_t offset,
 
 EXPORT void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size)
 {
-    PCI_TRACE("copy: bus=%#.2x, slot=%#.2x, func=%#.2x, ofs=%#.x, sz=%#.zx\n",
-              addr.bus(), addr.slot(), addr.func(), ofs, size);
+//    PCI_TRACE("copy: bus=%#.2x, slot=%#.2x, func=%#.2x, ofs=%#.x, sz=%#.zx\n",
+//              addr.bus(), addr.slot(), addr.func(), ofs, size);
 
     pci_accessor->copy(addr, dest, ofs, size);
 
@@ -488,8 +488,8 @@ EXPORT void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size)
             break;
     if (i != size)
         hex_dump(dest, size);
-    else
-        PCI_TRACE("All 0xFF\n");
+//    else
+//        PCI_TRACE("All 0xFF\n");
 }
 
 static void pci_enumerate_read(pci_addr_t addr, pci_config_hdr_t *config)

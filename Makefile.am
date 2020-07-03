@@ -1499,6 +1499,8 @@ libc_a_SOURCES = \
 	libc/src/sys/mman/munlock.cc \
 	libc/src/sys/mman/madvise.cc \
 	libc/src/sys/ioctl/ioctl.cc \
+	libc/src/sys/time/clock_gettime.cc \
+	libc/src/sys/time/clock_getres.cc \
 	libc/src/sys/tls/tls_get_addr.h \
 	libc/src/sys/tls/tls_get_addr.cc \
 	libc/src/unistd/access.cc \

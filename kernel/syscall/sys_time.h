@@ -5,8 +5,8 @@
 __BEGIN_DECLS
 
 struct timespec {
-    time_t tv_sec;
-    long   tv_nsec;
+    int32_t tv_sec;
+    int32_t tv_nsec;
 };
 
 int sys_nanosleep(timespec const* req, timespec *rem);

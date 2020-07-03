@@ -8,6 +8,7 @@
 #include <string.h>
 #include <png.h>
 #include <sys/likely.h>
+#include <sys/time.h>
 
 // Build a shuffle control mask consisting of 16 4-bit fields
 // Same thing is broadcasted in AVX, this instruction only shuffles within
@@ -94,6 +95,10 @@ static void translate_pixels_rgbx32_ssse3(
         ++input;
         --count;
     }
+
+    // Fence to push out fill buffers.
+    // No point them hoping to be eventually filled
+    _mm_sfence();
 }
 
 _optimized
@@ -210,6 +215,10 @@ static void translate_pixels_rgbx32_avx2(
         ++input;
         --count;
     }
+
+    // Fence to push out fill buffers.
+    // No point them hoping to be eventually filled
+    _mm_sfence();
 }
 
 _optimized
@@ -295,6 +304,10 @@ void translate_pixels_bgrx32_avx2(
         ++input;
         --count;
     }
+
+    // Fence to push out fill buffers.
+    // No point them hoping to be eventually filled
+    _mm_sfence();
 }
 
 _optimized
@@ -351,6 +364,10 @@ void translate_pixels_bgrx32_sse(
         _mm_stream_si32(reinterpret_cast<int*>(output++), *input++);
         --count;
     }
+
+    // Fence to push out fill buffers.
+    // No point them hoping to be eventually filled
+    _mm_sfence();
 }
 
 template<int rbit, int gbit, int bbit, int abit,
@@ -622,6 +639,10 @@ static void translate_pixels_generic32_sse(
                         _mm_cvtsi128_si32(pixels));
         --count;
     }
+
+    // Fence to push out fill buffers.
+    // No point them hoping to be eventually filled
+    _mm_sfence();
 }
 
 template<__m128i (*translate_block)(fb_info_t const * restrict, __m128i)>
@@ -744,6 +765,10 @@ static void translate_pixels_generic16_sse4_1(
         memcpy(output, &halfword, sizeof(halfword));
         --count;
     }
+
+    // Fence to push out fill buffers.
+    // No point them hoping to be eventually filled
+    _mm_sfence();
 }
 
 _optimized
@@ -829,7 +854,7 @@ _optimized
 void png_draw_noclip(int dx, int dy,
                      int dw, int dh,
                      int sx, int sy,
-                     surface_t *img, fb_info_t *info)
+                     surface_t const *img, fb_info_t const *info)
 {
     // Calculate a pointer to the first image pixel
     uint32_t const * restrict src = png_pixels(img) + img->width * sy + sx;
@@ -848,7 +873,7 @@ _optimized
 void png_draw(int dx, int dy,
               int dw, int dh,
               int sx, int sy,
-              surface_t *img, fb_info_t *info)
+              surface_t const *img, fb_info_t const *info)
 {
     int hclip, vclip;
 
@@ -901,20 +926,8 @@ void png_draw(int dx, int dy,
     png_draw_noclip(dx, dy, dw, dh, sx, sy, img, info);
 }
 
-int start_framebuffer()
+static int stress(fb_info_t const& info)
 {
-    fb_info_t info;
-    int err = framebuffer_enum(0, 0, &info);
-
-    if (err < 0) {
-        errno_t save_errno = errno;
-        printf("Unable to map framebuffer!\n");
-        errno = save_errno;
-        return -1;
-    }
-
-    translate_pixels = translate_pixels_resolver(&info);
-
     surface_t *img = png_load("background.png");
 
     if (unlikely(!img))
@@ -922,15 +935,61 @@ int start_framebuffer()
 
     int x = 0;
     int direction = 1;
-    for (;;) {
+    int divisor = 100;
+    int divisor_countdown = divisor;
+    timespec since{};
+    clock_gettime(CLOCK_MONOTONIC, &since);
+    for (int frame_count = 0; ; ++frame_count) {
+        if (--divisor_countdown == 0) {
+            timespec now{};
+            clock_gettime(CLOCK_MONOTONIC, &now);
+
+            int64_t since_time = since.tv_sec * UINT64_C(1000000000) +
+                    since.tv_nsec;
+            int64_t now_time = now.tv_sec * UINT64_C(1000000000) +
+                    now.tv_nsec;
+            int64_t elap_time = now_time - since_time;
+
+            int64_t ns_per_frame = elap_time / divisor;
+            int64_t fps = UINT64_C(1000000000) / ns_per_frame;
+            printf("blitter stress, fps=%zu\n", (size_t)fps);
+
+            divisor = fps;
+            divisor_countdown = divisor;
+
+            memcpy(&since, &now, sizeof(since));
+        }
+
         x += direction;
-        if (x + 200 == 0)
+        if (x == 0)
             direction = 1;
-        if (x - 200 > img->width - info.w)
+        if (x >= img->width - info.w || x >= img->height - info.h)
             direction = -1;
 
-        png_draw(x, x, img->width, img->height, 0, 0, img, &info);
+        png_draw(-x, -x, img->width, img->height, 0, 0, img, &info);
     }
 
     png_free(img);
+
+    return 0;
+}
+
+int start_framebuffer()
+{
+    fb_info_t info;
+    int err = framebuffer_enum(0, 0, &info);
+
+    if (unlikely(err < 0)) {
+        errno_t save_errno = errno;
+        printf("Unable to map framebuffer!\n");
+        errno = save_errno;
+        return -1;
+    }
+
+    printf("Using %dx%d %zdbpp framebuffer\n",
+           info.w, info.h, info.pixel_sz * 8);
+
+    translate_pixels = translate_pixels_resolver(&info);
+
+    return stress(info);
 }

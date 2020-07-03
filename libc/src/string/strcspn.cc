@@ -5,7 +5,7 @@
 size_t strcspn(char const *lhs, char const *rhs)
 {
     // Build a bitmap of characters
-    uint32_t bitmap[256 >> 5];
+    uint32_t bitmap[256 >> 5] = {};
     __byte_bitmap(bitmap, rhs);
 
     // Count leading characters that are not in the bitmap

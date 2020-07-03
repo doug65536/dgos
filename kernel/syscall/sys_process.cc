@@ -338,7 +338,8 @@ timeout_from_user_timespec(timespec const *t)
     if (unlikely(!mm_copy_user(&ts, t, sizeof(ts))))
         return { 0, false };
 
-    return { t ? t->tv_sec * 1000000000 + t->tv_nsec : UINT64_MAX, true };
+    return { t ? t->tv_sec * UINT64_C(1000000000) +
+                 t->tv_nsec : UINT64_MAX, true };
 }
 
 long sys_futex(int *uaddr, int futex_op, int val,

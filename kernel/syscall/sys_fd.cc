@@ -139,7 +139,7 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
     if (unlikely(id < 0))
         return badf_err();
 
-    if (uintptr_t(bufaddr) >= 0x800000000000)
+    if (uintptr_t(bufaddr) >= 0x800000000000U)
         return fault_err();
 
     //unique_memlock memlock(bufaddr, count);

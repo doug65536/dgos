@@ -376,6 +376,7 @@ struct alignas(256) cpu_info_t {
     using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
+    // This lock protects ready_list and sleep_list
     lock_type queue_lock;
 
     // Oldest timeslice first
@@ -389,7 +390,7 @@ struct alignas(256) cpu_info_t {
     ready_set_t ready_list;
 
     // Sleeping threads are keyed here in the order they wake up,
-    // using (thread->wake_time)
+    // using (thread->wake_time). Threads waiting forever are here too.
     ready_set_t sleep_list;
 
     uint64_t volatile tlb_shootdown_count = 0;

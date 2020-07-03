@@ -88,6 +88,8 @@ src/string/__bytebitmap.cc
 src/string/__bytebitmap.h
 src/sys/indirect-thunk.S
 src/sys/ioctl/ioctl.cc
+src/sys/time/clock_gettime.cc
+src/sys/time/clock_getres.cc
 src/sys/mman/madvise.cc
 src/sys/mman/mlock.cc
 src/sys/mman/mmap.cc

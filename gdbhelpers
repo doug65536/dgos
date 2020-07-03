@@ -14,8 +14,8 @@ define startupbreakpoints
 	thbreak entry
 	commands
 		#allow everything
-		maintenance packet qqemu.sstep=1
-		#allow timers
+		#maintenance packet qqemu.sstep=1
+		#allow irqs only
 		#maintenance packet qqemu.sstep=5
 		#b isr_entry_13
 		b cpu_debug_break

@@ -604,7 +604,7 @@ isr_common:
     insn_fixup
     call protection_barrier_from_user
 
-    mov %gs:CPU_INFO_CURTHREAD_OFS(%rdi),%r12
+    movq %gs:CPU_INFO_CURTHREAD_OFS(%rdi),%r12
 
     /// Register usage:
     ///  rdi = 0
@@ -695,16 +695,15 @@ isr_common:
 
     // ...returning to user code
 
+    btl $(ISR_CTX_CTX_FLAGS_FIXGS_QWBIT),frame_intr(%rbp)
+    jnc .Lno_restore_swap
+    swapgs
+.Lno_restore_swap:
+
     // If segments are not changing, avoid 136*4 cycles
     cmpq %r15,%rdx
     jnz .Lsegments_changed
-
 .Lsegments_restored:
-
-    testl $(1 << ISR_CTX_CTX_FLAGS_FIXGS_QWBIT),frame_intr(%rbp)
-    jz .Lno_restore_swap
-    swapgs
-.Lno_restore_swap:
 
     movq THREAD_GSBASE_OFS(%r13),%r14
     movq THREAD_FSBASE_OFS(%r13),%r13
@@ -716,12 +715,6 @@ isr_common:
     //jmp .Lreturning_to_user
 
 .Lreturning_to_kernel:
-//    testl $(1 << ISR_CTX_CTX_FLAGS_FIXGS_QWBIT),frame_intr(%rbp)
-//    jz .Lno_restore_swap2
-//    swapgs
-//.Lno_restore_swap2:
-
-//.Lreturning_to_user:
 
     .cfi_remember_state
 
@@ -1692,6 +1685,9 @@ __module_dynlink_plt_thunk:
     // | rax         |
     // *-------------*
 
+    // The call to __module_dynamic_linker will be
+    // preserving the rest if necessary
+
     push_cfi $0
 
     pushfq_cfi
@@ -2279,9 +2275,9 @@ nofault_memcpy:
 
     // Copy a 64 bit chunk
     mov (%rsi),%rax
-    add $8,%rsi
+    add $ 8,%rsi
     mov %rax,(%rdi)
-    add $8,%rdi
+    add $ 8,%rdi
     add $-8,%rdx
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_little_remaining

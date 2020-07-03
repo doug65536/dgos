@@ -12,6 +12,8 @@ struct timespec {
     int32_t tv_nsec;
 };
 
+#define CLOCK_MONOTONIC 0
+
 int nanosleep(const struct timespec *req, struct timespec *rem);
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);

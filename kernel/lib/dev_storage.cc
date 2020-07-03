@@ -677,7 +677,8 @@ int fs_nosys_t::truncateat(fs_file_info_t *dirfi, fs_cpath_t path, off_t size)
     return -int(errno_t::ENOSYS);
 }
 
-int fs_nosys_t::utimensat(fs_file_info_t *dirfi, fs_cpath_t path, const fs_timespec_t *ts)
+int fs_nosys_t::utimensat(fs_file_info_t *dirfi, fs_cpath_t path,
+                          fs_timespec_t const *ts)
 {
     return -int(errno_t::ENOSYS);
 }
