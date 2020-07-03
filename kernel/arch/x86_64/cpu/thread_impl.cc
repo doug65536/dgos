@@ -1540,7 +1540,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     assert(ctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
 
     if (thread != outgoing) {
-        cpu_irq_disable();
+//        cpu_irq_disable();
         cpu->after_csw_fn = thread_clear_busy;
         cpu->after_csw_vp = outgoing;
     } else {
@@ -1551,6 +1551,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     assert((outgoing->state == THREAD_IS_RUNNING && thread == outgoing) ||
            (outgoing->state & THREAD_BUSY));
     thread->last_cpu = cpu->cpu_nr;
+    cpu->should_reschedule = false;
 
     return ctx;
 }
@@ -1985,8 +1986,10 @@ EXPORT isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx)
 {
     cpu_info_t *cpu = this_cpu();
 
-    if (cpu->should_reschedule)
+    if (cpu->should_reschedule) {
+        cpu->should_reschedule = false;
         return thread_schedule(ctx);
+    }
 
     return ctx;
 }
