@@ -142,7 +142,7 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
     if (uintptr_t(bufaddr) >= 0x800000000000)
         return fault_err();
 
-    unique_memlock memlock(bufaddr, count);
+    //unique_memlock memlock(bufaddr, count);
 
     if (!verify_accessible(bufaddr, count, false))
         return fault_err();

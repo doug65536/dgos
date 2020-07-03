@@ -2,6 +2,7 @@
 
 #include "kmodule.h"
 #include "pci.h"
+#include "user_mem.h"
 
 PCI_DRIVER_BY_CLASS(
         vga,
@@ -40,8 +41,12 @@ public:
 
     ssize_t write(const char *buf, size_t size, off_t offset) override final
     {
-        writedbg(buf, size);
-        return size;
+        user_str_t text(buf, size, user_str_t::truncate_t());
+
+        if (text)
+            writedbg(text, text.lenof_str);
+
+        return text.lenof_str;
     }
 
 

@@ -760,6 +760,14 @@ user_str_t::user_str_t(const char *user_str)
     }
 }
 
+user_str_t::user_str_t(const char *user_str, size_t truncate_len, truncate_t)
+{
+    truncate_len = std::min(max_sz, truncate_len);
+    lenof_str = 0;
+    if (likely(mm_copy_user(data.data, user_str, truncate_len)))
+        lenof_str = truncate_len;
+}
+
 // =======================================================================
 
 class socket_fs_t final : public fs_nosys_t {

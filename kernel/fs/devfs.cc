@@ -157,13 +157,15 @@ ssize_t dev_fs_t::read(fs_file_info_t *fi,
         size_t size,
         off_t offset)
 {
-    return -int(errno_t::ENOSYS);
+    dev_fs_file_t *file = static_cast<dev_fs_file_t*>(fi);
+    return file->read(buf, size, offset);
 }
 
 ssize_t dev_fs_t::write(fs_file_info_t *fi, char const *buf,
                         size_t size, off_t offset)
 {
-    return -int(errno_t::ENOSYS);
+    dev_fs_file_t *file = static_cast<dev_fs_file_t*>(fi);
+    return file->write(buf, size, offset);
 }
 
 int dev_fs_t::ftruncate(fs_file_info_t *fi, off_t offset)

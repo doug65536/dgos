@@ -11,6 +11,7 @@
 #include "isr.h"
 #include "rand.h"
 #include "control_regs_constants.h"
+#include "stacktrace.h"
 
 static stacktrace_xlat_fn_t stacktrace_xlat_fn;
 static void *stacktrace_xlat_fn_arg;
@@ -483,4 +484,23 @@ void perf_stacktrace_xlat(void * const *ips, size_t count)
 {
     if (stacktrace_xlat_fn)
         stacktrace_xlat_fn(stacktrace_xlat_fn_arg, ips, count);
+}
+
+void perf_stacktrace_decoded()
+{
+    printdbg("-------------------------------------------\n");
+
+    void *stacktrace_addrs[32];
+    size_t frame_cnt = stacktrace(stacktrace_addrs,
+                                  countof(stacktrace_addrs));
+
+    //    for (size_t i = 0; i < frame_cnt; ++i)
+    //        printdbg("[%zu] rip=%#zx\n",
+    //                 i, uintptr_t(stacktrace_addrs[i]));
+
+    //    printdbg("- - - - - - - - - - - - - - - - - - - - - -\n");
+
+    perf_stacktrace_xlat(stacktrace_addrs, frame_cnt);
+
+    printdbg("-------------------------------------------\n");
 }

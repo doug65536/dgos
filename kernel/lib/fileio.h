@@ -231,60 +231,6 @@ struct path_frag_t {
     uint32_t hash;
 };
 
-struct user_str_t {
-    user_str_t(char const *user_str);
-    user_str_t(user_str_t const&) = delete;
-    user_str_t operator=(user_str_t const&) = delete;
-
-    // Returns true if holding a valid null terminated string
-    operator bool() const
-    {
-        return lenof_str >= 0;
-    }
-
-    // Return a pointer to the kernel copy of the string if there is
-    // a string present, otherwise returns nullptr
-    operator char const *() const
-    {
-        return lenof_str >= 0
-                ? reinterpret_cast<char const *>(&data)
-                : nullptr;
-    }
-
-    // Returns the length of the string, excluding the null terminator
-    // if there is a string present, otherwise returns 0
-    size_t len() const
-    {
-        return lenof_str >= 0 ? lenof_str : 0;
-    }
-
-    // Returns the errno of the user-to-kernel transfer result
-    // Successful use returns errno_t::OK
-    errno_t err() const
-    {
-        return lenof_str < 0 ? errno_t(-lenof_str) : errno_t::OK;
-    }
-
-    // Returns the negated integer errno of the user-to-kernel transfer result
-    // Successful use returns errno_t::OK
-    int err_int() const
-    {
-        return lenof_str < 0 ? lenof_str : int(errno_t::OK);
-    }
-
-    void set_err(errno_t err)
-    {
-        lenof_str = -intptr_t(err);
-    }
-
-    static constexpr size_t max_sz = PATH_MAX;
-
-    // Doubles as length storage when >= 0
-    // otherwise holds negated errno value
-    intptr_t lenof_str;
-    typename std::aligned_storage<max_sz, sizeof(char const*)>::type data;
-};
-
 // Safely bring a path string into a large object
 struct path_t {
     // Locked down tight, create once, no copy, no assign

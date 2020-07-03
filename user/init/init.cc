@@ -72,6 +72,8 @@ void load_module(char const *path, char const *parameters = nullptr)
 
 int main(int argc, char **argv, char **envp)
 {
+    printf("init startup complete\n");
+
     DIR *dir = opendir("/");
 
     dirent *ent;

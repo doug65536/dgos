@@ -715,21 +715,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
                  rip - modload_get_base(closest_module));
     }
 
-    printdbg("-------------------------------------------\n");
-
-    void *stacktrace_addrs[32];
-    size_t frame_cnt = stacktrace(stacktrace_addrs,
-                                  countof(stacktrace_addrs));
-
-    for (size_t i = 0; i < frame_cnt; ++i)
-        printdbg("[%zu] rip=%#zx\n",
-                 i, uintptr_t(stacktrace_addrs[i]));
-
-    printdbg("- - - - - - - - - - - - - - - - - - - - - -\n");
-
-    perf_stacktrace_xlat(stacktrace_addrs, frame_cnt);
-
-    printdbg("-------------------------------------------\n");
+    perf_stacktrace_decoded();
 
     //
     // Dump context to screen
