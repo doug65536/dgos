@@ -977,9 +977,12 @@ static int stress(fb_info_t const& info)
         }
 
         x += direction;
-        if (x == 0)
+
+        if (x == -100)
             direction = 1;
-        if (x >= img->width - info.w || x >= img->height - info.h)
+
+        if (x - 100 >= img->width - info.w ||
+                x - 100 >= img->height - info.h)
             direction = -1;
 
         surface_draw(-x, -x, img->width, img->height, 0, 0, img, &info);
