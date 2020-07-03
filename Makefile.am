@@ -2001,7 +2001,9 @@ noinst_LIBRARIES += libpng.a
 
 libpng_a_SOURCES = \
 	user/libpng/png.cc \
-	user/libpng/png.h
+	user/libpng/png.h \
+	user/libpng/surface.cc \
+	user/libpng/surface.h
 
 libpng_a_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
@@ -2031,9 +2033,7 @@ EXTRA_libpng_a_DEPENDENCIES = \
 
 noinst_LIBRARIES += libpng32.a
 
-libpng32_a_SOURCES = \
-	user/libpng/png.cc \
-	user/libpng/png.h
+libpng32_a_SOURCES = $(libpng_a_SOURCES)
 
 libpng32_a_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
@@ -2051,13 +2051,9 @@ libpng32_a_CFLAGS = \
 	$(USER32_FLAGS) \
 	$(USER32_EXE_FLAGS)
 
-libpng32_a_CCASFLAGS = \
-	$(ASM_DEBUG_INFO_FLAGS) \
-	$(COMPILER_FLAGS) \
-	-isystem $(top_builddir)/sysroot/include
+libpng32_a_CCASFLAGS = $(libpng_a_CCASFLAGS)
 
-EXTRA_libpng32_a_DEPENDENCIES = \
-	$(INCLUDES_DEPLOYED)
+EXTRA_libpng32_a_DEPENDENCIES = $(EXTRA_libpng_a_DEPENDENCIES)
 
 #===========
 

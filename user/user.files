@@ -19,6 +19,8 @@ shell/lemon_highlight.xml
 shell/Makefile
 libpng/png.cc
 include/png.h
+include/surface.h
+libpng/surface.cc
 zlib/adler32.c
 zlib/compress.c
 zlib/crc32.c

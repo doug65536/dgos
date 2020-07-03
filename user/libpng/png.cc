@@ -4,15 +4,6 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <zlib.h>
-//#include "zlib_helper.h"
-//#include "fileio.h"
-//#include "stdlib.h"
-//#include "bswap.h"
-//#include "string.h"
-//#include "likely.h"
-//#include "assert.h"
-//#include "printk.h"
-//#include "unique_ptr.h"
 
 #define C_ASSERT(expr) static_assert((expr), #expr)
 
@@ -297,7 +288,7 @@ static void zlib_free(void *opaque, void *p)
     free(p);
 }
 
-surface_t *png_load(char const *path)
+surface_t *surface_from_png(char const *path)
 {
     // Allocate read buffer
     // fixme, was unique_ptr
@@ -486,9 +477,3 @@ surface_t *png_load(char const *path)
     return img;//.release();
 }
 
-
-
-void png_free(surface_t *pp)
-{
-    free(pp);
-}

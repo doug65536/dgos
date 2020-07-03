@@ -855,7 +855,7 @@ void surface_draw_noclip(int dx, int dy,
                          surface_t const *img, fb_info_t const *info)
 {
     // Calculate a pointer to the first image pixel
-    uint32_t const * restrict src = png_pixels(img) + img->width * sy + sx;
+    uint32_t const * restrict src = surface_pixels(img) + img->width * sy + sx;
 
     void * restrict dst;
     dst = ((char*)info->vmem + dy * info->pitch) + dx * info->pixel_sz;
@@ -935,7 +935,7 @@ overflow:
 
 static int stress(fb_info_t const& info)
 {
-    surface_t *img = png_load("background.png");
+    surface_t *img = surface_from_png("background.png");
 
     if (unlikely(!img))
         return -1;
@@ -985,7 +985,7 @@ static int stress(fb_info_t const& info)
         surface_draw(-x, -x, img->width, img->height, 0, 0, img, &info);
     }
 
-    png_free(img);
+    surface_free(img);
 
     return 0;
 }
