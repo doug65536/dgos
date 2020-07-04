@@ -1,8 +1,10 @@
 #include <stdint.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/likely.h>
 //#include <typeinfo>
 //#include <cxxabi.h>
+#include <pthread.h>
 
 static char emergency_space[4096];
 static size_t emergency_ptr = sizeof(emergency_space);
@@ -26,6 +28,23 @@ extern "C" void *__cxa_allocate_exception(size_t thrown_size) throw()
 /// Effects: Frees memory allocated by __cxa_allocate_exception.
 void __cxa_free_exception(void * thrown_exception) throw()
 {
+}
+
+static pthread_mutex_t __cxa_guard = PTHREAD_MUTEX_INITIALIZER;
+
+int __cxa_guard_acquire(uint64_t* guard_object)
+{
+    return pthread_mutex_lock(&__cxa_guard) == 0;
+}
+
+void __cxa_guard_release(uint64_t*)
+{
+    pthread_mutex_unlock(&__cxa_guard);
+}
+
+void __cxa_guard_abort(uint64_t*)
+{
+    pthread_mutex_unlock(&__cxa_guard);
 }
 
 #if 0
@@ -164,21 +183,6 @@ bool __cxa_uncaught_exception() throw()
 _Unwind_Reason_Code __gxx_personality_v0 (
         int, _Unwind_Action, _Unwind_Exception_Class,
         struct _Unwind_Exception *, struct _Unwind_Context *)
-{
-
-}
-
-int __cxa_guard_acquire(uint64_t* guard_object)
-{
-
-}
-
-void __cxa_guard_release(uint64_t*)
-{
-
-}
-
-void __cxa_guard_abort(uint64_t*)
 {
 
 }
