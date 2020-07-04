@@ -454,9 +454,7 @@ static uint32_t get_apic_id_slow()
 cpu_info_t *this_cpu_by_apic_id_slow()
 {
     uint32_t apic_id = get_apic_id_slow();
-    printdbg("Searching for apic ID %x\n", apic_id);
     for (size_t i = 0, e = total_cpus; i != e; ++i) {
-        printdbg("...checking against %x\n", cpus[i].apic_id);
         if (cpus[i].apic_id == apic_id)
             return cpus + i;
     }
