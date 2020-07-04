@@ -3,6 +3,7 @@
 
 __BEGIN_DECLS
 
+__attribute__((__noreturn__))
 void __assert_failed(char const *filename, int line, char const *expr);
 
 #define assert(e) (__builtin_expect(!!(e), !0) \
