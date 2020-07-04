@@ -1,10 +1,11 @@
-//#include <process.h>
+#include <stdlib.h>
 
 namespace std {
 
+__attribute__((__noreturn__))
 void terminate()
 {
-    //exit(-1);
+    abort();
 }
 
 }
