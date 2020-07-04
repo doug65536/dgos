@@ -100,8 +100,7 @@ static void translate_pixels_rgbx32_ssse3(
     _mm_sfence();
 }
 
-_optimized
-__attribute__((__target__("avx2")))
+_avx2 _optimized
 static void translate_pixels_rgbx32_avx2(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -219,33 +218,46 @@ static void translate_pixels_rgbx32_avx2(
     _mm_sfence();
 }
 
-_optimized
-__attribute__((__target__("avx2")))
-void translate_pixels_bgrx32_avx2(
+// It is much faster to have a dedicated version of this (and the sse one)
+// in debug build. Calling the generic one with a noop translate
+// block is much slower. Sorry for the duplication.
+_avx2 _optimized
+static void translate_pixels_bgrx32_avx2(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
 {
     uint32_t * restrict output = (uint32_t*)output_p;
 
-    // One pixel at a time until destination is 128-bit aligned (up to 3 loops)
-    // If output is not 32 bit aligned, this loop does the whole scanline
-    while ((count >= 1) && (uintptr_t(output) & 0x0F)) {
-        // Destination is not 16-byte aligned
-        _mm_stream_si32(reinterpret_cast<int*>(output), *input);
+    if ((count >= 1) && (uintptr_t(output) & 0x7)) {
+        // Destination is not 8-byte aligned
+        __m256i pixels = _mm256_castsi128_si256(_mm_cvtsi32_si128(*input));
+        _mm_stream_si32(reinterpret_cast<int*>(output),
+                        _mm_cvtsi128_si32(_mm256_castsi256_si128(pixels)));
         ++output;
         ++input;
         --count;
     }
 
-    // Either no pixels left, or destination is now 128-bit aligned
+    if ((count >= 2) && (uintptr_t(output) & 0xF)) {
+        // Destination is not 16-byte aligned
+        __m256i pixels = _mm256_castsi128_si256(
+                    _mm_cvtsi64_si128(input[0] | (uint64_t(input[1]) << 32)));
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                        _mm_cvtsi128_si64(_mm256_castsi256_si128(pixels)));
+        output += 2;
+        input += 2;
+        count -= 2;
+    }
 
-    if ((count >= 4) && (uintptr_t(output) & 0x10)) {
-        // Destination is 128-bit aligned, but not 256-bit aligned
-        __m128i pixels = _mm_loadu_si128(reinterpret_cast
-                                         <__m128i_u const*>(input));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
-        input += 4;
+    if ((count >= 4) && (uintptr_t(output) & 0x1F)) {
+        // Destination is not 32-byte aligned
+        __m256i pixels = _mm256_castsi128_si256(
+                    _mm_loadu_si128(reinterpret_cast
+                                    <__m128i_u const*>(input)));
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output),
+                        _mm256_castsi256_si128(pixels));
         output += 4;
+        input += 4;
         count -= 4;
     }
 
@@ -275,11 +287,29 @@ void translate_pixels_bgrx32_avx2(
         count -= 32;
     }
 
-    // Copy blocks of 8 pixels (up to 3 loops)
-    while (count >= 8) {
+    if (count >= 16) {
+        // Copy 16 pixels
+
         __m256i pixels = _mm256_loadu_si256(reinterpret_cast
-                                            <__m256i_u const*>(input));
+                                    <__m256i_u const*>(input));
         _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+
+        pixels = _mm256_loadu_si256(reinterpret_cast
+                                    <__m256i_u const*>(input + 8));
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 8), pixels);
+
+        input += 16;
+        output += 16;
+        count -= 16;
+    }
+
+    if (count >= 8) {
+        // Copy 8 pixels
+
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
+                                    <__m256i_u const*>(input));
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+
         input += 8;
         output += 8;
         count -= 8;
@@ -295,8 +325,18 @@ void translate_pixels_bgrx32_avx2(
         count -= 4;
     }
 
+    if (count >= 2) {
+        __m256i pixels = _mm256_castsi128_si256(
+                    _mm_cvtsi64_si128(input[0] | (uint64_t(input[1]) << 32)));
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                         _mm_cvtsi128_si64(_mm256_castsi256_si128(pixels)));
+        input += 2;
+        output += 2;
+        count -= 2;
+    }
+
     // Copy remaining pixels
-    while (count >= 1) {
+    if (count >= 1) {
         _mm_stream_si32(reinterpret_cast<int*>(output), *input);
         ++output;
         ++input;
@@ -309,23 +349,33 @@ void translate_pixels_bgrx32_avx2(
 }
 
 _optimized
-void translate_pixels_bgrx32_sse(
+static void translate_pixels_bgrx32_sse(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
 {
     uint32_t * restrict output = (uint32_t*)output_p;
 
-    // One pixel at a time until destination is 128-bit aligned (up to 3 loops)
-    // If output is not 32 bit aligned, this loop does the whole scanline
-    while ((count >= 1) && (uintptr_t(output) & 0x0F)) {
-        // Destination is not 16-byte aligned
-        _mm_stream_si32(reinterpret_cast<int*>(output++), *input++);
+    if ((count >= 1) && (uintptr_t(output) & 0x7)) {
+        // Destination is not 8-byte aligned
+        _mm_stream_si32(reinterpret_cast<int*>(output), *input);
+
+        ++output;
+        ++input;
         --count;
     }
 
-    // Either no pixels left, or destination is now 128-bit aligned
+    if ((count >= 2) && (uintptr_t(output) & 0xF)) {
+        // Destination is not 16-byte aligned
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                        input[0] | ((uint64_t(input[1]) << 32)));
+
+        output += 2;
+        input += 2;
+        count -= 2;
+    }
 
     while (count >= 16) {
+        // Destination is
         __m128i pixels = _mm_loadu_si128(reinterpret_cast
                                  <__m128i_u const*>(input));
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
@@ -347,8 +397,23 @@ void translate_pixels_bgrx32_sse(
         count -= 16;
     }
 
-    // Copy blocks of 4 pixels
-    while (count >= 4) {
+    // Copy block of 8 pixels
+    if (count >= 8) {
+        __m128i pixels = _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input));
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
+
+        pixels = _mm_loadu_si128(reinterpret_cast
+                                 <__m128i_u const*>(input + 4));
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 4), pixels);
+
+        input += 8;
+        output += 8;
+        count -= 8;
+    }
+
+    // Copy block of 4 pixels
+    if (count >= 4) {
         __m128i pixels = _mm_loadu_si128(reinterpret_cast
                                          <__m128i_u const*>(input));
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
@@ -357,8 +422,19 @@ void translate_pixels_bgrx32_sse(
         count -= 4;
     }
 
+    // Copy block of 2 pixels
+    if (count >= 2) {
+        // Destination is not 16-byte aligned
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                        input[0] | ((uint64_t(input[1]) << 32)));
+
+        output += 2;
+        input += 2;
+        count -= 2;
+    }
+
     // Copy remaining pixels
-    while (count >= 1) {
+    if (count >= 1) {
         _mm_stream_si32(reinterpret_cast<int*>(output++), *input++);
         --count;
     }
@@ -370,7 +446,8 @@ void translate_pixels_bgrx32_sse(
 
 template<int rbit, int gbit, int bbit, int abit,
          int rshl, int gshl, int bshl, int ashl>
-_optimized static __m128i translate_block_specific_sse(
+_optimized
+static __m128i translate_block_specific_sse(
         fb_info_t const * restrict , __m128i pixels)
 {
     __m128i mask = _mm_set1_epi32(0xFF);
@@ -410,10 +487,18 @@ _optimized static __m128i translate_block_specific_sse(
     return b;
 }
 
+//_optimized
+//static __m128i translate_block_noop_sse(
+//        fb_info_t const * restrict , __m128i pixels)
+//{
+//    return pixels;
+//}
+
 template<int rshr, int gshr, int bshr, int ashr,
          int rshl, int gshl, int bshl, int ashl>
-_optimized __attribute__((__target__("avx2")))
-static __m256i translate_block_specific_avx2(fb_info_t *, __m256i pixels)
+_avx2 _optimized
+static __m256i translate_block_specific_avx2(
+        fb_info_t const * restrict, __m256i pixels)
 {
     __m256i mask = _mm256_set1_epi32(0xFF);
 
@@ -452,6 +537,13 @@ static __m256i translate_block_specific_avx2(fb_info_t *, __m256i pixels)
     return b;
 }
 
+//_avx2
+//static __m256i translate_block_noop_avx2(fb_info_t const * restrict,
+//                                         __m256i pixels)
+//{
+//    return pixels;
+//}
+
 _optimized static __m128i translate_block_generic_sse(
         fb_info_t const * restrict info, __m128i pixels)
 {
@@ -484,9 +576,9 @@ _optimized static __m128i translate_block_generic_sse(
     return r;
 }
 
-_optimized
-__attribute__((__target__("avx2")))
-static __m256i translate_block_generic_avx2(fb_info_t *info, __m256i pixels)
+_avx2 _optimized
+static __m256i translate_block_generic_avx2(
+        fb_info_t const *info, __m256i pixels)
 {
     __m256i mask = _mm256_set1_epi32(0xFF);
 
@@ -516,6 +608,9 @@ static __m256i translate_block_generic_avx2(fb_info_t *info, __m256i pixels)
 
     return r;
 }
+
+_optimized
+
 
 typedef void (*translate_pixels_fn)(
         void * restrict output, uint32_t const * restrict input,
@@ -577,16 +672,26 @@ static void translate_pixels_generic32_sse(
         size_t count, fb_info_t const * restrict info)
 {
     uint32_t * restrict output = (uint32_t*)output_p;
-    __m128i pixels;
 
-    // One pixel at a time until destination is 128-bit aligned (up to 3 loops)
-    // If output is not 32 bit aligned, this loop does the whole scanline
-    while ((count >= 1) && (uintptr_t(output) & 0x0F)) {
-        // Destination is not 16-byte aligned
-        pixels = _mm_cvtsi32_si128(*input);
+    if ((count >= 1) && (uintptr_t(output) & 0x07)) {
+        // Destination is not 8-byte aligned
+        __m128i pixels = _mm_cvtsi32_si128(*input);
         pixels = translate_block_generic_sse(info, pixels);
-        _mm_stream_si32(reinterpret_cast<int*>(output++),
+        _mm_stream_si32(reinterpret_cast<int*>(output),
                         _mm_cvtsi128_si32(pixels));
+        ++output;
+        ++input;
+        --count;
+    }
+
+    if ((count >= 2) && (uintptr_t(output) & 0x0F)) {
+        // Destination is not 16-byte aligned
+        __m128i pixels = _mm_cvtsi64_si128(
+                    input[0] | (uint64_t(input[1]) << 32));
+        pixels = translate_block_generic_sse(info, pixels);
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                        _mm_cvtsi128_si64(pixels));
+        ++output;
         ++input;
         --count;
     }
@@ -594,7 +699,7 @@ static void translate_pixels_generic32_sse(
     // Either no pixels left, or destination is now 128-bit aligned
 
     while (count >= 16) {
-        pixels = _mm_loadu_si128(reinterpret_cast
+        __m128i pixels = _mm_loadu_si128(reinterpret_cast
                                  <__m128i_u const*>(input));
         pixels = translate_block_generic_sse(info, pixels);
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
@@ -621,7 +726,8 @@ static void translate_pixels_generic32_sse(
 
     // Copy blocks of 4 pixels
     while (count >= 4) {
-        pixels = _mm_loadu_si128(reinterpret_cast<__m128i_u const*>(input));
+        __m128i pixels = _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input));
         pixels = translate_block_generic_sse(info, pixels);
         _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
         input += 4;
@@ -629,12 +735,165 @@ static void translate_pixels_generic32_sse(
         count -= 4;
     }
 
+    if (count >= 2) {
+        // Copy block of 2 pixels
+        __m128i pixels = _mm_cvtsi64_si128(
+                    input[0] | (uint64_t(input[1]) << 32));
+        pixels = translate_block_generic_sse(info, pixels);
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                        _mm_cvtsi128_si64(pixels));
+        input += 2;
+        output += 2;
+        count -= 2;
+    }
+
     // Copy remaining pixels
-    while (count >= 1) {
-        pixels = _mm_cvtsi32_si128(*input);
+    if (count == 1) {
+        __m128i pixels = _mm_cvtsi32_si128(*input);
         pixels = translate_block_generic_sse(info, pixels);
         _mm_stream_si32(reinterpret_cast<int*>(output++),
                         _mm_cvtsi128_si32(pixels));
+        ++input;
+        ++output;
+        --count;
+    }
+
+    // Fence to push out fill buffers.
+    // No point them hoping to be eventually filled
+    _mm_sfence();
+}
+
+template<__m256i (*translate_block)(fb_info_t const * restrict, __m256i)>
+_avx2 _optimized
+static void translate_pixels_generic32_avx2(
+        void * restrict output_p, uint32_t const * restrict input,
+        size_t count, fb_info_t const * restrict info)
+{
+    uint32_t * restrict output = (uint32_t*)output_p;
+
+    if ((count >= 1) && (uintptr_t(output) & 0x7)) {
+        // Destination is not 8-byte aligned
+        __m256i pixels = _mm256_castsi128_si256(_mm_cvtsi32_si128(*input));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm_stream_si32(reinterpret_cast<int*>(output),
+                        _mm_cvtsi128_si32(_mm256_castsi256_si128(pixels)));
+        ++output;
+        ++input;
+        --count;
+    }
+
+    if ((count >= 2) && (uintptr_t(output) & 0xF)) {
+        // Destination is not 16-byte aligned
+        __m256i pixels = _mm256_castsi128_si256(
+                    _mm_cvtsi64_si128(input[0] | (uint64_t(input[1]) << 32)));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                        _mm_cvtsi128_si64(_mm256_castsi256_si128(pixels)));
+        output += 2;
+        input += 2;
+        count -= 2;
+    }
+
+    if ((count >= 4) && (uintptr_t(output) & 0x1F)) {
+        // Destination is not 32-byte aligned
+        __m256i pixels = _mm256_castsi128_si256(
+                    _mm_loadu_si128(reinterpret_cast
+                                    <__m128i_u const*>(input)));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output),
+                        _mm256_castsi256_si128(pixels));
+        output += 4;
+        input += 4;
+        count -= 4;
+    }
+
+    // Either no pixels left, or destination is now 256-bit aligned
+
+    while (count >= 32) {
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
+                                            <__m256i_u const*>(input));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+
+        pixels = _mm256_loadu_si256(reinterpret_cast
+                                    <__m256i_u const*>(input + 8));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 8), pixels);
+
+        pixels = _mm256_loadu_si256(reinterpret_cast
+                                    <__m256i_u const*>(input + 16));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 6), pixels);
+
+        pixels = _mm256_loadu_si256(reinterpret_cast
+                                    <__m256i_u const*>(input + 24));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 24), pixels);
+
+        input += 32;
+        output += 32;
+        count -= 32;
+    }
+
+    if (count >= 16) {
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
+                                            <__m256i_u const*>(input));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+
+        pixels = _mm256_loadu_si256(reinterpret_cast
+                                    <__m256i_u const*>(input + 8));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 8), pixels);
+
+        input += 16;
+        output += 16;
+        count -= 16;
+    }
+
+    if (count >= 8) {
+        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
+                                            <__m256i_u const*>(input));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+
+        input += 8;
+        output += 8;
+        count -= 8;
+    }
+
+    // Copy blocks of 4 pixels
+    if (count >= 4) {
+        __m256i pixels = _mm256_castsi128_si256(
+                    _mm_loadu_si128(reinterpret_cast
+                                    <__m128i_u const*>(input)));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output),
+                         _mm256_castsi256_si128(pixels));
+        input += 4;
+        output += 4;
+        count -= 4;
+    }
+
+    if (count >= 2) {
+        __m256i pixels = _mm256_castsi128_si256(
+                    _mm_cvtsi64_si128(input[0] | (uint64_t(input[1]) << 32)));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm_stream_si64(reinterpret_cast<long long*>(output),
+                         _mm_cvtsi128_si64(_mm256_castsi256_si128(pixels)));
+        input += 2;
+        output += 2;
+        count -= 2;
+    }
+
+    // Copy remaining pixels
+    if (count >= 1) {
+        __m256i pixels = _mm256_castsi128_si256(_mm_cvtsi32_si128(*input));
+        pixels = translate_block_generic_avx2(info, pixels);
+        _mm_stream_si32(reinterpret_cast<int*>(output),
+                        _mm_cvtsi128_si32(_mm256_castsi256_si128(pixels)));
+        ++input;
+        ++output;
         --count;
     }
 
@@ -828,8 +1087,13 @@ static translate_pixels_fn translate_pixels_resolver(fb_info_t *info)
             return translate_pixels_rgbx32_ssse3;
     }
 
-    if (info->pixel_sz == 4)
+    if (info->pixel_sz == 4) {
+        if (avx2)
+            return translate_pixels_generic32_avx2
+                    <translate_block_generic_avx2>;
+
         return translate_pixels_generic32_sse<translate_block_generic_sse>;
+    }
 
     if (info->pixel_sz == 2 && sse4_1) {
         if (fmt_is_rgba_1555_16(info->fmt))
@@ -874,12 +1138,6 @@ void surface_draw(int dx, int dy,
                   surface_t const *img, fb_info_t const *info)
 {
     int hclip, vclip;
-
-    if (unlikely(__builtin_add_overflow_p(dx, dw, 0)))
-        goto overflow;
-
-    if (unlikely(__builtin_add_overflow_p(dy, dh, 0)))
-        goto overflow;
 
     // Calculate amount clipped off left and top
     hclip = -dx;
@@ -928,9 +1186,6 @@ void surface_draw(int dx, int dy,
         return;
 
     surface_draw_noclip(dx, dy, dw, dh, sx, sy, img, info);
-
-overflow:
-    return;
 }
 
 static int stress(fb_info_t const& info)
@@ -978,11 +1233,13 @@ static int stress(fb_info_t const& info)
 
         x += direction;
 
-        if (x == -100)
+        int clip_edges = 0;
+
+        if (x == -info.w * clip_edges)
             direction = 1;
 
-        if (x - 100 >= img->width - info.w ||
-                x - 100 >= img->height - info.h)
+        if (x - info.w * clip_edges >= img->width - info.w ||
+                x - info.h * clip_edges >= img->height - info.h)
             direction = -1;
 
         surface_draw(-x, -x, img->width, img->height, 0, 0, img, &info);
