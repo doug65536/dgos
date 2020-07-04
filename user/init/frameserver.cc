@@ -24,7 +24,8 @@ static void translate_pixels_rgbx32_ssse3(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
 {
-    __m128i const shuf = _mm_cvtsi64x_si128(byte_reorder_shuffle(2, 1, 0, 3));
+    __m128i const shuf = _mm_cvtsi64_si128(
+                byte_reorder_shuffle(2, 1, 0, 3));
 
     uint32_t * restrict output = (uint32_t*)output_p;
 
@@ -230,9 +231,7 @@ static void translate_pixels_bgrx32_avx2(
 
     if ((count >= 1) && (uintptr_t(output) & 0x7)) {
         // Destination is not 8-byte aligned
-        __m256i pixels = _mm256_castsi128_si256(_mm_cvtsi32_si128(*input));
-        _mm_stream_si32(reinterpret_cast<int*>(output),
-                        _mm_cvtsi128_si32(_mm256_castsi256_si128(pixels)));
+        _mm_stream_si32(reinterpret_cast<int*>(output), *input);
         ++output;
         ++input;
         --count;
@@ -240,10 +239,8 @@ static void translate_pixels_bgrx32_avx2(
 
     if ((count >= 2) && (uintptr_t(output) & 0xF)) {
         // Destination is not 16-byte aligned
-        __m256i pixels = _mm256_castsi128_si256(
-                    _mm_cvtsi64_si128(input[0] | (uint64_t(input[1]) << 32)));
         _mm_stream_si64(reinterpret_cast<long long*>(output),
-                        _mm_cvtsi128_si64(_mm256_castsi256_si128(pixels)));
+                        input[0] | (uint64_t(input[1]) << 32));
         output += 2;
         input += 2;
         count -= 2;
@@ -251,11 +248,9 @@ static void translate_pixels_bgrx32_avx2(
 
     if ((count >= 4) && (uintptr_t(output) & 0x1F)) {
         // Destination is not 32-byte aligned
-        __m256i pixels = _mm256_castsi128_si256(
-                    _mm_loadu_si128(reinterpret_cast
-                                    <__m128i_u const*>(input)));
         _mm_stream_si128(reinterpret_cast<__m128i*>(output),
-                        _mm256_castsi256_si128(pixels));
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input)));
         output += 4;
         input += 4;
         count -= 4;
@@ -266,21 +261,21 @@ static void translate_pixels_bgrx32_avx2(
     while (count >= 32) {
         // Copy 32 pixels
 
-        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
-                                    <__m256i_u const*>(input));
-        _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output),
+                            _mm256_loadu_si256(reinterpret_cast
+                                               <__m256i_u const*>(input)));
 
-        pixels = _mm256_loadu_si256(reinterpret_cast
-                                    <__m256i_u const*>(input + 8));
-        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 8), pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 8),
+                            _mm256_loadu_si256(reinterpret_cast
+                                               <__m256i_u const*>(input + 8)));
 
-        pixels = _mm256_loadu_si256(reinterpret_cast
-                                    <__m256i_u const*>(input + 16));
-        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 16), pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 16),
+                            _mm256_loadu_si256(reinterpret_cast
+                                               <__m256i_u const*>(input + 16)));
 
-        pixels = _mm256_loadu_si256(reinterpret_cast
-                                    <__m256i_u const*>(input + 24));
-        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 24), pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 24),
+                            _mm256_loadu_si256(reinterpret_cast
+                                               <__m256i_u const*>(input + 24)));
 
         input += 32;
         output += 32;
@@ -290,13 +285,13 @@ static void translate_pixels_bgrx32_avx2(
     if (count >= 16) {
         // Copy 16 pixels
 
-        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
-                                    <__m256i_u const*>(input));
-        _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output),
+                            _mm256_loadu_si256(reinterpret_cast
+                                               <__m256i_u const*>(input)));
 
-        pixels = _mm256_loadu_si256(reinterpret_cast
-                                    <__m256i_u const*>(input + 8));
-        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 8), pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output + 8),
+                            _mm256_loadu_si256(reinterpret_cast
+                                               <__m256i_u const*>(input + 8)));
 
         input += 16;
         output += 16;
@@ -306,9 +301,9 @@ static void translate_pixels_bgrx32_avx2(
     if (count >= 8) {
         // Copy 8 pixels
 
-        __m256i pixels = _mm256_loadu_si256(reinterpret_cast
-                                    <__m256i_u const*>(input));
-        _mm256_stream_si256(reinterpret_cast<__m256i*>(output), pixels);
+        _mm256_stream_si256(reinterpret_cast<__m256i*>(output),
+                            _mm256_loadu_si256(reinterpret_cast
+                                               <__m256i_u const*>(input)));
 
         input += 8;
         output += 8;
@@ -317,19 +312,19 @@ static void translate_pixels_bgrx32_avx2(
 
     // Copy blocks of 4 pixels
     if (count >= 4) {
-        __m128i pixels = _mm_loadu_si128(reinterpret_cast
-                                         <__m128i_u const*>(input));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input)));
+
         input += 4;
         output += 4;
         count -= 4;
     }
 
     if (count >= 2) {
-        __m256i pixels = _mm256_castsi128_si256(
-                    _mm_cvtsi64_si128(input[0] | (uint64_t(input[1]) << 32)));
         _mm_stream_si64(reinterpret_cast<long long*>(output),
-                         _mm_cvtsi128_si64(_mm256_castsi256_si128(pixels)));
+                         input[0] | (uint64_t(input[1]) << 32));
+
         input += 2;
         output += 2;
         count -= 2;
@@ -375,22 +370,21 @@ static void translate_pixels_bgrx32_sse(
     }
 
     while (count >= 16) {
-        // Destination is
-        __m128i pixels = _mm_loadu_si128(reinterpret_cast
-                                 <__m128i_u const*>(input));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input)));
 
-        pixels = _mm_loadu_si128(reinterpret_cast
-                                 <__m128i_u const*>(input + 4));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 4), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 4),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input + 4)));
 
-        pixels = _mm_loadu_si128(reinterpret_cast
-                                 <__m128i_u const*>(input + 8));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 8), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 8),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input + 8)));
 
-        pixels = _mm_loadu_si128(reinterpret_cast
-                                 <__m128i_u const*>(input + 12));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 12), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 12),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input + 12)));
 
         input += 16;
         output += 16;
@@ -399,13 +393,13 @@ static void translate_pixels_bgrx32_sse(
 
     // Copy block of 8 pixels
     if (count >= 8) {
-        __m128i pixels = _mm_loadu_si128(reinterpret_cast
-                                         <__m128i_u const*>(input));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input)));
 
-        pixels = _mm_loadu_si128(reinterpret_cast
-                                 <__m128i_u const*>(input + 4));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 4), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output + 4),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input + 4)));
 
         input += 8;
         output += 8;
@@ -414,9 +408,10 @@ static void translate_pixels_bgrx32_sse(
 
     // Copy block of 4 pixels
     if (count >= 4) {
-        __m128i pixels = _mm_loadu_si128(reinterpret_cast
-                                         <__m128i_u const*>(input));
-        _mm_stream_si128(reinterpret_cast<__m128i*>(output), pixels);
+        _mm_stream_si128(reinterpret_cast<__m128i*>(output),
+                         _mm_loadu_si128(reinterpret_cast
+                                         <__m128i_u const*>(input)));
+
         input += 4;
         output += 4;
         count -= 4;
@@ -988,7 +983,7 @@ static void translate_pixels_generic16_sse4_1(
     }
 
     // Copy blocks of 4 pixels
-    while (count >= 4) {
+    if (count >= 4) {
         pixels = _mm_loadu_si128(reinterpret_cast<__m128i_u const*>(input));
         pixels = translate_block(info, pixels);
         _mm_stream_si64(reinterpret_cast<long long *>(output),
@@ -999,7 +994,7 @@ static void translate_pixels_generic16_sse4_1(
     }
 
     // Copy blocks of 2 pixels
-    while (count >= 2) {
+    if (count >= 2) {
         // Move two pixels because destination is not 64-bit aligned
         pixels = _mm_cvtsi32_si128(*input);
         pixels2 = _mm_cvtsi32_si128(input[1]);
