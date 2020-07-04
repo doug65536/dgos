@@ -2407,12 +2407,14 @@ QEMU_NP_numa = \
 #    -drive file=disk.img,if=none,id=hd0 \
 #    -device virtio-blk-pci,drive=hd0,bus=pcie_bridge2
 
+QEMU_ICOUNT_SHIFT = 4
 
 QEMU_EMU = $(QEMU_EMU_$(1))
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand,fsgsbase
 QEMU_EMU_tcg_BASE = -cpu max,migratable=false,fsgsbase,vmware-cpuid-freq
 QEMU_EMU_tcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=single
 QEMU_EMU_mttcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=multi
+QEMU_EMU_icount = $(QEMU_EMU_tcg) -icount shift=$(QEMU_ICOUNT_SHIFT),sleep=off
 #-cpu max,la57
 
 QEMU_BOOT = $(QEMU_BOOT_$(1))
@@ -2460,7 +2462,7 @@ QL_BM = pxe hd
 QL_FS = iso mbr gpt
 QL_SC = none ahci ide nvme usb virtio
 QL_VO = vga gl
-QL_EM = kvm tcg mttcg
+QL_EM = kvm icount tcg mttcg
 
 # 1=rt, 2=np, 3=bt, 4=bm, 5=fs, 6=sc, 7=vo, 8=em
 define qemu_launcher =
@@ -2577,7 +2579,7 @@ $(foreach media,$(BOCHS_MEDIA), \
 	) \
 )
 
-debug: all debug-up-efi-hd-iso-ahci-vga-tcg
+debug: all debug-up-efi-hd-iso-ahci-vga-icount
 
 .PHONY: debug
 
