@@ -4,6 +4,7 @@
 
 KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	-D__DGOS_KERNEL__ \
@@ -467,11 +468,13 @@ generate_symbols_list += user-shell
 
 user_shell_CXXFLAGS = \
 	-g \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS)
 
 user_shell_CFLAGS = \
 	-g \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS)
 
 user_shell_SOURCES = \
 	user/test/test.S
@@ -482,6 +485,7 @@ user_shell_LDFLAGS = \
 user_shell_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	-isystem sysroot/include
 
 EXTRA_user_shell_DEPENDENCIES = \
@@ -502,6 +506,7 @@ init_CXXFLAGS = \
 	-ggdb \
 	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
 
@@ -510,6 +515,7 @@ init_CFLAGS = \
 	-ggdb \
 	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
 
@@ -528,6 +534,7 @@ init_LDADD = \
 init_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	-isystem $(top_builddir)/sysroot/include
 
 EXTRA_init_DEPENDENCIES = \
@@ -546,6 +553,7 @@ init_shared_CXXFLAGS = \
 	-ggdb \
 	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS) \
 	$(TLS_MODEL_FLAGS)
@@ -555,6 +563,7 @@ init_shared_CFLAGS = \
 	-ggdb \
 	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
 
@@ -573,6 +582,7 @@ init_shared_LDADD = -lpng -lz
 init_shared_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	-isystem $(top_builddir)/sysroot/include
 
 EXTRA_init_shared_DEPENDENCIES = \
