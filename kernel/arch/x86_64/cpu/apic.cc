@@ -2569,7 +2569,7 @@ static bool ioapic_set_flags(mp_ioapic_t *ioapic,
     switch (polarity) {
     default:
         APIC_TRACE("MP: Unrecognized IRQ polarity type!"
-                   " Guessing active low\n");
+                   " Guessing active high\n");
         // fall through
 
     case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO:
@@ -2956,7 +2956,7 @@ void lapic_kvm_t::paravirt_eoi() noexcept
         lapic_x2_t::write32(APIC_REG_EOI, 0);
 }
 
-void apic_hook_perf_local_irq(intr_handler_t handler, const char *name)
+void apic_hook_perf_local_irq(intr_handler_t handler, char const *name)
 {
     intr_hook(INTR_EX_NMI, handler, name, eoi_none);
     apic->write32(APIC_REG_LVT_PMCR,
