@@ -487,16 +487,16 @@ _optimized static __m128i translate_block_generic_sse(
     r = _mm_srli_epi32(pixels, 16);
     a = _mm_srli_epi32(pixels, 24);
 
-    m = _mm_cvtsi32_si128(0xFF);
+    m = _mm_set1_epi32(0xFF);
     b = _mm_and_si128(b, m);
     g = _mm_and_si128(g, m);
     r = _mm_and_si128(r, m);
     a = _mm_and_si128(a, m);
 
-    b = _mm_srl_epi32(b, _mm_cvtsi32_si128( 8 - info->fmt.mask_size_b));
-    g = _mm_srl_epi32(g, _mm_cvtsi32_si128(16 - info->fmt.mask_size_g));
-    r = _mm_srl_epi32(r, _mm_cvtsi32_si128(24 - info->fmt.mask_size_r));
-    a = _mm_srl_epi32(a, _mm_cvtsi32_si128(32 - info->fmt.mask_size_a));
+    b = _mm_srl_epi32(b, _mm_cvtsi32_si128(8 - info->fmt.mask_size_b));
+    g = _mm_srl_epi32(g, _mm_cvtsi32_si128(8 - info->fmt.mask_size_g));
+    r = _mm_srl_epi32(r, _mm_cvtsi32_si128(8 - info->fmt.mask_size_r));
+    a = _mm_srl_epi32(a, _mm_cvtsi32_si128(8 - info->fmt.mask_size_a));
 
     b = _mm_sll_epi32(b, _mm_cvtsi32_si128(info->fmt.mask_pos_b));
     g = _mm_sll_epi32(g, _mm_cvtsi32_si128(info->fmt.mask_pos_g));
@@ -574,18 +574,18 @@ static bool fmt_is_rgbx32(pix_fmt_t fmt)
             fmt.mask_size_a == 8;
 }
 
-static bool fmt_is_rgb_565_16(pix_fmt_t fmt)
+static bool fmt_is_bgr_565_16(pix_fmt_t fmt)
 {
-    return fmt.mask_pos_r == 0 &&
+    return fmt.mask_pos_r == 11 &&
             fmt.mask_pos_g == 5 &&
-            fmt.mask_pos_b == 11 &&
+            fmt.mask_pos_b == 0 &&
             fmt.mask_size_r == 5 &&
             fmt.mask_size_g == 6 &&
             fmt.mask_size_b == 5 &&
             fmt.mask_size_a == 0;
 }
 
-static bool fmt_is_rgba_1555_16(pix_fmt_t fmt)
+static bool fmt_is_rgbx_1555_16(pix_fmt_t fmt)
 {
     return fmt.mask_size_r == 5 &&
             fmt.mask_size_g == 5 &&
@@ -1515,19 +1515,19 @@ static translate_pixels_fn translate_pixels_resolver(fb_info_t *info)
     if (info->pixel_sz == 2) {
         // Note: discarding alpha channel below
 
-        if (fmt_is_rgba_1555_16(info->fmt)) {
+        if (fmt_is_rgbx_1555_16(info->fmt)) {
             if (avx2)
                 return translate_pixels_generic16_avx2
                         <translate_block_specific_avx2<
-                        5, 5, 5, 0, 10, 5, 0, 15>>;
+                        5, 5, 5, 0, 10, 5, 0, 0>>;
 
             if (sse4_1)
                 return translate_pixels_generic16_sse4_1
                         <translate_block_specific_sse<
-                        5, 5, 5, 0, 10, 5, 0, 15>>;
+                        5, 5, 5, 0, 10, 5, 0, 0>>;
         }
 
-        if (fmt_is_rgb_565_16(info->fmt)) {
+        if (fmt_is_bgr_565_16(info->fmt)) {
             if (avx2)
                 return translate_pixels_generic16_avx2
                         <translate_block_specific_avx2<
