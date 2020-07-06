@@ -127,7 +127,7 @@ static long futex_wake(int *uaddr, int max_awakened)
             fent->wake.notify_n(max_awakened);
     }
 
-    // Nobody is waiting, oh well. Continue.
+    // Nobody is waiting, that's fine. Continue.
 
     return 0;
 }
