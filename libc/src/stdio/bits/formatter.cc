@@ -805,3 +805,19 @@ long formatter(
 
     return chars_written;
 }
+
+int __emit_stream_chars(const char *p, intptr_t n, void *ctx)
+{
+    FILE *stream = (FILE*)ctx;
+
+    if (!p) {
+        fputc(n, stream);
+        return 1;
+    }
+
+    if (!n)
+        n = strlen(p);
+
+    fwrite(p, 1, n, stream);
+    return n;
+}

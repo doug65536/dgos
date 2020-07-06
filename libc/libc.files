@@ -77,6 +77,8 @@ src/stdio/printf.cc
 src/stdio/puts.cc
 src/stdio/stdin_out_err.cc
 src/stdio/vfprintf.cc
+src/stdio/vsnprintf.cc
+src/stdio/snprintf.cc
 src/stdio/vprintf.cc
 src/stdlib/abort.cc
 src/stdlib/abs.cc
