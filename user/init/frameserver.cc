@@ -1531,12 +1531,12 @@ static translate_pixels_fn translate_pixels_resolver(fb_info_t *info)
             if (avx2)
                 return translate_pixels_generic16_avx2
                         <translate_block_specific_avx2<
-                        5, 6, 5, 0, 0, 5, 10, 0>>;
+                        5, 6, 5, 0, 11, 5, 0, 0>>;
 
             if (sse4_1)
                 return translate_pixels_generic16_sse4_1
                         <translate_block_specific_sse<
-                        5, 6, 5, 0, 0, 5, 10, 0>>;
+                        5, 6, 5, 0, 11, 5, 0, 0>>;
         }
 
         if (sse4_1)
