@@ -47,5 +47,7 @@ zlib/zconf.h
 zlib/zlib.h
 zlib/zutil.c
 zlib/zutil.h
+zlib/contrib/amd64/amd64-match.S
+zlib/contrib/asm686/match.S
 Makefile
 .gitignore
