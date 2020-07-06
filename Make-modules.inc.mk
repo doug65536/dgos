@@ -488,8 +488,7 @@ user_shell_CCASFLAGS = \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	-isystem sysroot/include
 
-EXTRA_user_shell_DEPENDENCIES = \
-	$(ALL_STDLIB_INSTALLED)
+EXTRA_user_shell_DEPENDENCIES =
 
 #==========
 
@@ -538,10 +537,7 @@ init_CCASFLAGS = \
 	-isystem $(top_builddir)/sysroot/include
 
 EXTRA_init_DEPENDENCIES = \
-	$(top_srcdir)/user/user64_phdrs.ld \
-	$(ALL_STDLIB_INSTALLED) \
-	$(ALL_USRLIB_INSTALLED) \
-	$(INCLUDES_DEPLOYED)
+	$(top_srcdir)/user/user64_phdrs.ld
 
 #===========
 
@@ -586,8 +582,5 @@ init_shared_CCASFLAGS = \
 	-isystem $(top_builddir)/sysroot/include
 
 EXTRA_init_shared_DEPENDENCIES = \
-	$(top_srcdir)/user/user64_phdrs.ld \
-	$(ALL_STDLIB_INSTALLED) \
-	$(INCLUDES_DEPLOYED)
-
+	$(top_srcdir)/user/user64_phdrs.ld
 

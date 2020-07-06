@@ -66,9 +66,6 @@ ALL_USRLIB_INSTALLED = \
 	$(USRLIB_STATIC_FILES_INSTALLED_32)
 
 BUILT_SOURCES = \
-	$(DUMPDIR)/qemu-debug-out \
-	$(DUMPDIR)/call-trace-out \
-	$(generated_headers) \
 	$(ALL_STDLIB_INSTALLED) \
 	$(ALL_USRLIB_INSTALLED)
 
@@ -992,8 +989,8 @@ EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(top_builddir)/u_vga16.o \
 	$(top_builddir)/libkei.a \
-	$(DUMPDIR)
-
+	$(DUMPDIR) \
+	$(generated_headers)
 
 KERNEL_LDADD_SHARED = -lgcc $(top_builddir)/u_vga16.o
 
@@ -1320,9 +1317,7 @@ $(top_srcdir)/user/shell/grammar.out: $(top_srcdir)/user/shell/grammar.c
 
 EXTRA_shell_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
-	$(top_srcdir)/user/shell/grammar.c \
-	$(ALL_STDLIB_INSTALLED) \
-	$(INCLUDES_DEPLOYED)
+	$(top_srcdir)/user/shell/grammar.c
 
 # ----------------------------------------------------------------------------
 # libc
@@ -1485,6 +1480,8 @@ libc_a_SOURCES = \
 	libc/src/stdio/fgets.cc \
 	libc/src/stdio/printf.cc \
 	libc/src/stdio/vfprintf.cc \
+	libc/src/stdio/vsnprintf.cc \
+	libc/src/stdio/snprintf.cc \
 	libc/src/stdio/vprintf.cc \
 	libc/src/stdio/fread.cc \
 	libc/src/stdio/fwrite.cc \
@@ -2074,28 +2071,70 @@ libz_a_SOURCES = \
 	user/zlib/gzwrite.c   \
 	user/zlib/inffast.c   \
 	user/zlib/inftrees.c  \
-	user/zlib/uncompr.c
+	user/zlib/uncompr.c   \
+	user/zlib/contrib/amd64/amd64-match.S
 
 libz_a_CFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
-	$(USER64_EXE_FLAGS) \
+	$(USERLIB64_FLAGS) \
 	--sysroot $(top_builddir)/sysroot \
-	-isystem=/include
+	-isystem=/include \
+	-DASMV -DNO_UNDERLINE -DHAVE_MEMCPY -DHAVE_HIDDEN -DHAVE_VSNPRINTF
 
 libz_a_CXXFLAGS = $(libz_a_CFLAGS)
 
-#libz_a_HEADERS = \
-#	user/zlib/zlib.h \
-#	user/zlib/zconf.h
+libz_a_CCASFLAGS = -DWTF \
+	$(libz_a_CFLAGS)
 
-#$(top_builddir)/sysroot/include/zconf.h: $(top_srcdir)/user/zlib/zconf.h
-#	$(CP) "$<" "$@"
+EXTRA_libz_a_DEPENDENCIES =
+
+##===========
 #
-#$(top_builddir)/sysroot/include/zlib.h: $(top_srcdir)/user/zlib/zlib.h
-#	$(CP) "$<" "$@"
-
-#===========
+#noinst_LIBRARIES += libz32.a
+#
+#libz32_a_SOURCES = \
+#	user/zlib/adler32.c   \
+#	user/zlib/crc32.c     \
+#	user/zlib/gzclose.c   \
+#	user/zlib/gzread.c    \
+#	user/zlib/infback.c   \
+#	user/zlib/inflate.c   \
+#	user/zlib/trees.c     \
+#	user/zlib/zutil.c	  \
+#	user/zlib/compress.c  \
+#	user/zlib/deflate.c   \
+#	user/zlib/gzlib.c     \
+#	user/zlib/gzwrite.c   \
+#	user/zlib/inffast.c   \
+#	user/zlib/inftrees.c  \
+#	user/zlib/uncompr.c   \
+#	user/zlib/contrib/asm686/match.S
+#
+#libz32_a_CFLAGS = \
+#	$(COMPILER_FLAGS) \
+#	$(USER32_FLAGS) \
+#	$(USER32_EXE_FLAGS) \
+#	--sysroot $(top_builddir)/sysroot \
+#	-isystem=/include \
+#	-DASMV -DNO_UNDERLINE
+#
+#libz32_CCASFLAGS = \
+#	$(libz32_a_CFLAGS)
+#
+#libz32_a_CXXFLAGS = -DWTF $(libz32_a_CFLAGS)
+#
+##libz32_a_HEADERS = \
+##	user/zlib/zlib.h \
+##	user/zlib/zconf.h
+#
+##$(top_builddir)/sysroot/include/zconf.h: $(top_srcdir)/user/zlib/zconf.h
+##	$(CP) "$<" "$@"
+##
+##$(top_builddir)/sysroot/include/zlib.h: $(top_srcdir)/user/zlib/zlib.h
+##	$(CP) "$<" "$@"
+#
+##===========
 
 MODULE_FILENAMES = $(filter %.km,$(bin_PROGRAMS)) init
 MODULE_LIST = $(subst %,$(top_builddir)/%,$(MODULE_FILENAMES))
@@ -2610,6 +2649,10 @@ run-smp: all run-smp-efi-hd-gpt-ahci-vga-tcg
 run-bios: all run-up-bios-hd-gpt-ahci-vga-tcg
 
 .PHONY: run-bios
+
+run-bios-kvm: all run-up-bios-hd-gpt-ahci-vga-kvm
+
+.PHONY: run-bios-kvm
 
 run-pxe: all run-up-bios-pxe-gpt-ahci-vga-tcg
 
