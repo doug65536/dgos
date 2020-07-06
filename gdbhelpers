@@ -1,15 +1,20 @@
 define startupbreakpoints
 	set remotetimeout 86400
 	set architecture i386:x86-64
+
 	#set architecture i386
+
 	set osabi none
 	set scheduler-locking off
+
 	#set scheduler-locking step
+
 	set range-stepping off
+
 	#set may-call-functions off
 
 	#good for TCG
-	set breakpoint always-inserted on
+	#set breakpoint always-inserted on
 
 	thbreak entry
 	commands
@@ -34,6 +39,7 @@ define startupbreakpoints
 		printf "Loading %s at 0x%lx",$rdi,$rsi
 		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
 	end
+
 	set may-call-functions off
 end
 
