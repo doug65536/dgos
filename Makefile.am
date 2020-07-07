@@ -2647,7 +2647,15 @@ debug-kvm: all debug-up-efi-hd-iso-ahci-vga-kvm
 
 .PHONY: debug-kvm
 
-run: all run-up-bios-hd-gpt-ahci-vga-tcg
+debug-virtio: all debug-up-efi-hd-iso-virtio-vga-tcg
+
+.PHONY: debug-virtio
+
+run: all run-up-efi-hd-gpt-ahci-vga-tcg
+
+.PHONY: run
+
+run-virtio: all run-up-efi-hd-gpt-virtio-vga-tcg
 
 .PHONY: run
 
