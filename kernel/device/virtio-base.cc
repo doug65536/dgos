@@ -240,7 +240,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             notify_bar = bar;
             notify_is_mmio = is_mmio;
             uint64_t notify_paddr;
-            notify_paddr = bar + cap_rec.offset;
+            notify_paddr = bar;
             VIRTIO_TRACE("mapping notify bar %u"
                          " at physaddr %#" PRIx64
                          ", mmio=%u",
