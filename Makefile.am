@@ -2455,7 +2455,7 @@ QEMU_NP_numa = \
 #    -drive file=disk.img,if=none,id=hd0 \
 #    -device virtio-blk-pci,drive=hd0,bus=pcie_bridge2
 
-QEMU_ICOUNT_SHIFT = 4
+QEMU_ICOUNT_SHIFT = 1
 
 QEMU_EMU = $(QEMU_EMU_$(1))
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand,fsgsbase
