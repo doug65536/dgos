@@ -381,7 +381,8 @@ for flag in \
 	Wl,-z,relro \
 	Wl,-z,now \
 	Wl,--relax \
-	Wl,-g
+	Wl,-g \
+	"isystem=/include"
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([USER64_FLAGS], [" -$flag"])]
@@ -403,7 +404,8 @@ for flag in \
 	Wl,-z,relro \
 	Wl,-z,now \
 	Wl,--relax \
-	Wl,-g
+	Wl,-g \
+	"isystem=/include"
 do
 	AX_CHECK_COMPILE_FLAG([-$flag -m32],
 		[AS_VAR_APPEND([USER32_FLAGS], [" -$flag"])]
