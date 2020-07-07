@@ -193,9 +193,8 @@ _constructor(ctor_ctors_ran) static void isr_lookup_init()
     for (size_t i = INTR_EX_BASE; i <= INTR_EX_LAST; ++i)
         isr_lookup[i] = exception_isr_handler;
 
-    isr_lookup[INTR_EX_NMI] = intr_invoke;
-
     // Couple of special cases
+    isr_lookup[INTR_EX_NMI] = intr_invoke;
     isr_lookup[INTR_EX_GPF] = cpu_gpf_handler;
     isr_lookup[INTR_EX_PAGE] = mmu_page_fault_handler;
 
