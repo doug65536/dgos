@@ -673,7 +673,8 @@ static void translate_pixels_generic32_sse(
         }
 
         // Flush fill buffers because we didn't fill start of this cache line
-        _mm_sfence();
+        if (count)
+            _mm_sfence();
     }
 
     while (count >= 16) {
@@ -858,7 +859,8 @@ static void translate_pixels_generic32_avx2(
         }
 
         // Flush fill buffers because we didn't fill start of this cache line
-        _mm_sfence();
+        if (count)
+            _mm_sfence();
     }
 
     // Copy blocks of 32 pixels
@@ -1119,7 +1121,8 @@ static void translate_pixels_generic16_sse4_1(
 
         // Fence to push out and free up fill buffers.
         // No point them hoping to be eventually filled
-        _mm_sfence();
+        if (count)
+            _mm_sfence();
     }
 
     while (count >= 8) {
@@ -1327,7 +1330,8 @@ static void translate_pixels_generic16_avx2(
 
         // Fence to push out and free up fill buffers.
         // No point them hoping to be eventually filled
-        _mm_sfence();
+        if (count)
+            _mm_sfence();
     }
 
     while (count >= 16) {
