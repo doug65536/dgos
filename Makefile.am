@@ -1407,7 +1407,26 @@ libc_a_HEADERS = \
 	libc/include/langinfo.h \
 	libc/include/locale.h \
 	libc/include/sys/socket.h \
-	libc/include/sys/ioctl.h
+	libc/include/sys/ioctl.h \
+	libc/include/cassert \
+	libc/include/cfenv \
+	libc/include/climits \
+	libc/include/csignal \
+	libc/include/cstdint \
+	libc/include/cstring \
+	libc/include/cwctype \
+	libc/include/cctype \
+	libc/include/cfloat \
+	libc/include/clocale \
+	libc/include/cstdbool \
+	libc/include/cstdio \
+	libc/include/ctime \
+	libc/include/cerrno \
+	libc/include/cinttypes \
+	libc/include/cmath \
+	libc/include/csetjmp \
+	libc/include/cstddef \
+	libc/include/cstdlib
 
 libc_a_SOURCES = \
 	libc/src/assert/assert.cc \
