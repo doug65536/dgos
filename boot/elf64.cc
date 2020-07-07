@@ -221,8 +221,7 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
-    paging_map_physical(0, (UINT64_C(0xFFFFFFFF80000000) -
-                            PAGE_SIZE) + base_adj,
+    paging_map_physical(0, (base - PAGE_SIZE) + base_adj,
                         PAGE_SIZE, PTE_PRESENT |
                         PTE_WRITABLE | PTE_EX_PHYSICAL);
 
@@ -528,7 +527,7 @@ void elf64_run(tchar const *filename)
 
     message_bar_draw(10, 7, 70, TSTR "Showing boot menu");
 
-    enter_kernel(file_hdr.e_entry + base_adj, 0xFFFFFFFF80000000 + base_adj);
+    enter_kernel(file_hdr.e_entry + base_adj, new_base);
 }
 
 extern "C" _noreturn
