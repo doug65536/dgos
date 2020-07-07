@@ -4,21 +4,25 @@
 #include "likely.h"
 
 void progress_bar_draw(int left, int top, int right,
-                       int percent, tchar const *title)
+                       int percent, tchar const *title,
+                       bool bar_only)
 {
     if (title) {
         size_t title_len = strlen(title);
 
-        print_xy(left, top, ' ', 0xF, title_len);
+        if (!bar_only) {
+            print_xy(left, top, ' ', 0xF, title_len);
 
-        print_box(left, top, left + title_len + 3, top + 2, 0x17, true);
+            print_box(left, top, left + title_len + 3, top + 2, 0x17, true);
 
-        print_at(left + 2, top + 1, 0x17, title_len, title);
+            print_at(left + 2, top + 1, 0x17, title_len, title);
+        }
 
         left += title_len + 4;
     }
 
-    print_box(left, top, right, top + 2, 0x18, false);
+    if (!bar_only)
+        print_box(left, top, right, top + 2, 0x18, false);
 
     int filled = (percent * ((right - left) - 1)) / 100;
 

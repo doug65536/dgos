@@ -278,9 +278,9 @@ void progress(size_t fsz, size_t msz, elf64_context_t *ctx)
     int mem_percent = int(UINT64_C(100) *
                            ctx->done_mem_bytes / ctx->total_mem_bytes);
 
-    progress_bar_draw(17, 0, 63, file_percent, TSTR "I/O");
+    progress_bar_draw(17, 0, 63, file_percent, TSTR "I/O", file_percent > 0);
 
-    progress_bar_draw(17, 3, 63, mem_percent, TSTR "RAM");
+    progress_bar_draw(17, 3, 63, mem_percent, TSTR "RAM", mem_percent > 0);
 
     print_line_at(65, 1, 0x7, TSTR "%" PRIu64 "/%" PRIu64 "MB",
                   ctx->done_file_bytes >> 20,
@@ -441,6 +441,8 @@ void elf64_run(tchar const *filename)
     base_adj = new_base - 0xFFFFFFFF80000000;
 
     message_bar_draw(10, 7, 70, TSTR "Loading kernel");
+
+    progress(0, 0, ctx);
 
     ctx->start_time = systime();
 
