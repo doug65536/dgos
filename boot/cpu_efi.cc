@@ -20,7 +20,6 @@ void reloc_kernel(uint64_t distance, Elf64_Rela const *elf_rela, size_t relcnt)
         ++elf_rela;
         uint64_t value = distance + addend;
         void *spot = (void*)(offset + distance);
-        addend += distance;
         memcpy(spot, &value, sizeof(value));
     }
 }
