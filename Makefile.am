@@ -1189,7 +1189,7 @@ $(top_builddir)/sysroot/lib/$(1): \
 			-g \
 			$$(ASM_DEBUG_INFO_FLAGS) \
 			--sysroot $(top_builddir)/sysroot \
-			-isystem $(top_builddir)/sysroot/include \
+			-isystem=/include \
 			-o "$$@" \
 			-c "$$<"
 
@@ -1203,7 +1203,7 @@ $(top_builddir)/sysroot/lib/32/$(1): \
 			-g \
 			$$(ASM_DEBUG_INFO_FLAGS) \
 			--sysroot $(top_builddir)/sysroot \
-			-isystem $(top_builddir)/sysroot/include \
+			-isystem=/include \
 			-o "$$@" \
 			-c "$$<"
 
@@ -1284,8 +1284,6 @@ shell_SOURCES = \
 
 shell_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
-	-isystem $(top_builddir)/sysroot/include \
-	-g \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
@@ -2023,8 +2021,6 @@ libpng_a_SOURCES = \
 
 libpng_a_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
-	-ggdb \
-	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
@@ -2032,15 +2028,13 @@ libpng_a_CXXFLAGS = \
 libpng_a_CFLAGS = \
 	-DFROMCFLAGS  \
 	-ggdb \
-	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
 
 libpng_a_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
-	$(COMPILER_FLAGS) \
-	-isystem $(top_builddir)/sysroot/include
+	$(COMPILER_FLAGS)
 
 EXTRA_libpng_a_DEPENDENCIES = \
 	$(INCLUDES_DEPLOYED)
@@ -2053,16 +2047,12 @@ libpng32_a_SOURCES = $(libpng_a_SOURCES)
 
 libpng32_a_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
-	-ggdb \
-	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(USER32_FLAGS) \
 	$(USER32_EXE_FLAGS)
 
 libpng32_a_CFLAGS = \
 	-DFROMCFLAGS  \
-	-ggdb \
-	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(USER32_FLAGS) \
 	$(USER32_EXE_FLAGS)
