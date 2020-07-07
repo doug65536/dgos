@@ -1,15 +1,17 @@
-#include <sys/module.h>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cinttypes>
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/likely.h>
 #include <spawn.h>
 #include <dirent.h>
-#include <string.h>
-#include <inttypes.h>
 #include <pthread.h>
-#include <stddef.h>
+
+#include <sys/mman.h>
+#include <sys/likely.h>
+#include <sys/module.h>
+
 #include "frameserver.h"
 
 __attribute__((__format__(__printf__, 1, 0), __noreturn__))
