@@ -101,4 +101,7 @@
 - Kernel unit test module (for unit testing parts of the kernel)
 - PNG parser
 - Fast system memory to video memory clipped blitter with AVX2, SSE4.1, SSE2
-  optimizations and a platform independent implementation
+  optimizations and a platform independent implementation.
+- Support 16-, 24-, and 32-bit per pixel modes. Specialized fast implemetation
+  internals for common modes, arbitrary pixel format is still handled. No
+  palette support.
