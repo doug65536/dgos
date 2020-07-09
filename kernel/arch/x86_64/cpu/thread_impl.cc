@@ -1634,22 +1634,26 @@ void thread_request_reschedule_noirq()
 void thread_request_reschedule()
 {
     cpu_scoped_irq_disable irq_dis;
+
     thread_request_reschedule_noirq();
 }
 
 isr_context_t *thread_reschedule_if_requested_noirq(isr_context_t *ctx)
 {
     cpu_info_t *cpu = this_cpu();
+
     if (cpu->should_reschedule) {
         cpu->should_reschedule = false;
         return thread_schedule(ctx);
     }
+
     return ctx;
 }
 
 isr_context_t *thread_reschedule_if_requested(isr_context_t *ctx)
 {
     cpu_scoped_irq_disable irq_dis;
+
     return thread_reschedule_if_requested_noirq(ctx);
 }
 
@@ -1751,9 +1755,12 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
 EXPORT int thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
+
     thread_info_t::scoped_lock thread_lock(thread->lock);
+
     while (thread->state != THREAD_IS_FINISHED)
         thread->done_cond.wait(thread_lock);
+
     return thread->exit_code;
 }
 
@@ -1780,8 +1787,10 @@ EXPORT thread_t thread_get_id()
 EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
 {
     cpu_info_t *cpu = this_cpu();
+
     if (tid < 0)
         tid = cpu->cur_thread->thread_id;
+
     if (uintptr_t(tid) < countof(threads))
         threads[tid].gsbase = (void*)gsbase;
 }
@@ -1789,10 +1798,13 @@ EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
 EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
 {
     cpu_info_t *cpu = this_cpu();
+
     if (tid < 0)
         tid = cpu->cur_thread->thread_id;
+
     if (uintptr_t(tid) < countof(threads))
         threads[tid].fsbase = (void*)fsbase;
+
 //    int cur_tid = cpu->cur_thread->thread_id;
 //    if (cur_tid == tid)
 //        cpu_fsbase_set((void*)fsbase);
@@ -1811,8 +1823,11 @@ EXPORT size_t thread_get_cpu_count()
 EXPORT void thread_set_affinity(int id, thread_cpu_mask_t const &affinity)
 {
     cpu_scoped_irq_disable intr_was_enabled;
+
     cpu_info_t *cpu = this_cpu();
+
     size_t cpu_nr = cpu->cpu_nr;
+
     thread_info_t *thread = threads + (id >= 0 ? id : thread_get_id());
 
     thread->cpu_affinity = affinity;
@@ -1874,6 +1889,7 @@ void thread_check_stack(int intr)
     }
 
     cpu_scoped_irq_disable irq_dis;
+
     cpu_info_t *cpu = this_cpu();
 
     std::pair<void *, void *> stk;
@@ -1909,6 +1925,7 @@ void *thread_get_exception_top()
 void *thread_set_exception_top(void *chain)
 {
     thread_info_t *thread = this_thread();
+
     void *old = thread->exception_chain;
     thread->exception_chain = chain;
     return old;
@@ -1917,6 +1934,7 @@ void *thread_set_exception_top(void *chain)
 size_t thread_cls_alloc()
 {
     size_t next;
+
     while ((next = storage_next_slot) < cpu_info_t::max_cls) {
         if (atomic_cmpxchg(&storage_next_slot, next + 1, next) == next)
             return next;
@@ -1928,12 +1946,14 @@ size_t thread_cls_alloc()
 void *thread_cls_get(size_t slot)
 {
     cpu_info_t *cpu = this_cpu();
+
     return cpu->storage[slot];
 }
 
 void thread_cls_set(size_t slot, void *value)
 {
     cpu_info_t *cpu = this_cpu();
+
     cpu->storage[slot] = value;
 }
 
