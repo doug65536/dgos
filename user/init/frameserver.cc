@@ -36,7 +36,7 @@
     (((UINT64_C(4 )+b)|((4 +g) << 4)|((4 +r) << 8) | ((4 +a) << 12)) << 16) | \
     (((UINT64_C(0 )+b)|((0 +g) << 4)|((0 +r) << 8) | ((0 +a) << 12)) << 0))
 
-_optimized _ssse3
+_ssse3
 static void translate_pixels_rgbx32_ssse3(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -178,7 +178,7 @@ static void translate_pixels_rgbx32_ssse3(
     _mm_sfence();
 }
 
-_avx2 _optimized
+_avx2
 static void translate_pixels_rgbx32_avx2(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -377,7 +377,6 @@ static void translate_pixels_rgbx32_avx2(
 
 template<int rbit, int gbit, int bbit, int abit,
          int rshl, int gshl, int bshl, int ashl>
-_optimized
 static __m128i translate_block_specific_sse(
         fb_info_t const * restrict , __m128i pixels)
 {
@@ -432,7 +431,6 @@ static __m128i translate_block_specific_sse(
     return b;
 }
 
-_optimized
 static __m128i translate_block_noop_sse(
         fb_info_t const * restrict , __m128i pixels)
 {
@@ -441,7 +439,7 @@ static __m128i translate_block_noop_sse(
 
 template<int rbit, int gbit, int bbit, int abit,
          int rshl, int gshl, int bshl, int ashl>
-_avx2 _optimized
+_avx2
 static __m256i translate_block_specific_avx2(
         fb_info_t const * restrict, __m256i pixels)
 {
@@ -477,7 +475,7 @@ static __m256i translate_block_noop_avx2(fb_info_t const * restrict,
     return pixels;
 }
 
-_optimized static __m128i translate_block_generic_sse(
+static __m128i translate_block_generic_sse(
         fb_info_t const * restrict info, __m128i pixels)
 {
     __m128i b, g, r, a, m;
@@ -511,7 +509,7 @@ _optimized static __m128i translate_block_generic_sse(
     return b;
 }
 
-_avx2 _optimized
+_avx2
 static __m256i translate_block_generic_avx2(
         fb_info_t const *info, __m256i pixels)
 {
@@ -598,7 +596,6 @@ static bool fmt_is_rgbx_1555_16(pix_fmt_t fmt)
 }
 
 template<__m128i (*translate_block)(fb_info_t const * restrict, __m128i)>
-_optimized
 static void translate_pixels_generic32_sse(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -783,7 +780,7 @@ static void translate_pixels_generic32_sse(
 }
 
 template<__m256i (*translate_block)(fb_info_t const * restrict, __m256i)>
-_avx2 _optimized
+_avx2
 static void translate_pixels_generic32_avx2(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -993,7 +990,7 @@ static void translate_pixels_generic32_avx2(
 }
 
 template<__m128i (*translate_block)(fb_info_t const * restrict, __m128i)>
-_optimized _sse4_1
+_sse4_1
 static void translate_pixels_generic16_sse4_1(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -1202,7 +1199,7 @@ static void translate_pixels_generic16_sse4_1(
 }
 
 template<__m256i (*translate_block)(fb_info_t const * restrict, __m256i)>
-_optimized _avx2
+_avx2
 static void translate_pixels_generic16_avx2(
         void * restrict output_p, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -1442,7 +1439,6 @@ static void translate_pixels_generic16_avx2(
     _mm_sfence();
 }
 
-_optimized
 static void translate_pixels_generic(
         void * restrict output, uint32_t const * restrict input,
         size_t count, fb_info_t const * restrict info)
@@ -1553,7 +1549,6 @@ static translate_pixels_fn translate_pixels_resolver(fb_info_t *info)
     return translate_pixels_generic;
 }
 
-_optimized
 void surface_draw_noclip(int dx, int dy,
                          int dw, int dh,
                          int sx, int sy,
@@ -1572,7 +1567,6 @@ void surface_draw_noclip(int dx, int dy,
     }
 }
 
-_optimized
 void surface_draw(int dx, int dy,
                   int dw, int dh,
                   int sx, int sy,
