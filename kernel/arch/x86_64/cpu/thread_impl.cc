@@ -124,13 +124,11 @@ struct alignas(256) thread_info_t {
     // When used_time >= preempt_time, get a new timestamp
     uint64_t preempt_time;
 
-    uint32_t last_cpu;
-    uint32_t reserved[1];
+    uint8_t reserved[8];
 
     // --- cache line --- shared line
 
     // 2 64-bit pointers
-    //link_t link;
     uint64_t reserved3[2];
 
     // Owning process
@@ -178,12 +176,12 @@ struct alignas(256) thread_info_t {
 
     uint32_t thread_flags;
 
-    int wake_count;
+    uint32_t reserved4;
 
     // Process exit code
     int exit_code;
 
-    int reserved2;
+    uint32_t reserved2;
 
     // 2 64-bit values
     __cxa_eh_globals cxx_exception_info;
@@ -200,7 +198,7 @@ struct alignas(256) thread_info_t {
     // Each time a thread context switches, time is removed from this value
     // When it reaches zero, it is replenished, and timeslice_timestamp
     // is set to now. Preemption is set up so the timer will fire when this
-    // time elapses.
+    // time elapses (or the earliest timer expiry, whichever is earlier).
     uint64_t timeslice_remaining;
 
     // --- cache line ---
@@ -284,7 +282,12 @@ struct alignas(256) cpu_info_t {
     bool online = false;
     fpu_state_t fpu_state = discarded;
     uint8_t apic_dcr = {};
-    uint8_t reserved1[1] = {};
+
+    // in_irq is incremented after irq entry and decremented before irq exit
+    // you can expect setting should_reschedule to work when in_irq is > 0
+    // thread_entering_irq() and thread_finishing_irq() adjust the value
+    // of in_irq
+    uint8_t in_irq;
 
     // Which thread's context is in the FPU, or -1 if discarded
     thread_t fpu_owner = -1;
@@ -405,11 +408,13 @@ C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, apic_id) == CPU_INFO_APIC_ID_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, syscall_flags) == CPU_INFO_SYSCALL_FLAGS_OFS);
+C_ASSERT(offsetof(cpu_info_t, in_irq) == CPU_INFO_IN_IRQ_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
 C_ASSERT(offsetof(cpu_info_t, locks_held) == CPU_INFO_LOCKS_HELD_OFS);
 C_ASSERT(offsetof(cpu_info_t, csw_deferred) == CPU_INFO_CSW_DEFERRED_OFS);
 C_ASSERT(offsetof(cpu_info_t, after_csw_fn) == CPU_INFO_AFTER_CSW_FN_OFS);
 C_ASSERT(offsetof(cpu_info_t, after_csw_vp) == CPU_INFO_AFTER_CSW_VP_OFS);
+
 C_ASSERT((offsetof(cpu_info_t, self) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, apic_id) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, storage) & ~-64) == 0);
@@ -1549,7 +1554,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     assert(ctx);
     assert((outgoing->state == THREAD_IS_RUNNING && thread == outgoing) ||
            (outgoing->state & THREAD_BUSY));
-    thread->last_cpu = cpu->cpu_nr;
     cpu->should_reschedule = false;
 
     return ctx;
@@ -1620,6 +1624,10 @@ EXPORT uintptr_t thread_sleep_release(
 void thread_request_reschedule_noirq()
 {
     cpu_info_t *cpu = this_cpu();
+
+    // If this weren't true, then someone is setting it when it will be missed
+    assert(cpu->in_irq > 0 || !cpu->should_reschedule);
+
     cpu->should_reschedule = true;
 }
 
@@ -2259,3 +2267,18 @@ void thread_panic_other_cpus()
 //{
 //  return __gthread_mutex_destroy(__mutex);
 //}
+
+isr_context_t *thread_entering_irq(isr_context_t *ctx)
+{
+    if (unlikely((!++*cpu_gs_ptr<uint8_t, CPU_INFO_IN_IRQ_OFS>())))
+        panic("Excessive IRQ nesting\n");
+
+    return ctx;
+}
+
+isr_context_t *thread_finishing_irq(isr_context_t *ctx)
+{
+    if (!--*cpu_gs_ptr<uint8_t, CPU_INFO_IN_IRQ_OFS>())
+        return thread_reschedule_if_requested_noirq(ctx);
+    return ctx;
+}

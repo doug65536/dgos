@@ -273,4 +273,8 @@ void thread_set_timer(uint8_t &apic_dcr, uint64_t ns);
 
 void thread_panic_other_cpus();
 
+isr_context_t *thread_entering_irq(isr_context_t *ctx);
+
+isr_context_t *thread_finishing_irq(isr_context_t *ctx);
+
 __END_DECLS

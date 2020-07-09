@@ -111,6 +111,8 @@ static uint16_t pic8259_port_data(int slave)
 isr_context_t *pic8259_dispatcher(
         int intr, isr_context_t *ctx)
 {
+    ctx = thread_entering_irq(ctx);
+
     isr_context_t *returned_stack_ctx;
 
     int irq = intr - INTR_PIC1_IRQ_BASE;
@@ -149,7 +151,7 @@ isr_context_t *pic8259_dispatcher(
         pic8259_eoi(is_slave);
     }
 
-    return thread_schedule_if_requested_noirq(returned_stack_ctx);
+    return thread_finishing_irq(returned_stack_ctx);
 }
 
 void pic8259_disable(void)

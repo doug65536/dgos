@@ -2656,6 +2656,8 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 
     uint64_t st = cpu_rdtsc();
 
+    ctx = thread_entering_irq(ctx);
+
     assert(intr >= INTR_APIC_DSP_BASE);
     assert(intr <= INTR_APIC_DSP_LAST);
 
@@ -2676,7 +2678,7 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 
     thread_add_cpu_irq_time(en);
 
-    return thread_schedule_if_requested_noirq(ctx);
+    return thread_finishing_irq(ctx);
 }
 
 static void ioapic_setmask(int irq, bool unmask)

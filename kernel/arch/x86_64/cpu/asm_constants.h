@@ -6,6 +6,7 @@
 #define CPU_INFO_CURTHREAD_OFS      8
 #define CPU_INFO_TSS_PTR_OFS        16
 #define CPU_INFO_SYSCALL_FLAGS_OFS  24
+#define CPU_INFO_IN_IRQ_OFS         35
 #define CPU_INFO_PF_COUNT_OFS       48
 #define CPU_INFO_LOCKS_HELD_OFS     56
 #define CPU_INFO_CSW_DEFERRED_OFS   60
