@@ -630,7 +630,8 @@ bool virtio_gpu_dev_t::init(pci_dev_iterator_t const &pci_iter)
 
     config_worker_tid = thread_create(config_work_thread,
                                       this, "virtio-gpu-config-worker", 0,
-                                      false, false);
+                                      false, false, thread_cpu_mask_t(
+                                          thread_current_cpu(0)));
 
     uint32_t events = atomic_ld_acq(&gpu_config->events_read);
     if (events & 1) {
