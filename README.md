@@ -32,10 +32,12 @@
 ## Kernel
 
 - SMP (supporting Multiprocessor Specification and ACPI)
-- Priority-based scheduler
 - LAPIC timer driven preemptive multithreading
+- Priority-based scheduler
+- Tickless scheduler, variable deadline at timeslice exhaustion or timer expiry
 - Processor affinity
-- full SSE/AVX/AVX2/AVX-512 support using
+- Oldest timeslice first, optimizes latency over throughput
+- Full SSE/AVX/AVX2/AVX-512 support using
   fxsave/fxrstor or xsave/xsavec/xsaveopt/xrstor where available
 - Recursive paging
 - Per-CPU small block heap
@@ -44,11 +46,11 @@
 - Lazy TLB shootdown
 - Memory protection (no mapping of entire physical memory)
 - Interprocessor TLB shootdown
-- Sleep with 16ms resolution and usleep implementation
+- High resolution sleep and usleep implementation
 - RTC
 - Atomics
 - GSBASE based CPU-local storage
-- FSBASE per thread
+- FSBASE and GSBASE per user thread
 - Interrupt Stack Table support with emergency stacks for critical exceptions
 - MCS locks, Spinlocks, Reader/Writer Spinlocks
 - Mutex, Condition Variable, Reader/Writer locks
@@ -96,3 +98,6 @@
 - All filesystems, partition parsers, and device drivers in separate
   dynamically loaded modules
 - Kernel unit test module (for unit testing parts of the kernel)
+- PNG parser
+- Fast system memory to video memory clipped blitter with AVX, SSE4.1, SSE2
+  optimizations and a platform independent implementation
