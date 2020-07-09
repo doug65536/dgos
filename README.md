@@ -36,7 +36,8 @@
 - Priority-based scheduler
 - Tickless scheduler, variable deadline at timeslice exhaustion or timer expiry
 - Processor affinity
-- Oldest timeslice first, optimizes latency over throughput
+- Oldest timeslice first, optimizes latency over throughput. Timeslice
+  exhaustion causes the repleished timeslice to become young again.
 - Full SSE/AVX/AVX2/AVX-512 support using
   fxsave/fxrstor or xsave/xsavec/xsaveopt/xrstor where available
 - Recursive paging
