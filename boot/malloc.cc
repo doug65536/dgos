@@ -168,6 +168,7 @@ void *malloc_aligned(size_t bytes, size_t alignment)
                     aligned_hdr->make_valid();
                     aligned_hdr->sig = blk_hdr_t::FREE;
 
+                    // Keep first_free pointing at first free block
                     if (first_free > aligned_hdr)
                         first_free = aligned_hdr;
 
@@ -267,6 +268,8 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
         memcpy(other_blk, blk + 1, blk->size - sizeof(*blk));
 
         blk->sig = blk_hdr_t::FREE;
+
+        // Keep first_free pointing at first free block
         if (first_free > blk)
             first_free = blk;
 
