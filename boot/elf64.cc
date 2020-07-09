@@ -436,7 +436,8 @@ void elf64_run(tchar const *filename)
                      file, shdrs, shbytes, file_hdr.e_shoff)))
         PANIC("Could not read section headers\n");
 
-    uint64_t new_base = 0xFFFFFFFF80000000;
+    // OOM if relocated!
+    uint64_t new_base = 0xFFFFFFFF80000000; // - 0x000000ff80000000;
     base_adj = new_base - 0xFFFFFFFF80000000;
 
     message_bar_draw(10, 7, 70, TSTR "Loading kernel");
