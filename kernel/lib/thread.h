@@ -3,6 +3,7 @@
 #include "cpu/spinlock.h"
 #include "cpu/spinlock_arch.h"
 #include "errno.h"
+
 //#include "algorithm.h"
 //#include "bitsearch.h"
 
@@ -39,7 +40,7 @@ struct thread_cpu_mask_t
 
 #ifdef __cplusplus
     // In-place, all zeros
-    constexpr thread_cpu_mask_t()
+    inline constexpr thread_cpu_mask_t()
         : bitmap{}
     {
     }
