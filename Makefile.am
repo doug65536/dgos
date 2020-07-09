@@ -2647,7 +2647,7 @@ debug-kvm: all debug-up-efi-hd-iso-ahci-vga-kvm
 
 .PHONY: debug-kvm
 
-debug-virtio: all debug-up-efi-hd-iso-virtio-vga-tcg
+debug-virtio: all debug-up-efi-hd-iso-virtio-gl-tcg
 
 .PHONY: debug-virtio
 
