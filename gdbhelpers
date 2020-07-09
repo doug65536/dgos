@@ -16,6 +16,9 @@ define startupbreakpoints
 	#good for TCG
 	#set breakpoint always-inserted on
 
+	#exec-file kernel-generic
+	#symbol-file kernel-generic -o -0x000000ff80000000
+
 	thbreak entry
 	commands
 		#allow everything
