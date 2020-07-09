@@ -2011,6 +2011,24 @@ include Make-modules.inc.mk
 
 #===========
 
+noinst_LIBRARIES += libwing.a
+
+libwing_a_SOURCES = \
+	user/libwing/window.cc \
+	user/libwing/window.h
+
+libwing_a_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
+
+libwing_a_CFLAGS = $(libwing_a_CXXFLAGS)
+libwing_a_CCASFLAGS = $(libwing_a_CXXFLAGS)
+EXTRA_libwing_a_DEPENDENCIES =
+
+#===========
+
 noinst_LIBRARIES += libpng.a
 
 libpng_a_SOURCES = \

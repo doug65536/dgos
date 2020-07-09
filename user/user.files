@@ -18,6 +18,8 @@ shell/grammar.y
 shell/lemon_highlight.xml
 shell/Makefile
 libpng/png.cc
+libwing/window.h
+libwing/window.cc
 include/png.h
 include/surface.h
 libpng/surface.cc
