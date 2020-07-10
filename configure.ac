@@ -117,6 +117,11 @@ AS_IF([test x"$SED" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find sed])])
 AC_SUBST([SED])
 
+AC_CHECK_TOOL([CXXFILT], [c++filt], [NOT_FOUND])
+AS_IF([test x"$CXXFILT" == x"NOT_FOUND"],
+    [AC_MSG_FAILURE([Cannot find c++filt])])
+AC_SUBST([CXXFILT])
+
 AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
 AS_IF([test x"$MKISOFS" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Install mkisofs (or genisoimage) to build CD images])])

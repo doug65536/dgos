@@ -2578,6 +2578,24 @@ debug-tcg: debug-smp-bios-hd-gpt-ahci-vga-tcg
 .PHONY: debug-tcg
 
 # ---
+# check modules, module imports, kernel exports
+
+show-kernel-exports: all-kernel
+	"$(top_srcdir)/kernel_exports.sh"
+
+show-srcdir:
+	printf "%s\n" $(top_srcdir)
+
+.PHONY: show-kernel-exports
+
+#objdump -p virtio-blk.km | \
+# grep -oP '(?<=NEEDED)\s+\S+\.km' | grep -oP '\S.*'
+check-module-imports: all-kernel
+	"$(top_srcdir)/module_checkimports.sh" $(MODULE_LIST) | $(CXXFILT)
+
+.PHONY: check-module-imports
+
+# ---
 # Generate symbols
 
 define genkallsym =

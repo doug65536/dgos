@@ -175,6 +175,8 @@ syscall/sys_time.cc
 ../gdbhelpers
 ../genregs.py
 ../gensymtab.sh
+../kernel_exports.sh
+../module_checkimports.sh
 arch/x86_64/cfi_helpers.h
 arch/x86_64/cpu/apic.bits
 arch/x86_64/cpu/apic.bits.h
