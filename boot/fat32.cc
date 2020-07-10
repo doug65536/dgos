@@ -12,7 +12,7 @@
 #include "log2.h"
 #include "halt.h"
 
-#include "../kernel/fs/fat32_decl.h"
+#include "../kernel/fs/fat32/fat32_decl.h"
 
 #define FAT32_DEBUG_DIRENT 0
 

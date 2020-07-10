@@ -367,7 +367,7 @@ generate_symbols_list += ext4.km
 generate_kallsym_list += ext4.km
 
 ext4_km_SOURCES = \
-	kernel/fs/ext4.cc
+	kernel/fs/ext4/ext4.cc
 
 ext4_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
@@ -389,8 +389,8 @@ generate_symbols_list += fat32.km
 generate_kallsym_list += fat32.km
 
 fat32_km_SOURCES = \
-	kernel/fs/fat32.cc \
-	kernel/fs/fat32_decl.h
+	kernel/fs/fat32/fat32.cc \
+	kernel/fs/fat32/fat32_decl.h
 
 fat32_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
@@ -437,9 +437,9 @@ generate_symbols_list += iso9660.km
 generate_kallsym_list += iso9660.km
 
 iso9660_km_SOURCES = \
-	kernel/fs/iso9660.cc \
-	kernel/fs/iso9660_decl.h \
-	kernel/fs/iso9660_part.cc
+	kernel/fs/iso9660/iso9660.cc \
+	kernel/fs/iso9660/iso9660_decl.h \
+	kernel/fs/iso9660/iso9660_part.cc
 
 iso9660_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
@@ -461,7 +461,7 @@ generate_symbols_list += mbr.km
 generate_kallsym_list += mbr.km
 
 mbr_km_SOURCES = \
-	kernel/fs/mbr.cc
+	kernel/fs/mbr/mbr.cc
 
 mbr_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
@@ -483,7 +483,7 @@ generate_symbols_list += gpt.km
 generate_kallsym_list += gpt.km
 
 gpt_km_SOURCES = \
-	kernel/fs/gpt.cc
+	kernel/fs/gpt/gpt.cc
 
 gpt_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
@@ -495,28 +495,6 @@ gpt_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_gpt_km_DEPENDENCIES = \
-	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
-
-#==========
-# iso9660 "partition" recognizer
-
-bin_PROGRAMS += iso9660_part.km
-generate_symbols_list += iso9660_part.km
-generate_kallsym_list += iso9660_part.km
-
-iso9660_part_km_SOURCES = \
-	kernel/fs/iso9660_part.cc
-
-iso9660_part_km_CXXFLAGS = \
-	$(KERNEL_MODULE_CXXFLAGS_SHARED)
-
-iso9660_part_km_LDFLAGS = \
-	$(call KERNEL_MODULE_LDFLAGS_FN,iso9660_part)
-
-iso9660_part_km_LDADD = \
-	$(KERNEL_MODULE_LDADD_SHARED)
-
-EXTRA_iso9660_part_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========
