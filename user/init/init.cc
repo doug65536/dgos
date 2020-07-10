@@ -135,7 +135,6 @@ int main(int argc, char **argv, char **envp)
 
     load_module("gpt.km");
     load_module("mbr.km");
-    load_module("iso9660_part.km");
 
     if (probe_pci_for(0x10EC, 0x8139,
                       PCI_DEV_CLASS_NETWORK,
