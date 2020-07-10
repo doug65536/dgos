@@ -211,7 +211,9 @@ virtio_base_t *virtio_blk_factory_t::create()
 
 void virtio_blk_factory_t::found_device(virtio_base_t *device)
 {
-    virtio_blk_ifs.push_back(static_cast<virtio_blk_if_t*>(device));
+    if (unlikely(!virtio_blk_ifs.push_back(
+                     static_cast<virtio_blk_if_t*>(device))))
+        panic_oom();
 }
 
 int virtio_blk_if_t::io(request_t *request)

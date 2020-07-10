@@ -594,18 +594,25 @@ int process_t::run()
 
     if (unlikely(!auxent.push_back({ auxv_t::AT_ENTRY, (void*)hdr.e_entry })))
         panic_oom();
+
     if (unlikely(!auxent.push_back({ auxv_t::AT_PAGESZ, PAGESIZE })))
         panic_oom();
+
     if (unlikely(!auxent.push_back({ auxv_t::AT_PHENT, hdr.e_phentsize })))
         panic_oom();
+
     if (unlikely(!auxent.push_back({ auxv_t::AT_EXECFD, fd.release() })))
         panic_oom();
+
     if (unlikely(!auxent.push_back({ auxv_t::AT_UID, 0L })))
         panic_oom();
+
     if (unlikely(!auxent.push_back({ auxv_t::AT_EUID, 0L })))
         panic_oom();
+
     if (unlikely(!auxent.push_back({ auxv_t::AT_GID, 0L })))
         panic_oom();
+
     if (unlikely(!auxent.push_back({ auxv_t::AT_EGID, 0L })))
         panic_oom();
 

@@ -647,7 +647,9 @@ std::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 
         std::unique_ptr<nvme_if_t> self(new (ext::nothrow) nvme_if_t{});
 
-        nvme_devices.push_back(self);
+        if (unlikely(!nvme_devices.push_back(self)))
+            panic_oom();
+
         if (self->init(pci_iter)) {
             if (likely(list.push_back(self.get())))
                 self.release();
@@ -898,8 +900,10 @@ void nvme_if_t::identify_ns_id_handler(
 
     namespaces.reserve(count);
 
-    for (int i = 0; i < count; ++i)
-        namespaces.push_back(ns_list[i]);
+    for (int i = 0; i < count; ++i) {
+        if (unlikely(!namespaces.push_back(ns_list[i])))
+            panic_oom();
+    }
 
     ctx->cur_ns = 0;
     uint8_t ns = namespaces[ctx->cur_ns];
@@ -1330,7 +1334,8 @@ void nvme_queue_state_t::process_completions(
         sub_queue_state.advance_head(sub_queue_head,
                                      &sub_queue_state != this);
 
-        cmp_buf.push_back(packet);
+        if (unlikely(!cmp_buf.push_back(packet)))
+            panic_oom();
     }
 
     if (i > 0)

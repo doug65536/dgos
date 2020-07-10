@@ -956,7 +956,8 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr, char const *hdr)
                         [](acpi_madt_ent_t const* ent) noexcept {
         ACPI_TRACE("Got IOAPIC LNMI mapping\n");
 
-        lapic_lint_nmi.push_back(ent->lnmi);
+        if (unlikely(!lapic_lint_nmi.push_back(ent->lnmi)))
+            panic_oom();
     }, ACPI_MADT_REC_TYPE_LNMI);
 
     acpi_foreach_record((acpi_madt_t const *)hdr,
@@ -978,7 +979,8 @@ static void acpi_process_hpet(void *acpi_hdr)
     acpi_gas_t aligned_gas;
     memcpy(&aligned_gas, (char*)acpi_hdr + offsetof(acpi_hpet_t, addr),
            sizeof(aligned_gas));
-    acpi_hpet_list.push_back(aligned_gas);
+    if (unlikely(!acpi_hpet_list.push_back(aligned_gas)))
+        panic_oom();
 }
 
 
@@ -992,14 +994,22 @@ static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
     if (actual_len > guess) {
         auto it = std::find(acpi_mappings.begin(), acpi_mappings.end(),
                             acpi_mapping_t{uint64_t(ptr), uint64_t(guess)});
+
         assert(it != acpi_mappings.end());
+
         acpi_mappings.erase(it);
+
         munmap((void*)ptr, guess);
+
         ptr = (T*)mmap((void*)physaddr, actual_len,
                        PROT_READ, MAP_PHYSICAL);
+
         if (unlikely(ptr == MAP_FAILED))
             panic_oom();
-        acpi_mappings.push_back({uint64_t(ptr), uint64_t(actual_len)});
+
+        if (unlikely(!acpi_mappings.push_back({uint64_t(ptr),
+                                              uint64_t(actual_len)})))
+            panic_oom();
     }
 
     return ptr;
@@ -1136,7 +1146,8 @@ static void acpi_parse_rsdt()
                 PROT_READ, MAP_PHYSICAL);
     if (unlikely(rsdt_hdr == MAP_FAILED))
         panic_oom();
-    acpi_mappings.push_back({uint64_t(rsdt_hdr), len});
+    if (unlikely(!acpi_mappings.push_back({uint64_t(rsdt_hdr), len})))
+        panic_oom();
 
     acpi_sdt_hdr_t aligned_rsdt_hdr{};
     memcpy(&aligned_rsdt_hdr, rsdt_hdr, sizeof(aligned_rsdt_hdr));
@@ -1175,7 +1186,9 @@ static void acpi_parse_rsdt()
 
         acpi_sdt_hdr_t aligned_sdt_hdr{};
         memcpy(&aligned_sdt_hdr, hdr, sizeof(aligned_sdt_hdr));
-        acpi_mappings.push_back({uint64_t(hdr), uint64_t{64 << 10}});
+        if (unlikely(!acpi_mappings.push_back({uint64_t(hdr),
+                                              uint64_t{64 << 10}})))
+            panic_oom();
 
         hdr = acpi_remap_len(hdr, hdr_addr, 64 << 10, aligned_sdt_hdr.len);
 
@@ -1263,7 +1276,8 @@ static void mp_parse_fps()
     if (unlikely(cth == MAP_FAILED))
         panic_oom();
 
-    acpi_mappings.push_back({uint64_t(cth), 0x10000});
+    if (!acpi_mappings.push_back({uint64_t(cth), 0x10000}))
+        panic_oom();
 
     cth = acpi_remap_len(cth, uintptr_t(mp_tables),
                          0x10000, cth->base_tbl_len + cth->ext_tbl_len);

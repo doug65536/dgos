@@ -926,9 +926,11 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
     if (synchronous) {
         shootdown_counts.reserve(thread_cpu_count());
         for (uint32_t i = 0; i < cpu_count; ++i) {
-            shootdown_counts.push_back((i != cur_cpu_nr)
-                                       ? thread_shootdown_count(i)
-                                       : -1);
+            if (unlikely(!shootdown_counts.push_back(
+                             (i != cur_cpu_nr)
+                             ? thread_shootdown_count(i)
+                             : -1)))
+                panic_oom();
         }
     }
 
@@ -2762,7 +2764,7 @@ EXPORT void *mmap_register_device(void *context,
     mapping->active_read = -1;
 
     if (ins == mm_dev_mappings.end()) {
-        if (!mm_dev_mappings.push_back(mapping)) {
+        if (unlikely(!mm_dev_mappings.push_back(mapping))) {
             munmap(mapping->range, sz);
             delete mapping;
             return nullptr;
@@ -2970,19 +2972,24 @@ void mm_destroy_process()
 
         if ((present_mask & 0xF) == 0xF &&
                 !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
-            pending_frees.push_back(*ptes[3] & PTE_ADDR);
+            if (unlikely(!pending_frees.push_back(*ptes[3] & PTE_ADDR)))
+                panic_oom();
         if (unlikely(path[3] == 511)) {
             if ((present_mask & 0x7) == 0x7 &&
                     !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
-                pending_frees.push_back(*ptes[2] & PTE_ADDR);
+                if (unlikely(!pending_frees.push_back(*ptes[2] & PTE_ADDR)))
+                    panic_oom();
             if (path[2] == 511) {
                 if ((present_mask & 0x3) == 0x3 &&
                         !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
-                    pending_frees.push_back(*ptes[1] & PTE_ADDR);
+                    if (unlikely(!pending_frees.push_back(*ptes[1] & PTE_ADDR)))
+                        panic_oom();
                 if (path[1] == 511) {
                     if ((present_mask & 0x1) == 0x1 &&
                             !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
-                        pending_frees.push_back(*ptes[0] & PTE_ADDR);
+                        if (unlikely(!pending_frees.push_back(
+                                         *ptes[0] & PTE_ADDR)))
+                            panic_oom();
                 }
             }
         }

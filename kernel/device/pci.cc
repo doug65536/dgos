@@ -1317,7 +1317,9 @@ void pci_init_ecam_entry(uint64_t base, uint16_t seg,
                          PROT_READ | PROT_WRITE,
                          MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
     assert(mapping != MAP_FAILED);
-    pci_ecam_list.push_back(pci_ecam_t{base, mapping, seg, st_bus, en_bus});
+    if (unlikely(!pci_ecam_list.push_back(
+                     pci_ecam_t{base, mapping, seg, st_bus, en_bus})))
+        panic_oom();
 }
 
 void pci_init_ecam_enable()

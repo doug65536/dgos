@@ -72,7 +72,9 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                         part->lba_len = ptbl[i].total_sectors;
                         part->name = "fat32";
 
-                        partitions.push_back(part);
+                        if (unlikely(!partitions.push_back(part)))
+                            panic_oom();
+
                         if (likely(list.push_back(part.get())))
                             part.release();
                         break;

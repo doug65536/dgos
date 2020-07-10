@@ -1119,7 +1119,8 @@ void usbxhci::cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp)
         result.cc = usb_cc_t(USBXHCI_EVT_CMDCOMP_INFO_CC_GET(evt->data[2]));
         result.ccp = USBXHCI_EVT_CMDCOMP_INFO_CCP_GET(evt->data[2]);
         result.slotid = evt->slotid;
-        completed_iocp.push_back(iocp);
+        if (unlikely(!completed_iocp.push_back(iocp)))
+            panic_oom();
     } else {
         USBXHCI_TRACE("Got cmd_comp with null iocp\n");
     }
@@ -1138,7 +1139,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 
     scoped_lock hold_endpoints_lock(endpoints_lock);
 
-    if (!endpoints.emplace_back(newepd.get()))
+    if (unlikely(!endpoints.emplace_back(newepd.get())))
         return nullptr;
 
     if (unlikely(!newepd->ring.alloc(PAGESIZE / sizeof(*newepd->ring.ptr)))) {
@@ -2466,7 +2467,7 @@ void usbxhci::detect()
 
         std::unique_ptr<usbxhci> self(new (ext::nothrow) usbxhci);
 
-        if (!usbxhci_devices.emplace_back(self.get())) {
+        if (unlikely(!usbxhci_devices.emplace_back(self.get()))) {
             USBXHCI_TRACE("Out of memory!");
             break;
         }

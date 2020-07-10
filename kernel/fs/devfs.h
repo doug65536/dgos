@@ -108,6 +108,7 @@ struct dev_fs_t final
         }
     };
 
+    _use_result
     bool register_file(dev_fs_file_reg_t *reg)
     {
         return files.emplace_back(reg);

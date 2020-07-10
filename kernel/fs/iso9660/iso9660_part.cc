@@ -49,7 +49,9 @@ iso9660_part_factory_t::detect(storage_dev_base_t *drive)
         part->lba_len = pvd->block_count.le;
         part->name = "iso9660";
 
-        partitions.push_back(part);
+        if (unlikely(!partitions.push_back(part)))
+            panic_oom();
+
         if (likely(list.push_back(part.get())))
             part.release();
     }

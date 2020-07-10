@@ -269,9 +269,6 @@ module_t *modload_load_image(void const *image, size_t image_sz,
 
     parameters.insert(parameters.begin(), module_name);
 
-//    if (parameters.back())
-//        parameters.push_back(nullptr);
-
     errno_t err = module->load_image(image, image_sz, module_name,
                                      std::move(parameters), ret_needed);
 
@@ -443,7 +440,8 @@ errno_t module_t::parse_dynamic()
             continue;
 
         case DT_NEEDED:
-            dt_needed.push_back(dyn_ent.d_un.d_val);
+            if (unlikely(!dt_needed.push_back(dyn_ent.d_un.d_val)))
+                panic_oom();
             continue;
 
         case DT_HASH:
@@ -1263,7 +1261,8 @@ public:
             ent_t ent;
             ent.initial_loc = read_enc_val(input, table_enc);
             ent.address = read_enc_val(input, table_enc);
-            search_table.push_back(ent);
+            if (unlikely(!search_table.push_back(ent)))
+                panic_oom();
         }
     }
 };
@@ -1305,7 +1304,9 @@ _constructor(ctor_mmu_init) static void atexit_init()
 {
     for (size_t i = 0; i < early_atexit_count; ++i) {
         fn_list_t& list = atexit_lookup[early_atexit[i].dso_handle];
-        list.push_back({early_atexit[i].handler, early_atexit[i].arg});
+        if (unlikely(!list.push_back({early_atexit[i].handler,
+                                     early_atexit[i].arg})))
+            panic_oom();
     }
     early_atexit_count = 0;
 
@@ -1321,7 +1322,8 @@ EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
 
     if (atexit_ready) {
         fn_list_t& list = atexit_lookup[dso_handle];
-        list.push_back({func, arg});
+        if (unlikely(!list.push_back({func, arg})))
+            panic_oom();
     } else {
         early_atexit[early_atexit_count++] = {dso_handle, func, arg};
     }

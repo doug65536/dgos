@@ -124,7 +124,7 @@ static filetab_t *file_new_filetab(void)
         item->next_free = nullptr;
     } else if (file_table.size() < file_table.capacity()) {
         // Add another item
-        if (!file_table.emplace_back())
+        if (unlikely(!file_table.emplace_back()))
             return nullptr;
         item = &file_table.back();
     } else {

@@ -82,10 +82,15 @@ static size_t perf_tokenize(char const *st, char const *en, bool force = true)
     }
 
     size_t token = perf_tokens.size();
-    perf_tokens.push_back(std::move(text));
+    if (unlikely(!perf_tokens.push_back(std::move(text))))
+        panic_oom();
 
-    if (!force)
-        token_map.emplace(perf_tokens.back(), token);
+    if (!force) {
+        if (unlikely(token_map.emplace(
+                         perf_tokens.back(), token).first
+                     == token_map_t::iterator()))
+            panic_oom();
+    }
 
     return token;
 }
