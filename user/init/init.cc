@@ -94,7 +94,6 @@ int main(int argc, char **argv, char **envp)
 
     load_module("ext4.km");
     load_module("fat32.km");
-    load_module("iso9660.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_SERIAL,
@@ -133,6 +132,7 @@ int main(int argc, char **argv, char **envp)
                       PCI_SUBCLASS_STORAGE_ATA, -1))
         load_module("ide.km");
 
+    load_module("iso9660.km");
     load_module("gpt.km");
     load_module("mbr.km");
 
