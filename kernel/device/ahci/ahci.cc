@@ -1210,9 +1210,9 @@ isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
         int irq_ofs = irq - dev->irq_range.base;
 
         if (unlikely(irq_ofs >= 0 && irq_ofs < dev->irq_range.count)) {
-            workq::enqueue([=] {
+            //workq::enqueue([=] {
                 dev->irq_handler(irq_ofs);
-            });
+            //});
         }
     }
 
