@@ -43,8 +43,8 @@ int ucs4_to_utf16(char16_t *out, char32_t in);
 char32_t utf8_to_ucs4(char const *in, char const **ret_end);
 char32_t utf8_to_ucs4_upd(char const *&in);
 
-int utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
-int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
+char32_t utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
+char32_t utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
 
 size_t utf8_count(char const *in);
 size_t utf16_count(uint16_t const *in);

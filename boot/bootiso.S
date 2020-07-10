@@ -157,7 +157,7 @@ load_done:	// utility label for placing debugger breakpoint
 
     movl bootinfo_primary_volume_desc,%eax
     xorl %edx,%edx
-    movl $iso9660_boot_partition,%ecx
+    movl $ iso9660_boot_partition,%ecx
     gs movb $'!',80*25*2-2
     movl $ 0f,%ebx
     jmp boot

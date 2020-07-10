@@ -734,7 +734,7 @@ EXPORT char32_t utf8_to_ucs4_upd(char const *&in)
 }
 
 // Same semantics as utf8_to_ucs4
-EXPORT int utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
+EXPORT char32_t utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
 {
     if (in[0] < 0xD800 || in[0] > 0xDFFF) {
         if (ret_end)
@@ -752,9 +752,14 @@ EXPORT int utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
 }
 
 // Same semantics as utf8_to_ucs4
-EXPORT int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
+EXPORT char32_t utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
 {
-    uint16_t in0 = ntohs(in[0]);
+    uint16_t in0 = 0;
+
+    // Handle misalignment
+    memcpy(&in0, in, sizeof(in0));
+
+    in0 = ntohs(in0);
 
     if (in0 < 0xD800 || in0 > 0xDFFF) {
         if (ret_end)

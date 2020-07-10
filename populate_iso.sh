@@ -1,14 +1,19 @@
 #!/bin/bash
 
+TOPSRC="$1"
 set -x
 
 mkdir -p iso_stage || exit
 
 echo Running mkposixdirs
-"$1/mkposixdirs.sh" iso_stage || exit
+"$TOPSRC/mkposixdirs.sh" iso_stage || exit
 
 echo mkposixdirs complete
-cp bootiso-bin iso_stage/bootiso-bin || exit
+ln -fsr bootiso-bin iso_stage/bootiso-bin || exit
+
+for f in *.km; do
+    ln -fsTr "$f" "iso_stage/$f"
+done
 
 ln -fsr kernel-generic iso_stage/dgos-kernel-generic || exit
 ln -fsr kernel-tracing iso_stage/dgos-kernel-tracing || exit
@@ -17,7 +22,7 @@ for f in initrd; do
     ln -fsr "$f" "iso_stage/$f" || exit
 done
 
-ln -fsr "$1/user/background.png" iso_stage/background.png || exit
+ln -fsr "$TOPSRC/user/background.png" iso_stage/background.png || exit
 
 mkdir -p iso_stage/EFI/boot || exit
 ln -fsr bootx64.efi iso_stage/EFI/boot/bootx64.efi || exit

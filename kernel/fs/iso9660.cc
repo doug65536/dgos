@@ -12,6 +12,7 @@
 #include "inttypes.h"
 #include "cxxstring.h"
 #include "user_mem.h"
+#include "string.h"
 
 struct iso9660_factory_t : public fs_factory_t {
 public:
@@ -79,14 +80,22 @@ struct iso9660_fs_t final : public fs_base_ro_t {
             void *ascii_buf,
             char const *utf8);
 
+    static size_t name_len_ascii(
+            void *ascii_buf,
+            size_t limit);
+
+    static size_t name_len_utf16be(
+            void *ascii_buf,
+            size_t limit);
+
     static int name_to_utf16be(
             void *utf16be_buf,
             char const *utf8);
 
-    static void name_copy_ascii(
+    static char *name_copy_ascii(
             char *out, void *in, size_t len);
 
-    static void name_copy_utf16be(
+    static char *name_copy_utf16be(
             char *out, void *in, size_t len);
 
     static uint32_t round_up(
@@ -135,30 +144,31 @@ struct iso9660_fs_t final : public fs_base_ro_t {
 
     bool mount(fs_init_info_t *conn);
 
-    storage_dev_base_t *drive;
+    storage_dev_base_t *drive = nullptr;
 
     // Partition range
-    uint64_t lba_st;
-    uint64_t lba_len;
+    uint64_t lba_st = 0;
+    uint64_t lba_len = 0;
 
     // Root
-    uint32_t root_lba;
-    uint32_t root_bytes;
+    uint32_t root_lba = 0;
+    uint32_t root_bytes = 0;
 
     // Path table
-    uint32_t pt_lba;
-    uint32_t pt_bytes;
+    uint32_t pt_lba = 0;
+    uint32_t pt_bytes = 0;
 
     ext::string serial;
 
     int (*name_convert)(void *encoded_buf,
                         char const *utf8);
+    size_t (*name_len)(void *encoded_buf, size_t limit);
     int (*lookup_path_cmp)(void const *v,
                            void const *k,
                            void *s);
     int (*name_compare)(void const *name, size_t name_len,
                         char const *find, size_t find_len);
-    void (*name_copy)(char *out, void *in, size_t len);
+    char *(*name_copy)(char *out, void *in, size_t len);
 
     // Path table and path table lookup table
     iso9660_pt_rec_t *pt;
@@ -207,6 +217,12 @@ uint64_t iso9660_fs_t::dirent_lba(iso9660_dir_ent_t const *de)
 uint64_t iso9660_fs_t::pt_rec_lba(iso9660_pt_rec_t const *pt_rec)
 {
     return (pt_rec->lba_hi << 16) | pt_rec->lba_lo;
+}
+
+size_t iso9660_fs_t::name_len_ascii(void *ascii_buf, size_t limit)
+{
+    char *np = (char*)memchr(ascii_buf, 0, limit);
+    return np ? np - (char*)ascii_buf : limit;
 }
 
 int iso9660_fs_t::name_to_ascii(
@@ -265,14 +281,25 @@ int iso9660_fs_t::name_to_utf16be(
     return out;
 }
 
-void iso9660_fs_t::name_copy_ascii(
+size_t iso9660_fs_t::name_len_utf16be(void *buf, size_t limit)
+{
+    char *input = (char*)buf;
+    for (size_t i = 0; i < limit; i += 2) {
+        if (input[i] == 0 && input[i + 1] == 0)
+            return i >> 1;
+    }
+    return limit;
+}
+
+char *iso9660_fs_t::name_copy_ascii(
         char *out, void *in, size_t len)
 {
     memcpy(out, in, len);
     out[len] = 0;
+    return out + len;
 }
 
-void iso9660_fs_t::name_copy_utf16be(
+char *iso9660_fs_t::name_copy_utf16be(
         char *out, void *in, size_t len)
 {
     uint16_t const *name = (uint16_t const*)in;
@@ -283,7 +310,9 @@ void iso9660_fs_t::name_copy_utf16be(
         int codepoint = utf16be_to_ucs4(name, &name);
         out += ucs4_to_utf8(out, codepoint);
     }
-    *out++ = 0;
+    *out = 0;
+
+    return out;
 }
 
 uint32_t iso9660_fs_t::round_up(
@@ -345,12 +374,26 @@ int iso9660_fs_t::name_compare_ascii(
 
     for (int pass = 0; pass < 2; ++pass) {
         while (find < find_limit || chk < chk_limit) {
-            int key_codepoint = find < find_limit
+            char32_t key_codepoint = find < find_limit
                     ? utf8_to_ucs4(find, &find)
                     : ' ';
-            int chk_codepoint = chk < chk_limit
+            char32_t chk_codepoint = chk < chk_limit
                     ? *chk
                     : ' ';
+
+            printdbg("utf8: compare %c (0x%02x) %c (0x%02x)\n",
+                     !key_codepoint
+                     ? '0'
+                     : key_codepoint >= ' ' && key_codepoint < 126
+                     ? key_codepoint
+                     : '.',
+                     key_codepoint,
+                     !chk_codepoint
+                     ? '0'
+                     : chk_codepoint >= ' ' && chk_codepoint < 126
+                     ? chk_codepoint
+                     : '.',
+                     chk_codepoint);
 
             cmp = chk_codepoint - key_codepoint;
 
@@ -375,8 +418,29 @@ int iso9660_fs_t::name_compare_utf16be(
 
     int cmp = 0;
     while (find < find_end || chk < chk_end) {
-        int key_codepoint = utf8_to_ucs4(find, &find);
-        int chk_codepoint = utf16be_to_ucs4(chk, &chk);
+        char32_t key_codepoint =
+                find < find_end
+                ? utf8_to_ucs4(find, &find)
+                : 0;
+
+        char32_t chk_codepoint =
+                chk < chk_end
+                ? utf16be_to_ucs4(chk, &chk)
+                : 0;
+
+        printdbg("utf16be: compare %c (0x%02x) %c (0x%02x)\n",
+                 !key_codepoint
+                 ? '0'
+                 : key_codepoint >= ' ' && key_codepoint < 126
+                 ? key_codepoint
+                 : '.',
+                 key_codepoint,
+                 !chk_codepoint
+                 ? '0'
+                 : chk_codepoint >= ' ' && chk_codepoint < 126
+                 ? chk_codepoint
+                 : '.',
+                 chk_codepoint);
 
         cmp = key_codepoint - chk_codepoint;
 
@@ -580,6 +644,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
     uint32_t best_ofs = 0;
 
     name_convert = name_to_ascii;
+    name_len = name_len_ascii;
     lookup_path_cmp = lookup_path_cmp_ascii;
     name_compare = name_compare_ascii;
     name_copy = name_copy_ascii;
@@ -596,6 +661,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
         if (pvd.type_code == 2) {
             // Prefer joliet pvd
             name_convert = name_to_utf16be;
+            name_len = name_len_utf16be;
             lookup_path_cmp = lookup_path_cmp_utf16be;
             name_compare = name_compare_utf16be;
             name_copy = name_copy_utf16be;
@@ -613,7 +679,15 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
             return false;
     }
 
-    serial = pvd.app_id;
+    serial.resize(sizeof(pvd.app_id));
+
+    char *serial_end = name_copy(
+                serial.data(), pvd.app_id, sizeof(pvd.app_id));
+
+    serial.resize(serial_end - serial.data());
+
+    while (!serial.empty() && serial.back() == ' ')
+        serial.pop_back();
 
     root_lba = dirent_lba(&pvd.root_dirent);
 
