@@ -1,7 +1,7 @@
 // pci driver: C=SERIAL, S=USB, I=XHCI
 
 #include "kmodule.h"
-#include "pci.h"
+#include "../pci.h"
 
 PCI_DRIVER_BY_CLASS(
         usb_xhci,
@@ -17,10 +17,10 @@ PCI_DRIVER_BY_CLASS(
 #include "string.h"
 #include "hash_table.h"
 #include "mutex.h"
-#include "usb.h"
+#include "../usb.h"
 #include "vector.h"
 #include "dev_usb_ctl.h"
-#include "iocp.h"
+#include "../iocp.h"
 #include "refcount.h"
 #include "time.h"
 #include "inttypes.h"

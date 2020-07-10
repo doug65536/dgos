@@ -1,9 +1,9 @@
 #pragma once
 #include "types.h"
-#include "pci.h"
+#include "../pci.h"
 #include "vector.h"
 #include "mutex.h"
-#include "iocp.h"
+#include "../iocp.h"
 #include "unique_ptr.h"
 
 class virtio_base_t;

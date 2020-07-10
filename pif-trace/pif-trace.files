@@ -1,2 +1,4 @@
-./pif-trace.files
-./pif-trace.cc
+pif-trace.cflags
+pif-trace.cxxflags
+pif-trace.files
+pif-trace.cc

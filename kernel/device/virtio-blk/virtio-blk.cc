@@ -1,14 +1,14 @@
 // pci driver: C=STORAGE, V=VIRTIO (0x1AF4)
 
 #include "kmodule.h"
-#include "pci.h"
+#include "../pci.h"
 
 PCI_DRIVER(
         virtio_blk,
         0x1AF4, -1, PCI_DEV_CLASS_STORAGE, -1, -1);
 
 #include "virtio-blk.h"
-#include "virtio-base.h"
+#include "../virtio-base/virtio-base.h"
 #include "dev_storage.h"
 #include "callout.h"
 #include "numeric_limits.h"

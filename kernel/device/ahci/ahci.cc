@@ -1,7 +1,7 @@
 // pci driver: C=STORAGE,S=SATA,I=AHCI
 
 #include "kmodule.h"
-#include "pci.h"
+#include "../pci.h"
 
 PCI_DRIVER_BY_CLASS(
         ahci,
@@ -9,7 +9,7 @@ PCI_DRIVER_BY_CLASS(
         PCI_PROGIF_STORAGE_SATA_AHCI);
 
 #include "dev_storage.h"
-#include "ata.h"
+#include "../ata.h"
 #include "ahci.bits.h"
 #include "device/pci.h"
 #include "irq.h"

@@ -1,7 +1,7 @@
 // pci driver: C=STORAGE, S=NVM, I=NVME
 
 #include "kmodule.h"
-#include "pci.h"
+#include "../pci.h"
 
 PCI_DRIVER_BY_CLASS(
         nvme,

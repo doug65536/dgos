@@ -1,7 +1,7 @@
 // pci driver: C=STORAGE, S=IDE
 
 #include "kmodule.h"
-#include "pci.h"
+#include "../pci.h"
 
 PCI_DRIVER_BY_CLASS(
         ide,
@@ -9,9 +9,9 @@ PCI_DRIVER_BY_CLASS(
         PCI_SUBCLASS_STORAGE_ATA, -1);
 
 #include "dev_storage.h"
-#include "ata.h"
+#include "../ata.h"
 #include "cpu/ioport.h"
-#include "pci.h"
+#include "../pci.h"
 #include "mm.h"
 #include "string.h"
 #include "time.h"

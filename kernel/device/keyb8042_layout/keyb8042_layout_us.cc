@@ -1,5 +1,5 @@
 #include "keyboard.h"
-#include "device/keyb8042.h"
+#include "device/keyb8042/keyb8042.h"
 #include "export.h"
 
 // Scancodes resolve to an ASCII equivalent, or,

@@ -804,6 +804,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/net/ipv4_frame.cc \
 	kernel/net/ipv4_frame.h \
 	kernel/net/ipv4.h \
+	kernel/net/ipv4.bits.h \
 	kernel/net/tcp.cc \
 	kernel/net/tcp_frame.cc \
 	kernel/net/tcp_frame.h \
@@ -899,7 +900,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/eainstrument.cc \
 	kernel/device/eainstrument.h \
 	kernel/device/e9debug.h \
-	kernel/device/i350.cc \
+	kernel/device/i350/i350.cc \
 	kernel/device/keyb8042_layout/keyb8042_layout_us.cc \
 	kernel/device/pci.cc \
 	kernel/device/pci.h \
@@ -910,14 +911,14 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/usb.h	\
 	kernel/device/usb.cc \
 	kernel/device/dev_usb_ctl.cc \
-	kernel/device/usb_hid.h \
-	kernel/device/usb_hid.cc \
-	kernel/device/usb_hid_keybd_lookup.h \
-	kernel/device/usb_hid_keybd_lookup.cc \
-	kernel/device/usb_audio.h \
-	kernel/device/usb_audio.cc \
-	kernel/device/usb_hub.h \
-	kernel/device/usb_hub.cc \
+	kernel/device/usb_hid/usb_hid.h \
+	kernel/device/usb_hid/usb_hid.cc \
+	kernel/device/usb_hid/usb_hid_keybd_lookup.h \
+	kernel/device/usb_hid/usb_hid_keybd_lookup.cc \
+	kernel/device/usb_audio/usb_audio.h \
+	kernel/device/usb_audio/usb_audio.cc \
+	kernel/device/usb_hub/usb_hub.h \
+	kernel/device/usb_hub/usb_hub.cc \
 	kernel/device/vga.cc \
 	kernel/device/vt100.cc \
 	kernel/device/vt100.h \
@@ -2169,8 +2170,7 @@ MODULE_LIST = $(subst %,$(top_builddir)/%,$(MODULE_FILENAMES))
 SYMBOL_FILE = sym/$(1).sym
 
 CPIO_LIST = $(MODULE_LIST) \
-	$(generate_symbols_outputs) \
-	background.png
+	$(generate_symbols_outputs)
 
 all-kernel: kernel-generic $(MODULE_LIST)
 
@@ -2233,19 +2233,19 @@ distclean-local:
 # Generate register definitions
 
 BITFIELD_FILES = \
-	$(top_srcdir)/kernel/device/nvme.bits \
-	$(top_srcdir)/kernel/device/usb_hid.bits \
-	$(top_srcdir)/kernel/device/usb_audio.bits \
+	$(top_srcdir)/kernel/device/nvme/nvme.bits \
+	$(top_srcdir)/kernel/device/usb_hid/usb_hid.bits \
+	$(top_srcdir)/kernel/device/usb_audio/usb_audio.bits \
 	$(top_srcdir)/kernel/device/pci.bits \
-	$(top_srcdir)/kernel/device/rtl8139.bits \
-	$(top_srcdir)/kernel/device/i350.bits \
-	$(top_srcdir)/kernel/device/usb_xhci.bits \
+	$(top_srcdir)/kernel/device/rtl8139/rtl8139.bits \
+	$(top_srcdir)/kernel/device/i350/i350.bits \
+	$(top_srcdir)/kernel/device/usb_xhci/usb_xhci.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/perf_reg.bits \
 	$(top_srcdir)/kernel/device/acpi.bits \
-	$(top_srcdir)/kernel/device/ahci.bits \
-	$(top_srcdir)/kernel/device/es173x.bits \
+	$(top_srcdir)/kernel/device/ahci/ahci.bits \
+	$(top_srcdir)/kernel/device/es137x/es137x.bits \
 	$(top_srcdir)/kernel/net/ipv4.bits
 
 # 1=path to bits file

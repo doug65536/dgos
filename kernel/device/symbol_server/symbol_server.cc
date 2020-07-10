@@ -1,6 +1,6 @@
 #include "kmodule.h"
 #include "symbol_server.h"
-#include "serial-uart.h"
+#include "../serial-uart.h"
 #include "fileio.h"
 #include "main.h"
 #include "elf64.h"

@@ -1,3 +1,5 @@
+user.cflags
+user.cxxflags
 bin/dhcpclient/dhcpclient.cc
 crt0/crt0pc32.S
 crt0/crt0pc64.S
@@ -10,13 +12,11 @@ init/frameserver.h
 user64.ld
 bin/ls/ls.cc
 crt0/crt0.S
-crt0/crt032.S
 shell/parser.cc
 shell/parser.h
 test/test.S
 shell/grammar.y
 shell/lemon_highlight.xml
-shell/Makefile
 libpng/png.cc
 libwing/window.h
 libwing/window.cc
@@ -51,5 +51,4 @@ zlib/zutil.c
 zlib/zutil.h
 zlib/contrib/amd64/amd64-match.S
 zlib/contrib/asm686/match.S
-Makefile
 .gitignore

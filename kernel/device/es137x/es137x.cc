@@ -5,7 +5,7 @@
 /// S=1 (AUDIO),
 
 #include "kmodule.h"
-#include "pci.h"
+#include "../pci.h"
 
 PCI_DRIVER(
         es137x,
@@ -54,7 +54,7 @@ void set_playback2_sample_rate(unsigned rate)
 {
     uint32_t frequency = (uint64_t(rate) << 16) / 3000;
 
-    SampleRateConverter[0x75] = (frequency >> 6) & 0xfc00;
-    SampleRateConverter[0x77] = (frequency >> 1);
+//    SampleRateConverter[0x75] = (frequency >> 6) & 0xfc00;
+//    SampleRateConverter[0x77] = (frequency >> 1);
 }
 

@@ -5,7 +5,7 @@
 #include "cpu/halt.h"
 #include "thread.h"
 #include "device/pci.h"
-#include "device/keyb8042.h"
+#include "device/keyb8042/keyb8042.h"
 #include "callout.h"
 #include "time.h"
 #include "keyboard.h"

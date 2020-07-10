@@ -1,7 +1,7 @@
 // pci driver: C=NETWORK, S=ETHERNET, V=0x10EC, D=0x8139
 
 #include "kmodule.h"
-#include "pci.h"
+#include "../pci.h"
 
 PCI_DRIVER(rtl8139,
            0x10EC, 0x8139,

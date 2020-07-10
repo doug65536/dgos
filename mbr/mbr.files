@@ -1,4 +1,6 @@
-./mbr.S
-./empty.cc
-./mbr.ld
-./mbr.files
+mbr.cflags
+mbr.cxxflags
+mbr.S
+mbr.ld
+mbr.files
+empty.cc

@@ -1,3 +1,5 @@
+libc.cflags
+libc.cxxflags
 cxx/abi/cxa_allocate_exception.cc
 cxx/terminate.cc
 include/byteswap.h
@@ -6,10 +8,11 @@ include/disabled_stdint.h
 include/disabled_limits.h
 include/new.h
 include/stdint.h
+include/sys/limits.h
 include/sys/cpu_bug.h
 include/sys/ioctl.h
 include/sys/likely.h
-nclude/sys/module.h
+include/sys/module.h
 include/sys/socket.h
 include/sys/syscall_num.h
 include/sys/framebuffer.h
