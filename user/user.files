@@ -6,6 +6,7 @@ crt0/crt0pc64.S
 crt0/crt0pc80.S
 lib64.ld
 user64_phdrs.ld
+background.png
 init/init.cc
 init/frameserver.cc
 init/frameserver.h
