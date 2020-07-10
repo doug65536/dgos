@@ -582,7 +582,9 @@ init_CCASFLAGS = \
 	-isystem $(top_builddir)/sysroot/include
 
 EXTRA_init_DEPENDENCIES = \
-	$(top_srcdir)/user/user64_phdrs.ld
+	$(top_srcdir)/user/user64_phdrs.ld \
+	$(top_builddir)/sysroot/lib/libz.a \
+	$(top_builddir)/sysroot/lib/libpng.a
 
 #===========
 
@@ -628,4 +630,8 @@ init_shared_CCASFLAGS = \
 
 EXTRA_init_shared_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld
+	EXTRA_init_DEPENDENCIES = \
+		$(top_srcdir)/user/user64_phdrs.ld \
+		$(top_builddir)/sysroot/lib/libz.so \
+		$(top_builddir)/sysroot/lib/libpng.so
 
