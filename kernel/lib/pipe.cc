@@ -1,23 +1,24 @@
 #include "pipe.h"
 #include "stdlib.h"
+#include "export.h"
 
-pipe_t::pipe_t()
+EXPORT pipe_t::pipe_t()
 {
 
 }
 
-pipe_t::~pipe_t()
+EXPORT pipe_t::~pipe_t()
 {
     scoped_lock lock(pipe_lock);
     cleanup_buffer(lock);
 }
 
-size_t pipe_t::capacity() const
+EXPORT size_t pipe_t::capacity() const
 {
     return 0;
 }
 
-void pipe_t::cleanup_buffer(scoped_lock& lock)
+EXPORT void pipe_t::cleanup_buffer(scoped_lock& lock)
 {
     if (page_pool) {
         munmap(page_pool, page_capacity * PAGESIZE);
@@ -33,7 +34,7 @@ void pipe_t::cleanup_buffer(scoped_lock& lock)
     pipe_not_full.notify_all();
 }
 
-pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock)
+EXPORT pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock)
 {
     for (pipe_buffer_hdr_t *result = nullptr;
          page_pool; pipe_not_full.wait(lock)) {
@@ -61,7 +62,7 @@ pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock)
     return nullptr;
 }
 
-void pipe_t::free_page(pipe_buffer_hdr_t *page, scoped_lock& lock)
+EXPORT void pipe_t::free_page(pipe_buffer_hdr_t *page, scoped_lock& lock)
 {
     page->next = free_buffer;
     page->size = 0;
@@ -69,7 +70,7 @@ void pipe_t::free_page(pipe_buffer_hdr_t *page, scoped_lock& lock)
     pipe_not_full.notify_one();
 }
 
-bool pipe_t::reserve(size_t pages)
+EXPORT bool pipe_t::reserve(size_t pages)
 {
     scoped_lock lock(pipe_lock);
 
@@ -90,7 +91,7 @@ bool pipe_t::reserve(size_t pages)
     return true;
 }
 
-ssize_t pipe_t::enqueue(void *data, size_t size, int64_t timeout)
+EXPORT ssize_t pipe_t::enqueue(void *data, size_t size, int64_t timeout)
 {
     scoped_lock lock(pipe_lock);
 
@@ -136,7 +137,7 @@ ssize_t pipe_t::enqueue(void *data, size_t size, int64_t timeout)
     return -int(errno_t::ENOSYS);
 }
 
-ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout)
+EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout)
 {
     scoped_lock lock(pipe_lock);
 
