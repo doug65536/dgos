@@ -498,6 +498,28 @@ EXTRA_gpt_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========
+# iso9660 "partition" recognizer
+
+bin_PROGRAMS += iso9660_part.km
+generate_symbols_list += iso9660_part.km
+generate_kallsym_list += iso9660_part.km
+
+iso9660_part_km_SOURCES = \
+	kernel/fs/iso9660_part.cc
+
+iso9660_part_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+iso9660_part_km_LDFLAGS = \
+	$(call KERNEL_MODULE_LDFLAGS_FN,iso9660_part)
+
+iso9660_part_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_iso9660_part_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
 
 define strip_module =
 modsym/$(1).km: $(1).km
