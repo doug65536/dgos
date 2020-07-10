@@ -80,7 +80,7 @@ public:
     U wait_and_return();
 
 private:
-    using lock_type = ext::spinlock;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
