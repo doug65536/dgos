@@ -380,7 +380,6 @@ lib/heap.h
 lib/mouse.h
 lib/bswap.cc
 lib/assert.cc
-lib/Makefile
 lib/dev_eth.cc
 lib/irq.cc
 lib/rand.cc
