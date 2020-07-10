@@ -1012,7 +1012,7 @@ struct symbols_t {
         return tokens.data() + n;
     }
 
-    using name_lookup_t = std::map<std::string, size_t>;
+    using name_lookup_t = std::map<ext::string, size_t>;
 
     static void symbol_xlat(void *arg, void * const *ips, size_t count)
     {
@@ -1083,7 +1083,7 @@ struct symbols_t {
         // Make empty string map to zero token
         name_lookup.insert({"", 0});
 
-        std::string name;
+        ext::string name;
 
         char *src = buf;
         for (char *line_end, *end = buf + len; src < end; src = line_end + 1) {
@@ -1180,7 +1180,7 @@ struct symbols_t {
 
     name_lookup_t::iterator name_insert(
             name_lookup_t &name_lookup,
-            std::string const& entry)
+            ext::string const& entry)
     {
         std::pair<name_lookup_t::iterator, bool> ins =
                 name_lookup.insert({ entry, tokens.size() });

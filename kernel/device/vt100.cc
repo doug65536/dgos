@@ -89,8 +89,8 @@ private:
     state_t state;
     uint8_t utf8_remain;
     char32_t utf8_codepoint;
-    std::u32string csi;
-    using csi_iter = std::u32string::iterator;
+    ext::u32string csi;
+    using csi_iter = ext::u32string::iterator;
 
     struct gr_t {
         unsigned font:4;

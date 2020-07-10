@@ -16,7 +16,7 @@
 static stacktrace_xlat_fn_t stacktrace_xlat_fn;
 static void *stacktrace_xlat_fn_arg;
 
-using perf_token_table_t = std::vector<std::string>;
+using perf_token_table_t = std::vector<ext::string>;
 
 using perf_symbol_table_t = ext::fast_map<uintptr_t, size_t>;
 
@@ -29,7 +29,7 @@ struct perf_module_t {
 
 using perf_module_lookup_t = ext::fast_map<uintptr_t, perf_module_t*>;
 
-using perf_module_table_t = ext::fast_map<std::string, perf_module_t>;
+using perf_module_table_t = ext::fast_map<ext::string, perf_module_t>;
 
 static perf_token_table_t perf_tokens;
 static perf_module_table_t perf_module_syms;
@@ -65,7 +65,7 @@ static std::vector<padded_rand_lfs113_t> perf_rand;
 static uint32_t volatile perf_event = 0xC0;
 static uint8_t volatile perf_event_scale = 21;
 
-using token_map_t = std::map<std::string, size_t>;
+using token_map_t = std::map<ext::string, size_t>;
 static token_map_t token_map;
 
 static size_t perf_tokenize(char const *st, char const *en, bool force = true)
@@ -73,7 +73,7 @@ static size_t perf_tokenize(char const *st, char const *en, bool force = true)
     if (st && !en)
         en = st + strlen(st);
 
-    std::string text(st, en);
+    ext::string text(st, en);
 
     if (!force) {
         token_map_t::iterator existing_it = token_map.find(text);
@@ -129,7 +129,7 @@ static bool perf_add_symbols(char const *filename,
                 filename, '/', filename_end - filename);
     slash = slash ? slash + 1 : filename;
 
-    std::string module_name(slash, filename_end);
+    ext::string module_name(slash, filename_end);
 
     // Cut off -kallsyms suffix
     if (module_name.length() > 9 &&
@@ -398,11 +398,11 @@ EXPORT void perf_init()
     for (size_t i = 0; i < mod_count; ++i) {
         module_t *m = modload_get_index(i);
 
-        std::string name = modload_get_name(m);
+        ext::string name = modload_get_name(m);
         uintptr_t base = modload_get_base(m);
         size_t size = modload_get_size(m);
 
-        std::string symname;
+        ext::string symname;
         symname.append("sym/")
                 .append(name)
                 .append("-kallsyms");

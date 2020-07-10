@@ -1,3 +1,4 @@
+#include "kmodule.h"
 #include "dev_storage.h"
 #include "stdlib.h"
 #include "printk.h"
@@ -41,7 +42,7 @@ struct fat32_fs_t final : public fs_base_t {
         uint8_t lfn_entry_count = 0;
 
         // Debugging magic, reconstructs the filename
-        std::string str() const;
+        ext::string str() const;
     };
 
     struct file_handle_t : public fs_file_info_t {
@@ -62,7 +63,7 @@ struct fat32_fs_t final : public fs_base_t {
 
         fat32_fs_t *fs;
         fat32_dir_entry_t *dirent;
-        std::string filename;
+        ext::string filename;
 
         off_t cached_offset;
         cluster_t cached_cluster;
@@ -1988,9 +1989,9 @@ int fat32_fs_t::poll(fs_file_info_t *fi,
 
 static fat32_factory_t fat32_factory;
 
-std::string fat32_fs_t::full_lfn_t::str() const
+ext::string fat32_fs_t::full_lfn_t::str() const
 {
     char name[NAME_MAX+1];
     size_t len = name_from_dirents(name, this);
-    return std::string(name, name + len);
+    return ext::string(name, name + len);
 }

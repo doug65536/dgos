@@ -99,7 +99,7 @@ void modload_init(void)
 }
 
 _unused
-static std::string module_reloc_type(size_t sym_type)
+static ext::string module_reloc_type(size_t sym_type)
 {
     switch (sym_type) {
 	case R_AMD64_NONE: return "R_AMD64_NONE";
@@ -154,7 +154,7 @@ public:
     bool load(char const *path);
     errno_t load_image(void const *module, size_t module_sz,
                        char const *module_name,
-                       std::vector<std::string> parameters,
+                       std::vector<ext::string> parameters,
                        char *ret_needed);
     int run();
 
@@ -210,8 +210,8 @@ public:
 
     char const *strs = nullptr;
 
-    std::string module_name;
-    std::vector<std::string> param;
+    ext::string module_name;
+    std::vector<ext::string> param;
     std::vector<char const *> argv;
 
     void *dso_handle = nullptr;
@@ -255,7 +255,7 @@ module_t *modload_load(char const *path, bool run)
 // Shared module loader
 module_t *modload_load_image(void const *image, size_t image_sz,
                              char const *module_name,
-                             std::vector<std::string> parameters,
+                             std::vector<ext::string> parameters,
                              char *ret_needed,
                              errno_t *ret_errno)
 {
@@ -1011,7 +1011,7 @@ truncated_common:
 
 errno_t module_t::load_image(void const *module, size_t module_sz,
                              char const *module_name,
-                             std::vector<std::string> parameters,
+                             std::vector<ext::string> parameters,
                              char *ret_needed)
 {
     this->module_name = module_name;
@@ -1173,7 +1173,7 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
     if (unlikely(!argv.reserve(param.size() + 1)))
         return load_failed(errno_t::ENOMEM);
 
-    for (std::string const& parameter : param) {
+    for (ext::string const& parameter : param) {
         if (unlikely(!argv.push_back(parameter.c_str())))
             return load_failed(errno_t::ENOMEM);
     }
@@ -1355,7 +1355,7 @@ EXPORT module_t *modload_closest(ptrdiff_t address)
     return closest_module;
 }
 
-EXPORT std::string const& modload_get_name(module_t *module)
+EXPORT ext::string const& modload_get_name(module_t *module)
 {
     return module->module_name;
 }

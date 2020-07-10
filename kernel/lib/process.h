@@ -192,9 +192,9 @@ struct process_t
         exited
     };
 
-    std::string path;
-    std::vector<std::string> argv;
-    std::vector<std::string> env;
+    ext::string path;
+    std::vector<ext::string> argv;
+    std::vector<ext::string> env;
     uintptr_t mmu_context = 0;
     void *linear_allocator = nullptr;
     uintptr_t tls_addr = 0;
@@ -219,9 +219,9 @@ struct process_t
     state_t state = state_t::unused;
 
     static int spawn(pid_t * pid_result,
-                     std::string path,
-                     std::vector<std::string> argv,
-                     std::vector<std::string> env);
+                     ext::string path,
+                     std::vector<ext::string> argv,
+                     std::vector<ext::string> env);
     static process_t *init(uintptr_t mmu_context);
 
     void *get_allocator();

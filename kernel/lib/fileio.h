@@ -274,7 +274,7 @@ struct path_t {
 #ifdef NDEBUG
     __attribute__((__deprecated__("For debugging only")))
 #endif
-    std::string to_string() const;
+    ext::string to_string() const;
 
 private:
     static const constexpr size_t path_buf_sz =

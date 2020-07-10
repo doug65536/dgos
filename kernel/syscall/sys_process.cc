@@ -388,9 +388,9 @@ long sys_posix_spawn(pid_t *restrict pid,
     if (!path_string.second)
         return -int(errno_t::EFAULT);
 
-    std::vector<std::string> argv_items;
-    std::vector<std::string> envp_items;
-    std::vector<std::string> *curr_items = &argv_items;
+    std::vector<ext::string> argv_items;
+    std::vector<ext::string> envp_items;
+    std::vector<ext::string> *curr_items = &argv_items;
     char const ** restrict cur_src = argv;
 
     for (size_t pass = 0; pass < 2; ++pass) {

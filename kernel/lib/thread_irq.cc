@@ -15,7 +15,7 @@ private:
     intr_handler_t handler;
     ext::spinlock worker_lock;
     std::condition_variable work;
-    std::string name;
+    ext::string name;
 };
 
 isr_context_t *threaded_irq_thread_fn(void *arg)

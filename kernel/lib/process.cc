@@ -96,9 +96,9 @@ process_t *process_t::add()
 }
 
 int process_t::spawn(pid_t * pid_result,
-                     std::string path,
-                     std::vector<std::string> argv,
-                     std::vector<std::string> env)
+                     ext::string path,
+                     std::vector<ext::string> argv,
+                     std::vector<ext::string> env)
 {
     *pid_result = -1;
 
@@ -668,13 +668,13 @@ void process_t::set_allocator(void *allocator)
 
 void process_t::destroy()
 {
-    std::string empty_path;
+    ext::string empty_path;
     empty_path.swap(path);
 
-    std::vector<std::string> empty_argv;
+    std::vector<ext::string> empty_argv;
     empty_argv.swap(argv);
 
-    std::vector<std::string> empty_env;
+    std::vector<ext::string> empty_env;
     empty_env.swap(env);
 
     delete (contiguous_allocator_t*)linear_allocator;

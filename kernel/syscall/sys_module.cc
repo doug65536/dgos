@@ -38,7 +38,7 @@ int sys_init_module(char const *module, ptrdiff_t module_sz,
     if (unlikely(module_params && !parameter_buffer.second))
         return -int(errno_t::EFAULT);
 
-    std::vector<std::string> parameters;
+    std::vector<ext::string> parameters;
 
     bool in_squote = false;
     bool in_dquote = false;

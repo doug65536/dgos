@@ -4,7 +4,7 @@
 #include "hash.h"
 #include "cxxexception.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename _CharT>
 class char_traits
@@ -128,11 +128,11 @@ void throw_bad_alloc();
 
 template<typename _CharT,
 typename _Traits = char_traits<_CharT>,
-typename _Allocator = allocator<_CharT>>
+typename _Allocator = std::allocator<_CharT>>
 class basic_string
 {
 private:
-    using _Storage = vector<_CharT, _Allocator>;
+    using _Storage = std::vector<_CharT, _Allocator>;
 public:
     static_assert(std::has_trivial_destructor<_CharT>::value,
                   "Null termination technique requires"
@@ -198,7 +198,7 @@ public:
     }
 
     template<typename _IterT,
-             typename _IterV = decltype(*declval<_IterT>())>
+             typename _IterV = decltype(*std::declval<_IterT>())>
     basic_string(_IterT __st, _IterT __en)
     {
         size_type __sz = __en - __st;
@@ -426,6 +426,7 @@ public:
     void pop_back()
     {
         __str.pop_back();
+        __str[__str.size()] = 0;
     }
 
     basic_string& erase(size_type __index, size_type __count = npos)
@@ -498,7 +499,7 @@ public:
         return append(size_type(1), __rhs);
     }
 
-    basic_string& operator+=(initializer_list<_CharT> __ilist)
+    basic_string& operator+=(std::initializer_list<_CharT> __ilist)
     {
         return append(__ilist.begin(), __ilist.end());
     }
@@ -569,14 +570,14 @@ public:
         return *this;
     }
 
-    basic_string& append(initializer_list<_CharT> __ilist)
+    basic_string& append(std::initializer_list<_CharT> __ilist)
     {
         return append(__ilist.begin(), __ilist.end());
     }
 
     int compare(basic_string const& __rhs) const
     {
-        size_type __rlen = min(__str.size(), __rhs.size());
+        size_type __rlen = std::min(__str.size(), __rhs.size());
 
         int __cmp = traits_type::compare(__str.data(), __rhs.data(), __rlen);
 
@@ -664,7 +665,7 @@ public:
         if (__count1 > __max_count1)
             __count1 = __max_count1;
 
-        size_type __rlen = min(__count1, __count2);
+        size_type __rlen = std::min(__count1, __count2);
 
         int __cmp = traits_type::compare(__str.data() + __pos1, __rhs, __rlen);
 
@@ -879,7 +880,7 @@ private:
         return *this;
     }
 
-    vector<_CharT> __str;
+    std::vector<_CharT> __str;
 };
 
 template<typename _CharT, typename _Traits, typename _Alloc>
@@ -1016,9 +1017,14 @@ using wstring = basic_string<wchar_t>;
 using u16string = basic_string<char16_t>;
 using u32string = basic_string<char32_t>;
 
+template<typename T>
+struct hash
+{
+};
+
 template<typename _CharT, typename _Traits, typename _Alloc>
-struct hash<basic_string<_CharT, _Traits, _Alloc>> {
-    size_t operator()(std::basic_string<_CharT, _Traits, _Alloc> const& s) const
+struct hash<ext::basic_string<_CharT, _Traits, _Alloc>> {
+    size_t operator()(ext::basic_string<_CharT, _Traits, _Alloc> const& s) const
     {
         return hash_32(s.data(), s.size() * sizeof(*s.data()));
     }
@@ -1036,15 +1042,11 @@ string to_string( double value );
 string to_string( long double value );
 #endif
 
-__END_NAMESPACE_STD
-
-__BEGIN_NAMESPACE_EXT
-
-std::string to_hex(unsigned long long value, bool prefix = true);
+ext::string to_hex(unsigned long long value, bool prefix = true);
 
 template<typename _T,
          typename = typename std::enable_if<std::is_integral<_T>::value>::type>
-std::string to_hex(_T value, bool prefix)
+ext::string to_hex(_T value, bool prefix)
 {
     if (std::is_same<_T, long long>::value)
         return to_hex((unsigned long long)value, prefix);

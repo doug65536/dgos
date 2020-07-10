@@ -708,9 +708,9 @@ char const *path_t::operator[](size_t component) const
     return begin_of(component);
 }
 
-std::string path_t::to_string() const
+ext::string path_t::to_string() const
 {
-    std::string s;
+    ext::string s;
 
     s.reserve(8 + uintptr_t(components) - uintptr_t(&data));
 

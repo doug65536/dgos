@@ -30,7 +30,7 @@ size_t mm_max_user_len(void const *buf);
 
 __END_DECLS
 
-using mm_copy_string_result_t = std::pair<std::string, bool>;
+using mm_copy_string_result_t = std::pair<ext::string, bool>;
 
 mm_copy_string_result_t mm_copy_user_string(
         char const *user_src, size_t max_size);

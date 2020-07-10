@@ -17,7 +17,7 @@ public:
 // when a device file is opened
 class dev_fs_file_reg_t {
 public:
-    static size_t hash(std::string const& s)
+    static size_t hash(ext::string const& s)
     {
         return hash_32(s.data(), s.length());
     }
@@ -27,7 +27,7 @@ public:
         return hash_32(s, strlen(s));
     }
 
-    dev_fs_file_reg_t(std::string const& name)
+    dev_fs_file_reg_t(ext::string const& name)
         : name(name)
         , name_hash(hash(name))
     {
@@ -37,7 +37,7 @@ public:
 
     virtual dev_fs_file_t *open(int flags, mode_t mode) = 0;
 
-    std::string name;
+    ext::string name;
     size_t name_hash;
 };
 
@@ -47,7 +47,7 @@ void devfs_register(dev_fs_file_reg_t *reg);
 
 struct device_t
 {
-    std::string name;
+    ext::string name;
     fs_base_t *fs;
 };
 
@@ -67,7 +67,7 @@ struct dev_fs_t final
     };
 
     struct device_t {
-        std::string name;
+        ext::string name;
         device_factory_t *factory;
     };
 

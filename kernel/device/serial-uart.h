@@ -55,7 +55,7 @@ public:
         return write((void const *)str, N - 1);
     }
 
-    ssize_t write(std::string const& str)
+    ssize_t write(ext::string const& str)
     {
         return write(str.data(), str.length());
     }

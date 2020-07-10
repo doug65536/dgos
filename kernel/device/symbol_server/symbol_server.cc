@@ -18,7 +18,7 @@ class symbol_server_t {
         return self->worker();
     }
 
-    std::string base_name(char const *filename)
+    ext::string base_name(char const *filename)
     {
         char const *end = filename + strlen(filename);
         char const *slash = strrchr(filename, '/');
@@ -41,7 +41,7 @@ class symbol_server_t {
             ch = '_';
         }
 
-        return std::string(name.begin(), name.end());
+        return ext::string(name.begin(), name.end());
     }
 
     bool send_symbols_reply(long adj, char const *filename, bool with_name)
@@ -76,7 +76,7 @@ class symbol_server_t {
         char *end = buf.get() + sz;
         char *next;
 
-        std::string module_name = base_name(filename);
+        ext::string module_name = base_name(filename);
 
         for (char *line = buf; line < end; line = next) {
             char *eol = (char*)memchr(line, '\n', end - line);
@@ -168,7 +168,7 @@ class symbol_server_t {
 
     void modal_top(uint64_t total_samples, char command)
     {
-        port->write(std::string(16, '\n'));
+        port->write(ext::string(16, '\n'));
 
         for (bool done = false ; !done;) {
             // up 16 lines
@@ -179,13 +179,13 @@ class symbol_server_t {
 
             while (top_rows < 16) {
                 port->wrstr("\x1b" "[");
-                port->write(std::to_string(top_rows++));
+                port->write(ext::to_string(top_rows++));
                 port->wrstr(";1H"
                             "\x1b" "[K");
             }
 
             port->wrstr("\r" "\x1b" "[K");
-            port->write(std::to_string(total_samples));
+            port->write(ext::to_string(total_samples));
             port->wrstr(" samples\r\n");
 
             size_t cpu_count;
@@ -202,8 +202,8 @@ class symbol_server_t {
             unsigned usage_fixed = usage_1k_total / 1000;
             unsigned usage_frac = usage_1k_total % 1000;
 
-            std::string fixed = std::to_string(usage_fixed);
-            std::string frac = std::to_string(usage_frac);
+            ext::string fixed = ext::to_string(usage_fixed);
+            ext::string frac = ext::to_string(usage_frac);
             port->write(std::move(fixed));
             port->wrstr(".");
             port->write(std::move(frac));
@@ -277,9 +277,9 @@ class symbol_server_t {
                 for (size_t i = 0; i < mod_count; ++i) {
                     module_t *m = modload_get_index(i);
 
-                    std::string name = modload_get_name(m);
+                    ext::string name = modload_get_name(m);
 
-                    std::string symname;
+                    ext::string symname;
                     symname.reserve(4 + name.length() + 9);
                     symname.append("sym/")
                             .append(name)
@@ -297,21 +297,21 @@ class symbol_server_t {
 
                 port->wrstr("\r\nkernel_generic");
                 port->write(' ');
-                port->write(std::to_string(kernel_sz));
+                port->write(ext::to_string(kernel_sz));
                 port->wrstr(" 0 - Live ");
                 port->write(ext::to_hex(uintptr_t(__image_start)));
 
                 for (size_t i = 0; i < mod_count; ++i) {
                     module_t *m = modload_get_index(i);
 
-                    std::string name = modload_get_name(m);
+                    ext::string name = modload_get_name(m);
                     ptrdiff_t base = modload_get_base(m);
                     size_t size = modload_get_size(m);
 
                     port->wrstr("\r\n");
                     port->write(base_name(name.c_str()));
                     port->write(' ');
-                    port->write(std::to_string(size));
+                    port->write(ext::to_string(size));
                     port->wrstr(" 0 - Live 0x");
 
                     char addr_text[17];
@@ -325,7 +325,7 @@ class symbol_server_t {
             case 'p':
                 uint64_t total_samples;
                 total_samples = perf_gather_samples(perf_sample_callback, this);
-                port->write(std::to_string(total_samples));
+                port->write(ext::to_string(total_samples));
                 port->wrstr(" samples\n");
                 break;
 
