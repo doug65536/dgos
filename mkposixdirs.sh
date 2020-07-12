@@ -37,4 +37,4 @@ mkdir -p "$1/var/run" || exit
 mkdir -p "$1/var/spool" || exit
 mkdir -p "$1/var/tmp" || exit
 mkdir -p "$1/dev" || exit
-#touch "$1/home/unicode-🂡"
+touch "$1/home/unicode-🂡-works"
