@@ -6,17 +6,25 @@
 // Reader takes whole buffer. Writer appends to current buffer,
 // creating one whenever necessary
 struct pipe_buffer_hdr_t {
-    pipe_buffer_hdr_t *next;
-    size_t size;
+    pipe_buffer_hdr_t *next = nullptr;
+    size_t size = 0;
 };
+
+C_ASSERT_ISPO2(sizeof(pipe_buffer_hdr_t));
 
 struct pipe_t {
     pipe_t();
     ~pipe_t();
 
     size_t capacity() const;
+
     bool reserve(size_t pages);
-    ssize_t enqueue(void *data, size_t size, int64_t timeout);
+
+    // Get the number of bytes in each page that are not available for payload
+    size_t overhead() const;
+
+    ssize_t enqueue(void const *data, size_t size, int64_t timeout);
+
     ssize_t dequeue(void *data, size_t size, int64_t timeout);
 
 private:
@@ -24,7 +32,9 @@ private:
     using scoped_lock = std::unique_lock<lock_type>;
 
     void cleanup_buffer(scoped_lock &lock);
+
     pipe_buffer_hdr_t *allocate_page(scoped_lock &lock, int64_t timeout);
+
     void free_page(pipe_buffer_hdr_t *page, scoped_lock &lock);
 
     // Points to first page of buffered outgoing data

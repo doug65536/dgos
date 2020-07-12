@@ -51,8 +51,12 @@ EXPORT pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock,
             result->size = 0;
         } else if (page_bump < page_capacity) {
             // Haven't bump allocated them all yet
-            result = new (page_pool + (page_bump++ * PAGESIZE))
+            result = new (page_pool + (page_bump * PAGESIZE))
                     pipe_buffer_hdr_t();
+
+            ++page_bump;
+
+            assert(page_bump <= page_capacity);
         } else {
             // Wait for someone to free a page
             continue;
@@ -94,27 +98,42 @@ EXPORT bool pipe_t::reserve(size_t pages)
     return true;
 }
 
-EXPORT ssize_t pipe_t::enqueue(void *data, size_t size, int64_t timeout)
+EXPORT size_t pipe_t::overhead() const
+{
+    return sizeof(pipe_buffer_hdr_t);
+}
+
+EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size, int64_t timeout)
 {
     scoped_lock lock(pipe_lock);
 
     ssize_t sent = 0;
 
+    // The payload capacity per page
+    size_t const capacity = PAGESIZE - sizeof(*write_buffer);
+
     // Loop
     while (size) {
-        if (!write_buffer) {
+        if (!write_buffer || write_buffer->size == capacity) {
             // Need a new write buffer
 
-            write_buffer = allocate_page(lock, timeout);
-            write_buffer_first = write_buffer;
+            pipe_buffer_hdr_t *new_write_buffer = allocate_page(lock, timeout);
+
+            if (unlikely(!new_write_buffer))
+                return sent;
+
+            pipe_buffer_hdr_t **ptr_to_next_ptr = write_buffer
+                    ? &write_buffer->next
+                    : &write_buffer_first;
+
+            *ptr_to_next_ptr = new_write_buffer;
+
+            write_buffer = new_write_buffer;
 
             // Handle timeout
             if (unlikely(!write_buffer))
                 return sent;
         }
-
-        // The payload capacity per page
-        size_t capacity = PAGESIZE - sizeof(*write_buffer);
 
         // The amount of space left in this page
         size_t remain = capacity - write_buffer->size;
@@ -132,15 +151,6 @@ EXPORT ssize_t pipe_t::enqueue(void *data, size_t size, int64_t timeout)
 
         write_buffer->size += transferred;
 
-        if (write_buffer->size == capacity) {
-            // Buffer reached capacity, prepare another
-            // And link it into the chain
-            write_buffer->next = allocate_page(lock, timeout);
-
-            // And bump ahead to new buffer
-            write_buffer = write_buffer->next;
-        }
-
         data = (char*)data + transferred;
         sent += transferred;
         size -= transferred;
@@ -157,6 +167,8 @@ EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout)
 
     while (size) {
         if (read_buffer) {
+            // Read serviced from existing read buffer chain
+
             size_t remain = read_buffer->size - read_ofs;
 
             size_t transferred = std::min(remain, size);
@@ -185,6 +197,7 @@ EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout)
             // There is no read buffer, but something is buffered,
             // take the entire chain of pages from the writer
             read_buffer = write_buffer_first;
+            read_ofs = 0;
 
             write_buffer_first = nullptr;
 
@@ -193,7 +206,7 @@ EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout)
             // Wait
             if (pipe_not_empty.wait_until(lock, timeout) ==
                     std::cv_status::timeout)
-                return -int(errno_t::ETIMEDOUT);
+                break;
         }
     }
 

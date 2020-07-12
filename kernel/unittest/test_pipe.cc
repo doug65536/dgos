@@ -28,11 +28,16 @@ UNITTEST(test_pipe_easy_enqueue_dequeue)
 
     char data[64];
 
-    for (size_t sent = 0; sent < (64 << 10); sent += sizeof(data)) {
+    size_t amount = (16 * PAGESIZE) - (16 * pipe.overhead());
+
+    // Round down to multiple of 64
+    amount &= -64;
+
+    for (size_t sent = 0; sent < amount; sent += sizeof(data)) {
         for (size_t k = 0; k < sizeof(data) / sizeof(*data); ++k)
             data[k] = (char)sent + k;
 
-        ssize_t block = pipe.enqueue(data, sizeof(data), INT64_MAX);
+        ssize_t block = pipe.enqueue(data, sizeof(data), 0);
 
         eq(ssize_t(sizeof(data)), block);
 
@@ -42,13 +47,15 @@ UNITTEST(test_pipe_easy_enqueue_dequeue)
     // Make sure it can't accept more, because it is completely full
     eq(0, pipe.enqueue(data, 1, 0));
 
-
-    for (size_t sent = 0; sent < (64 << 10); sent += sizeof(data)) {
-        ssize_t block = pipe.dequeue(data, sizeof(data), INT64_MAX);
+    for (size_t sent = 0; sent < amount; sent += sizeof(data)) {
+        ssize_t block = pipe.dequeue(data, sizeof(data), 0);
 
         eq(ssize_t(sizeof(data)), block);
 
         for (size_t k = 0; k < sizeof(data) / sizeof(*data); ++k)
             eq(char(sent + k), data[k]);
     }
+
+    // Make sure it can't provide more, because it is completely empty
+    eq(0, pipe.dequeue(data, sizeof(data), 0));
 }
