@@ -136,14 +136,16 @@ static fs_factory_t *find_fs(char const *name)
 
 EXPORT void fs_add(fs_factory_t *fs_reg, fs_base_t *fs)
 {
-    if (fs && fs->is_boot()) {
-        scoped_lock lock(storage_lock);
-        fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, fs });
-    } else if (fs) {
-        scoped_lock lock(storage_lock);
-        if (unlikely(!fs_mounts.push_back(fs_mount_t{ fs_reg, fs })))
-            panic_oom();
-    }
+    if (unlikely(!fs))
+        return;
+
+    scoped_lock lock(storage_lock);
+    if (unlikely(fs_mounts.insert(fs->is_boot()
+                     ? fs_mounts.begin()
+                     : fs_mounts.end(),
+                     fs_mount_t{ fs_reg, fs }) ==
+                 std::vector<fs_mount_t>::iterator()))
+        panic_oom();
 }
 
 EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
