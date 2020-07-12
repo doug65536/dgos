@@ -158,6 +158,10 @@ public:
 
     bool open(char const *filename)
     {
+        char const *first_slash;
+        while ((first_slash = strchr(filename, '/')) != nullptr)
+            filename = first_slash + 1;;
+
         if (unlikely(!set_filename(filename)))
             return false;
 
