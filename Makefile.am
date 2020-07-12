@@ -2497,7 +2497,7 @@ QEMU_BOOTMEDIA_hd_efi = -boot c \
 	-netdev user,id=n1
 
 QEMU_BOOTMEDIA_pxe_bios = -boot n \
-	-netdev user,id=n1,tftp=$(top_builddir)/,bootfile=/bootpxe-bios-bin
+	-netdev user,id=n1,tftp=$(top_builddir)/,bootfile=bootpxe-bios-bin
 
 QEMU_BOOTMEDIA_pxe_efi = \
 	-boot n -netdev user,id=n1,tftp=$(top_builddir)/,bootfile=bootx64.efi
