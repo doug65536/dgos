@@ -780,9 +780,14 @@ vector<_T,_Allocator>::insert(const_iterator __pos, _T const& __value)
 
     constexpr size_t __count = 1;
 
-    new (__make_space(__it, __count)) value_type(__value);
+    pointer place = __make_space(__it, __count);
 
-    __sz += __count;
+    __it = iterator(place);
+
+    if (likely(place)) {
+        new (place) value_type(__value);
+        __sz += __count;
+    }
 
     return __it;
 }
@@ -795,9 +800,14 @@ vector<_T,_Allocator>::insert(const_iterator __pos, _T&& __value)
 
     constexpr size_t __count = 1;
 
-    new (__make_space(__it, __count)) value_type(move(__value));
+    pointer place = __make_space(__it, __count);
 
-    __sz += __count;
+    __it = iterator(place);
+
+    if (likely(place)) {
+        new (place) value_type(move(__value));
+        __sz += __count;
+    }
 
     return __it;
 }
@@ -809,6 +819,9 @@ vector<_T,_Allocator>::insert(
 {
     iterator __it = iterator(__pos.__p);
     pointer place = __make_space(__it, __count);
+
+    __it = iterator(place);
+
     if (likely(place)) {
         uninitialized_fill(place, place + __count, __value);
 
@@ -827,10 +840,11 @@ vector<_T,_Allocator>::insert(const_iterator __pos,
     iterator __it(__pos.__p);
     size_t __count = __last - __first;
     pointer place = __make_space(__it, __count);
+
+    __it = iterator(place);
+
     if (likely(place))
         uninitialized_copy(__first, __last, place);
-    else
-        __it.__p = nullptr;
 
     return __it;
 }
@@ -840,7 +854,7 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
                               initializer_list<_T> __ilist)
 {
-    return iterator(insert(__pos, __ilist.begin(), __ilist.end()).__p);
+    return insert(__pos, __ilist.begin(), __ilist.end());
 }
 
 template<typename _T, typename _Allocator>
@@ -850,6 +864,7 @@ vector<_T,_Allocator>::emplace(const_iterator __pos, _Args&&... __args)
 {
     pointer place = __make_space(__pos, 1);
     new (place) value_type(forward<_Args>(__args)...);
+    return iterator(place);
 }
 
 template<typename _T, typename _Allocator>

@@ -2019,6 +2019,9 @@ __basic_tree<_T, _V, _Compare, _Alloc>::insert(
         __result = { iterator(__ins, this), true };
 
         _NodePolicy::__retrace_insert(__root, __ins, this);
+    } else {
+        __result = pair<iterator, bool>(
+                    iterator((__node_t*)_OOMPolicy::oom(), this), false);
     }
 
     return __result;
@@ -2041,6 +2044,9 @@ __basic_tree<_T, _V, _Compare, _Alloc>::__insert_key(key_type const& __key)
         __result = { iterator(__ins, this), true };
 
         _NodePolicy::__retrace_insert(__root, __ins, this);
+    } else {
+        __result = pair<iterator, bool>(
+                    iterator((__node_t*)_OOMPolicy::oom(), this), false);
     }
 
     return __result;
@@ -2064,6 +2070,9 @@ __basic_tree<_T, _V, _Compare, _Alloc>::__insert_key(key_type&& __key)
         __result = { iterator(__ins, this), true };
 
         _NodePolicy::__retrace_insert(__root, __ins, this);
+    } else {
+        __result = pair<iterator, bool>(
+                    iterator((__node_t*)_OOMPolicy::oom(), this), false);
     }
 
     return __result;
@@ -2087,6 +2096,9 @@ __basic_tree<_T, _V, _Compare, _Alloc>::insert(__item_type const& __value)
         __result = { iterator(__ins, this), true };
 
         _NodePolicy::__retrace_insert(__root, __ins, this);
+    } else {
+        __result = pair<iterator, bool>(
+                    iterator((__node_t*)_OOMPolicy::oom(), this), false);
     }
 
     return __result;
@@ -2111,6 +2123,9 @@ __basic_tree<_T, _V, _Compare, _Alloc>::insert(node_type&& __node_handle)
             __result = { iterator(__node, this), true };
 
             _NodePolicy::__retrace_insert(__root, __node, this);
+        } else {
+            __result = pair<iterator, bool>(
+                        iterator((__node_t*)_OOMPolicy::oom(), this), false);
         }
     }
 
@@ -2661,7 +2676,7 @@ __basic_tree<_T, _V, _Compare, _Alloc>::__tree_ins(
         void* __n_mem = __alloc.allocate(1);
 
         if (unlikely(!__n_mem))
-            _OOMPolicy::oom();
+            return (__node_t*)_OOMPolicy::oom();
 
         // Placement new into memory
         __n = new (__n_mem) __node_t();

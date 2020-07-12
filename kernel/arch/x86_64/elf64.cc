@@ -267,7 +267,12 @@ module_t *modload_load_image(void const *image, size_t image_sz,
         return nullptr;
     }
 
-    parameters.insert(parameters.begin(), module_name);
+    if (unlikely(parameters.insert(parameters.begin(), module_name) ==
+                 std::vector<ext::string>::iterator())) {
+        if (ret_errno)
+            *ret_errno = errno_t::ENOMEM;
+        return nullptr;
+    }
 
     errno_t err = module->load_image(image, image_sz, module_name,
                                      std::move(parameters), ret_needed);

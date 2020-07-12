@@ -87,3 +87,14 @@ EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
 
     return 0;
 }
+
+EXPORT void bootinfo_drop_initrd()
+{
+    auto data = kernel_params;
+
+    if (uintptr_t(data) < 0x1000)
+        data = (kernel_params_t*)(zero_page + (uintptr_t)data);
+
+    data->initrd_st = 0;
+    data->initrd_sz = 0;
+}

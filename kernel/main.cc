@@ -1123,7 +1123,9 @@ struct symbols_t {
             entry.line_nr = line_nr_value;
 
             // Insert the file/line lookup entry by address
-            line_lookup.insert({ addr_value, entry });
+            if (unlikely(line_lookup.insert({ addr_value, entry }).first ==
+                    linemap_t::iterator()))
+                panic_oom();
         }
 
         symfd = file_openat(AT_FDCWD, "sym/kernel-generic-kallsyms",
@@ -1137,7 +1139,8 @@ struct symbols_t {
         if (unlikely(len < 0))
             return;
 
-        buf.reset(new (ext::nothrow) char[len]);
+        if (!buf.reset(new (ext::nothrow) char[len]))
+            panic_oom();
 
         if (unlikely(!buf))
             return;
@@ -1230,7 +1233,7 @@ struct symbols_t {
 
 static symbols_t symbols;
 
-extern "C" _noreturn int kernel_main(void)
+extern "C" _noreturn void kernel_main(void)
 {
 #ifdef _ASAN_ENABLED
     __builtin___asan_storeN_noabort((void*)kernel_params->phys_mapping,

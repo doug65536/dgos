@@ -11,6 +11,7 @@
 #include "vector.h"
 #include "hash.h"
 #include "user_mem.h"
+#include "bootinfo.h"
 
 #define DEBUG_TMPFS 1
 #if DEBUG_TMPFS
@@ -181,6 +182,19 @@ void* tmpfs_fs_t::mount(fs_init_info_t *conn)
 
 void tmpfs_fs_t::unmount()
 {
+    decltype(names) replacement_names;
+    decltype(files) replacement_files;
+
+    names.swap(replacement_names);
+    files.swap(replacement_files);
+
+    if (en > st)
+        munmap(const_cast<char*>(st), en - st);
+
+    en = nullptr;
+    st = nullptr;
+
+    bootinfo_drop_initrd();
 }
 
 bool tmpfs_fs_t::is_boot() const
@@ -251,8 +265,10 @@ int tmpfs_fs_t::opendirat(fs_file_info_t **fi,
 ssize_t tmpfs_fs_t::readdir(fs_file_info_t *fi, dirent_t *buf, off_t offset)
 {
     auto file = static_cast<tmpfs_file_t*>(fi);
+
     if (unlikely(offset >= off_t(files.size())))
         return 0;
+
     size_t index = file->file_index + offset;
     auto const& file_info = files[index];
 
