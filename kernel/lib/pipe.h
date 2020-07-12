@@ -24,13 +24,18 @@ private:
     using scoped_lock = std::unique_lock<lock_type>;
 
     void cleanup_buffer(scoped_lock &lock);
-    pipe_buffer_hdr_t *allocate_page(scoped_lock &lock);
+    pipe_buffer_hdr_t *allocate_page(scoped_lock &lock, int64_t timeout);
     void free_page(pipe_buffer_hdr_t *page, scoped_lock &lock);
 
+    // Points to first page of buffered outgoing data
+    pipe_buffer_hdr_t *write_buffer_first = nullptr;
+
     // Points to buffer that is to hold more transmitted data
+    // Is equal to write_buffer_first sometimes, sometimes
+    // it is a few next links ahead of write_buffer_first
     pipe_buffer_hdr_t *write_buffer = nullptr;
 
-    // Points to buffer
+    // Points to buffer from which reads are serviced
     pipe_buffer_hdr_t *read_buffer = nullptr;
     size_t read_ofs;
 

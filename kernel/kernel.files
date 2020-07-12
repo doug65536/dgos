@@ -458,5 +458,6 @@ unittest/test_sort.cc
 unittest/test_string.cc
 unittest/test_threads.cc
 unittest/test_vector.cc
+unittest/test_pipe.cc
 unittest/unittest.cc
 unittest/unittest.h

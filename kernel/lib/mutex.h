@@ -669,17 +669,16 @@ public:
                          chrono::time_point<_Clock, _Duration> const&
                          timeout_time)
     {
-        return wait_until_impl(lock,
+        return wait_until(lock,
                           chrono::steady_clock::time_point(timeout_time).
                           time_since_epoch().count());
     }
 
-private:
     //
     // Underlying implementation uses monotonic time_ns time for timeout
 
     template<typename _Lock>
-    cv_status wait_until_impl(unique_lock<_Lock>& lock, uint64_t timeout_time)
+    cv_status wait_until(unique_lock<_Lock>& lock, uint64_t timeout_time)
     {
         assert(lock.is_locked());
 
