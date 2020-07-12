@@ -9,12 +9,12 @@ size_t strlen(char16_t const *src)
 
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
-void *strchr(char16_t const *s, int ch)
+char16_t *strchr(char16_t const *s, int ch)
 {
     for (;; ++s) {
         char c = *s;
         if (c == (char)ch)
-            return (void*)s;
+            return (char16_t*)s;
         if (c == 0)
             return nullptr;
     }

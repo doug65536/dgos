@@ -97,9 +97,41 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
     bool open_impl(tchar const *filename) override final
     {
         EFI_STATUS status;
+        tchar name[256];
 
-        status = efi_root_dir->Open(efi_root_dir, &file,
-                                    filename, EFI_FILE_MODE_READ, 0);
+        // Traverse path
+        EFI_FILE_PROTOCOL *dir = efi_root_dir;
+
+        tchar const *first_slash;
+
+        while ((first_slash = strchr(filename, '/')) != nullptr) {
+            size_t dirname_len = first_slash - filename;
+
+            if (dirname_len > sizeof(name) - 1)
+                panic(TSTR "invalid filename");
+
+            memcpy(name, filename, dirname_len * sizeof(*name));
+
+            name[dirname_len] = 0;
+
+            EFI_FILE_PROTOCOL *next_dir = nullptr;
+
+            status = dir->Open(dir, &next_dir,
+                               name, EFI_FILE_MODE_READ, 0);
+
+            if (unlikely(EFI_ERROR(status)))
+                return false;
+
+            filename = first_slash + 1;
+
+            if (dir != efi_root_dir)
+                dir->Close(dir);
+
+            dir = next_dir;
+        }
+
+        status = dir->Open(dir, &file,
+                           filename, EFI_FILE_MODE_READ, 0);
 
         if (unlikely(EFI_ERROR(status)))
             return false;

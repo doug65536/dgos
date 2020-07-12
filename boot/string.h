@@ -6,7 +6,7 @@ _pure size_t strlen(char const *src);
 _pure size_t strlen(char16_t const *src);
 _pure void *memchr(void const *mem, int ch, size_t count);
 _pure void *strchr(char const *s, int ch);
-_pure void *strchr(char16_t const *s, int ch);
+_pure char16_t *strchr(char16_t const *s, int ch);
 
 _pure int strcmp(char const *lhs, char const *rhs);
 _pure int strcmp(char16_t const *lhs, char16_t const *rhs);

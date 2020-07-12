@@ -124,11 +124,11 @@ tchar const *cpu_choose_kernel()
             qemu_fw_cfg(fw_cfg_type, sizeof(fw_cfg_type),
                         file_size, selector) > 0) {
         switch (fw_cfg_type[0]) {
-        case 'A': return TSTR "dgos-kernel-asan";
-        case 'T': return TSTR "dgos-kernel-tracing";
+        case 'A': return TSTR "boot/dgos-kernel-asan";
+        case 'T': return TSTR "boot/dgos-kernel-tracing";
         }
     }
-    return TSTR "dgos-kernel-generic";
+    return TSTR "boot/dgos-kernel-generic";
 }
 
 static kernel_params_t *prompt_kernel_param(
@@ -354,7 +354,7 @@ void elf64_run(tchar const *filename)
 
     message_bar_draw(10, 7, 70, TSTR "Getting initrd size");
 
-    int initrd_fd = boot_open(TSTR "initrd");
+    int initrd_fd = boot_open(TSTR "boot/initrd");
     initrd_size = boot_filesize(initrd_fd);
     boot_close(initrd_fd);
     initrd_fd = -1;
@@ -515,7 +515,7 @@ void elf64_run(tchar const *filename)
     message_bar_draw(10, 7, 70, TSTR "Loading initrd");
 
     assert(initrd_fd == -1);
-    initrd_fd = boot_open(TSTR "initrd");
+    initrd_fd = boot_open(TSTR "boot/initrd");
 
     load_initrd(initrd_fd, initrd_size, ctx);
     boot_close(initrd_fd);
