@@ -1184,9 +1184,9 @@ isr_context_t *ide_if_t::ide_chan_t::irq_handler(int irq, isr_context_t *ctx)
     for (unsigned i = 0; i < ide_devs.size(); ++i) {
         ide_dev_t *dev = ide_devs[i];
         if (dev->chan->ports.irq == irq) {
-            workq::enqueue([=] {
+            //workq::enqueue([=] {
                 dev->chan->irq_handler();
-            });
+            //});
         }
     }
 
