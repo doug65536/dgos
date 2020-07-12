@@ -206,7 +206,8 @@ unittest_km_SOURCES = \
 	kernel/unittest/test_chrono.cc \
 	kernel/unittest/test_nofault.cc \
 	kernel/unittest/test_block.cc \
-	kernel/unittest/test_filesystem.cc
+	kernel/unittest/test_filesystem.cc \
+	kernel/unittest/test_pipe.cc
 
 unittest_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)

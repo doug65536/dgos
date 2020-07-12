@@ -2172,7 +2172,7 @@ SYMBOL_FILE = sym/$(1).sym
 CPIO_LIST = $(MODULE_LIST) \
 	$(generate_symbols_outputs)
 
-all-kernel: kernel-generic $(MODULE_LIST)
+all-kernel: kernel-generic $(MODULE_LIST) initrd
 
 .PHONY: all-kernel
 
@@ -2423,9 +2423,9 @@ QEMU_DISK_TYPE_iso = ide-cd
 QEMU_DISK_TYPE_mbr = ide-hd
 QEMU_DISK_TYPE_gpt = ide-hd
 
-QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42
 QEMU_HDCTL_DEV_virtio = \
 	-device virtio-blk-pci,drive=bootdrv,disable-legacy=on
+
 #,num-queues=$(QEMU_CPUS)
 
 #-device ich9-ahci,id=bootif
@@ -2434,6 +2434,8 @@ QEMU_HDCTL_DEV_none =
 
 QEMU_HDCTL_DEV_ahci = \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv
+
+QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42
 
 QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=bootif.0,drive=bootdrv
@@ -2588,8 +2590,6 @@ show-srcdir:
 
 .PHONY: show-kernel-exports
 
-#objdump -p virtio-blk.km | \
-# grep -oP '(?<=NEEDED)\s+\S+\.km' | grep -oP '\S.*'
 check-module-imports: all-kernel
 	"$(top_srcdir)/module_checkimports.sh" $(MODULE_LIST) | $(CXXFILT)
 
@@ -2711,7 +2711,7 @@ run-pxe: all run-up-bios-pxe-gpt-ahci-vga-tcg
 
 .PHONY: run-pxe
 
-run-kvm: all run-up-efi-hd-iso-ahci-vga-kvm
+run-kvm: all run-up-efi-hd-gpt-nvme-vga-kvm
 
 .PHONY: run-kvm
 

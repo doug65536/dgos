@@ -10,17 +10,18 @@ mkdir -p stage || exit
 truncate --size 128K stage/.big || exit
 
 for f in *.km; do
-    ln -fsTr "$f" "stage/$f"
-done
-
-ln -fsTr kernel-generic stage/dgos-kernel-generic || exit
-ln -fsTr kernel-tracing stage/dgos-kernel-tracing || exit
-ln -fsTr kernel-asan stage/dgos-kernel-asan || exit
-for f in initrd; do
     ln -fsTr "$f" "stage/$f" || exit
 done
 
-ln -fsTr "$TOPSRC/user/background.png" stage/background.png || exit
+ln -fsTr kernel-generic stage/boot/dgos-kernel-generic || exit
+ln -fsTr kernel-tracing stage/boot/dgos-kernel-tracing || exit
+ln -fsTr kernel-asan stage/boot/dgos-kernel-asan || exit
+
+for f in initrd; do
+    ln -fsTr "$f" "stage/boot/$f" || exit
+done
+
+ln -fsTr "$TOPSRC/user/background.png" stage/usr/share/background.png || exit
 
 mkdir -p stage/sym || exit
 for f in sym/*; do
