@@ -2,6 +2,9 @@
 #include "conio.h"
 #include "printk.h"
 #include "export.h"
+#include "fs/devfs.h"
+#include "pipe.h"
+#include "cpu/atomic.h"
 
 #define DEBUG_MOUSE 1
 #if DEBUG_MOUSE
@@ -13,6 +16,105 @@
 static int accum_x;
 static int accum_y;
 
+class mouse_file_reg_t : public dev_fs_file_reg_t {
+public:
+    static mouse_file_reg_t *get_registration()
+    {
+        return new (ext::nothrow) mouse_file_reg_t("mousein");
+    }
+
+    mouse_file_reg_t(char const *name)
+        : dev_fs_file_reg_t(name)
+    {
+    }
+
+    bool add_event(mouse_raw_event_t const& event) {
+        return pipe.enqueue(&event, sizeof(event), 0);
+    }
+
+    struct mouse_file_t : public dev_fs_file_t {
+        mouse_file_t(mouse_file_reg_t *owner)
+            : owner(owner)
+        {
+        }
+
+        mouse_file_t(mouse_file_t const&) = delete;
+        mouse_file_t &operator=(mouse_file_t const&) = delete;
+
+        // dev_fs_file_t interface
+        ssize_t read(char *buf, size_t size, off_t offset) override final
+        {
+            if (size < sizeof(mouse_raw_event_t))
+                return -int(errno_t::EINVAL);
+
+            mouse_raw_event_t ev;
+
+            if (owner->pipe.dequeue(&ev, sizeof(ev), INT64_MAX) == sizeof(ev)) {
+                memcpy(buf, &ev, sizeof(ev));
+                return sizeof(ev);
+            }
+
+            return 0;
+        }
+
+        // dev_fs_file_t interface
+        ssize_t write(char const *buf, size_t size, off_t offset) override final
+        {
+            return -int(errno_t::EROFS);
+        }
+
+        ino_t get_inode() const override final
+        {
+            return -int(errno_t::ENOSYS);
+        }
+
+        mouse_file_reg_t *owner;
+    };
+
+    // dev_fs_file_reg_t interface
+    dev_fs_file_t *open(int flags, mode_t mode) override
+    {
+        return new (ext::nothrow) mouse_file_t(this);
+    }
+
+    pipe_t pipe;
+};
+
+static mouse_file_reg_t *mouse_file;
+
+// Prepare to receive mouse_event calls
+static mouse_file_reg_t *mouse_file_instance()
+{
+    mouse_file_reg_t *old_mouse_file = atomic_ld_acq(&mouse_file);
+
+    if (likely(old_mouse_file))
+        return old_mouse_file;
+
+    // A stampede of threads could get here and construct a
+    // mouse_file_reg_t, but only one will win the first cmpxchg,
+    // and everyone else fail their cmpxchg, and use winner's object
+    mouse_file_reg_t *new_mouse_file = new (ext::nothrow)
+            mouse_file_reg_t("mousein");
+
+    if (unlikely(!new_mouse_file))
+        panic_oom();
+
+    if (unlikely(!new_mouse_file->pipe.reserve(16)))
+        panic_oom();
+
+    // Try to win race
+    old_mouse_file = atomic_cmpxchg(&mouse_file, nullptr, new_mouse_file);
+
+    // If won race, done
+    if (likely(old_mouse_file == nullptr))
+        return new_mouse_file;
+
+    // Lost race
+    delete new_mouse_file;
+
+    return old_mouse_file;
+}
+
 EXPORT void mouse_event(mouse_raw_event_t event)
 {
     MOUSE_TRACE("hdist=%+d, vdist=%+d, buttons=0x%x\n",
@@ -21,15 +123,17 @@ EXPORT void mouse_event(mouse_raw_event_t event)
     accum_x += event.hdist * 10;
     accum_y += -event.vdist * 10;
 
-    con_move_cursor(accum_x / 45, accum_y / 80);
+    mouse_file_instance()->add_event(event);
+
+    //con_move_cursor(accum_x / 45, accum_y / 80);
 
     // Improve responsiveness by resetting accumulator
     // when mouse reverses direction on that axis
-    if ((accum_x < 0) != (event.hdist < 0))
-        accum_x = 0;
-    if ((accum_y < 0) != (-event.vdist < 0))
-        accum_y = 0;
+//    if ((accum_x < 0) != (event.hdist < 0))
+//        accum_x = 0;
+//    if ((accum_y < 0) != (-event.vdist < 0))
+//        accum_y = 0;
 
-    accum_x %= 45;
-    accum_y %= 80;
+//    accum_x %= 45;
+//    accum_y %= 80;
 }
