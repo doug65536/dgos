@@ -41,8 +41,7 @@ $(top_builddir)/fatpart.img: \
 		$(generate_symbols_outputs) \
 		\
 		$(MODULE_LIST)
-	set -x && \
-		$(RM) -f $(top_builddir)/fatpart.img \
+	$(RM) -f $(top_builddir)/fatpart.img \
 			$(top_builddir)/mbrdisk.img \
 			$(top_builddir)/gptdisk.img && \
 		\
