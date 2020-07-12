@@ -1008,9 +1008,9 @@ isr_context_t *nvme_if_t::irq_handler(int irq, isr_context_t *ctx)
         if (unlikely(irq_offset < 0 || irq_offset > dev->irq_range.count))
             continue;
 
-        workq::enqueue([=] {
+        //workq::enqueue([=] {
             dev->deferred_irq_handler(irq_offset);
-        });
+        //});
     }
 
     return ctx;
