@@ -1,6 +1,7 @@
 #include "halt.h"
 #include "debug.h"
 #include "screen.h"
+
 extern "C" _noreturn void panic(tchar const *s)
 {
     debug_out(s, -1);
