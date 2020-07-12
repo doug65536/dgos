@@ -113,16 +113,26 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
     // The payload capacity per page
     size_t const capacity = PAGESIZE - sizeof(*write_buffer);
 
+    bool notify_pending = false;
+
     // Loop
     while (size) {
         if (!write_buffer || write_buffer->size == capacity) {
             // Need a new write buffer
 
+            // We might wait to get a new page,
+            // so push out any pending notify before waiting
+            if (notify_pending) {
+                pipe_not_empty.notify_all();
+                notify_pending = false;
+            }
+
             pipe_buffer_hdr_t *new_write_buffer;
             new_write_buffer = allocate_page(lock, timeout_time);
 
+            // If timed out
             if (unlikely(!new_write_buffer))
-                return sent;
+                break;
 
             pipe_buffer_hdr_t **ptr_to_next_ptr = write_buffer
                     ? &write_buffer->next
@@ -131,10 +141,6 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
             *ptr_to_next_ptr = new_write_buffer;
 
             write_buffer = new_write_buffer;
-
-            // Handle timeout
-            if (unlikely(!write_buffer))
-                return sent;
         }
 
         // The amount of space left in this page
@@ -156,7 +162,12 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
         data = (char*)data + transferred;
         sent += transferred;
         size -= transferred;
+
+        notify_pending = true;
     }
+
+    if (notify_pending)
+        pipe_not_empty.notify_all();
 
     return sent;
 }
