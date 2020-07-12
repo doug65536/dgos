@@ -113,12 +113,12 @@ OutIt to_str(T n, OutIt out, size_t out_sz, OutT pad = OutT{})
 
 bool mode_is_bgrx32(vbe_selected_mode_t const& mode)
 {
-    return (mode.byte_pp) == 4 |
-            (mode.mask_pos_r) == 16 |
-            (mode.mask_pos_g) == 8 |
-            (mode.mask_pos_b) == 0 |
-            (mode.mask_size_r) == 8 |
-            (mode.mask_size_g) == 8 |
+    return (mode.byte_pp) == 4 ||
+            (mode.mask_pos_r) == 16 ||
+            (mode.mask_pos_g) == 8 ||
+            (mode.mask_pos_b) == 0 ||
+            (mode.mask_size_r) == 8 ||
+            (mode.mask_size_g) == 8 ||
             (mode.mask_size_b) == 8;
 }
 
