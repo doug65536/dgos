@@ -36,13 +36,13 @@ EXPORT void pipe_t::cleanup_buffer(scoped_lock& lock)
 }
 
 EXPORT pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock,
-                                                int64_t timeout)
+                                                int64_t timeout_time)
 {
     std::cv_status wait_result = std::cv_status::no_timeout;
 
     for (pipe_buffer_hdr_t *result = nullptr;
          page_pool && wait_result == std::cv_status::no_timeout;
-         wait_result = pipe_not_full.wait_until(lock, timeout)) {
+         wait_result = pipe_not_full.wait_until(lock, timeout_time)) {
         if (free_buffer) {
             // Use most recently used one from freelist
             result = free_buffer;
@@ -103,7 +103,8 @@ EXPORT size_t pipe_t::overhead() const
     return sizeof(pipe_buffer_hdr_t);
 }
 
-EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size, int64_t timeout)
+EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
+                               int64_t timeout_time)
 {
     scoped_lock lock(pipe_lock);
 
@@ -117,7 +118,8 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size, int64_t timeout)
         if (!write_buffer || write_buffer->size == capacity) {
             // Need a new write buffer
 
-            pipe_buffer_hdr_t *new_write_buffer = allocate_page(lock, timeout);
+            pipe_buffer_hdr_t *new_write_buffer;
+            new_write_buffer = allocate_page(lock, timeout_time);
 
             if (unlikely(!new_write_buffer))
                 return sent;
@@ -159,7 +161,7 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size, int64_t timeout)
     return sent;
 }
 
-EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout)
+EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout_time)
 {
     scoped_lock lock(pipe_lock);
 
@@ -204,7 +206,7 @@ EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout)
             write_buffer = nullptr;
         } else {
             // Wait
-            if (pipe_not_empty.wait_until(lock, timeout) ==
+            if (pipe_not_empty.wait_until(lock, timeout_time) ==
                     std::cv_status::timeout)
                 break;
         }

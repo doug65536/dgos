@@ -23,9 +23,9 @@ struct pipe_t {
     // Get the number of bytes in each page that are not available for payload
     size_t overhead() const;
 
-    ssize_t enqueue(void const *data, size_t size, int64_t timeout);
+    ssize_t enqueue(void const *data, size_t size, int64_t timeout_time);
 
-    ssize_t dequeue(void *data, size_t size, int64_t timeout);
+    ssize_t dequeue(void *data, size_t size, int64_t timeout_time);
 
 private:
     using lock_type = std::mutex;
@@ -33,7 +33,7 @@ private:
 
     void cleanup_buffer(scoped_lock &lock);
 
-    pipe_buffer_hdr_t *allocate_page(scoped_lock &lock, int64_t timeout);
+    pipe_buffer_hdr_t *allocate_page(scoped_lock &lock, int64_t timeout_time);
 
     void free_page(pipe_buffer_hdr_t *page, scoped_lock &lock);
 
