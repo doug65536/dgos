@@ -377,7 +377,7 @@ static void translate_pixels_rgbx32_avx2(
 
 template<int rbit, int gbit, int bbit, int abit,
          int rshl, int gshl, int bshl, int ashl>
-static __m128i translate_block_specific_sse(
+static _always_inline __m128i translate_block_specific_sse(
         fb_info_t const * restrict , __m128i pixels)
 {
     // bit                   bit
@@ -431,7 +431,7 @@ static __m128i translate_block_specific_sse(
     return b;
 }
 
-static __m128i translate_block_noop_sse(
+static _always_inline __m128i translate_block_noop_sse(
         fb_info_t const * restrict , __m128i pixels)
 {
     return pixels;
@@ -440,7 +440,7 @@ static __m128i translate_block_noop_sse(
 template<int rbit, int gbit, int bbit, int abit,
          int rshl, int gshl, int bshl, int ashl>
 _avx2
-static __m256i translate_block_specific_avx2(
+static _always_inline __m256i translate_block_specific_avx2(
         fb_info_t const * restrict, __m256i pixels)
 {
     __m256i b, g, r, a;
@@ -469,13 +469,13 @@ static __m256i translate_block_specific_avx2(
 }
 
 _avx2
-static __m256i translate_block_noop_avx2(fb_info_t const * restrict,
+static _always_inline __m256i translate_block_noop_avx2(fb_info_t const * restrict,
                                          __m256i pixels)
 {
     return pixels;
 }
 
-static __m128i translate_block_generic_sse(
+static _always_inline __m128i translate_block_generic_sse(
         fb_info_t const * restrict info, __m128i pixels)
 {
     __m128i b, g, r, a, m;
@@ -510,7 +510,7 @@ static __m128i translate_block_generic_sse(
 }
 
 _avx2
-static __m256i translate_block_generic_avx2(
+static _always_inline __m256i translate_block_generic_avx2(
         fb_info_t const *info, __m256i pixels)
 {
     __m256i mask = _mm256_set1_epi32(0xFF);
