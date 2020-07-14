@@ -417,7 +417,8 @@ int iso9660_fs_t::name_compare_utf16be(
     uint16_t const *chk_end = chk + (name_len >> 1);
 
     int cmp = 0;
-    while (find < find_end || chk < chk_end) {
+
+    while ((cmp == 0) && (find < find_end || chk < chk_end)) {
         char32_t key_codepoint =
                 find < find_end
                 ? utf8_to_ucs4(find, &find)
@@ -443,10 +444,8 @@ int iso9660_fs_t::name_compare_utf16be(
                  chk_codepoint);
 
         cmp = key_codepoint - chk_codepoint;
-
-        if (cmp)
-            break;
     }
+
     return cmp;
 }
 
