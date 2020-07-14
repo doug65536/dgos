@@ -36,7 +36,7 @@ static inline SYSCALL_API scp_t syscall6(
         , "+r" (r9)
         , "+r" (rax)
         :
-        : "memory"
+        : "rcx", "r11", "memory"
     );
 
     return rax;
@@ -62,7 +62,7 @@ static inline SYSCALL_API scp_t syscall5(
         , "+r" (r8)
         , "+r" (rax)
         :
-        : "memory"
+        : "rcx", "r11", "r9", "memory"
     );
 
     return rax;
@@ -86,7 +86,7 @@ static inline SYSCALL_API scp_t syscall4(
         , "+r" (r10)
         , "+r" (rax)
         :
-        : "memory"
+        : "rcx", "r11", "r9", "r8", "memory"
     );
 
     return rax;
@@ -107,7 +107,7 @@ static inline SYSCALL_API scp_t syscall3(
         , "+r" (rdx)
         , "+r" (rax)
         :
-        : "memory"
+        : "rcx", "r11", "r9", "r8", "r10", "memory"
     );
 
     return rax;
@@ -126,7 +126,7 @@ static inline SYSCALL_API scp_t syscall2(
         , "+r" (rsi)
         , "+r" (rax)
         :
-        : "memory"
+        : "rcx", "r11", "r9", "r8", "r10", "rdx", "memory"
     );
 
     return rax;
@@ -143,7 +143,7 @@ static inline SYSCALL_API scp_t syscall1(
         : "+r" (rdi)
         , "+r" (rax)
         :
-        : "memory"
+        : "rcx", "r11", "r9", "r8", "r10", "rdx", "rsi", "memory"
     );
 
     return rax;
@@ -158,7 +158,7 @@ static inline SYSCALL_API scp_t syscall0(
         "syscall\n\t"
         : "+r" (rax)
         :
-        : "memory"
+        : "rcx", "r11", "r9", "r8", "r10", "rdx", "rsi", "rdi", "memory"
     );
 
     return rax;
