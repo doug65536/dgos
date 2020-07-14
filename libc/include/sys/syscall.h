@@ -24,7 +24,7 @@ static inline SYSCALL_API scp_t syscall6(
     register scp_t r10 __asm__("r10") = p3;
     register scp_t r8 __asm__("r8") = p4;
     register scp_t r9 __asm__("r9") = p5;
-    register scn_t rax __asm__("rax") = num;
+    register scp_t rax __asm__("rax") = num;
 
     __asm__ __volatile__ (
         "syscall\n\t"
