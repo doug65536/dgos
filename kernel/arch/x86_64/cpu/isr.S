@@ -876,9 +876,6 @@ thread_yield:
     .cfi_offset rflags,-3*8
     cli
 
-    // Segments (hardcoded kernel ones) (scheduled far ahead)
-    movabs $ (GDT_SEL_USER_DATA | 3) * 0x0001000100010001,%rdx
-
     // rax remains a zero constant for a while
     xorl %eax,%eax
 
@@ -964,11 +961,14 @@ thread_yield:
     .cfi_undefined rsi
     .cfi_undefined rdi
 
+    // Segments (hardcoded kernel ones)
+    movabs $ (GDT_SEL_USER_DATA | 3) * 0x0001000100010001,%r15
+
     // Save CR3
     push %rcx
 
     // Push segments
-    push %rdx
+    push %r15
 
     // FPU context pointer is initially null
     push $ 0
