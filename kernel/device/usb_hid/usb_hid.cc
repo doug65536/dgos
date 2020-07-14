@@ -342,6 +342,7 @@ void usb_hid_mouse_t::mouse_completion(const usb_iocp_result_t &result)
 
     mouse_raw_event_t evt;
     uint8_t *state = this_mouse_state[phase];
+    evt.timestamp = time_ns();
     evt.buttons = state[0];
     evt.hdist = int8_t(state[1]);
     evt.vdist = -int8_t(state[2]);
@@ -390,6 +391,8 @@ usb_hid_mouse_t::usb_hid_mouse_t(usb_pipe_t const& control,
 {
     set_protocol(0);
     set_idle(0, 0);
+
+    mouse_file_init();
 
     for (unsigned phase = 0; phase < phase_count; ++phase)
         post_mouse_in(phase);

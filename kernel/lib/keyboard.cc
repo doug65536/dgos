@@ -341,6 +341,8 @@ EXPORT void keybd_fsa_t::deliver_vk(int vk)
 
     keyboard_event_t event;
 
+    event.timestamp = time_ns();
+
     event.flags = get_modifiers();
 
     if (vk || codepoint) {

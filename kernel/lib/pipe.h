@@ -29,7 +29,7 @@ struct pipe_t {
     ssize_t dequeue(void *data, size_t size, int64_t timeout_time);
 
 private:
-    using lock_type = std::mutex;
+    using lock_type = ext::irq_mutex;
     using scoped_lock = std::unique_lock<lock_type>;
 
     void cleanup_buffer(scoped_lock &lock);

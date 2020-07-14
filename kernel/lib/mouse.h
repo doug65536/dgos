@@ -4,6 +4,7 @@
 __BEGIN_DECLS
 
 struct mouse_raw_event_t {
+    uint64_t timestamp;
     int16_t hdist;
     int16_t vdist;
     int16_t wdist;

@@ -183,6 +183,7 @@ static void keyb8042_keyboard_handler(void)
 static void keyb8042_process_mouse_packet(uint8_t const *packet)
 {
     mouse_raw_event_t event;
+    event.timestamp = time_ns();
     event.hdist = 0;
     event.vdist = 0;
     event.wdist = 0;
@@ -623,11 +624,13 @@ void keyb8042_init(void)
 
     printk("Keyboard/mouse initialization complete\n");
 
+
     irq_hook(1, keyb8042_handler, "keyb8042");
     irq_setmask(1, 1);
 
     if (port2_exists) {
         printk("Mouse enabled\n");
+        mouse_file_init();
         irq_hook(12, keyb8042_handler, "keyb8042_mouse");
         irq_setmask(12, 1);
     }

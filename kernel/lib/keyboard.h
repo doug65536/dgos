@@ -159,6 +159,7 @@ typedef enum keyboard_virtual_key_t {
 struct keyboard_event_t {
     // Positive values indicate keydown/repeat
     // Negative values indicate keyup
+    uint64_t timestamp;
     int vk;
     int codepoint;
 

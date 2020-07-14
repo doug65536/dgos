@@ -5,6 +5,7 @@
 #include "fs/devfs.h"
 #include "pipe.h"
 #include "cpu/atomic.h"
+#include "user_mem.h"
 
 #define DEBUG_MOUSE 1
 #if DEBUG_MOUSE
@@ -46,9 +47,13 @@ public:
 
             mouse_raw_event_t ev;
 
-            if (owner->pipe.dequeue(&ev, sizeof(ev),
-                                    INT64_MAX) == sizeof(ev)) {
-                memcpy(buf, &ev, sizeof(ev));
+            ssize_t dequeue_sz = owner->pipe.dequeue(
+                        &ev, sizeof(ev), INT64_MAX);
+
+            if (likely(dequeue_sz == sizeof(ev))) {
+                if (unlikely(!mm_copy_user(buf, &ev, sizeof(ev))))
+                    return -int(errno_t::EFAULT);
+
                 return sizeof(ev);
             }
 
@@ -105,8 +110,10 @@ mouse_file_reg_t *mouse_file_instance()
     old_mouse_file = atomic_cmpxchg(&mouse_file, nullptr, new_mouse_file);
 
     // If won race, done
-    if (likely(old_mouse_file == nullptr))
+    if (likely(old_mouse_file == nullptr)) {
+        devfs_register(new_mouse_file);
         return new_mouse_file;
+    }
 
     // Lost race
     delete new_mouse_file;
@@ -122,7 +129,7 @@ EXPORT void mouse_event(mouse_raw_event_t event)
     mouse_file_instance()->add_event(event);
 }
 
-void mouse_file_init()
+EXPORT void mouse_file_init()
 {
     mouse_file_instance();
 }
