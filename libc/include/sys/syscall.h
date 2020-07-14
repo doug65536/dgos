@@ -26,7 +26,18 @@ static inline SYSCALL_API scp_t syscall6(
     register scp_t r9 __asm__("r9") = p5;
     register scn_t rax __asm__("rax") = num;
 
-    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+    __asm__ __volatile__ (
+        "syscall\n\t"
+        : "+r" (rdi)
+        , "+r" (rsi)
+        , "+r" (rdx)
+        , "+r" (r10)
+        , "+r" (r8)
+        , "+r" (r9)
+        , "+r" (rax)
+        :
+        : "memory"
+    );
 
     return rax;
 }
@@ -42,7 +53,17 @@ static inline SYSCALL_API scp_t syscall5(
     register scp_t r8 __asm__("r8") = p4;
     register scn_t rax __asm__("rax") = num;
 
-    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+    __asm__ __volatile__ (
+        "syscall\n\t"
+        : "+r" (rdi)
+        , "+r" (rsi)
+        , "+r" (rdx)
+        , "+r" (r10)
+        , "+r" (r8)
+        , "+r" (rax)
+        :
+        : "memory"
+    );
 
     return rax;
 }
@@ -57,7 +78,16 @@ static inline SYSCALL_API scp_t syscall4(
     register scp_t r10 __asm__("r10") = p3;
     register scn_t rax __asm__("rax") = num;
 
-    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+    __asm__ __volatile__ (
+        "syscall\n\t"
+        : "+r" (rdi)
+        , "+r" (rsi)
+        , "+r" (rdx)
+        , "+r" (r10)
+        , "+r" (rax)
+        :
+        : "memory"
+    );
 
     return rax;
 }
@@ -70,7 +100,15 @@ static inline SYSCALL_API scp_t syscall3(
     register scp_t rdx __asm__("rdx") = p2;
     register scn_t rax __asm__("rax") = num;
 
-    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+    __asm__ __volatile__ (
+        "syscall\n\t"
+        : "+r" (rdi)
+        , "+r" (rsi)
+        , "+r" (rdx)
+        , "+r" (rax)
+        :
+        : "memory"
+    );
 
     return rax;
 }
@@ -82,7 +120,14 @@ static inline SYSCALL_API scp_t syscall2(
     register scp_t rsi __asm__("rsi") = p1;
     register scn_t rax __asm__("rax") = num;
 
-    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+    __asm__ __volatile__ (
+        "syscall\n\t"
+        : "+r" (rdi)
+        , "+r" (rsi)
+        , "+r" (rax)
+        :
+        : "memory"
+    );
 
     return rax;
 }
@@ -93,7 +138,13 @@ static inline SYSCALL_API scp_t syscall1(
     register scp_t rdi __asm__("rdi") = p0;
     register scn_t rax __asm__("rax") = num;
 
-    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+    __asm__ __volatile__ (
+        "syscall\n\t"
+        : "+r" (rdi)
+        , "+r" (rax)
+        :
+        : "memory"
+    );
 
     return rax;
 }
@@ -103,7 +154,12 @@ static inline SYSCALL_API scp_t syscall0(
 {
     register scn_t rax __asm__("rax") = num;
 
-    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+    __asm__ __volatile__ (
+        "syscall\n\t"
+        : "+r" (rax)
+        :
+        : "memory"
+    );
 
     return rax;
 }
