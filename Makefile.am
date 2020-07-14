@@ -2676,6 +2676,10 @@ debug: all debug-up-efi-hd-iso-ahci-vga-icount
 
 .PHONY: debug
 
+debug-gpt: all debug-up-efi-hd-gpt-ahci-vga-tcg
+
+.PHONY: debug-gpt
+
 debug-pxe: all debug-up-bios-pxe-gpt-ahci-vga-tcg
 
 .PHONY: debug-pxe
