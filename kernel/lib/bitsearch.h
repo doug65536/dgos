@@ -174,7 +174,7 @@ static constexpr _always_inline _flatten uint8_t bit_log2_n_32(int32_t n)
 
 template<typename T>
 _const
-static constexpr _always_inline  _flatten uint8_t bit_log2_n(
+static constexpr _always_inline _flatten uint8_t bit_log2_n(
         T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_log2_n_64(int64_t(n));
