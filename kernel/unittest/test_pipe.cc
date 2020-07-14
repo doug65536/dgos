@@ -40,8 +40,6 @@ UNITTEST(test_pipe_easy_enqueue_dequeue)
         ssize_t block = pipe.enqueue(data, sizeof(data), 0);
 
         eq(ssize_t(sizeof(data)), block);
-
-        printdbg("sent %zd\n", sent + block);
     }
 
     // Make sure it can't accept more, because it is completely full
