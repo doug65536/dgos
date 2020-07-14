@@ -568,6 +568,31 @@ _constructor(ctor_cpu_init_bsp) static void cpu_init_bsp()
     cpu_init(0);
 }
 
+extern "C" isr_context_t *cpu_signal_dispatcher(int intr, isr_context_t *ctx)
+{
+    // If it is kernel code, unhandled
+    if (unlikely(!GDT_SEL_RPL_IS_USER(ISR_CTX_REG_CS(ctx))))
+        return nullptr;
+
+    switch (intr) {
+    case INTR_EX_DIV:
+    case INTR_EX_STACK:
+    case INTR_EX_MATH:
+    case INTR_EX_OVF:
+    case INTR_EX_DEV_NOT_AV:
+    case INTR_EX_OPCODE:
+    case INTR_EX_BOUND:
+    case INTR_EX_SIMD:
+    case INTR_EX_SEGMENT:
+    case INTR_EX_ALIGNMENT:
+        break;
+    }
+
+    assert(!"unimplemented");
+
+    return nullptr;
+}
+
 extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
 {
     // Handle nofault functions
@@ -754,6 +779,17 @@ void cpu_init(int ap)
 
     // Load null LDT
     cpu_ldt_set(0);
+
+    intr_hook(INTR_EX_DIV, cpu_signal_dispatcher, "cpu_div_err", eoi_none);
+    intr_hook(INTR_EX_STACK, cpu_signal_dispatcher, "cpu_stack_err", eoi_none);
+    intr_hook(INTR_EX_MATH, cpu_signal_dispatcher, "cpu_x87_err", eoi_none);
+    intr_hook(INTR_EX_OVF, cpu_signal_dispatcher, "cpu_overflow_err", eoi_none);
+    intr_hook(INTR_EX_DEV_NOT_AV, cpu_signal_dispatcher, "cpu_fpu_na_err", eoi_none);
+    intr_hook(INTR_EX_OPCODE, cpu_signal_dispatcher, "cpu_opcode_err", eoi_none);
+    intr_hook(INTR_EX_BOUND, cpu_signal_dispatcher, "cpu_bound_err", eoi_none);
+    intr_hook(INTR_EX_SIMD, cpu_signal_dispatcher, "cpu_simd_err", eoi_none);
+    intr_hook(INTR_EX_SEGMENT, cpu_signal_dispatcher, "cpu_segment_err", eoi_none);
+    intr_hook(INTR_EX_ALIGNMENT, cpu_signal_dispatcher, "cpu_align_err", eoi_none);
 
     intr_hook(INTR_EX_GPF, cpu_gpf_handler, "cpu_gpf_handler", eoi_none);
 

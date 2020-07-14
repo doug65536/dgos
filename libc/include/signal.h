@@ -40,7 +40,7 @@
 typedef __SIG_ATOMIC_TYPE__ sig_atomic_t;
 
 // Integer or structure type of an object used to represent sets of signals.
-typedef long sigset_t;
+typedef uint64_t sigset_t;
 
 // The <signal.h> header shall define the pthread_attr_t type as
 // described in <sys/types.h>.
@@ -57,10 +57,13 @@ union sigval {
 typedef struct sigevent {
     // Notification type.
     int sigev_notify;
+
     // Signal number.
     int sigev_signo;
+
     // Signal value.
     union sigval sigev_value;
+
     // Notification function.
     void (*sigev_notify_function)(union sigval);
 } sigevent;
@@ -72,9 +75,11 @@ typedef struct sigevent {
 
 // No asynchronous notification is delivered when the event of interest occurs.
 #define SIGEV_NONE      1
+
 // A queued signal, with an application-defined value, is generated when
 // the event of interest occurs.
 #define SIGEV_SIGNAL    0
+
 // A notification function is called to perform notification.
 #define SIGEV_THREAD    2
 
@@ -551,7 +556,7 @@ int pthread_sigmask(int, sigset_t const *restrict,
 
 int raise(int);
 
-int sigaction(int, const struct sigaction *restrict,
+int sigaction(int, struct sigaction const *restrict,
            struct sigaction *restrict);
 int sigaddset(sigset_t *, int);
 
@@ -559,9 +564,18 @@ int sigaddset(sigset_t *, int);
 int sigaltstack(stack_t const *restrict, stack_t *restrict);
 
 
-int sigdelset(sigset_t *, int);
+
+// clear the signal set
 int sigemptyset(sigset_t *);
+
+// remove the signal from the set
+int sigdelset(sigset_t *, int);
+
+// fill the set
 int sigfillset(sigset_t *);
+
+// Check whether signal is member of set
+int sigismember(sigset_t const *, int);
 
 
 int sighold(int);
@@ -569,7 +583,6 @@ int sigignore(int);
 int siginterrupt(int, int);
 
 
-int sigismember(sigset_t const *, int);
 
 void (*signal(int, void (*)(int)))(int);
 

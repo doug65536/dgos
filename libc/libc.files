@@ -315,6 +315,14 @@ src/pthread/pthread_rwlock_wrlock.cc
 src/pthread/pthread_barrierattr_destroy.cc
 src/pthread/pthread_attr_setschedparam.cc
 src/pthread/pthread_mutex_init.cc
+src/signal/signal.cc
+src/signal/kill.cc
+src/signal/sigaction.cc
+src/signal/raise.cc
+src/signal/sigaddset.cc
+src/signal/sigemptyset.cc
+src/signal/sigfillset.cc
+src/signal/sigismember.cc
 libc.files
 include/pthread.h
 include/termios.h

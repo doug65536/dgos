@@ -167,6 +167,8 @@ syscall/sys_framebuffer.h
 syscall/sys_sys.cc
 syscall/sys_sys.h
 syscall/sys_time.cc
+syscall/sys_signal.cc
+syscall/sys_signal.h
 ../bootstrap
 ../gdbhelpers
 ../genregs.py

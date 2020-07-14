@@ -331,3 +331,4 @@
 #define SYS_closedir                320
 #define SYS_framebuffer_enum        321
 #define SYS_framebuffer_map         322
+#define SYS_sigaction               323

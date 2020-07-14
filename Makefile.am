@@ -888,6 +888,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_sys.cc \
 	kernel/syscall/sys_render.cc \
 	kernel/syscall/sys_framebuffer.cc \
+	kernel/syscall/sys_signal.cc \
 	kernel/device/acpigas.cc \
 	kernel/device/acpigas.h \
 	kernel/device/acpihw.cc \
@@ -1692,6 +1693,14 @@ libc_a_SOURCES = \
 	libc/src/pthread/pthread_mutex_init.cc \
 	libc/src/pthread/__futex.cc \
 	libc/src/pthread/__clone.cc \
+	libc/src/signal/sigaction.cc \
+	libc/src/signal/sigaddset.cc \
+	libc/src/signal/kill.cc \
+	libc/src/signal/signal.cc \
+	libc/src/signal/raise.cc \
+	libc/src/signal/sigismember.cc \
+	libc/src/signal/sigemptyset.cc \
+	libc/src/signal/sigfillset.cc \
 	libc/src/sys/socket/socket.cc \
 	libc/src/sys/module/init_module.cc \
 	libc/src/sys/module/probe_pci_for.cc \
