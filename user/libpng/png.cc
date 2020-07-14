@@ -292,7 +292,7 @@ surface_t *surface_from_png(char const *path)
 {
     // Allocate read buffer
     // fixme, was unique_ptr
-    uint8_t *buf = new uint8_t[PNG_BUFSIZE]();
+    uint8_t *buf = new uint8_t[PNG_BUFSIZE];
     if (unlikely(!buf))
         return nullptr;
 
