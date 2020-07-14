@@ -106,14 +106,14 @@ EXPORT size_t pipe_t::overhead() const
 EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
                                int64_t timeout_time)
 {
-    scoped_lock lock(pipe_lock);
-
     ssize_t sent = 0;
 
     // The payload capacity per page
     size_t const capacity = PAGESIZE - sizeof(*write_buffer);
 
     bool notify_pending = false;
+
+    scoped_lock lock(pipe_lock);
 
     // Loop
     while (size) {
@@ -166,6 +166,8 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
         notify_pending = true;
     }
 
+    lock.unlock();
+
     if (notify_pending)
         pipe_not_empty.notify_all();
 
@@ -174,9 +176,9 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
 
 EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout_time)
 {
-    scoped_lock lock(pipe_lock);
-
     size_t received = 0;
+
+    scoped_lock lock(pipe_lock);
 
     while (size) {
         if (read_buffer) {

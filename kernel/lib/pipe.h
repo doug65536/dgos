@@ -8,6 +8,7 @@
 struct pipe_buffer_hdr_t {
     pipe_buffer_hdr_t *next = nullptr;
     size_t size = 0;
+    uintptr_t reserved[6];
 };
 
 C_ASSERT_ISPO2(sizeof(pipe_buffer_hdr_t));
