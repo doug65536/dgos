@@ -14,7 +14,7 @@ typedef int32_t scn_t;
 
 #ifdef __x86_64__
 
-static inline SYSCALL_API scp_t syscall6(
+static _always_inline SYSCALL_API scp_t syscall6(
         scp_t p0, scp_t p1, scp_t p2,
         scp_t p3, scp_t p4, scp_t p5, scn_t num)
 {
@@ -45,7 +45,7 @@ static inline SYSCALL_API scp_t syscall6(
     return rax;
 }
 
-static inline SYSCALL_API scp_t syscall5(
+static _always_inline SYSCALL_API scp_t syscall5(
         scp_t p0, scp_t p1, scp_t p2,
         scp_t p3, scp_t p4, scn_t num)
 {
@@ -74,7 +74,7 @@ static inline SYSCALL_API scp_t syscall5(
     return rax;
 }
 
-static inline SYSCALL_API scp_t syscall4(
+static _always_inline SYSCALL_API scp_t syscall4(
         scp_t p0, scp_t p1, scp_t p2,
         scp_t p3, scn_t num)
 {
@@ -101,7 +101,7 @@ static inline SYSCALL_API scp_t syscall4(
     return rax;
 }
 
-static inline SYSCALL_API scp_t syscall3(
+static _always_inline SYSCALL_API scp_t syscall3(
         scp_t p0, scp_t p1, scp_t p2, scn_t num)
 {
     register scp_t rdi __asm__("rdi") = p0;
@@ -125,7 +125,7 @@ static inline SYSCALL_API scp_t syscall3(
     return rax;
 }
 
-static inline SYSCALL_API scp_t syscall2(
+static _always_inline SYSCALL_API scp_t syscall2(
         scp_t p0, scp_t p1, scn_t num)
 {
     register scp_t rdi __asm__("rdi") = p0;
@@ -147,7 +147,7 @@ static inline SYSCALL_API scp_t syscall2(
     return rax;
 }
 
-static inline SYSCALL_API scp_t syscall1(
+static _always_inline SYSCALL_API scp_t syscall1(
         scp_t p0, scn_t num)
 {
     register scp_t rdi __asm__("rdi") = p0;
@@ -167,7 +167,7 @@ static inline SYSCALL_API scp_t syscall1(
     return rax;
 }
 
-static inline SYSCALL_API scp_t syscall0(
+static _always_inline SYSCALL_API scp_t syscall0(
         scn_t num)
 {
     register scp_t rax __asm__("rax") = num;
