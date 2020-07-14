@@ -22,7 +22,7 @@ for f in initrd; do
     ln -fsr "$f" "iso_stage/$f" || exit
 done
 
-ln -fsr "$TOPSRC/user/background.png" iso_stage/background.png || exit
+ln -fsr "$TOPSRC/user/background.png" iso_stage/usr/share/background.png || exit
 
 mkdir -p iso_stage/EFI/boot || exit
 ln -fsr bootx64.efi iso_stage/EFI/boot/bootx64.efi || exit

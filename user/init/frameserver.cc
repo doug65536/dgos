@@ -1625,7 +1625,7 @@ void surface_draw(int dx, int dy,
 
 static int stress(fb_info_t const& info)
 {
-    surface_t *img = surface_from_png("background.png");
+    surface_t *img = surface_from_png("/usr/share/background.png");
 
     if (unlikely(!img))
         return -1;

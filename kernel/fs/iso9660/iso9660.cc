@@ -127,7 +127,7 @@ struct iso9660_fs_t final : public fs_base_ro_t {
     static int lookup_path_cmp_utf16be(
             void const *v, void const *k, void *s);
 
-    iso9660_pt_rec_t *lookup_path(char const *path, int path_len);
+    iso9660_pt_rec_t *lookup_path(char const *path, size_t path_len);
 
     _pure
     void *lookup_sector(uint64_t lba);
@@ -483,11 +483,11 @@ int iso9660_fs_t::lookup_path_cmp_utf16be(
                 key->name, key->len);
 }
 
-iso9660_pt_rec_t *iso9660_fs_t::lookup_path(char const *path, int path_len)
+iso9660_pt_rec_t *iso9660_fs_t::lookup_path(char const *path, size_t path_len)
 {
     path_key_t key;
 
-    if (path_len < 0)
+    if (path_len == -size_t(1))
         path_len = strlen(path);
 
     key.parent = 1;
@@ -497,19 +497,23 @@ iso9660_pt_rec_t *iso9660_fs_t::lookup_path(char const *path, int path_len)
     int done;
     do {
         char *sep = (char*)memchr(key.name, '/', path_len);
+
         done = !sep;
+
         if (!done)
             key.len = sep - key.name;
         else
-            key.len = (path + path_len) - key.name;
+            break;
 
-        match = binary_search(
+        intptr_t next_match = binary_search(
                     pt_ptrs, pt_count,
                     sizeof(*pt_ptrs), &key,
                     lookup_path_cmp, this, 1);
 
-        if (match < 0)
-            return nullptr;
+        if (next_match < 0)
+            break;
+
+        match = next_match;
 
         key.parent = match + 1;
         key.name += key.len + 1;
@@ -561,17 +565,19 @@ iso9660_dir_ent_t *iso9660_fs_t::lookup_dirent(char const *pathname)
         pt_rec = pt_ptrs[0];
     }
 
+    if (unlikely(!pt_rec))
+        return nullptr;
+
     iso9660_dir_ent_t *dir = (iso9660_dir_ent_t *)
             lookup_sector(pt_rec_lba(pt_rec));
 
-    if (!dir)
+    if (unlikely(!dir))
         return nullptr;
 
     size_t dir_len = dirent_size(dir);
 
     iso9660_dir_ent_t *result = nullptr;
-    for (size_t ofs = 0; ofs < dir_len;
-         ofs = next_dirent(dir, ofs)) {
+    for (size_t ofs = 0; ofs < dir_len; ofs = next_dirent(dir, ofs)) {
         iso9660_dir_ent_t *de = (iso9660_dir_ent_t*)((char*)dir + ofs);
 
         int cmp = name_compare(de->name, de->filename_len, name, name_len);
@@ -908,7 +914,7 @@ int iso9660_fs_t::openat(fs_file_info_t **fi,
     file_handle_t *file = (file_handle_t *)handles.alloc(std::true_type());
     *fi = file;
 
-    file->dirent = lookup_dirent(path);
+    file->dirent = lookup_dirent(path + (path[0] == '/'));
 
     if (!file->dirent)
         return -int(errno_t::ENOENT);
