@@ -12,6 +12,104 @@ __BEGIN_DECLS
 typedef int64_t scp_t;
 typedef int32_t scn_t;
 
+#ifdef __x86_64__
+
+static inline SYSCALL_API scp_t syscall6(
+        scp_t p0, scp_t p1, scp_t p2,
+        scp_t p3, scp_t p4, scp_t p5, scn_t num)
+{
+    register scp_t rdi __asm__("rdi") = p0;
+    register scp_t rsi __asm__("rsi") = p1;
+    register scp_t rdx __asm__("rdx") = p2;
+    register scp_t r10 __asm__("r10") = p3;
+    register scp_t r8 __asm__("r8") = p4;
+    register scp_t r9 __asm__("r9") = p5;
+    register scn_t rax __asm__("rax") = num;
+
+    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+
+    return rax;
+}
+
+static inline SYSCALL_API scp_t syscall5(
+        scp_t p0, scp_t p1, scp_t p2,
+        scp_t p3, scp_t p4, scn_t num)
+{
+    register scp_t rdi __asm__("rdi") = p0;
+    register scp_t rsi __asm__("rsi") = p1;
+    register scp_t rdx __asm__("rdx") = p2;
+    register scp_t r10 __asm__("r10") = p3;
+    register scp_t r8 __asm__("r8") = p4;
+    register scn_t rax __asm__("rax") = num;
+
+    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+
+    return rax;
+}
+
+static inline SYSCALL_API scp_t syscall4(
+        scp_t p0, scp_t p1, scp_t p2,
+        scp_t p3, scn_t num)
+{
+    register scp_t rdi __asm__("rdi") = p0;
+    register scp_t rsi __asm__("rsi") = p1;
+    register scp_t rdx __asm__("rdx") = p2;
+    register scp_t r10 __asm__("r10") = p3;
+    register scn_t rax __asm__("rax") = num;
+
+    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+
+    return rax;
+}
+
+static inline SYSCALL_API scp_t syscall3(
+        scp_t p0, scp_t p1, scp_t p2, scn_t num)
+{
+    register scp_t rdi __asm__("rdi") = p0;
+    register scp_t rsi __asm__("rsi") = p1;
+    register scp_t rdx __asm__("rdx") = p2;
+    register scn_t rax __asm__("rax") = num;
+
+    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+
+    return rax;
+}
+
+static inline SYSCALL_API scp_t syscall2(
+        scp_t p0, scp_t p1, scn_t num)
+{
+    register scp_t rdi __asm__("rdi") = p0;
+    register scp_t rsi __asm__("rsi") = p1;
+    register scn_t rax __asm__("rax") = num;
+
+    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+
+    return rax;
+}
+
+static inline SYSCALL_API scp_t syscall1(
+        scp_t p0, scn_t num)
+{
+    register scp_t rdi __asm__("rdi") = p0;
+    register scn_t rax __asm__("rax") = num;
+
+    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+
+    return rax;
+}
+
+static inline SYSCALL_API scp_t syscall0(
+        scn_t num)
+{
+    register scn_t rax __asm__("rax") = num;
+
+    __asm__ __volatile__ ( "syscall\n\t" : : : "memory" );
+
+    return rax;
+}
+
+#else
+
 // Syscall number last so most of the arguments are already in the correct
 // registers, and only rcx and r11 and rax need to be dealt with.
 // These are implemented in assembly to ensure that link time optimizations
@@ -25,6 +123,8 @@ SYSCALL_API scp_t syscall3(scp_t p0, scp_t p1, scp_t p2, scn_t num);
 SYSCALL_API scp_t syscall2(scp_t p0, scp_t p1, scn_t num);
 SYSCALL_API scp_t syscall1(scp_t p0, scn_t num);
 SYSCALL_API scp_t syscall0(scn_t num);
+
+#endif
 
 static _always_inline scp_t syscallv(scn_t number, va_list ap)
 {
