@@ -1288,7 +1288,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         if (thread->state == THREAD_IS_RUNNING) {
             // Replenish timeslice and reinsert it into ready queue
             thread->state = THREAD_IS_READY_BUSY;
-            thread->preempt_time = thread->used_time + 64000000;
+            thread->preempt_time = thread->used_time + 16000000;
             thread->timeslice_timestamp = now;
             sched_node.value().first = now;
             thread->schedule_node = cpu->ready_list
