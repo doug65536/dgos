@@ -17,7 +17,8 @@ code64_run_kernel:
     cli
     cld
 
-    // Save parameters in call preserved registers
+    // Save parameters in call preserved registers,
+    // and no point preserving callee saved registers, we are never going back
     mov %rdi,%r15
     .cfi_undefined r15
     mov %rsi,%r14

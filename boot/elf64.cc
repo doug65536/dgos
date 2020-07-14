@@ -200,14 +200,14 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     size_t phys_mem_table_size = 0;
     void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
-    uint64_t top_addr =
-            physmap_top_addr();
+    uint64_t top_addr = physmap_top_addr();
 
     assert(top_addr != 0);
 
     // Round up to a 1GB boundary
     top_addr = (top_addr + (UINT64_C(1) << 30) - 1) & -(UINT64_C(1) << 30);
 
+    // 512GB below base of kernel, rounded down to 1GB boundary
     uint64_t physmap_addr = (base - (UINT64_C(512) << 30)) &
             -(UINT64_C(512) << 30);
 
