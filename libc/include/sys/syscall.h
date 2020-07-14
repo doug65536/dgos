@@ -37,6 +37,9 @@ static inline SYSCALL_API scp_t syscall6(
         , "+r" (rax)
         :
         : "rcx", "r11", "memory"
+        , "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+        , "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        , "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     );
 
     return rax;
@@ -63,6 +66,9 @@ static inline SYSCALL_API scp_t syscall5(
         , "+r" (rax)
         :
         : "rcx", "r11", "r9", "memory"
+        , "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+        , "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        , "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     );
 
     return rax;
@@ -87,6 +93,9 @@ static inline SYSCALL_API scp_t syscall4(
         , "+r" (rax)
         :
         : "rcx", "r11", "r9", "r8", "memory"
+        , "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+        , "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        , "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     );
 
     return rax;
@@ -108,6 +117,9 @@ static inline SYSCALL_API scp_t syscall3(
         , "+r" (rax)
         :
         : "rcx", "r11", "r9", "r8", "r10", "memory"
+        , "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+        , "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        , "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     );
 
     return rax;
@@ -127,6 +139,9 @@ static inline SYSCALL_API scp_t syscall2(
         , "+r" (rax)
         :
         : "rcx", "r11", "r9", "r8", "r10", "rdx", "memory"
+        , "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+        , "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        , "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     );
 
     return rax;
@@ -144,6 +159,9 @@ static inline SYSCALL_API scp_t syscall1(
         , "+r" (rax)
         :
         : "rcx", "r11", "r9", "r8", "r10", "rdx", "rsi", "memory"
+        , "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+        , "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        , "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     );
 
     return rax;
@@ -159,6 +177,9 @@ static inline SYSCALL_API scp_t syscall0(
         : "+r" (rax)
         :
         : "rcx", "r11", "r9", "r8", "r10", "rdx", "rsi", "rdi", "memory"
+        , "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+        , "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"
+        , "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     );
 
     return rax;
