@@ -91,7 +91,7 @@ static vga_reg_storage_t<vga_conerr_reg_t> vga_conerr_reg_storage;
 static void vga_init_devs(void*)
 {
     devfs_register(new (vga_conout_reg_storage.data) vga_conout_reg_t);
-    devfs_register(new (vga_conerr_reg_storage.data) vga_conout_reg_t);
+    devfs_register(new (vga_conerr_reg_storage.data) vga_conerr_reg_t);
 }
 
 REGISTER_CALLOUT(vga_init_devs, nullptr, callout_type_t::
