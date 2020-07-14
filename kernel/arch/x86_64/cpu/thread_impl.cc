@@ -29,7 +29,7 @@
 
 // Implements platform independent thread.h
 
-#define DEBUG_THREAD    1
+#define DEBUG_THREAD    0
 #if DEBUG_THREAD
 #define THREAD_TRACE(...) printdbg("thread: " __VA_ARGS__)
 #else
@@ -1514,14 +1514,14 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         if (to_fpu) {
             if (cpu->cr0_shadow & CPU_CR0_TS) {
                 // Allow use of FPU
-                printdbg("FPU allowed\n");
+                THREAD_TRACE("FPU allowed\n");
                 cpu->cr0_shadow &= ~CPU_CR0_TS;
                 cpu_cr0_clts();
             }
         } else if ((cpu->cr0_shadow & CPU_CR0_TS) == 0) {
             // Lock out the FPU
             // Set TS flag to block access to FPU
-            printdbg("FPU locked out\n");
+            THREAD_TRACE("FPU locked out\n");
             cpu->cr0_shadow |= CPU_CR0_TS;
             cpu_cr0_set(cpu->cr0_shadow);
         }
