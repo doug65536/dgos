@@ -2724,11 +2724,11 @@ run-pxe: all run-up-bios-pxe-gpt-ahci-vga-tcg
 
 .PHONY: run-pxe
 
-run-kvm: all run-up-efi-hd-gpt-nvme-vga-kvm
+run-kvm: all run-up-efi-hd-gpt-ahci-vga-kvm
 
 .PHONY: run-kvm
 
-run-smp-kvm: all run-smp-efi-hd-iso-ahci-vga-kvm
+run-smp-kvm: all run-smp-efi-hd-gpt-ahci-vga-kvm
 
 .PHONY: run-smp-kvm
 
