@@ -834,6 +834,8 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(
     if (name_st == path_end)
         return &root_dirent;
 
+    name_st += ((name_st[0] == '/') ? 1 : 0);
+
     char const *name_en;
     for ( ; name_st < path_end; name_st = name_en + 1) {
         name_en = (char*)memchr(name_st, '/', path_end - name_st);
