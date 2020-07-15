@@ -765,8 +765,12 @@ void process_t::exit_thread(thread_t tid, int exitcode)
         ++i;
     }
 
-    if (likely(i < threads.size()))
-        __longjmp(exit_jmpbufs[i], 1);
+    __exception_jmp_buf_t *jmpbuf = exit_jmpbufs[i];
+
+    if (likely(i < threads.size())) {
+        lock.unlock();
+        __longjmp(jmpbuf, 1);
+    }
 
     panic("Thread not found in exit_thread!");
 }
