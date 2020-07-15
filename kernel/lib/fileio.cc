@@ -42,8 +42,12 @@ struct filetab_t {
     // Reference count
     int refcount;
 
+    bool close_on_exec;
+    bool async;
+    bool nonblock;
+
     // Size align
-    int reserved[7];
+    char reserved[25];
 };
 
 // Make it fast to compute index from pointer difference
