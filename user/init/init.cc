@@ -72,6 +72,25 @@ void load_module(char const *path, char const *parameters = nullptr)
     close(fd);
 }
 
+static void *mouse_test(void*)
+{
+    int mouse = open("/dev/mousein", O_RDONLY | O_NBLOCK);
+
+    if (mouse >= 0) {
+        char buf[16];
+        int packet = read(mouse, &buf, sizeof(buf));
+
+        for (size_t i = 0; packet > 0 && i < size_t(packet); ++i)
+            printf(" %02x", (unsigned char)buf[i]);
+        puts("");
+
+        close(mouse);
+        mouse = -1;
+    }
+
+    return nullptr;
+}
+
 int main(int argc, char **argv, char **envp)
 {
     printf("init startup complete\n");
@@ -102,6 +121,8 @@ int main(int argc, char **argv, char **envp)
         load_module("usbxhci.km");
 
     load_module("usbmsc.km");
+
+    //mouse_test();
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_STORAGE,
@@ -140,6 +161,9 @@ int main(int argc, char **argv, char **envp)
                       PCI_DEV_CLASS_NETWORK,
                       PCI_SUBCLASS_NETWORK_ETHERNET, -1))
         load_module("rtl8139.km");
+
+    pthread_t mouse_thread{};
+    int err = pthread_create(&mouse_thread, nullptr, mouse_test, nullptr);
 
     return start_framebuffer();
 }

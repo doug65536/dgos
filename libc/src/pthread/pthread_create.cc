@@ -10,10 +10,13 @@ int pthread_create(pthread_t *result, pthread_attr_t const *attr,
 {
     size_t guard_sz = attr ? attr->guard_sz : 0;
 
-    void *stack_st = mmap(nullptr, (8 << 20) + (guard_sz * 2),
+    // 8MB
+    size_t stack_sz = 8 << 20;
+
+    void *stack_st = mmap(nullptr, stack_sz + (guard_sz * 2),
                           PROT_READ | PROT_WRITE,
                           MAP_ANONYMOUS | MAP_STACK, -1, 0);
-    void *stack_en = (char*)stack_st + (8 << 20);
+    void *stack_en = (char*)stack_st + stack_sz;
 
     void *stack_keep_st = (char*)stack_st + guard_sz;
     void *stack_keep_en = (char*)stack_en - guard_sz;

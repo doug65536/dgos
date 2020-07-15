@@ -12,7 +12,6 @@ void *mmap(void *addr, size_t length, int prot,
     if ((unsigned long)result > 256)
         return result;
 
-
     errno = errno_t(uintptr_t(result));
 
     return (void*)-1;   // MAP_FAILED

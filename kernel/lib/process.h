@@ -243,13 +243,14 @@ struct process_t
 
     int clone(int (*fn)(void *), void *child_stack, int flags, void *arg);
 
+    void *create_tls();
+
     struct clone_data_t {
         process_t *process;
         int (*fn)(void *arg);
         void *arg;
         void *sp;
-        uintptr_t tid;
-        uintptr_t rsi;
+        uintptr_t arg2;
     };
 
     size_t thread_index(thread_t tid) const noexcept

@@ -148,6 +148,8 @@ int process_t::start_clone_thunk(void *clone_data)
     // run_clone doesn't return, have to do this first
     delete cdp;
 
+    data.process->create_tls();
+
     // goto the usermode entry
     return data.process->start_clone(data);
 }
@@ -156,10 +158,11 @@ int process_t::start_clone_thunk(void *clone_data)
 int process_t::start_clone(clone_data_t data)
 {
     uintptr_t tid = thread_get_id();
-    thread_set_fsbase(tid, tls_addr);
-    if (!__setjmp(process_get_exit_jmpbuf(tid))) {
-        isr_sysret(uintptr_t((void*)data.fn), uintptr_t(data.arg),
-                   uintptr_t(data.sp), use64, tid, data.rsi);
+    __exception_jmp_buf_t *buf = process_get_exit_jmpbuf(tid);
+
+    if (!__setjmp(buf)) {
+        isr_sysret(uintptr_t((void*)data.fn), uintptr_t(data.sp),
+                   uintptr_t(buf->rsp), use64, tid, data.arg2);
     }
 
     return 0;
@@ -170,22 +173,40 @@ int process_t::clone(int (*fn)(void *), void *child_stack,
 {
     clone_data_t *kernel_thread_arg = new (ext::nothrow) clone_data_t();
 
+    kernel_thread_arg->process = this;
+    kernel_thread_arg->fn = fn;
+    kernel_thread_arg->sp = child_stack;
+    kernel_thread_arg->arg = arg;
+    kernel_thread_arg->arg2 = 0;
+
     if (unlikely(!kernel_thread_arg))
         return -int(errno_t::ENOMEM);
 
 #ifdef __x86_64__
-    // Intel throws #GP in kernel mode with user's stack if user rip is not
-    // canonical. Check.
+    // Intel ineptly throws #GP in kernel mode with user's stack if
+    // user rip is not canonical. Check.
     if (unlikely((intptr_t(uintptr_t(kernel_thread_arg->fn) << 16) >> 16) !=
                  intptr_t(kernel_thread_arg->fn)))
         return -int(errno_t::EFAULT);
 #endif
 
-    thread_t new_tid = thread_create(&process_t::start_clone_thunk,
-                                     kernel_thread_arg, "user_thread", 0,
-                                     true, true);
+    scoped_lock lock(processes_lock);
 
-    return new_tid;
+    thread_t tid = thread_create(
+                &process_t::start_clone_thunk, kernel_thread_arg,
+                "user_thread", 0, true, true);
+
+    if (unlikely(!exit_jmpbufs.push_back(
+                     new (ext::nothrow) __exception_jmp_buf_t())))
+        panic_oom();
+
+    if (unlikely(exit_jmpbufs.back() == nullptr))
+        panic_oom();
+
+    if (!threads.push_back(tid))
+        panic_oom();
+
+    return tid;
 }
 
 // Hack to reuse module loader symbol auto-load hook for processes too
@@ -355,6 +376,70 @@ intptr_t process_t::load_elf_with_policy(int fd)
     return first_exec;
 }
 
+// Must run in the context of the new thread
+void *process_t::create_tls()
+{
+    // The space for the uintptr_t is for the pointer to itself at TLS offset 0
+    size_t tls_vsize = PAGE_SIZE + sizeof(uintptr_t) + tls_msize + PAGE_SIZE;
+
+    void *tls = mmap(nullptr, tls_vsize, PROT_NONE, MAP_USER);
+
+    if (tls == MAP_FAILED)
+        return nullptr;
+
+    // 4KB guard region around TLS
+    uintptr_t tls_area = uintptr_t(tls) + PAGESIZE;
+
+    if (unlikely(!mm_is_user_range((void*)tls_area,
+                                   sizeof(uintptr_t) + tls_msize)))
+        return nullptr;
+
+    if (unlikely(mprotect((void*)tls_area, tls_msize + sizeof(uintptr_t),
+                          PROT_READ | PROT_WRITE) < 0))
+        return nullptr;
+
+    // Explicitly commit faster than taking demand faults
+    if (unlikely(madvise((void*)tls_area, tls_msize + sizeof(uintptr_t),
+                         MADV_WILLNEED) < 0))
+        return nullptr;
+
+    // Copy template into TLS area
+    if (unlikely(!mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize)))
+        return nullptr;
+
+    // Zero fill the region not specified in the file
+    if (unlikely(!mm_copy_user((char*)tls_area + tls_fsize, nullptr,
+                               tls_msize - tls_fsize)))
+        return nullptr;
+
+    /// TLS uses negative offsets from the end of the TLS data, and a
+    /// pointer to the TLS is located at the TLS base address.
+    ///
+    ///    /\       +-----------------+
+    ///    |  +-----| pointer to self |
+    ///    |  +---->+-----------------+ <--- TLS base address (FSBASE)
+    ///    +        |                 |
+    ///    +        |    TLS  data    | <--- copied from TLS template
+    ///    +        |                 |
+    ///  addr       +-----------------+ <--- mmap allocation for TLS
+    ///
+
+    // The TLS pointer here points to the end of the TLS, which is where
+    // the pointer to itself is located
+    uintptr_t tls_ptr = tls_area + tls_msize;
+    // Patch the pointer to itself into the TLS area
+    if (unlikely(!mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr))))
+        return nullptr;
+
+    // Point appropriate tls selector register at it
+    if (use64)
+        thread_set_fsbase(thread_get_id(), tls_ptr);
+    else
+        thread_set_gsbase(thread_get_id(), tls_ptr);
+
+    return (void*)tls_ptr;
+}
+
 // Returns when program exits
 int process_t::run()
 {
@@ -446,62 +531,13 @@ int process_t::run()
              stack_size >> 10, uintptr_t(stack));
 
     // Initialize main thread TLS
+    void *tls = create_tls();
+
+    if (unlikely(!tls))
+        panic_oom();
+
     static_assert(sizeof(uintptr_t) == sizeof(void*), "Unexpected size");
-    // The space for the uintptr_t is for the pointer to itself at TLS offset 0
-    size_t tls_vsize = PAGE_SIZE + sizeof(uintptr_t) + tls_msize + PAGE_SIZE;
-    void *tls = mmap(nullptr, tls_vsize, PROT_NONE, MAP_USER);
-    if (tls == MAP_FAILED)
-        return -1;
 
-    // 4KB guard region around TLS
-    uintptr_t tls_area = uintptr_t(tls) + PAGESIZE;
-
-    if (unlikely(!mm_is_user_range((void*)tls_area,
-                                   sizeof(uintptr_t) + tls_msize)))
-        return -1;
-
-    if (unlikely(mprotect((void*)tls_area, tls_msize + sizeof(uintptr_t),
-                          PROT_READ | PROT_WRITE) < 0))
-        return -1;
-
-    // Explicitly commit faster than taking demand faults
-    if (unlikely(madvise((void*)tls_area, tls_msize + sizeof(uintptr_t),
-                         MADV_WILLNEED) < 0))
-        return -1;
-
-    // Copy template into TLS area
-    if (unlikely(!mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize)))
-        return -1;
-
-    // Zero fill the region not specified in the file
-    if (unlikely(!mm_copy_user((char*)tls_area + tls_fsize, nullptr,
-                               tls_msize - tls_fsize)))
-        return -1;
-
-    /// TLS uses negative offsets from the end of the TLS data, and a
-    /// pointer to the TLS is located at the TLS base address.
-    ///
-    ///    /\       +-----------------+
-    ///    |  +-----| pointer to self |
-    ///    |  +---->+-----------------+ <--- TLS base address (FSBASE)
-    ///    +        |                 |
-    ///    +        |    TLS  data    | <--- copied from TLS template
-    ///    +        |                 |
-    ///  addr       +-----------------+ <--- mmap allocation for TLS
-    ///
-
-    // The TLS pointer here points to the end of the TLS, which is where
-    // the pointer to itself is located
-    uintptr_t tls_ptr = tls_area + tls_msize;
-    // Patch the pointer to itself into the TLS area
-    if (unlikely(!mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr))))
-        return -1;
-
-    // Point appropriate tls selector register at it
-    if (use64)
-        thread_set_fsbase(thread_get_id(), tls_ptr);
-    else
-        thread_set_gsbase(thread_get_id(), tls_ptr);
 
     // Initialize the stack according to the ELF ABI
     //
