@@ -149,7 +149,7 @@ static int test_thread_worker(void *variation)
     return 0;
 }
 
-DISABLED_UNITTEST(test_thread_context)
+UNITTEST(test_thread_context)
 {
     size_t count = thread_get_cpu_count();
     for (size_t i = 0; i < count; ++i)
