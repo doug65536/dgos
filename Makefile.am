@@ -2679,9 +2679,13 @@ $(foreach media,$(BOCHS_MEDIA), \
 	) \
 )
 
-debug: all debug-up-efi-hd-iso-ahci-vga-icount
+debug: all debug-up-efi-hd-iso-ahci-vga-tcg
 
 .PHONY: debug
+
+debug-icount: all debug-up-efi-hd-iso-ahci-vga-icount
+
+.PHONY: debug-icount
 
 debug-gpt: all debug-up-efi-hd-gpt-ahci-vga-tcg
 
