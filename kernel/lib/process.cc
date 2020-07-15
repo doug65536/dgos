@@ -162,14 +162,14 @@ int process_t::start_clone(clone_data_t data)
 
     if (!__setjmp(buf)) {
         isr_sysret(uintptr_t((void*)data.fn), uintptr_t(data.sp),
-                   uintptr_t(buf->rsp), use64, tid, data.arg2);
+                   uintptr_t(buf->rsp), use64, tid, uintptr_t(data.arg2));
     }
 
     return 0;
 }
 
 int process_t::clone(int (*fn)(void *), void *child_stack,
-                     int flags, void *arg)
+                     int flags, void *arg, void *arg2)
 {
     clone_data_t *kernel_thread_arg = new (ext::nothrow) clone_data_t();
 
@@ -177,7 +177,7 @@ int process_t::clone(int (*fn)(void *), void *child_stack,
     kernel_thread_arg->fn = fn;
     kernel_thread_arg->sp = child_stack;
     kernel_thread_arg->arg = arg;
-    kernel_thread_arg->arg2 = 0;
+    kernel_thread_arg->arg2 = arg2;
 
     if (unlikely(!kernel_thread_arg))
         return -int(errno_t::ENOMEM);
@@ -752,6 +752,23 @@ void process_t::exit(pid_t pid, int exitcode)
         __longjmp(process_ptr->exit_jmpbufs[index], 1);
 
     panic("Thread has no exit jmpbuf!");
+}
+
+void process_t::exit_thread(thread_t tid, int exitcode)
+{
+    scoped_lock lock(process_lock);
+
+    size_t i = 0;
+    for (thread_t id: threads) {
+        if (id == tid)
+            break;
+        ++i;
+    }
+
+    if (likely(i < threads.size()))
+        __longjmp(exit_jmpbufs[i], 1);
+
+    panic("Thread not found in exit_thread!");
 }
 
 bool process_t::add_thread(thread_t tid)

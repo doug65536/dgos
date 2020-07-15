@@ -259,6 +259,8 @@ int   pthread_create(pthread_t *restrict, pthread_attr_t const *restrict,
           void *(*)(void*), void *restrict);
 int   pthread_detach(pthread_t);
 int   pthread_equal(pthread_t, pthread_t);
+
+__attribute__((__noreturn__))
 void  pthread_exit(void *);
 
 //[OB XSI][Option Start]
@@ -387,8 +389,9 @@ void  pthread_testcancel(void);
 
 // ---
 
-int __clone(void *(*fn)(void *), void *child_stack,
-            int flags, void *arg);
+int __clone(void (*bootstrap)(void *(fn)(void*), void *arg),
+            void *child_stack,
+            int flags, void *fn, void *arg);
 
 int __futex(int *uaddr, int futex_op, int val,
             struct timespec const *timeout, int *uaddr2, int val3);
@@ -419,4 +422,6 @@ int __futex(int *uaddr, int futex_op, int val,
     (((oparg) & 0xfff) << 12) | \
     ((cmparg) & 0xfff))
 
-int __clone(int (*fn)(void *arg), void *child_stack, int flags, void *arg);
+int __clone(void (*bootstrap)(void *(*fn)(void*), void *arg),
+            void *child_stack, int flags,
+            void *(*fn)(void *arg), void *arg);

@@ -5,6 +5,13 @@
 #include <sys/syscall.h>
 #include <sys/syscall_num.h>
 
+__attribute__((__noreturn__))
+static void pthread_bootstrap(void *(fn)(void*), void *arg)
+{
+    void *result = fn(arg);
+    pthread_exit(result);
+}
+
 int pthread_create(pthread_t *result, pthread_attr_t const *attr,
                    void *(*fn)(void *arg), void *arg)
 {
@@ -29,7 +36,7 @@ int pthread_create(pthread_t *result, pthread_attr_t const *attr,
         mprotect(stack_keep_en, guard_sz, PROT_NONE);
     }
 
-    __clone(fn, stack_keep_en, 0, arg);
+    __clone(pthread_bootstrap, stack_keep_en, 0, fn, arg);
 
     return ENOSYS;
 }

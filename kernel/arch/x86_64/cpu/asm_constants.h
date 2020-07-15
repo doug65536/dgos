@@ -31,6 +31,6 @@
 
 #define THREAD_INFO_SIZE            512
 
-#define SYSCALL_COUNT   324
+#define SYSCALL_COUNT   325
 #define SYSCALL_ENOSYS  -81
 #define SYSCALL_RFLAGS  0x202
