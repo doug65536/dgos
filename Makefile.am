@@ -1693,6 +1693,13 @@ libc_a_SOURCES = \
 	libc/src/pthread/pthread_mutex_init.cc \
 	libc/src/pthread/__futex.cc \
 	libc/src/pthread/__clone.cc \
+	libc/src/aio/aio_cancel.cc \
+	libc/src/aio/aio_error.cc \
+	libc/src/aio/aio_fsync.cc \
+	libc/src/aio/aio_read.cc \
+	libc/src/aio/aio_return.cc \
+	libc/src/aio/aio_suspend.cc \
+	libc/src/aio/aio_write.cc \
 	libc/src/signal/sigaction.cc \
 	libc/src/signal/sigaddset.cc \
 	libc/src/signal/kill.cc \

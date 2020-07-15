@@ -63,6 +63,13 @@ src/posix_spawn/posix_spawnattr_setschedpolicy.cc
 src/posix_spawn/posix_spawnattr_setsigdefault.cc
 src/posix_spawn/posix_spawnattr_setsigmask.cc
 src/posix_spawn/posix_spawnp.cc
+src/aio/aio_cancel.cc
+src/aio/aio_error.cc
+src/aio/aio_fsync.cc
+src/aio/aio_read.cc
+src/aio/aio_return.cc
+src/aio/aio_suspend.cc
+src/aio/aio_write.cc
 src/pthread/__clone.cc
 src/pthread/__futex.cc
 src/stdio/bits/cfile.cc
