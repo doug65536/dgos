@@ -31,10 +31,19 @@ int sys_framebuffer_enum(size_t index, size_t count, fb_info_t *result_ptr)
     result.pitch = mode->pitch;
     result.pixel_sz = mode->byte_pp;
 
-    result.vmem = mmap((void*)mode->framebuffer_addr,
-                       mode->framebuffer_bytes,
+    size_t mapping_sz = mode->framebuffer_bytes;
+
+    size_t twoMB = 1 << (12+9);
+
+    // If it is suitably aligned,
+    // force it to be possible to use a 2MB page
+    if (mode->framebuffer_addr == (mode->framebuffer_addr & -twoMB))
+        mapping_sz = (mapping_sz + twoMB - 1) & -twoMB;
+
+    result.vmem = mmap((void*)mode->framebuffer_addr, mapping_sz,
                        PROT_READ | PROT_WRITE,
-                       MAP_PHYSICAL | MAP_WEAKORDER | MAP_USER);
+                       MAP_PHYSICAL | MAP_WEAKORDER |
+                       MAP_USER | MAP_HUGETLB);
 
     result.vmem_size = mode->framebuffer_bytes;
     result.x = 0;

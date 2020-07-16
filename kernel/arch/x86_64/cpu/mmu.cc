@@ -1674,7 +1674,7 @@ static void mm_destroy_pagetables_aligned(uintptr_t start, size_t size)
 }
 
 static pte_t *mm_create_pagetables_aligned(
-        uintptr_t start, size_t size,
+        uintptr_t start, size_t size, size_t levels,
         mmu_phys_allocator_t::free_batch_t& free_batch)
 {
     pte_t *pte_st[4];
@@ -1687,12 +1687,23 @@ static pte_t *mm_create_pagetables_aligned(
 
     // Fastpath small allocations fully within a 2MB region,
     // where there is nothing to do
-    if (likely(pte_st[2] == pte_en[2] &&
+    if (likely(levels == 3 &&
+               pte_st[2] == pte_en[2] &&
                (*pte_st[0] & PTE_PRESENT) &&
                (*pte_st[1] & PTE_PRESENT) &&
-               (*pte_st[2] & PTE_PRESENT))) {
+               (*pte_st[2] & PTE_PRESENT)))
         return pte_st[3];
-    }
+
+    if (levels == 2 &&
+            pte_st[1] == pte_en[1] &&
+            (*pte_st[0] & PTE_PRESENT) &&
+            (*pte_st[1] & PTE_PRESENT))
+        return pte_st[2];
+
+    if (levels == 1 &&
+            pte_st[0] == pte_en[0] &&
+            (*pte_st[0] & PTE_PRESENT))
+        return pte_st[1];
 
     bool const low = (start & 0xFFFFFFFFFFFFU) < 0x800000000000U;
 
@@ -1703,7 +1714,7 @@ static pte_t *mm_create_pagetables_aligned(
 
     pte_t global_mask = ~PTE_GLOBAL;
 
-    for (unsigned level = 0; level < 3; ++level) {
+    for (unsigned level = 0; level < levels; ++level) {
         pte_t * const base = pte_st[level];
         // Plus one because it is an inclusive end, not half open range
         size_t const range_count = (pte_en[level] - base) + 1;
@@ -1733,7 +1744,7 @@ static pte_t *mm_create_pagetables_aligned(
 #endif
     }
 
-    return pte_st[3];
+    return pte_st[levels];
 }
 
 template<typename T>
@@ -1837,8 +1848,53 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
     linaddr_t linear_addr;
 
+    uintptr_t const oneGB = 1 << (12+9+9);
+    uintptr_t const twoMB = 1 << (12+9);
+    uintptr_t const fourK = 1 << (12);
+
     if (likely(!addr || (flags & MAP_PHYSICAL))) {
-        linear_addr = allocator->alloc_linear(len);
+        if (likely(!(flags & MAP_HUGETLB))) {
+            linear_addr = allocator->alloc_linear(len);
+        } else {
+            // Make suitably aligned linear allocation for hugetlb
+
+            uintptr_t paddr = uintptr_t(addr);
+
+            uintptr_t alignment;
+
+            if (paddr == (paddr & -oneGB)) {
+                alignment = oneGB;
+                misalignment = paddr & ~-oneGB;
+            } else if (paddr == (paddr & -twoMB)) {
+                alignment = twoMB;
+                misalignment = paddr & ~-twoMB;
+            } else {
+                alignment = fourK;
+                misalignment = paddr & ~-fourK;
+            }
+
+            // Allocate 1GB extra in case we need to round up the start
+            // to a 1GB boundary
+            linear_addr = allocator->alloc_linear(len + alignment);
+
+            if (alignment) {
+                uintptr_t aligned_start;
+                aligned_start = (linear_addr + (alignment - 1)) & -alignment;
+
+                uintptr_t used_end = aligned_start + len;
+
+                uintptr_t unused_at_start = aligned_start - linear_addr;
+                uintptr_t unused_at_end = len + alignment - used_end;
+
+                if (unused_at_start)
+                    allocator->release_linear(linear_addr, unused_at_start);
+
+                if (unused_at_end)
+                    allocator->release_linear(used_end, unused_at_end);
+
+                linear_addr = aligned_start;
+            }
+        }
     } else {
         linear_addr = (linaddr_t)addr;
 
@@ -1864,13 +1920,17 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     if (likely(!usable_early_mem_ranges)) {
         // Normal operation
 
-        pte_t *base_pte = mm_create_pagetables_aligned(
-                    linear_addr, len, free_batch);
+        pte_t *base_pte = nullptr;
 
-        if (unlikely(!base_pte)) {
-            mm_destroy_pagetables_aligned(linear_addr, len);
-            munmap((void*)linear_addr, len);
-            return MAP_FAILED;
+        if (likely(!(flags & MAP_PHYSICAL))) {
+            base_pte = mm_create_pagetables_aligned(
+                        linear_addr, len, 3, free_batch);
+
+            if (unlikely(!base_pte)) {
+                mm_destroy_pagetables_aligned(linear_addr, len);
+                munmap((void*)linear_addr, len);
+                return MAP_FAILED;
+            }
         }
 
         if ((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) {
@@ -1944,23 +2004,105 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
             // Demand page fill
             for ( ; ofs < end; ++ofs) {
                 pte = demand_fill;
+
                 pte = atomic_xchg(base_pte + ofs, pte);
 
                 if (unlikely(pte_is_sysmem(pte)))
                     free_batch.free(pte & PTE_ADDR);
             }
         } else if (flags & MAP_PHYSICAL) {
-            pte_t pte;
 
-            physaddr_t paddr = physaddr_t(addr);
-            for (size_t ofs = 0, end = (len >> PAGE_SCALE); ofs < end;
-                 ++ofs, paddr += PAGE_SIZE) {
-                pte = paddr | page_flags;
-                pte = atomic_xchg(base_pte + ofs, pte);
+            uintptr_t paddr = uintptr_t(addr);
+            uintptr_t pend = paddr + len;
+            uintptr_t vaddr = linear_addr;
 
-                if (unlikely(pte_is_sysmem(pte)))
-                    free_batch.free(pte & PTE_ADDR);
-            }
+            bool huge = (flags & MAP_HUGETLB);
+
+            do {
+                size_t level;
+                size_t huge_shift;
+                pte_t huge_flags;
+                size_t huge_count;
+
+                uintptr_t next_2MB_boundary;
+                next_2MB_boundary = (paddr + twoMB) & -twoMB;
+
+                // 1GB aligned, and length is even multiple of 1GB
+                if (huge && (paddr == (paddr & -oneGB) &&
+                            len >= oneGB)) {
+                    // run of 1GB pages
+                    level = 1;
+
+                    huge_shift = 12 + 9 + 9;
+
+                    huge_count = len >> huge_shift;
+
+                    huge_flags = PTE_PAGESIZE |
+                            ((page_flags & PTE_PTEPAT)
+                             ? (page_flags & ~PTE_PTEPAT) | PTE_PDEPAT
+                             : page_flags);
+                } else if (huge && (paddr == (paddr & -twoMB) &&
+                                    len >= twoMB)) {
+                    // run of 2MB pages
+
+                    level = 2;
+
+                    huge_shift = 12 + 9;
+
+                    huge_count = len >> huge_shift;
+
+                    huge_flags = PTE_PAGESIZE |
+                            ((page_flags & PTE_PTEPAT)
+                             ? (page_flags & ~PTE_PTEPAT) | PTE_PDEPAT
+                             : page_flags);
+                } else if (huge && next_2MB_boundary < pend) {
+                    // 4KB pages until upcoming 2MB boundary
+                    level = 3;
+
+                    huge_shift = 12;
+
+                    huge_count = (next_2MB_boundary - paddr) >> huge_shift;
+
+                    huge_flags = page_flags;
+                } else {
+                    level = 3;
+
+                    huge_shift = 12;
+
+                    huge_flags = page_flags;
+
+                    huge_count = len >> huge_shift;
+                }
+
+                huge_count = len >> huge_shift;
+                size_t huge_size = 1 << huge_shift;
+                size_t huge_total = huge_count << huge_shift;
+
+                pte_t *p = mm_create_pagetables_aligned(
+                            vaddr, huge_total, level, free_batch);
+
+                for (size_t i = 0; i < huge_count; ++i) {
+                    pte_t new_pte = paddr | huge_flags;
+                    pte_t old_pte = atomic_xchg(p + i, new_pte);
+
+                    if (unlikely(pte_is_sysmem(old_pte)))
+                        free_batch.free(old_pte & PTE_ADDR);
+
+                    vaddr += huge_size;
+                    paddr += huge_size;
+                    len -= huge_size;
+                }
+            } while (len);
+
+
+//            for (size_t ofs = 0, end = (len >> PAGE_SCALE); ofs < end;
+//                 ++ofs, paddr += PAGE_SIZE) {
+//                pte = paddr | page_flags;
+//                pte = atomic_xchg(base_pte + ofs, pte);
+
+//                if (unlikely(pte_is_sysmem(pte)))
+//                    free_batch.free(pte & PTE_ADDR);
+//            }
         } else {
             assert(!"Unhandled condition");
         }
@@ -2077,7 +2219,8 @@ EXPORT void *mremap(
         // Expand in place
         new_st = old_st + old_size;
         new_size -= old_size;
-        new_base = mm_create_pagetables_aligned(new_st, new_size, free_batch);
+        new_base = mm_create_pagetables_aligned(
+                    new_st, new_size, 3, free_batch);
         pte_t new_pte = (low ? PTE_USER : PTE_GLOBAL) |
                 PTE_WRITABLE | PTE_ADDR;
         for (size_t i = 0, e = new_size >> PAGE_SCALE; i < e; ++i) {
@@ -2092,7 +2235,7 @@ EXPORT void *mremap(
     ptes_from_addr(old_pte, old_st);
 
     new_st = allocator->alloc_linear(new_size);
-    new_base = mm_create_pagetables_aligned(new_st, new_size, free_batch);
+    new_base = mm_create_pagetables_aligned(new_st, new_size, 3, free_batch);
 
     size_t i, e;
     for (i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
