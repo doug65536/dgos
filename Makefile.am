@@ -2422,10 +2422,12 @@ QEMU_DRV_COMMON = \
 QEMU_DRV = \
 	-drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
+QEMU_DISPLAY_API=sdl
+
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
 QEMU_DISPLAY_SPICE = -spice ipv4,port=14446,disable-ticketing=on
-QEMU_DISPLAY_vga = -display sdl
-QEMU_DISPLAY_gl = -display sdl,gl=on
+QEMU_DISPLAY_vga = -display $(QEMU_DISPLAY_API)
+QEMU_DISPLAY_gl = -display $(QEMU_DISPLAY_API),gl=on
 QEMU_DISPLAY = $(QEMU_DISPLAY_$(1))
 QEMU_MACHINE = -machine q35
 #$(QEMU_DISPLAY_$(1))
