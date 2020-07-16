@@ -19,7 +19,7 @@ export AR
 export RANLIB
 export NM
 
-(cd -- "$scriptroot" && autoreconf -f)
+(cd -- "$scriptroot" && autoreconf -f && git submodule update --init)
 
 if [[ ! -f sysroot/libc/libc.a ]]; then
 	echo Bootstrapping sysroot
