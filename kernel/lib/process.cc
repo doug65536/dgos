@@ -137,6 +137,8 @@ int process_t::run(void *process_arg)
     return ((process_t*)process_arg)->run();
 }
 
+// This is the thread start function for the new kernel thread backing
+// this user thread
 // Runs in the context of a new thread
 int process_t::start_clone_thunk(void *clone_data)
 {
@@ -155,29 +157,33 @@ int process_t::start_clone_thunk(void *clone_data)
 }
 
 // Runs in the context of a new thread
-int process_t::start_clone(clone_data_t data)
+int process_t::start_clone(clone_data_t const& data)
 {
     uintptr_t tid = thread_get_id();
     __exception_jmp_buf_t *buf = process_get_exit_jmpbuf(tid);
 
+    assert_msg(buf, "Can't find new thread's exit jmpbuf");
+
     if (!__setjmp(buf)) {
-        isr_sysret(uintptr_t((void*)data.fn), uintptr_t(data.sp),
-                   uintptr_t(buf->rsp), use64, tid, uintptr_t(data.arg2));
+        isr_sysret(uintptr_t((void*)data.bootstrap), uintptr_t(data.sp),
+                   uintptr_t(buf->rsp), use64,
+                   tid, uintptr_t(data.fn), uintptr_t(data.arg));
     }
 
     return 0;
 }
 
-int process_t::clone(int (*fn)(void *), void *child_stack,
-                     int flags, void *arg, void *arg2)
+int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
+                     void *child_stack, int flags,
+                     void *(*fn)(void *arg), void *arg)
 {
     clone_data_t *kernel_thread_arg = new (ext::nothrow) clone_data_t();
 
     kernel_thread_arg->process = this;
-    kernel_thread_arg->fn = fn;
     kernel_thread_arg->sp = child_stack;
+    kernel_thread_arg->bootstrap = bootstrap;
+    kernel_thread_arg->fn = fn;
     kernel_thread_arg->arg = arg;
-    kernel_thread_arg->arg2 = arg2;
 
     if (unlikely(!kernel_thread_arg))
         return -int(errno_t::ENOMEM);
@@ -185,8 +191,8 @@ int process_t::clone(int (*fn)(void *), void *child_stack,
 #ifdef __x86_64__
     // Intel ineptly throws #GP in kernel mode with user's stack if
     // user rip is not canonical. Check.
-    if (unlikely((intptr_t(uintptr_t(kernel_thread_arg->fn) << 16) >> 16) !=
-                 intptr_t(kernel_thread_arg->fn)))
+    if (unlikely((intptr_t(uintptr_t(kernel_thread_arg->bootstrap) << 16) >> 16) !=
+                 intptr_t(kernel_thread_arg->bootstrap)))
         return -int(errno_t::EFAULT);
 #endif
 
@@ -196,15 +202,23 @@ int process_t::clone(int (*fn)(void *), void *child_stack,
                 &process_t::start_clone_thunk, kernel_thread_arg,
                 "user_thread", 0, true, true);
 
+    // Add a new jmpbuf for thread exit
     if (unlikely(!exit_jmpbufs.push_back(
                      new (ext::nothrow) __exception_jmp_buf_t())))
         panic_oom();
 
-    if (unlikely(exit_jmpbufs.back() == nullptr))
+    // Check for oom
+    if (unlikely(exit_jmpbufs.back() == nullptr)) {
+        exit_jmpbufs.pop_back();
         panic_oom();
+        return -1;
+    }
 
-    if (!threads.push_back(tid))
+    if (unlikely(!threads.push_back(tid))) {
+        exit_jmpbufs.pop_back();
         panic_oom();
+        return -1;
+    }
 
     return tid;
 }
@@ -681,7 +695,7 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp, bool use64,
         // isr_sysret does not return
         printdbg("Entering user process\n");
         isr_sysret(ip, sp, uint64_t(buf->rsp) & -16, use64,
-                   thread_get_id(), 0);
+                   thread_get_id(), 0, 0);
     }
 
     // Execution reaches here when a thread of the process calls exit
@@ -765,9 +779,9 @@ void process_t::exit_thread(thread_t tid, int exitcode)
         ++i;
     }
 
-    __exception_jmp_buf_t *jmpbuf = exit_jmpbufs[i];
 
     if (likely(i < threads.size())) {
+        __exception_jmp_buf_t *jmpbuf = exit_jmpbufs[i];
         lock.unlock();
         __longjmp(jmpbuf, 1);
     }

@@ -231,7 +231,10 @@ struct process_t
 
     _noreturn
     static void exit(pid_t pid, int exitcode);
+
+    _noreturn
     void exit_thread(thread_t tid, int exitcode);
+
     bool add_thread(thread_t tid);
     bool del_thread(thread_t tid);
 
@@ -242,16 +245,18 @@ struct process_t
 
     bool is_main_thread(thread_t tid);
 
-    int clone(int (*fn)(void *), void *child_stack, int flags, void *arg, void *arg2);
+    int clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
+              void *child_stack, int flags,
+              void *(*fn)(void *), void *arg);
 
     void *create_tls();
 
     struct clone_data_t {
         process_t *process;
-        int (*fn)(void *arg);
-        void *arg;
         void *sp;
-        void *arg2;
+        void (*bootstrap)(int tid, void *(*fn)(void*), void *arg);
+        void *(*fn)(void *);
+        void *arg;
     };
 
     size_t thread_index(thread_t tid) const noexcept
@@ -284,7 +289,7 @@ private:
     static int run(void *process_arg);
 
     static int start_clone_thunk(void *clone_data);
-    int start_clone(clone_data_t clone_data);
+    int start_clone(clone_data_t const& clone_data);
 
     int run();
 };

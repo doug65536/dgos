@@ -5,8 +5,10 @@
 struct posix_spawn_file_actions_t;
 struct posix_spawnattr_t;
 
+_noreturn
 void sys_exit(int exitcode);
 
+_noreturn
 void sys_thread_exit(int tid, int exitcode);
 
 long sys_futex(int *uaddr, int futex_op, int val,
@@ -20,5 +22,5 @@ long sys_posix_spawn(pid_t *restrict pid,
                      char const * * restrict argv,
                      char const * * restrict envp);
 
-long sys_clone(int (*fn)(void *arg), void *child_stack,
-               int flags, void *arg, void *arg2);
+long sys_clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
+               void *child_stack, int flags, void *(*fn)(void *), void *arg);

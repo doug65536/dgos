@@ -6,8 +6,9 @@
 #include <sys/syscall_num.h>
 
 __attribute__((__noreturn__))
-static void pthread_bootstrap(void *(fn)(void*), void *arg)
+static void pthread_bootstrap(int tid, void *(fn)(void*), void *arg)
 {
+    __pthread_set_tid(tid);
     void *result = fn(arg);
     pthread_exit(result);
 }

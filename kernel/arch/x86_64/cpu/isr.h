@@ -311,7 +311,7 @@ void isr_restore_fxrstor(void);
 _noreturn
 void isr_sysret(uintptr_t rip, uintptr_t rsp,
                 uintptr_t kernel_rsp, bool use64,
-                uintptr_t tid, uintptr_t rsi);
+                uintptr_t tid, uintptr_t rsi, uintptr_t rdx);
 
 isr_xsave_context_t *isr_save_fpu_ctx64(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx64(thread_info_t *incoming_ctx);

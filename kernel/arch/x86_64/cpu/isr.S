@@ -1487,7 +1487,8 @@ thread_entry:
 //                           uintptr_t kernel_rsp,
 //                           bool use64,
 //                           uintptr_t rdi,
-//                           uintptr_t rsi);
+//                           uintptr_t rsi,
+//                           uintptr_t rdx);
 // expects rdi=rip, rsi=rsp, rdx=kernel_rsp, cl=use64
 .hidden isr_sysret
 .global isr_sysret
@@ -1495,49 +1496,38 @@ thread_entry:
 isr_sysret:
     .cfi_startproc
 
-     // rdi = rip parameter
-     // rsi = rsp parameter
-     // rdx = kernel_rsp parameter
-     // cl = use64 rip parameter
-     // r8 = rdi usermode parameter
-     // r9 = rsi usermode parameter
+    // rdi = rip parameter
+    // rsi = rsp parameter
+    // rdx = kernel_rsp parameter
+    // cl = use64 rip parameter
+    // r8 = rdi usermode parameter
+    // r9 = rsi usermode parameter
 
+    // zero constant
     xorl %eax,%eax
 
     // Don't even bother saving register variables, this is a goto user mode
     // that information is already saved by the caller and we are in the
     // "setjmp returned 0" path right now
-    //push_cfi %rbx
-    //.cfi_offset rbx,-2*8
-    //push_cfi %rbp
-    //.cfi_offset rbp,-3*8
-    //push_cfi %r12
-    //.cfi_offset r12,-4*8
-    //push_cfi %r13
-    //.cfi_offset r13,-5*8
-    //push_cfi %r14
-    //.cfi_offset r14,-6*8
-    //push_cfi %r15
-    //.cfi_offset r15,-7*8
 
     // Copy use64 to bpl
     mov %cl,%bpl
     .cfi_undefined rbp
 
+    // Entry point in rcx
     mov %rdi,%rcx
+
+    // Flags in r11
     mov $ CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS,%r11d
 
     // Prevent IRQ while swapped to user gs or using user stack
-    // in kernel mode or using per-cpu data
+    // in kernel mode or updating per-cpu data
     cli
 
     // Initialize kernel stack pointer for this thread
     // cpu_info_t *rbx = this_cpu()
     movq %gs:(%rax),%rbx
     .cfi_undefined rbx
-
-    // Protect kernel gs before loading user gs
-    swapgs
 
     // tss_t *r10 = rbx->tss_ptr
     movq CPU_INFO_TSS_PTR_OFS(%rbx),%r10
@@ -1559,6 +1549,9 @@ isr_sysret:
     // rdx->rsp0 = kernel_rsp
     movq %rdx,TSS_RSP0_OFS(%r10)
 
+    // Protect kernel gs before loading user gs
+    swapgs
+
     insn_fixup
     wrfsbase %r13
     wrgsbase %r14
@@ -1567,21 +1560,12 @@ isr_sysret:
     mov %eax,%r14d
 
     // Avoid leaking any register values to user code
-    // not ecx
-    // not edx (user stack pointer)
-    // not esi
-    mov %eax,%edi
-    // not ebp
-    // not r8
-    // not r9
-    mov %eax,%r10d
-    // not r11
+    mov %eax,%ebx
     mov %eax,%r12d
-    // not r13
-    // not r14
     mov %eax,%r15d
 
-    mov %eax,%ebx
+    // Load parameter spilled to stack before switching stack
+    mov 8(%rsp),%r10
 
     // Needs to be on the kernel stack to save/restore things
     insn_fixup
@@ -1609,7 +1593,7 @@ isr_sysret:
 
     // Hide kernel stack frame address from user mode
     // Lose ability to see call stack after this executes
-    mov %eax,%edx
+    mov %r10,%rdx
 
     // No idea where this call came from anymore
     // or the location of the kernel stack frame

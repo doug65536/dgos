@@ -447,9 +447,10 @@ void sys_thread_exit(int tid, int exitcode)
     p->exit_thread(tid, exitcode);
 }
 
-long sys_clone(int (*fn)(void *), void *child_stack,
-               int flags, void *arg, void *arg2)
+long sys_clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
+               void *child_stack, int flags,
+               void *(*fn)(void *arg), void *arg)
 {
     process_t *this_process = thread_current_process();
-    return this_process->clone(fn, child_stack, flags, arg, arg2);
+    return this_process->clone(bootstrap, child_stack, flags, fn, arg);
 }

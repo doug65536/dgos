@@ -389,7 +389,7 @@ void  pthread_testcancel(void);
 
 // ---
 
-int __clone(void (*bootstrap)(void *(fn)(void*), void *arg),
+int __clone(void (*bootstrap)(int tid, void *(fn)(void*), void *arg),
             void *child_stack,
             int flags, void *fn, void *arg);
 
@@ -422,6 +422,8 @@ int __futex(int *uaddr, int futex_op, int val,
     (((oparg) & 0xfff) << 12) | \
     ((cmparg) & 0xfff))
 
-int __clone(void (*bootstrap)(void *(*fn)(void*), void *arg),
+int __clone(void (*bootstrap)(int tid, void *(*fn)(void*), void *arg),
             void *child_stack, int flags,
             void *(*fn)(void *arg), void *arg);
+
+void __pthread_set_tid(pthread_t tid);
