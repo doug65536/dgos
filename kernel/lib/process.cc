@@ -198,10 +198,6 @@ int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
 
     scoped_lock lock(processes_lock);
 
-    thread_t tid = thread_create(
-                &process_t::start_clone_thunk, kernel_thread_arg,
-                "user_thread", 0, true, true);
-
     // Add a new jmpbuf for thread exit
     if (unlikely(!exit_jmpbufs.push_back(
                      new (ext::nothrow) __exception_jmp_buf_t())))
@@ -214,11 +210,17 @@ int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
         return -1;
     }
 
-    if (unlikely(!threads.push_back(tid))) {
+    if (unlikely(!threads.push_back(-1))) {
         exit_jmpbufs.pop_back();
         panic_oom();
         return -1;
     }
+
+    thread_t tid = thread_create(
+                &process_t::start_clone_thunk, kernel_thread_arg,
+                "user_thread", 0, true, true);
+
+    threads.back() = tid;
 
     return tid;
 }
