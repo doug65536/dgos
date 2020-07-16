@@ -7,14 +7,19 @@
 __setjmp:
     .cfi_startproc
 
+    // Save return address
+    movq (%rsp),%rax
+    leaq 8(%rsp),%rsi
+
+    // Return address
+    movq %rax,(%rdi)
+
+    // Save callers stack pointer
+    movq %rsi,1*8(%rdi)
+
     // Save call preserved registers
     movq %rbx,2*8(%rdi)
     movq %rbp,3*8(%rdi)
-
-    // Save return address
-    movq (%rsp),%rax
-    movq %rax,(%rdi)
-
     movq %r12,4*8(%rdi)
     movq %r13,5*8(%rdi)
     movq %r14,6*8(%rdi)
@@ -25,10 +30,6 @@ __setjmp:
     .cfi_adjust_cfa_offset 8
     popq 8*8(%rdi)
     .cfi_adjust_cfa_offset -8
-
-    // Save callers stack pointer
-    leaq 8(%rsp),%rax
-    movq %rax,1*8(%rdi)
 
     // Return value is zero
     xorl %eax,%eax
