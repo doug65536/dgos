@@ -217,7 +217,6 @@ typedef uintptr_t pte_t;
 #define PTE_GLOBAL          (1UL << PTE_GLOBAL_BIT)
 #define PTE_PDEPAT          (1UL << PTE_PDEPAT_BIT)
 #define PTE_NX              (1UL << PTE_NX_BIT)
-#define PTE_PDEPAT          (1UL << PTE_PDEPAT_BIT)
 #define PTE_PTEPAT          (1UL << PTE_PTEPAT_BIT)
 
 // Multi-bit field masks, in place
