@@ -6,9 +6,14 @@ script:
   - export CXX=$USE_CXX
   - export CC=$USE_CC
   - autoreconf -f
+  - mkdir -p build-toolchain/install
+  - pushd build-toolchain
+  - ../toolchain/build-crossgcc.sh -o build -p "$PWD"/install
+  - popd
   - mkdir -p build-$CXX
   - cd build-$CXX
-  - ../configure --enable-optimize
+  - export PATH="$PWD"/../build-toolchain/install/bin:"$PATH"
+  - ../bootstrap
   - make
 
 branches:
@@ -32,6 +37,7 @@ addons:
         - clang
         - automake
         - autoconf
+        - qemu
 
 notifications:
     email:
