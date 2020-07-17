@@ -11,6 +11,7 @@ script:
   - ../toolchain/build-crossgcc.sh -o build -p "$PWD"/install
   - popd
   - mkdir -p build-$CXX
+  - printf "cd build-%s\n" "$CXX"
   - cd build-$CXX
   - export PATH="$PWD"/../build-toolchain/install/bin:"$PATH"
   - ../bootstrap
@@ -23,7 +24,6 @@ branches:
 env:
   matrix:
     - USE_CC=gcc-5 USE_CXX=g++-5
-    - USE_CC=clang USE_CXX=clang++
 
 addons:
   apt:
