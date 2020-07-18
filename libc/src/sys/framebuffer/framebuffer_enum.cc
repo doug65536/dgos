@@ -11,6 +11,7 @@ long framebuffer_enum(size_t index, size_t count, fb_info_t *result_ptr)
 
     if (unlikely(result < 0)) {
         errno = -result;
+        return -1;
     }
 
     return 1;
