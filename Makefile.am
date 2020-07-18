@@ -1198,7 +1198,8 @@ $(top_builddir)/sysroot/lib/$(1): \
 $(top_builddir)/sysroot/lib/32/$(1): \
 		$(2) \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
-		$(INCLUDES_DEPLOYED)
+		$(STDLIB_INCLUDES_DEPLOYED) \
+		$(USRLIB_INCLUDES_DEPLOYED)
 	$$(MKDIR) -p "$$(@D)" && \
 		$$(CXX) \
 			-m32 \
