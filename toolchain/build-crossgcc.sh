@@ -276,7 +276,7 @@ ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
 
-if [[ -z extractonly ]]; then
+if [[ -n extractonly ]]; then
 	log echo 'Just extracting, done'
 	exit 0
 fi
