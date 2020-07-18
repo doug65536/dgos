@@ -210,8 +210,12 @@ static char *iso9660_sector_buffer;
 typedef int (*iso9660_name_cmp_t)(
         void const *candidate, void const *goal, size_t len);
 
+typedef size_t (*iso9660_name_sz_t)(
+        void const *st, void const *en);
+
 typedef void *(*iso9660_name_search_t)(
         void const *candidate, int c, size_t len);
+static size_t iso9660_lvl2_name_sz(void const *st, void const *en);
 
 static int iso9660_lvl2_cmp(void const *candidate,
                               void const *goal,
@@ -219,6 +223,7 @@ static int iso9660_lvl2_cmp(void const *candidate,
 
 static iso9660_name_search_t iso9660_name_search = memchr;
 static iso9660_name_cmp_t iso9660_name_comparer = iso9660_lvl2_cmp;
+static iso9660_name_sz_t iso9660_name_sz = iso9660_lvl2_name_sz;
 
 static uint32_t iso9660_root_dir_lba;
 static uint32_t iso9660_root_dir_size;
@@ -243,6 +248,11 @@ static int iso9660_find_available_file_handle()
 static uint16_t bswap_16(uint16_t n)
 {
     return (n >> 8) | uint16_t(n << 8);
+}
+
+static size_t iso9660_lvl2_name_sz(void const *st, void const *en)
+{
+    return (char*)en - (char*)st;
 }
 
 static int iso9660_lvl2_cmp(void const *candidate,
@@ -278,6 +288,11 @@ static int iso9660_joliet_compare(void const *candidate,
     return 0;
 }
 
+static size_t iso9660_joliet_name_sz(void const *st, void const *en)
+{
+    return (uint16_t*)en - (uint16_t*)st;
+}
+
 static void *iso9660_joliet_search(void const *candidate,
                             int c,
                             size_t len)
@@ -289,44 +304,85 @@ static void *iso9660_joliet_search(void const *candidate,
     return nullptr;
 }
 
-static uint32_t find_file_by_name(char const *filename,
+static uint32_t find_file_by_name(char const *pathname,
+                                  size_t pathname_len,
                                   uint64_t dir_lba,
                                   uint32_t dir_size,
                                   uint32_t *file_size)
 {
-    size_t filename_len = strlen(filename);
+    char const *pathname_end = pathname + pathname_len;
 
-    for (uint32_t ofs = 0; ofs < (dir_size >> 11); ++ofs) {
-        if (unlikely(!disk_read_lba(uint64_t(iso9660_sector_buffer),
-                                    dir_lba + ofs, 11, 1)))
-            return 0;
+    // Loop through the path
+    while (pathname_len) {
+        char const *filename_end = (char*)memchr(pathname, '/', pathname_len);
+        filename_end = filename_end ? filename_end : pathname_end;
+        size_t filename_len = filename_end - pathname;
 
-        iso9660_dir_ent_t *de = (iso9660_dir_ent_t*)iso9660_sector_buffer;
-        iso9660_dir_ent_t *de_end = (iso9660_dir_ent_t*)((char*)de + 2048);
+        // Loop through the sectors
+        bool do_next_level = false;
+        for (uint32_t ofs = 0; !do_next_level && ofs < (dir_size >> 11); ++ofs) {
+            if (unlikely(!disk_read_lba(uint64_t(iso9660_sector_buffer),
+                                        dir_lba + ofs, 11, 1)))
+                return 0;
 
-        do {
-            if (de->len >= sizeof(*de)) {
-                char *name = de->name;
-                char *name_end = (char*)iso9660_name_search(
-                            name, ';', de->filename_len);
-                size_t name_len = name_end - name;
-                if (name_len > de->filename_len)
-                    name_len = de->filename_len;
-                name_len >>= iso9660_char_shift;
-                if (filename_len == name_len &&
-                        !iso9660_name_comparer(name, filename, name_len)) {
-                    *file_size = de->size_lo_le |
-                            (de->size_hi_le << 16);
-                    return de->lba_lo_le | (de->lba_hi_le << 16);
+            // Loop through the directory entries
+            iso9660_dir_ent_t const *de;
+            iso9660_dir_ent_t const *de_end;
+            for (de = (iso9660_dir_ent_t const*)iso9660_sector_buffer,
+                 de_end = (iso9660_dir_ent_t const*)((char const*)de + 2048);
+                 de < de_end;
+                 de = (iso9660_dir_ent_t*)((char const*)de +
+                                           ((de->len + 1) & -2))) {
+                // Check for end
+                if (de->len < sizeof(*de)) {
+                    // Give up, rest of space is zeros
+                    // Directory entries never cross sector boundaries
+                    break;
                 }
 
-                de = (iso9660_dir_ent_t*)((char*)de + ((de->len + 1) & -2));
-            } else {
-                // Give up, rest of space is zeros
-                // Directory entries never cross sector boundaries
-                break;
+                char const *de_name = de->name;
+
+                char const *de_name_end = (char const*)iso9660_name_search(
+                            de_name, ';', de->filename_len);
+
+                size_t de_name_len = de_name_end - de_name;
+
+                if (de_name_len > de->filename_len)
+                    de_name_len = de->filename_len;
+
+                de_name_len >>= iso9660_char_shift;
+
+                if (filename_len != de_name_len)
+                    continue;
+
+                if (!iso9660_name_comparer(de_name, pathname, de_name_len)) {
+                    size_t path_fragment_len = filename_len +
+                            (*filename_end == '/');
+
+                    pathname_len -= path_fragment_len;
+                    pathname += path_fragment_len;
+
+                    uint32_t de_file_size = de->size_lo_le |
+                            (de->size_hi_le << 16);
+
+                    uint32_t de_lba = de->lba_lo_le | (de->lba_hi_le << 16);
+
+                    if (pathname_len == 0) {
+                        *file_size = de_file_size;
+                        return de_lba;
+                    }
+
+                    // Go into subdirectory
+                    dir_lba = de_lba;
+                    dir_size = de_file_size;
+                    do_next_level = true;
+                    break;
+                }
             }
-        } while (de < de_end);
+        }
+
+        if (unlikely(!do_next_level))
+            return 0;
     }
 
     return 0;
@@ -345,14 +401,16 @@ static int8_t iso9660_sector_iterator_begin(
     return disk_read_lba(uint64_t(sector), cluster, 11, 1);
 }
 
-static int iso9660_boot_open(char const *filename)
+static int iso9660_boot_open(char const *pathname)
 {
     uint32_t cluster;
     uint32_t file_size;
 
+    size_t pathname_len = strlen(pathname);
+
     // Find the start of the file
     cluster = find_file_by_name(
-                filename, iso9660_root_dir_lba,
+                pathname, pathname_len, iso9660_root_dir_lba,
                 iso9660_root_dir_size, &file_size);
     if (cluster == 0)
         return -1;
@@ -472,6 +530,7 @@ void iso9660_boot_partition(uint32_t pvd_lba)
             best_ofs = ofs;
             iso9660_name_search = iso9660_joliet_search;
             iso9660_name_comparer = iso9660_joliet_compare;
+            iso9660_name_sz = iso9660_joliet_name_sz;
             iso9660_char_shift = 1;
             break;
         }
