@@ -1480,6 +1480,7 @@ libc_a_SOURCES = \
 	libc/src/stdlib/abort.cc \
 	libc/src/stdlib/abs.cc \
 	libc/src/stdlib/malloc.cc \
+	libc/src/stdlib/realloc.cc \
 	libc/src/stdlib/calloc.cc \
 	libc/src/stdlib/free.cc \
 	libc/src/fcntl/creat.cc \

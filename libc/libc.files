@@ -95,6 +95,7 @@ src/stdlib/abs.cc
 src/stdlib/calloc.cc
 src/stdlib/free.cc
 src/stdlib/malloc.cc
+src/stdlib/realloc.cc
 src/stdlib/new.cc
 src/string/__bytebitmap.cc
 src/string/__bytebitmap.h
