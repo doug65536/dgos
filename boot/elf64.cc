@@ -355,6 +355,8 @@ void elf64_run(tchar const *filename)
     message_bar_draw(10, 7, 70, TSTR "Getting initrd size");
 
     int initrd_fd = boot_open(TSTR "boot/initrd");
+    if (unlikely(initrd_fd < 0))
+        PANIC("Unable to open initrd");
     initrd_size = boot_filesize(initrd_fd);
     boot_close(initrd_fd);
     initrd_fd = -1;
