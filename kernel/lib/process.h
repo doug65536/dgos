@@ -154,8 +154,6 @@ __BEGIN_DECLS
 void *process_get_allocator();
 void process_set_allocator(process_t *process, void *allocator);
 
-__exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);
-
 __END_DECLS
 
 struct process_t
@@ -270,6 +268,8 @@ struct process_t
         return i < e ? i : ~0;
     }
 
+    __exception_jmp_buf_t *exit_jmpbuf(int tid, scoped_lock &lock);
+
 private:
     friend __exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);
 
@@ -293,5 +293,8 @@ private:
 
     int run();
 };
+
+__exception_jmp_buf_t *process_get_exit_jmpbuf(
+        int tid, process_t::scoped_lock &lock);
 
 __exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);

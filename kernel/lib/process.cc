@@ -150,8 +150,6 @@ int process_t::start_clone_thunk(void *clone_data)
     // run_clone doesn't return, have to do this first
     delete cdp;
 
-    data.process->create_tls();
-
     // goto the usermode entry
     return data.process->start_clone(data);
 }
@@ -160,15 +158,24 @@ int process_t::start_clone_thunk(void *clone_data)
 int process_t::start_clone(clone_data_t const& data)
 {
     uintptr_t tid = thread_get_id();
-    __exception_jmp_buf_t *buf = process_get_exit_jmpbuf(tid);
+
+    scoped_lock lock(processes_lock);
+
+    create_tls();
+
+    __exception_jmp_buf_t *buf = process_get_exit_jmpbuf(tid, lock);
 
     assert_msg(buf, "Can't find new thread's exit jmpbuf");
 
     if (!__setjmp(buf)) {
+        lock.unlock();
+
         isr_sysret(uintptr_t((void*)data.bootstrap), uintptr_t(data.sp),
                    uintptr_t(buf->rsp), use64,
                    tid, uintptr_t(data.fn), uintptr_t(data.arg));
     }
+
+    // FIXME: thread exit code
 
     return 0;
 }
@@ -511,7 +518,11 @@ int process_t::run()
     if (unlikely(first_exec < 0))
         return first_exec;
 
-    modload_load_symbols(path.c_str(), first_exec, 0);
+    char const *path_ptr = path.c_str();
+    char const *filename = strrchr(path_ptr, '/');
+    filename = filename ? filename + 1 : path_ptr;
+
+    modload_load_symbols(filename, first_exec, 0);
 
     // Initialize the stack
 
@@ -702,8 +713,11 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp, bool use64,
 
     // Execution reaches here when a thread of the process calls exit
 
-    for (thread_t tid: threads)
+    for (thread_list::const_reverse_iterator it = threads.crbegin(),
+         en = threads.crend(); it != en; ++it) {
+        thread_t tid = *it;
         del_thread(tid);
+    }
 
     // exiting program continues here
     return exitcode;
@@ -842,22 +856,32 @@ process_t *process_t::lookup(pid_t pid)
 process_t *process_t::init(uintptr_t mmu_context)
 {
     process_t *process = process_t::add();
+
     process->mmu_context = mmu_context;
+
     return process;
 }
 
-__exception_jmp_buf_t *process_get_exit_jmpbuf(int tid)
+__exception_jmp_buf_t *process_t::exit_jmpbuf(int tid, scoped_lock& lock)
 {
-    process_t *process = thread_current_process();
-
     size_t i = 0;
-    size_t e = process->threads.size();
+
+    size_t e = threads.size();
+
     for ( ; i != e; ++i) {
-        if (process->threads[i] == tid)
+        if (threads[i] == tid)
             break;
     }
+
     if (unlikely(i == e))
         return nullptr;
 
-    return process->exit_jmpbufs[i];
+    return exit_jmpbufs[i];
+}
+
+__exception_jmp_buf_t *process_get_exit_jmpbuf(
+        int tid, process_t::scoped_lock &lock)
+{
+    process_t *process = thread_current_process();
+    return process->exit_jmpbuf(tid, lock);
 }
