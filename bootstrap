@@ -31,7 +31,7 @@ if [[ ! -f sysroot/libc/libc.a ]]; then
 			CXXFLAGS="$CFLAGS" \
 			LDFLAGS="$CFLAGS" \
 		"$(join_by ' ' ${configureflags[@]})" "$@" && \
-		nice make --trace -j $(nproc) \
+		nice make -j $(nproc) \
 			sysroot/lib/crt0.o \
 			sysroot/lib/32/crt0.o \
 			sysroot/lib/crt0pc32.o \
