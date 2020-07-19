@@ -793,7 +793,7 @@ static int init_thread(void *)
     printk("Spawning init\n");
 
     pid_t init_pid = -1;
-    if (unlikely(process_t::spawn(&init_pid, "init", {}, {}) != 0))
+    if (unlikely(process_t::spawn(&init_pid, "boot/init", {}, {}) != 0))
         panic("spawn init failed!");
 
     if (unlikely(process_t::wait_for_exit(init_pid) < 0))

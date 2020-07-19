@@ -41,11 +41,12 @@ $(top_builddir)/fatpart.img: \
 		$(generate_symbols_outputs) \
 		\
 		$(MODULE_LIST)
-	$(RM) -f $(top_builddir)/fatpart.img \
+	$(RM) -f $@ \
 			$(top_builddir)/mbrdisk.img \
 			$(top_builddir)/gptdisk.img && \
 		\
-		$(TRUNCATE) --size="$(DISK_SIZE_MB)M" "$(top_builddir)/fatpart.img" && \
+		$(TRUNCATE) --size="$(DISK_SIZE_MB)M" \
+			"$@" && \
 		\
 		$(MKFS_VFAT) \
 			-F 32 \
@@ -53,31 +54,34 @@ $(top_builddir)/fatpart.img: \
 			-R $$(( 0x10000 / $(SECTOR_SZ) )) \
 			-b $$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
 			-n DGOS \
-			$(top_builddir)/fatpart.img && \
+			$@ && \
 			\
 		$(DD) \
 			if=$(top_builddir)/boot1-bin \
-			of=$(top_builddir)/fatpart.img \
+			of=$@ \
 			bs=1 count=$$(( 0xB )) \
 			conv=notrunc && \
 			\
-		$(DD) if=$(top_builddir)/boot1-bin \
-			of=$(top_builddir)/fatpart.img \
+		$(DD) \
+			if=$(top_builddir)/boot1-bin \
+			of=$@ \
 			bs=1 \
 			seek=$$(( 0x5A )) \
 			skip=$$(( 0x5A )) \
 			count=$$(( 0x1FE - 0x5A )) \
 			conv=notrunc && \
 			\
-		$(DD) if=$(top_builddir)/bootfat-bin \
-			of=$(top_builddir)/fatpart.img \
+		$(DD) \
+			if=$(top_builddir)/bootfat-bin \
+			of=$@ \
 			bs=$(SECTOR_SZ) \
 			seek=2 \
 			skip=0 \
 			conv=notrunc && \
 			\
-		$(DD) if=$(top_builddir)/fatpart.img \
-			of=$(top_builddir)/fatpart.img \
+		$(DD) \
+			if=$@ \
+			of=$@ \
 			bs=$(SECTOR_SZ) \
 			count=1 \
 			skip=0 \
@@ -92,56 +96,79 @@ DGOS_MBRID=0x0615151f
 DGOS_UUID=0615151f-d802-4edf-914a-734dc4f03687
 
 $(top_builddir)/mbrdisk.img: fatpart.img
-	$(TRUNCATE) --size="$(DISK_SIZE_MB)M" $(top_builddir)/mbrdisk.img && \
+	$(TRUNCATE) --size="$$(( $(DISK_SIZE_MB) + 1 ))M" $@ && \
 		\
 		printf 'label: dos\nlabel: dos\nlabel-id: %s\n2048,,U,*' \
 				"$(DGOS_MBRID)" | \
-			$(SFDISK) --no-tell-kernel $(top_builddir)/mbrdisk.img && \
+			$(SFDISK) --no-tell-kernel $@ && \
 			\
-		$(DD) if=$(top_builddir)/fatpart.img \
-			of=$(top_builddir)/mbrdisk.img \
+		$(DD) \
+			if=$< \
+			of=$@ \
 			bs=$(SECTOR_SZ) \
 			seek=2048 \
 			conv=notrunc && \
 			\
-		$(DD) if=$(top_builddir)/mbr-bin \
-			of=$(top_builddir)/mbrdisk.img \
+		$(DD) \
+			if=$(top_builddir)/mbr-bin \
+			of=$@ \
 			bs=1 \
 			count=446 \
 			conv=notrunc && \
 			\
-		$(DD) if=$(top_builddir)/mbr-bin \
-			of=$(top_builddir)/mbrdisk.img \
+		$(DD) \
+			if=$(top_builddir)/mbr-bin \
+			of=$@ \
+			bs=1 \
+			seek=510 \
+			skip=510 \
+			count=2 \
+			conv=notrunc
+
+$(top_builddir)/hybdisk.img: fatpart.img
+	$(TRUNCATE) --size=$$(( $(DISK_SIZE_MB) + 2))M $@ && \
+	\
+		printf 'label: gpt\n2048,,U,*' | \
+			$(SFDISK) $@ && \
+		\
+		$(DD) \
+			if=$(top_builddir)/mbr-bin \
+			of=$@ \
+			bs=1 \
+			count=446 \
+			conv=notrunc && \
+		\
+		$(SGDISK) -A 1:set:2 -h 1 $@ && \
+		\
+		$(DD) \
+			if=$< \
+			of=$@ \
+			bs=$(SECTOR_SZ) \
+			seek=2048 \
+			conv=notrunc && \
+		\
+		$(DD) \
+			if=$(top_builddir)/mbr-bin \
+			of=$@ \
 			bs=1 seek=510 \
 			skip=510 \
 			count=2 \
 			conv=notrunc
 
 $(top_builddir)/gptdisk.img: fatpart.img
-	$(TRUNCATE) --size=256M $(top_builddir)/gptdisk.img && \
-	\
-		printf 'label: gpt\n2048,,U,*' | \
-			$(SFDISK) $(top_builddir)/gptdisk.img && \
-			\
-		$(SGDISK) -A 1:set:2 -h 1 $(top_builddir)/gptdisk.img && \
+	$(TRUNCATE) --size=0 $@ && \
 		\
-		$(DD) if=$(top_builddir)/fatpart.img \
-			of=$(top_builddir)/gptdisk.img \
+		$(TRUNCATE) --size=$$(( $(DISK_SIZE_MB) + 2))M \
+			$@ && \
+		\
+		$(SGDISK) -Z -n 1:2048:0 -t 1:ef00 -A 1:set:2 \
+			$@ && \
+		\
+		$(DD) \
+			if=$< \
+			of=$@ \
 			bs=$(SECTOR_SZ) \
 			seek=2048 \
-			conv=notrunc && \
-		\
-		$(DD) if=$(top_builddir)/mbr-bin \
-			of=$(top_builddir)/gptdisk.img \
-			bs=1 \
-			count=446 \
-			conv=notrunc && \
-			\
-		$(DD) if=$(top_builddir)/mbr-bin \
-			of=$(top_builddir)/gptdisk.img \
-			bs=1 seek=510 \
-			skip=510 \
-			count=2 \
 			conv=notrunc
 
 $(top_builddir)/mbrdisk.qcow: $(top_builddir)/mbrdisk.img

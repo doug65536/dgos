@@ -2183,11 +2183,33 @@ EXTRA_libz_a_DEPENDENCIES =
 ##===========
 
 MODULE_FILENAMES = $(filter %.km,$(bin_PROGRAMS)) init
+
 MODULE_LIST = $(subst %,$(top_builddir)/%,$(MODULE_FILENAMES))
 
 SYMBOL_FILE = sym/$(1).sym
 
-CPIO_LIST = $(MODULE_LIST) \
+MODULES_STAGED_HD = $(patsubst %,$(top_builddir)/stage/boot/%,$(MODULE_FILENAMES))
+
+MODULE_CPIO_PATHS = $(patsubst %,boot/%,$(MODULE_FILENAMES)) \
+	$(generate_symbols_outputs)
+
+define stage_boot=
+
+$$(top_builddir)/stage/boot/$(1): $(1)
+	$$(MKDIR) -p $$(@D)
+	$$(LN) -fsTr $$< $$@
+
+$$(top_builddir)/iso_stage/boot/$(1): $(1)
+	$$(MKDIR) -p $$(@D)
+	$$(LN) -fsTr $$< $$@
+
+endef
+
+$(foreach staged_boot_file,$(MODULE_FILENAMES), \
+	$(eval $(call stage_boot,$(staged_boot_file))) \
+)
+
+CPIO_LIST = $(MODULES_STAGED_HD) \
 	$(generate_symbols_outputs)
 
 all-kernel: kernel-generic $(MODULE_LIST) initrd
@@ -2201,8 +2223,9 @@ $(top_builddir)/background.png: $(top_srcdir)/user/background.png
 	$(CP) "$<" "$@"
 
 $(top_builddir)/initrd: $(CPIO_LIST)
-	$(CPIO) -o --device-independent -H bin \
-		< <($(patsubst %,printf "\%s\n" "%";,$(CPIO_LIST))) > "$@"
+	(cd stage && $(CPIO) -L -o --device-independent -H bin \
+		< <($(patsubst %,printf "\%s\n" "%";,$(MODULE_CPIO_PATHS))) \
+		> "$(@D)/../$(@F)")
 
 # ----------------------------------------------------------------------------
 # Misc make rules
@@ -2234,6 +2257,7 @@ clean-local:
 	rm -f "$(top_builddir)/bochs-debuglog"
 	rm -f "$(top_builddir)/mbrdisk.img"
 	rm -f "$(top_builddir)/gptdisk.img"
+	rm -f "$(top_builddir)/hybdisk.img"
 	rm -f "$(top_builddir)/fatpart.img"
 	rm -f "$(top_builddir)/isodisk.img"
 	rm -f "$(top_builddir)/initrd"
@@ -2442,6 +2466,7 @@ QEMU_BLKSIZE =
 QEMU_DISK_TYPE_iso = ide-cd
 QEMU_DISK_TYPE_mbr = ide-hd
 QEMU_DISK_TYPE_gpt = ide-hd
+QEMU_DISK_TYPE_hyb = ide-hd
 
 QEMU_HDCTL_DEV_virtio = \
 	-device virtio-blk-pci,drive=bootdrv,disable-legacy=on
@@ -2466,11 +2491,13 @@ QEMU_HDCTL_DEV_usb = \
 QEMU_HDCTL = $(call QEMU_MACHINE,$(1)) $(call QEMU_HDCTL_DEV_$(1),$(2))
 
 QEMU_MEDIA = $(QEMU_MEDIA_$(1))
+QEMU_MEDIA_hyb = disk
 QEMU_MEDIA_gpt = disk
 QEMU_MEDIA_mbr = disk
 QEMU_MEDIA_iso = cdrom
 
 QEMU_IMAGE = $(QEMU_IMAGE_$(1))
+QEMU_IMAGE_hyb = hybdisk.img
 QEMU_IMAGE_gpt = gptdisk.img
 QEMU_IMAGE_mbr = mbrdisk.img
 QEMU_IMAGE_iso = isodisk.img
@@ -2547,7 +2574,7 @@ QL_RT = debug run trace asan tracedbg
 QL_NP = up smp numa
 QL_BT = bios efi
 QL_BM = pxe hd
-QL_FS = iso mbr gpt
+QL_FS = iso mbr gpt hyb
 QL_SC = none ahci ide nvme usb virtio
 QL_VO = vga gl
 QL_EM = kvm icount tcg mttcg
@@ -2619,10 +2646,10 @@ check-module-imports: all-kernel
 # Generate symbols
 
 define genkallsym =
-$$(top_builddir)/sym/$(1)-kallsyms: $(1) $$(top_srcdir)/Makefile.am
+$$(top_builddir)/sym/$(1)-kallsyms: $(1)
 	$$(NM) --demangle --defined-only -n "$$<" > "$$@"
 
-$$(top_builddir)/sym/$(1)-klinesyms: $(1) $$(top_srcdir)/Makefile.am
+$$(top_builddir)/sym/$(1)-klinesyms: $(1)
 	$$(OBJDUMP) --dwarf=decodedline "$$<" | \
 		$$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+)\s*x?/\1 \2 \3/g' | \
 		$$(GREP) -P '.*\s+\d+\s+0x[0-9a-f]+' > "$$@"
@@ -2691,11 +2718,11 @@ debug-icount: all debug-up-efi-hd-iso-ahci-vga-icount
 
 .PHONY: debug-icount
 
-debug-gpt: all debug-up-efi-hd-gpt-ahci-vga-tcg
+debug-hyb: all debug-up-efi-hd-hyb-ahci-vga-tcg
 
-.PHONY: debug-gpt
+.PHONY: debug-hyb
 
-debug-pxe: all debug-up-bios-pxe-gpt-ahci-vga-tcg
+debug-pxe: all debug-up-bios-pxe-hyb-ahci-vga-tcg
 
 .PHONY: debug-pxe
 
@@ -2715,42 +2742,42 @@ debug-virtio: all debug-up-efi-hd-iso-virtio-gl-tcg
 
 .PHONY: debug-virtio
 
-run: all run-up-efi-hd-gpt-ahci-vga-tcg
+run: all run-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: run
 
-run-virtio: all run-up-efi-hd-gpt-virtio-vga-tcg
+run-virtio: all run-up-efi-hd-hyb-virtio-vga-tcg
 
 .PHONY: run
 
-run-smp: all run-smp-efi-hd-gpt-ahci-vga-tcg
+run-smp: all run-smp-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: run-smp
 
-run-bios: all run-up-bios-hd-gpt-ahci-vga-tcg
+run-bios: all run-up-bios-hd-hyb-ahci-vga-tcg
 
 .PHONY: run-bios
 
-run-bios-kvm: all run-up-bios-hd-gpt-ahci-vga-kvm
+run-bios-kvm: all run-up-bios-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-bios-kvm
 
-run-pxe: all run-up-bios-pxe-gpt-ahci-vga-tcg
+run-pxe: all run-up-bios-pxe-hyb-ahci-vga-tcg
 
 .PHONY: run-pxe
 
-run-kvm: all run-up-efi-hd-gpt-ahci-vga-kvm
+run-kvm: all run-up-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-kvm
 
-run-smp-kvm: all run-smp-efi-hd-gpt-ahci-vga-kvm
+run-smp-kvm: all run-smp-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-smp-kvm
 
-debug-bochs: all debug-gpt-bios-bochs-kernel
+debug-bochs: all debug-hyb-bios-bochs-kernel
 
 .PHONY: debug-bochs
 
-debug-bochs-boot: all debug-gpt-bios-bochs-boot
+debug-bochs-boot: all debug-hyb-bios-bochs-boot
 
 .PHONY: debug-bochs-boot

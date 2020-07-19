@@ -104,23 +104,23 @@ int main(int argc, char **argv, char **envp)
 
     closedir(dir);
 
-    load_module("symsrv.km");
+    load_module("boot/symsrv.km");
 
-    load_module("unittest.km");
+    load_module("boot/unittest.km");
 
     // fixme: check ACPI
-    load_module("keyb8042.km");
+    load_module("boot/keyb8042.km");
 
-    load_module("ext4.km");
-    load_module("fat32.km");
+    load_module("boot/ext4.km");
+    load_module("boot/fat32.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_SERIAL,
                       PCI_SUBCLASS_SERIAL_USB,
                       PCI_PROGIF_SERIAL_USB_XHCI) > 0)
-        load_module("usbxhci.km");
+        load_module("boot/usbxhci.km");
 
-    load_module("usbmsc.km");
+    load_module("boot/usbmsc.km");
 
     //mouse_test();
 
@@ -128,39 +128,45 @@ int main(int argc, char **argv, char **envp)
                       PCI_DEV_CLASS_STORAGE,
                       PCI_SUBCLASS_STORAGE_NVM,
                       PCI_PROGIF_STORAGE_NVM_NVME) > 0)
-        load_module("nvme.km");
+        load_module("boot/nvme.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_STORAGE,
                       PCI_SUBCLASS_STORAGE_SATA,
                       PCI_PROGIF_STORAGE_SATA_AHCI) > 0)
-        load_module("ahci.km");
+        load_module("boot/ahci.km");
 
     if (probe_pci_for(0x1AF4, -1,
                       PCI_DEV_CLASS_STORAGE,
                       -1,
                       -1) > 0)
-        load_module("virtio-blk.km");
+        load_module("boot/virtio-blk.km");
 
     if (probe_pci_for(0x1AF4, -1,
                       PCI_DEV_CLASS_DISPLAY,
                       -1,
                       -1) > 0)
-        load_module("virtio-gpu.km");
+        load_module("boot/virtio-gpu.km");
 
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_STORAGE,
                       PCI_SUBCLASS_STORAGE_ATA, -1))
-        load_module("ide.km");
+        load_module("boot/ide.km");
 
-    load_module("iso9660.km");
-    load_module("gpt.km");
-    load_module("mbr.km");
+
+    load_module("boot/iso9660.km");
+    load_module("boot/gpt.km");
+    load_module("boot/mbr.km");
 
     if (probe_pci_for(0x10EC, 0x8139,
                       PCI_DEV_CLASS_NETWORK,
                       PCI_SUBCLASS_NETWORK_ETHERNET, -1))
-        load_module("rtl8139.km");
+        load_module("boot/rtl8139.km");
+
+    if (probe_pci_for(-1, -1,
+                      PCI_DEV_CLASS_MULTIMEDIA,
+                      PCI_SUBCLASS_MULTIMEDIA_AUDIO, -1))
+        load_module("boot/ide.km");
 
     pthread_t mouse_thread{};
     int err = pthread_create(&mouse_thread, nullptr, mouse_test, nullptr);
