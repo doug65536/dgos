@@ -8,7 +8,7 @@ script:
   - autoreconf -f
   - mkdir -p build-toolchain/install
   - pushd build-toolchain
-  - ../toolchain/build-crossgcc.sh -o "$PWD"/build -p "$PWD"/install 2>/dev/null
+  - ../toolchain/build-crossgcc.sh -o "$PWD"/build -p "$PWD"/install -q
   - popd
   - mkdir -p build-$CXX
   - printf "cd build-%s\n" "$CXX"
