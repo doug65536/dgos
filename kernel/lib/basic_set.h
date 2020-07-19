@@ -814,12 +814,6 @@ struct __tree_value<_T, void>
     // Maps to itself
     using mapped_type = type;
 
-//    _always_inline
-//    static constexpr _T& key(type& __rhs)
-//    {
-//        return __rhs;
-//    }
-
     _always_inline
     static constexpr _T const& key(type const& __rhs)
     {

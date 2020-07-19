@@ -56,7 +56,7 @@ boot:
     lgdtl gdtr
 
     movl %cr0,%eax
-    btsl $0,%eax
+    btsl $ 0,%eax
     movl %eax,%cr0
 
     movw $ GDT_SEL_PM_DATA32,%dx

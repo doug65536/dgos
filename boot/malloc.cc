@@ -41,8 +41,8 @@ struct blk_hdr_t {
 
     _always_inline bool invalid() const
     {
-        return size + neg_size ||
-                uint32_t(intptr_t(self)) != uint32_t(intptr_t(this));
+        return (size + neg_size) ||
+                (uint32_t(intptr_t(self)) != uint32_t(intptr_t(this)));
     }
 
     _always_inline void make_invalid()

@@ -618,7 +618,6 @@ static void translate_pixels_generic32_sse(
             count -= 1;
         }
 
-
         if ((count >= 2) && (uintptr_t(output) & 0x0F)) {
             assert_aligned(output, 8);
 

@@ -501,10 +501,12 @@ EXTRA_gpt_km_DEPENDENCIES = \
 #==========
 
 define strip_module =
+
 modsym/$(1).km: $(1).km
 	$(MKDIR) -p kmod
 	mv -- "$<" "$@"
 	$(STRIP) -g -o "$@" "$<"
+
 endef
 
 #==========

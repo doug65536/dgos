@@ -336,10 +336,13 @@ static char const * const relocation_types_42_42[1] = {
 static constexpr char const *get_relocation_type(size_t type) {
     if (type <= 23)
         return relocation_types_0_23[type];
+
     if (type >= 32 && type <= 36)
         return relocation_types_32_36[type - 32];
+
     if (type >= 42 && type <= 42)
         return relocation_types_42_42[type - 42];
+
     return "<unrecognized relocation!>";
 }
 
