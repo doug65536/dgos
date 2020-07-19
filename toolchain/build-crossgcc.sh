@@ -186,7 +186,7 @@ done
 
 require_value "$arches" "Architecture list required, need -a <dir>"
 require_value "$outdir" "Output directory required, need -o <dir>"
-if [[ -z extractonly ]]; then
+if [[ -z $extractonly ]]; then
 	require_value "$prefixdir" "Prefix directory required, need -p <dir>"
 fi
 require_value "$gnu_mirror" "Specified mirror URL is invalid: -m \"$gnu_mirror\""
@@ -276,7 +276,7 @@ ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
 
-if [[ -n extractonly ]]; then
+if [[ -n $extractonly ]]; then
 	log echo 'Just extracting, done'
 	exit 0
 fi
