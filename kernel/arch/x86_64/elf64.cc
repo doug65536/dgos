@@ -1169,7 +1169,10 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
     printk("Module %s loaded at %#" PRIx64 "\n", module_name, base_adj);
     //printk("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
 
-    modload_load_symbols(module_name, first_exec, base_adj);
+    char const *filename = strrchr(module_name, '/');
+    filename = filename ? filename + 1 : module_name;
+
+    modload_load_symbols(filename, first_exec, base_adj);
 
     // Run the init array
     run_ctors();
