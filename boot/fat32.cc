@@ -652,6 +652,54 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
     return 0;
 }
 
+static uint32_t find_file_by_pathname(char const *pathname,
+                                      uint32_t dir_cluster,
+                                      uint32_t *out_file_size)
+{
+    char name[256];
+
+    size_t pathname_len = strlen(pathname);
+
+    for (; pathname_len; ) {
+        char const *filename_end = (char*)memchr(pathname, '/', pathname_len);
+
+        filename_end = filename_end
+                ? filename_end
+                : (pathname + pathname_len);
+
+        size_t filename_len = filename_end - pathname;
+
+        if (unlikely(filename_len >= sizeof(name)))
+            PANIC("Implausible filename length");
+
+        memcpy(name, pathname, filename_len);
+        name[filename_len] = 0;
+
+        uint32_t file_size = 0;
+        uint32_t cluster = find_file_by_name(name, dir_cluster, &file_size);
+
+        if (cluster == 0)
+            return 0;
+
+        if (*filename_end == 0) {
+            *out_file_size = file_size;
+            return cluster;
+        }
+
+        dir_cluster = cluster;
+
+        // Include slash
+        ++filename_len;
+
+        assert(pathname_len >= filename_len);
+
+        pathname += filename_len;
+        pathname_len -= filename_len;
+    }
+
+    return 0;
+}
+
 static int fat32_find_available_file_handle()
 {
     for (size_t i = 0; i < MAX_HANDLES; ++i) {
@@ -672,7 +720,7 @@ static int fat32_boot_open(char const *filename)
     uint32_t file_size = 0;
 
     // Find the start of the file
-    cluster = find_file_by_name(filename, bpb.root_dir_start, &file_size);
+    cluster = find_file_by_pathname(filename, bpb.root_dir_start, &file_size);
     if (cluster == 0)
         return -1;
 
