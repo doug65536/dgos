@@ -2270,6 +2270,8 @@ EXPORT int munmap(void *addr, size_t size)
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
+    pte_t combined_pte = 0;
+
     size_t freed = 0;
     int present_mask = ptes_present(ptes);
     for (size_t ofs = 0; ofs < size; ) {
@@ -2280,6 +2282,8 @@ EXPORT int munmap(void *addr, size_t size)
             if ((*ptes[2] & PTE_PAGESIZE) == 0) {
                 // PT page level is present, 4KB mapping
                 pte = atomic_xchg(ptes[3], 0);
+
+                combined_pte |= pte;
 
                 if (pte_is_sysmem(pte)) {
                     physaddr_t physaddr = pte & PTE_ADDR;
@@ -2292,6 +2296,8 @@ EXPORT int munmap(void *addr, size_t size)
             } else {
                 // 2MB mapping
                 pte = atomic_xchg(ptes[2], 0);
+
+                combined_pte |= pte;
 
                 if ((pte & (PTE_EX_PHYSICAL | PTE_PRESENT)) == PTE_PRESENT) {
                     physaddr_t physaddr = pte & (PTE_ADDR & -(1 << 21));
@@ -2312,6 +2318,8 @@ EXPORT int munmap(void *addr, size_t size)
                 // 1GB mapping
                 pte = atomic_xchg(ptes[1], 0);
 
+                combined_pte |= pte;
+
                 if ((pte & (PTE_EX_PHYSICAL | PTE_PRESENT)) == PTE_PRESENT) {
                     physaddr_t physaddr = pte & (PTE_ADDR & -(1 << 30));
 
@@ -2324,8 +2332,13 @@ EXPORT int munmap(void *addr, size_t size)
             distance = PAGE_SIZE;
         }
 
-        if (pte & PTE_PRESENT)
-            cpu_page_invalidate(a);
+        if (pte & PTE_PRESENT) {
+            if (pte & PTE_ACCESSED)
+                cpu_page_invalidate(a);
+            else
+                printdbg("Skipped an invlpg!\n");
+
+        }
 
         assert(distance != 0);
 
@@ -2338,8 +2351,12 @@ EXPORT int munmap(void *addr, size_t size)
 
     free_batch.flush();
 
-    if (freed)
-        mmu_send_tlb_shootdown();
+    if (freed) {
+        if (combined_pte & PTE_ACCESSED)
+            mmu_send_tlb_shootdown();
+        else
+            printdbg("Skipped a tlb shootdown!\n");
+    }
 
     contiguous_allocator_t *allocator =
             (a < 0x800000000000U) ?
