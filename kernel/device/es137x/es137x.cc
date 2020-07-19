@@ -8,27 +8,13 @@
 #include "../pci.h"
 
 PCI_DRIVER(
-        es137x,
-        0x1274, 0x5000,
+        es1370,
+        PCI_VENDOR_ENSONIQ, 0x5000,
         PCI_DEV_CLASS_MULTIMEDIA, PCI_SUBCLASS_MULTIMEDIA_AUDIO, -1);
 
 #include "types.h"
-
-struct es137x_t {
-    uint32_t control;
-    uint32_t status;
-    uint8_t uart_data;
-    uint8_t uart_status_ctl;
-    uint16_t uart_test_mode;
-    uint32_t memory_page;
-    uint32_t samp_rate_conv;
-    uint32_t code_rw;
-    uint32_t legacy;
-    uint32_t serial_iface;
-    uint32_t pb1fc;
-    uint32_t pb2fc;
-    uint32_t rfc;
-};
+#include "cpu/ioport.h"
+#include "es137x.bits.h"
 
 // Startup:
 /// Enable bus mastering
@@ -49,6 +35,17 @@ struct es137x_t {
 /// clear then set interrupt enable (serial interface register 0x20)
 /// to acknowledge IRQ
 ///
+///
+
+struct es1370_t {
+    unsigned base;
+
+    bool init(pci_dev_iterator_t const& pci_iter);
+
+};
+
+static es1370_t es1370_instances[4];
+static size_t es1370_count;
 
 void set_playback2_sample_rate(unsigned rate)
 {
@@ -58,3 +55,42 @@ void set_playback2_sample_rate(unsigned rate)
 //    SampleRateConverter[0x77] = (frequency >> 1);
 }
 
+int module_main(int argc, const char * const *argv)
+{
+    pci_dev_iterator_t pci_iter;
+
+    if (unlikely(!pci_enumerate_begin(
+                     &pci_iter, PCI_DEV_CLASS_MULTIMEDIA,
+                     PCI_SUBCLASS_MULTIMEDIA_AUDIO,
+                     PCI_VENDOR_ENSONIQ, 0x5000)))
+        return 0;
+
+    do {
+        es1370_t *dev = es1370_instances + es1370_count;
+
+        if (dev->init(pci_iter))
+            ++es1370_count;
+        else {
+            dev->~es1370_t();
+            new (dev) es1370_t();
+        }
+    } while (unlikely(pci_enumerate_next(&pci_iter)));
+
+    return 0;
+}
+
+bool es1370_t::init(const pci_dev_iterator_t &pci_iter)
+{
+    pci_adj_control_bits(pci_iter, PCI_CMD_IOSE | PCI_CMD_BME, PCI_CMD_MSE);
+
+    uint64_t bar = pci_iter.config.get_bar(0);
+
+    base = bar & -4;
+
+    outb(base + ES1370_CONTROL,
+         ES1370_CONTROL_ADC_STOP |
+         ES1370_CONTROL_WTSRSEL_n(ES1370_CONTROL_WTSRSEL_44K) |
+         ES1370_CONTROL_CDC_EN);
+
+    return true;
+}

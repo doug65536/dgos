@@ -420,6 +420,16 @@ char const *pci_describe_device(uint8_t cls, uint8_t sc, uint8_t pif);
 #define PCI_SUBCLASS_DSP_MGMTCARD       0x20
 #define PCI_SUBCLASS_DSP_OTHER          0x80
 
+//
+// Vendors
+
+#define PCI_VENDOR_AMD      0x1022
+#define PCI_VENDOR_INTEL    0x8086
+#define PCI_VENDOR_ENSONIQ  0x1274
+
+//
+// Functions
+
 int pci_init(void);
 
 int pci_enumerate_begin(pci_dev_iterator_t *iter,
