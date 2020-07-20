@@ -2518,16 +2518,28 @@ int usbxhci::make_data_trbs(
 
     for (size_t i = 0; i < range_count; ++i) {
         trb->data_physaddr = ranges[i].physaddr;
+
+        // Hint to HC how many TRBs are remaining in this transfer
+        unsigned remaining = std::min(
+                    size_t(USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_MASK),
+                    range_count - i - 1);
+
         trb->xfer_td_intr =
                 USBXHCI_CTL_TRB_XFERLEN_INTR_XFERLEN_n(ranges[i].size) |
-                USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_n(
-                    std::min(size_t(USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_MASK),
-                        range_count - i - 1)) |
+                USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_n(remaining) |
                 USBXHCI_CTL_TRB_XFERLEN_INTR_INTR_n(interrupter);
-        trb->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA) |
-                USBXHCI_CTL_TRB_FLAGS_CH_n(i + 1 < range_count) |
-                USBXHCI_CTL_TRB_FLAGS_IOC_n(intr && i + 1 >= range_count) |
-                USBXHCI_CTL_TRB_FLAGS_ISP_n(intr && i + 1 >= range_count);
+
+        bool is_last = i + 1 >= range_count;
+        bool chain = !is_last;
+        bool intr_on_completion = intr && is_last;
+        bool intr_short_packet = intr && is_last;
+
+        trb->flags =
+                USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA) |
+                USBXHCI_CTL_TRB_FLAGS_CH_n(chain) |
+                USBXHCI_CTL_TRB_FLAGS_IOC_n(intr_on_completion) |
+                USBXHCI_CTL_TRB_FLAGS_ISP_n(intr_short_packet);
+
         trb->dir = dir;
         ++trb;
     }
