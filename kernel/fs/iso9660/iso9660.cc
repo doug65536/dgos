@@ -559,7 +559,7 @@ iso9660_dir_ent_t *iso9660_fs_t::lookup_dirent(char const *pathname)
     iso9660_pt_rec_t *pt_rec;
 
     if (path_len > 0) {
-        pt_rec = lookup_path(pathname, path_len);
+        pt_rec = lookup_path(pathname, pathname_len);
     } else {
         pt_rec = pt_ptrs[0];
     }
