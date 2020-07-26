@@ -773,13 +773,16 @@ void process_t::exit(pid_t pid, int exitcode)
 
     process_ptr->exitcode = exitcode;
     process_ptr->state = state_t::exited;
+
+    size_t index = process_ptr->thread_index(current_thread_id, lock);
+
+    __exception_jmp_buf_t *exit_buf = process_ptr->exit_jmpbufs[index];
+
     lock.unlock();
     process_ptr->cond.notify_all();
 
-    size_t index = process_ptr->thread_index(current_thread_id);
-
     if (likely(index != ~0U))
-        __longjmp(process_ptr->exit_jmpbufs[index], 1);
+        __longjmp(exit_buf, 1);
 
     panic("Thread has no exit jmpbuf!");
 }

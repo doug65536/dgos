@@ -257,7 +257,7 @@ struct process_t
         void *arg;
     };
 
-    size_t thread_index(thread_t tid) const noexcept
+    size_t thread_index(thread_t tid, scoped_lock& lock) const noexcept
     {
         size_t i, e = threads.size();
         for (i = 0; i < e; ++i) {
