@@ -165,8 +165,10 @@ EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     if (mfs && mfs->is_boot()) {
         scoped_lock lock(storage_lock);
-        fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, mfs });
-
+        if (unlikely(fs_mounts.insert(fs_mounts.begin(),
+                                      fs_mount_t{ fs_reg, mfs }) ==
+                     std::vector<fs_mount_t>::iterator()))
+            panic_oom();
     } else if (mfs) {
         scoped_lock lock(storage_lock);
         if (unlikely(!fs_mounts.push_back(fs_mount_t{ fs_reg, mfs })))
