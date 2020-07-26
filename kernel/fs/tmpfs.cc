@@ -161,7 +161,8 @@ void* tmpfs_fs_t::mount(fs_init_info_t *conn)
     st = (char const *)conn->part_st;
     en = (st + conn->part_len);
 
-    names.resize(1);
+    if (unlikely(!names.resize(1)))
+        panic_oom();
 
     // Index the files
     cpio_hdr_t const *next_hdr = nullptr;
