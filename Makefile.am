@@ -20,36 +20,36 @@ USRLIB_FILE_NAMES =  png z
 USRLIB_FILE_NAMES_32 = png32
 
 STARTUP_FILES_INSTALLED = \
-	$(patsubst %,$(top_builddir)/sysroot/lib/%.o,\
+	$(patsubst %,sysroot/lib/%.o,\
 	$(STARTUP_FILE_NAMES))
 
 STARTUP_FILES_INSTALLED_32 = \
-	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.o,\
+	$(patsubst %32,sysroot/lib/32/%.o,\
 	$(STARTUP_FILE_NAMES_32))
 
 STDLIB_STATIC_FILES_INSTALLED = \
-	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,\
+	$(patsubst %,sysroot/lib/lib%.a,\
 	$(STDLIB_FILE_NAMES))
 
 STDLIB_STATIC_FILES_INSTALLED_32 = \
-	$(patsubst %32,$(top_builddir)/sysroot/lib/32/lib%.a,\
+	$(patsubst %32,sysroot/lib/32/lib%.a,\
 	$(STDLIB_FILE_NAMES_32))
 
 USRLIB_STATIC_FILES_INSTALLED = \
-	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,\
+	$(patsubst %,sysroot/lib/lib%.a,\
 	$(USRLIB_FILE_NAMES))
 
 USRLIB_STATIC_FILES_INSTALLED_32 = \
-	$(patsubst %32,$(top_builddir)/sysroot/lib/32/lib%.a,\
+	$(patsubst %32,sysroot/lib/32/lib%.a,\
 	$(USRLIB_FILE_NAMES_32))
 
 if userspace_so
 STDLIB_SHARED_FILES_INSTALLED = \
-	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.so,\
+	$(patsubst %,sysroot/lib/lib%.so,\
 	$(STDLIB_FILE_NAMES))
 
 STDLIB_SHARED_FILES_INSTALLED_32 = \
-	$(patsubst %32,$(top_builddir)/sysroot/lib/32/%.so,\
+	$(patsubst %32,sysroot/lib/32/%.so,\
 	$(STDLIB_FILE_NAMES_32))
 endif
 
@@ -139,7 +139,7 @@ mbr_elf_LDADD = \
 
 # mbr-bin
 
-$(top_builddir)/mbr-bin: $(top_builddir)/mbr-elf
+mbr-bin: mbr-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # boot1-elf
@@ -190,7 +190,7 @@ boot1_elf_LDADD = \
 
 # boot1-bin
 
-$(top_builddir)/boot1-bin: $(top_builddir)/boot1-elf
+boot1-bin: boot1-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # libbootsect.a
@@ -348,7 +348,7 @@ bootfat_elf_LDFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,--no-dynamic-linker -Wl,--relax \
-	-Wl,-Map,$(top_builddir)/bootfat.map \
+	-Wl,-Map,bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
 	$(LINKER_SEL) -static \
@@ -363,7 +363,7 @@ bootfat_elf_LDADD = \
 
 # bootfat-bin
 
-$(top_builddir)/bootfat-bin: $(top_builddir)/bootfat-elf
+bootfat-bin: bootfat-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # bootiso-elf
@@ -412,7 +412,7 @@ bootiso_elf_LDADD = \
 
 # bootiso-bin
 
-$(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
+bootiso-bin: bootiso-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # bootpxe-bios
@@ -445,7 +445,7 @@ bootpxe_bios_elf_LDFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
-	-Wl,-Map,$(top_builddir)/bootpxe-bios.map
+	-Wl,-Map,bootpxe-bios.map
 	$(LINKER_SEL) -static -Bsymbolic \
 	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -457,11 +457,11 @@ bootpxe_bios_elf_LDADD = \
 EXTRA_bootpxe_bios_elf_DEPENDENCIES = \
 	boot/bootpxe-bios.ld
 
-$(top_builddir)/bootpxe-bios.map: bootpxe-bios-elf
+bootpxe-bios.map: bootpxe-bios-elf
 
 # bootpxe-bin
 
-$(top_builddir)/bootpxe-bios-bin: $(top_builddir)/bootpxe-bios-elf
+bootpxe-bios-bin: bootpxe-bios-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # efi
@@ -580,7 +580,7 @@ bootefi_amd64_LDFLAGS = \
 	$(LIBGCC_PE64) \
 	-g \
 	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
-	-Wl,-Map,$(top_builddir)/bootefi-amd64.map \
+	-Wl,-Map,bootefi-amd64.map \
 	$(NOSTDLIB_FLAGS)
 
 #-Wl,--subsystem,10 \
@@ -597,7 +597,7 @@ bootefi_amd64_LDFLAGS = \
 	-Wl,-m,i386pe \
 	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
 	-Wl,--subsystem,10 \
-	-Wl,-Map,$(top_builddir)/bootefi-i386.map
+	-Wl,-Map,bootefi-i386.map
 
 bootefi_amd64_LDADD = \
    $(LIBGCC_PE64)
@@ -989,12 +989,12 @@ KERNEL_LDFLAGS_SHARED = \
 
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
-	$(top_builddir)/u_vga16.o \
-	$(top_builddir)/libkei.a \
+	u_vga16.o \
+	libkei.a \
 	$(DUMPDIR) \
 	$(generated_headers)
 
-KERNEL_LDADD_SHARED = -lgcc $(top_builddir)/u_vga16.o
+KERNEL_LDADD_SHARED = -lgcc u_vga16.o
 
 # Separate debug info for kernels
 
@@ -1005,9 +1005,15 @@ dgos-$(1): $(1)
 
 endef
 
-$(eval $(call separate_debug,kernel-generic))
-$(eval $(call separate_debug,kernel-tracing))
-$(eval $(call separate_debug,kernel-asan))
+KERNEL_VARIATIONS = generic tracing asan
+
+KERNEL_NAMES = $(patsubst %,kernel-%,$(KERNEL_VARIATIONS))
+
+KERNEL_NAMES_STRIPPED = $(patsubst %,dgos-%,$(KERNEL_NAMES))
+
+$(foreach variation,$(KERNEL_VARIATIONS), \
+	$(eval $(call separate_debug,kernel-$(variation))) \
+)
 
 # ----------------------------------------------------------------------------
 # Explicit instantiations because __attribute__((__visibility__(...))) is broken
@@ -1028,14 +1034,14 @@ libkei_a_CXXFLAGS = \
 
 KERNEL_TRACING_FLAGS = \
 	$(INSTRUMENT_FUNCTIONS_FLAGS) \
-	-Wl,-Map,$(top_builddir)/kernel-tracing.map
+	-Wl,-Map,kernel-tracing.map
 
 KERNEL_ASAN_FLAGS = \
 	$(ASAN_FLAGS) \
-	-Wl,-Map,$(top_builddir)/kernel-asan.map
+	-Wl,-Map,kernel-asan.map
 
 KERNEL_GENERIC_FLAGS = \
-	-Wl,-Map,$(top_builddir)/kernel-generic.map
+	-Wl,-Map,kernel-generic.map
 
 bin_PROGRAMS += kernel-generic
 generate_symbols_list += kernel-generic
@@ -1163,14 +1169,14 @@ STDLIB_INCLUDES_NAMES = $(shell \
 	$(FIND) -type f)
 
 STDLIB_INCLUDES_DEPLOYED = \
-	$(patsubst %,$(top_builddir)/sysroot/include/%,$(STDLIB_INCLUDES_NAMES))
+	$(patsubst %,sysroot/include/%,$(STDLIB_INCLUDES_NAMES))
 
 USRLIB_INCLUDES_NAMES = $(shell \
 	cd $(top_srcdir)/user/include && \
 	$(FIND) -type f) zconf.h zlib.h
 
 USRLIB_INCLUDES_DEPLOYED = \
-	$(patsubst %,$(top_builddir)/sysroot/include/%,$(USRLIB_INCLUDES_NAMES))
+	$(patsubst %,sysroot/include/%,$(USRLIB_INCLUDES_NAMES))
 
 sysroot/lib/:
 	$(MKDIR) -p "$@"
@@ -1179,9 +1185,9 @@ sysroot/lib/32/:
 	$(MKDIR) -p "$@"
 
 define compilestartup =
-STARTUPFILES += $(top_builddir)/sysroot/lib/$(1)
+STARTUPFILES += sysroot/lib/$(1)
 
-$(top_builddir)/sysroot/lib/$(1): \
+sysroot/lib/$(1): \
 		$(2) \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
 		$(STDLIB_INCLUDES_DEPLOYED) \
@@ -1190,12 +1196,12 @@ $(top_builddir)/sysroot/lib/$(1): \
 		$$(CXX) \
 			-g \
 			$$(ASM_DEBUG_INFO_FLAGS) \
-			--sysroot $(top_builddir)/sysroot \
+			--sysroot sysroot \
 			-isystem=/include \
 			-o "$$@" \
 			-c "$$<"
 
-$(top_builddir)/sysroot/lib/32/$(1): \
+sysroot/lib/32/$(1): \
 		$(2) \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
 		$(STDLIB_INCLUDES_DEPLOYED) \
@@ -1205,7 +1211,7 @@ $(top_builddir)/sysroot/lib/32/$(1): \
 			-m32 \
 			-g \
 			$$(ASM_DEBUG_INFO_FLAGS) \
-			--sysroot $(top_builddir)/sysroot \
+			--sysroot sysroot \
 			-isystem=/include \
 			-o "$$@" \
 			-c "$$<"
@@ -1238,37 +1244,43 @@ $(eval $(call \
 
 define deploy_stdlib=
 
-$(top_builddir)/sysroot/lib/lib$(1).a: $(top_builddir)/lib$(1).a
+sysroot/lib/lib$(1).a: lib$(1).a
 	$$(MKDIR) -p $$(@D) && $$(CP) "$$<" "$$@"
 
-$(top_builddir)/sysroot/lib/32/lib$(1).a: $(top_builddir)/lib$(1)32.a
+sysroot/lib/32/lib$(1).a: lib$(1)32.a
 	$$(MKDIR) -p $$(@D) && $$(CP) "$$<" "$$@"
 
 endef
 
-$(foreach name,$(STDLIB_FILE_NAMES),$(eval $(call deploy_stdlib,$(name))))
-$(foreach name,$(USRLIB_FILE_NAMES),$(eval $(call deploy_stdlib,$(name))))
+$(foreach name,$(STDLIB_FILE_NAMES), \
+	$(eval $(call deploy_stdlib,$(name))) \
+)
 
-define deploy_stdlib_header =
-$$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
+$(foreach name,$(USRLIB_FILE_NAMES), \
+	$(eval $(call deploy_stdlib,$(name))) \
+)
+
+define deploy_stdlib_header=
+sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
 	$(MKDIR) -p $$(@D)
 	$(CP) -f "$$<" "$$@"
 
 endef
 
-define deploy_usrlib_header =
-$$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/user/include/$(1)
+define deploy_usrlib_header=
+sysroot/include/$(1): $$(top_srcdir)/user/include/$(1)
 	$(MKDIR) -p $$(@D)
 	$(CP) -f "$$<" "$$@"
 
 endef
 
-$(foreach header,$(STDLIB_INCLUDES_NAMES),$(eval \
-	$(call deploy_stdlib_header,$(header)) \
-))
-$(foreach header,$(USRLIB_INCLUDES_NAMES),$(eval \
-	$(call deploy_usrlib_header,$(header)) \
-))
+$(foreach header,$(STDLIB_INCLUDES_NAMES), \
+	$(eval $(call deploy_stdlib_header,$(header))) \
+)
+
+$(foreach header,$(USRLIB_INCLUDES_NAMES), \
+	$(eval $(call deploy_usrlib_header,$(header))) \
+)
 
 startupcode: $(STARTUPFILES)
 
@@ -1298,7 +1310,7 @@ shell_CFLAGS = \
 
 shell_CCASFLAGS =
 shell_LDFLAGS = \
-	-Wl,-Map,$(top_builddir)/shell.map
+	-Wl,-Map,shell.map
 
 #-Wl,--orphan-handling,warn
 
@@ -1942,19 +1954,19 @@ LIBC_CXXFLAGS = \
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_EXCEPTIONS_FLAGS)
 
-$(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/sysroot/lib/libc.a
+libc_tests: $(LIBC_TESTS) sysroot/lib/libc.a
 	echo "#define TERMESC_RED" \
 		"\"$$(tput setaf 1 | sed 's/\x1b/\\x1b/g')\"" \
-		> $(top_builddir)/termesc.h
+		> termesc.h
 	echo "#define TERMESC_GREEN" \
 		"\"$$(tput setaf 2 | sed 's/\x1b/\\x1b/g')\"" \
-		>> $(top_builddir)/termesc.h
+		>> termesc.h
 	echo "#define TERMESC_BLUE" \
 		"\"$$(tput setaf 4 | sed 's/\x1b/\\x1b/g')\"" \
-		>> $(top_builddir)/termesc.h
+		>> termesc.h
 	echo "#define TERMESC_WHITE" \
 		"\"$$(tput setaf 7 | sed 's/\x1b/\\x1b/g')\"" \
-		>> $(top_builddir)/termesc.h
+		>> termesc.h
 
 	$(CXX_FOR_BUILD) \
 		$(LIBC_CXXFLAGS) \
@@ -1963,10 +1975,10 @@ $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/sysroot/lib/libc.a
 		-static -nostdlib -g -fno-builtin \
 		$(ALL_STDLIB_INSTALLED) -lgcc
 
-test_compile: $(top_builddir)/libc_tests
+test_compile: libc_tests
 
 test: test_compile
-	$(top_builddir)/libc_tests
+	libc_tests
 
 .PHONY: test_compile test
 
@@ -2020,7 +2032,7 @@ generate_symbols_list += ls
 ls_SOURCES = \
 	user/bin/ls/ls.cc
 
-ls_CXXFLAGS = -isystem $(top_builddir)/sysroot/include
+ls_CXXFLAGS = -isystem sysroot/include
 
 EXTRA_ls_DEPENDENCIES = \
 	$(ALL_STDLIB_INSTALLED) \
@@ -2100,9 +2112,49 @@ EXTRA_libpng32_a_DEPENDENCIES = $(EXTRA_libpng_a_DEPENDENCIES)
 
 #===========
 
+libz_SOURCES_COMMON = \
+	user/zlib/adler32.c   \
+	user/zlib/crc32.c     \
+	user/zlib/gzclose.c   \
+	user/zlib/gzread.c    \
+	user/zlib/infback.c   \
+	user/zlib/inflate.c   \
+	user/zlib/trees.c     \
+	user/zlib/zutil.c	  \
+	user/zlib/compress.c  \
+	user/zlib/deflate.c   \
+	user/zlib/gzlib.c     \
+	user/zlib/gzwrite.c   \
+	user/zlib/inffast.c   \
+	user/zlib/inftrees.c  \
+	user/zlib/uncompr.c
+
 noinst_LIBRARIES += libz.a
 
 libz_a_SOURCES = \
+	$(libz_SOURCES_COMMON) \
+	user/zlib/contrib/amd64/amd64-match.S
+
+libz_a_CFLAGS = \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USERLIB64_FLAGS) \
+	--sysroot sysroot \
+	-isystem=/include \
+	-DASMV -DNO_UNDERLINE -DHAVE_MEMCPY -DHAVE_HIDDEN -DHAVE_VSNPRINTF
+
+libz_a_CXXFLAGS = $(libz_a_CFLAGS)
+
+libz_a_CCASFLAGS = \
+	$(libz_a_CFLAGS)
+
+EXTRA_libz_a_DEPENDENCIES =
+
+#===========
+
+noinst_LIBRARIES += libz32.a
+
+libz32_a_SOURCES = \
 	user/zlib/adler32.c   \
 	user/zlib/crc32.c     \
 	user/zlib/gzclose.c   \
@@ -2118,120 +2170,26 @@ libz_a_SOURCES = \
 	user/zlib/inffast.c   \
 	user/zlib/inftrees.c  \
 	user/zlib/uncompr.c   \
-	user/zlib/contrib/amd64/amd64-match.S
+	user/zlib/contrib/asm686/match.S
 
-libz_a_CFLAGS = \
+libz32_a_CFLAGS = \
 	$(COMPILER_FLAGS) \
-	$(USER64_FLAGS) \
-	$(USERLIB64_FLAGS) \
-	--sysroot $(top_builddir)/sysroot \
+	$(USER32_FLAGS) \
+	$(USER32_EXE_FLAGS) \
+	--sysroot sysroot \
 	-isystem=/include \
 	-DASMV -DNO_UNDERLINE -DHAVE_MEMCPY -DHAVE_HIDDEN -DHAVE_VSNPRINTF
 
-libz_a_CXXFLAGS = $(libz_a_CFLAGS)
+libz32_a_CCASFLAGS = \
+	$(libz32_a_CFLAGS)
 
-libz_a_CCASFLAGS = -DWTF \
-	$(libz_a_CFLAGS)
-
-EXTRA_libz_a_DEPENDENCIES =
-
-##===========
-#
-#noinst_LIBRARIES += libz32.a
-#
-#libz32_a_SOURCES = \
-#	user/zlib/adler32.c   \
-#	user/zlib/crc32.c     \
-#	user/zlib/gzclose.c   \
-#	user/zlib/gzread.c    \
-#	user/zlib/infback.c   \
-#	user/zlib/inflate.c   \
-#	user/zlib/trees.c     \
-#	user/zlib/zutil.c	  \
-#	user/zlib/compress.c  \
-#	user/zlib/deflate.c   \
-#	user/zlib/gzlib.c     \
-#	user/zlib/gzwrite.c   \
-#	user/zlib/inffast.c   \
-#	user/zlib/inftrees.c  \
-#	user/zlib/uncompr.c   \
-#	user/zlib/contrib/asm686/match.S
-#
-#libz32_a_CFLAGS = \
-#	$(COMPILER_FLAGS) \
-#	$(USER32_FLAGS) \
-#	$(USER32_EXE_FLAGS) \
-#	--sysroot $(top_builddir)/sysroot \
-#	-isystem=/include \
-#	-DASMV -DNO_UNDERLINE
-#
-#libz32_CCASFLAGS = \
-#	$(libz32_a_CFLAGS)
-#
-#libz32_a_CXXFLAGS = -DWTF $(libz32_a_CFLAGS)
-#
-##libz32_a_HEADERS = \
-##	user/zlib/zlib.h \
-##	user/zlib/zconf.h
-#
-##$(top_builddir)/sysroot/include/zconf.h: $(top_srcdir)/user/zlib/zconf.h
-##	$(CP) "$<" "$@"
-##
-##$(top_builddir)/sysroot/include/zlib.h: $(top_srcdir)/user/zlib/zlib.h
-##	$(CP) "$<" "$@"
-#
-##===========
-
-MODULE_FILENAMES = $(filter %.km,$(bin_PROGRAMS)) init
-
-MODULE_LIST = $(subst %,$(top_builddir)/%,$(MODULE_FILENAMES))
-
-SYMBOL_FILE = sym/$(1).sym
-
-MODULES_STAGED_HD = $(patsubst %,$(top_builddir)/stage/boot/%,$(MODULE_FILENAMES))
-
-MODULE_CPIO_PATHS = $(patsubst %,boot/%,$(MODULE_FILENAMES)) \
-	$(generate_symbols_outputs)
-
-define stage_boot=
-
-$$(top_builddir)/stage/boot/$(1): $(1)
-	$$(MKDIR) -p $$(@D)
-	$$(LN) -fsTr $$< $$@
-
-$$(top_builddir)/iso_stage/boot/$(1): $(1)
-	$$(MKDIR) -p $$(@D)
-	$$(LN) -fsTr $$< $$@
-
-endef
-
-$(foreach staged_boot_file,$(MODULE_FILENAMES), \
-	$(eval $(call stage_boot,$(staged_boot_file))) \
-)
-
-CPIO_LIST = $(MODULES_STAGED_HD) \
-	$(generate_symbols_outputs)
-
-all-kernel: kernel-generic $(MODULE_LIST) initrd
-
-.PHONY: all-kernel
-
-$(top_builddir)/sym/:
-	$(MKDIR) -p "$@"
-
-$(top_builddir)/background.png: $(top_srcdir)/user/background.png
-	$(CP) "$<" "$@"
-
-$(top_builddir)/initrd: $(CPIO_LIST)
-	(cd stage && $(CPIO) -L -o --device-independent -H bin \
-		< <($(patsubst %,printf "\%s\n" "%";,$(MODULE_CPIO_PATHS))) \
-		> "$(@D)/../$(@F)")
+libz32_a_CXXFLAGS = $(libz32_a_CFLAGS)
 
 # ----------------------------------------------------------------------------
 # Misc make rules
 
 $(DUMPDIR):
-	$(MKDIR) -p $(top_builddir)/dump
+	$(MKDIR) -p dump
 
 #include zlib.mk
 include $(top_srcdir)/symbols.mk
@@ -2239,37 +2197,40 @@ include $(top_srcdir)/diskfat.mk
 include $(top_srcdir)/diskiso.mk
 
 clean-local:
-	rm -f $(top_builddir)/mbr-bin
-	rm -f $(top_builddir)/bootfat-bin
-	rm -f $(top_builddir)/bootiso-bin
-	rm -f $(top_builddir)/bootpxe-bios-bin
-	rm -f $(top_builddir)/bootpxe-bios-elf
-	rm -f $(top_builddir)/trace-tool
+	rm -f mbr-bin
+	rm -f bootfat-bin
+	rm -f bootiso-bin
+	rm -f bootpxe-bios-bin
+	rm -f bootpxe-bios-elf
+	rm -f trace-tool
 
-	rm -f $(top_builddir)/bootefi-pe
-	rm -f $(top_builddir)/boot*.efi
+	rm -f bootefi-pe
+	rm -f boot*.efi
 
-	rm -f $(top_builddir)/*.sym
+	rm -f *.sym
 
-	rm -f $(top_builddir)/*.map
+	rm -f *.map
+	rm -f background.png
 
-	rm -f "$(top_builddir)/*.dis.gz"
-	rm -f "$(top_builddir)/bochs-debuglog"
-	rm -f "$(top_builddir)/mbrdisk.img"
-	rm -f "$(top_builddir)/gptdisk.img"
-	rm -f "$(top_builddir)/hybdisk.img"
-	rm -f "$(top_builddir)/fatpart.img"
-	rm -f "$(top_builddir)/isodisk.img"
-	rm -f "$(top_builddir)/initrd"
+	rm -f "*.dis.gz"
+	rm -f "bochs-debuglog"
+	rm -f "mbrdisk.img"
+	rm -f "gptdisk.img"
+	rm -f "hybdisk.img"
+	rm -f "fatpart.img"
+	rm -f "isodisk.iso"
+	rm -f "initrd"
 
-	rm -f "$(top_builddir)/boot1-bin"
-	rm -f "$(top_builddir)/dgos-kernel-asan"
-	rm -f "$(top_builddir)/dgos-kernel-generic"
-	rm -f "$(top_builddir)/dgos-kernel-tracing"
-	rm -f "$(top_builddir)/u_vga16.raw"
+	rm -f "boot1-bin"
+	rm -f "dgos-kernel-asan"
+	rm -f "dgos-kernel-generic"
+	rm -f "dgos-kernel-tracing"
+	rm -f "u_vga16.raw"
+	rm -rf "stage"
+	rm -rf "iso_stage"
 
 distclean-local:
-	rm -rf $(top_builddir)/extern
+	rm -rf extern
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -2327,15 +2288,135 @@ u_vga16.o: u_vga16.raw
 #	$(TRUNCATE) --size $(QEMU_RAM) "$@"
 #	$(SHRED) --iterations=1 "$@"
 
+
+# ----------------------------------------------------------------------------
+# Directory tree staging
+
+MODULE_FILENAMES = $(filter %.km,$(bin_PROGRAMS))
+
+LIBRARY_FILENAMES = $(filter lib%.a,$(bin_PROGRAMS))
+
+MODULE_LIST = $(subst %,%,$(MODULE_FILENAMES))
+
+SYMBOL_FILE = sym/$(1).sym
+
+MODULES_STAGED_HD = \
+	$(patsubst %,stage/boot/%,$(MODULE_FILENAMES))
+
+MODULE_CPIO_PATHS = $(patsubst %,boot/%,$(MODULE_FILENAMES)) \
+	$(generate_symbols_outputs)
+
+
+define stage_file_to=
+
+$(2): $(1)
+	$$(MKDIR) -p $$(@D)
+	$$(LN) -fsTr $$< $$@
+
+fatpart.img: $(2)
+isodisk.iso: $(2)
+
+endef
+
+define stage_file=
+
+$(eval $(call stage_file_to,$(1),stage$(2)/$(1)))
+$(eval $(call stage_file_to,$(1),iso_stage$(2)/$(1)))
+
+endef
+
+$(foreach staged_boot_file,$(MODULE_FILENAMES), \
+	$(eval $(call stage_file,$(staged_boot_file),/boot)) \
+)
+
+$(foreach name,$(KERNEL_NAMES_STRIPPED), \
+	$(eval $(call stage_file,$(name),/boot)) \
+)
+
+$(eval $(call stage_file,init,/boot))
+$(eval $(call stage_file,background.png,/usr/share))
+
+BOOT_FILES = \
+	mbr-elf \
+	boot1-elf \
+	bootfat-elf \
+	bootiso-elf \
+	bootiso-bin \
+	bootpxe-bios-elf \
+	bootefi-amd64 \
+	kernel-generic \
+	kernel-tracing \
+	kernel-asan
+
+SBIN_FILES = \
+	shell \
+	init
+
+LIB_FILES = \
+	libc.a \
+	libc32.a
+
+# ISO only (EFI boot partition)
+iso_stage/EFI/boot/fatpart.img: fatpart.img
+	"$(MKDIR)" -p "$(@D)"
+	"$(LN)" -fsTr "$<" "$@"
+
+isodisk.iso: iso_stage/EFI/boot/fatpart.img
+
+$(foreach name,$(BOOT_FILES), \
+	$(eval $(call stage_file,$(name),/boot)) \
+)
+
+$(foreach name,$(SBIN_FILES), \
+	$(eval $(call stage_file,$(name),/sbin)) \
+)
+
+$(foreach name,$(LIB_FILES), \
+	$(eval $(call stage_file,$(name),/lib)) \
+)
+
+$(eval $(call stage_file,bootx64.efi,/EFI/boot))
+
+CPIO_LIST = $(MODULES_STAGED_HD) \
+	$(generate_symbols_outputs)
+
+STAGED_SYMS = $(patsubst %,stage/sym/%.sym,$(generate_symbols_list)) \
+	$(patsubst %,stage/sym/%-kallsyms,$(generate_kallsym_list)) \
+	$(patsubst %,stage/sym/%-klinesyms,$(generate_kallsym_list))
+
+STAGED_SYMS_CPIO_PATHS = $(patsubst stage/%,%,$(STAGED_SYMS))
+
+SBIN_PATHS = $(patsubst %,sbin/%,$(SBIN_FILES))
+
+$(foreach name,$(STAGED_SYMS_CPIO_PATHS), \
+	$(eval $(call stage_file,$(name))) \
+)
+
+all-kernel: $(KERNEL_NAMES) $(MODULE_LIST) initrd
+
+.PHONY: all-kernel
+
+background.png: $(top_srcdir)/user/background.png
+	$(LN) -fsTr "$<" "$@"
+
+CPIO_PATHS = \
+	$(MODULE_CPIO_PATHS) \
+	$(STAGED_SYMS_CPIO_PATHS) \
+	$(SBIN_PATHS)
+
+initrd: $(patsubst %,stage/%,$(CPIO_PATHS))
+	(cd stage && $(CPIO) -L -o --device-independent -H bin \
+		< <($(patsubst %,printf "\%s\n" "%";,$(CPIO_PATHS))) \
+		> "$(@D)/../$(@F)")
+
+$(eval $(call stage_file,initrd,/boot))
+
 # ----------------------------------------------------------------------------
 # QEMU launcher
 
 $(DUMPDIR)/qemu-debug-out:
 	$(MKDIR) -p "$(@D)"
 	mkfifo "$@"
-
-$(top_builddir)/iso_stage/:
-	mkdir -p "$(top_builddir)/iso_stage"
 
 $(DUMPDIR)/call-trace-out:
 	$(MKDIR) -p "$(@D)"
@@ -2500,7 +2581,7 @@ QEMU_IMAGE = $(QEMU_IMAGE_$(1))
 QEMU_IMAGE_hyb = hybdisk.img
 QEMU_IMAGE_gpt = gptdisk.img
 QEMU_IMAGE_mbr = mbrdisk.img
-QEMU_IMAGE_iso = isodisk.img
+QEMU_IMAGE_iso = isodisk.iso
 
 QEMU_NP = $(QEMU_NP_$(1))
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
@@ -2549,7 +2630,6 @@ QEMU_BOOTMEDIA_pxe_bios = -boot n \
 QEMU_BOOTMEDIA_pxe_efi = \
 	-boot n -netdev user,id=n1,tftp=$(top_builddir)/,bootfile=bootx64.efi
 
-#$(top_builddir)/
 QEMU_VIDEO = $(QEMU_VIDEO_$(1)) $(QEMU_DISPLAY_$(1))
 QEMU_VIDEO_vga = -vga std
 QEMU_VIDEO_gl = \
@@ -2646,29 +2726,37 @@ check-module-imports: all-kernel
 # Generate symbols
 
 define genkallsym =
-$$(top_builddir)/sym/$(1)-kallsyms: $(1)
+
+sym/$(1)-kallsyms: $(1)
 	$$(NM) --demangle --defined-only -n "$$<" > "$$@"
 
-$$(top_builddir)/sym/$(1)-klinesyms: $(1)
+sym/$(1)-klinesyms: $(1)
 	$$(OBJDUMP) --dwarf=decodedline "$$<" | \
 		$$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+)\s*x?/\1 \2 \3/g' | \
 		$$(GREP) -P '.*\s+\d+\s+0x[0-9a-f]+' > "$$@"
 
 endef
 
-$(foreach name,$(generate_kallsym_list),$(eval $(call genkallsym,$(name))))
+$(foreach name,$(generate_kallsym_list), \
+	$(eval $(call genkallsym,$(name))) \
+)
 
 define gensym =
-$$(top_builddir)/sym/$(1).sym: $$(top_builddir)/$(1) \
+
+sym/$(1).sym: $(1) \
 		$$(top_srcdir)/symbols.mk $$(top_srcdir)/gensymtab.sh
 	$$(MKDIR) -p $$(@D)
 	OBJDUMP=$$(OBJDUMP) SORT=$(SORT) \
 		$$(top_srcdir)/gensymtab.sh "$$(OBJDUMP)" e "$$@" "$$<"
+
 endef
 
-$(foreach name,$(generate_symbols_list),$(eval $(call gensym,$(name))))
+$(foreach name,$(generate_symbols_list), \
+	$(eval $(call gensym,$(name))) \
+)
 
-generate_symbols_outputs = $(patsubst %,sym/%.sym,$(generate_symbols_list)) \
+generate_symbols_outputs = \
+	$(patsubst %,sym/%.sym,$(generate_symbols_list)) \
 	$(patsubst %,sym/%-kallsyms,$(generate_kallsym_list)) \
 	$(patsubst %,sym/%-klinesyms,$(generate_kallsym_list))
 
@@ -2700,8 +2788,6 @@ debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
 .PHONY: debug-$(1)-$(2)-bochs-$(3)
 endef
 
-
-
 $(foreach media,$(BOCHS_MEDIA), \
 	$(foreach fw,$(BOCHS_FW), \
 		$(foreach part,$(BOCHS_PART), \
@@ -2710,6 +2796,13 @@ $(foreach media,$(BOCHS_MEDIA), \
 	) \
 )
 
+# ----------------------------------------------------------------------------
+# Utility targets
+
+disks: hybdisk.img gptdisk.img mbrdisk.img isodisk.iso
+
+.PHONY: disks
+
 debug: all debug-up-efi-hd-iso-ahci-vga-tcg
 
 .PHONY: debug
@@ -2717,6 +2810,10 @@ debug: all debug-up-efi-hd-iso-ahci-vga-tcg
 debug-icount: all debug-up-efi-hd-iso-ahci-vga-icount
 
 .PHONY: debug-icount
+
+debug-mbr: all debug-up-bios-hd-mbr-ahci-vga-tcg
+
+.PHONY: debug-mbr
 
 debug-hyb: all debug-up-efi-hd-hyb-ahci-vga-tcg
 
@@ -2746,6 +2843,26 @@ run: all run-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: run
 
+run-all: $(QEMU_LAUNCHERS)
+
+.PHONY: run
+
+run-icount: all run-up-efi-hd-hyb-ahci-vga-icount
+
+.PHONY: run-icount
+
+run-mbr: all run-up-efi-hd-mbr-ahci-vga-tcg
+
+.PHONY: run-mbr
+
+run-mbr-icount: all run-up-efi-hd-mbr-ahci-vga-icount
+
+.PHONY: run-mbr-icount
+
+debug-hyb: all run-up-efi-hd-hyb-ahci-vga-tcg
+
+.PHONY: run-hyb
+
 run-virtio: all run-up-efi-hd-hyb-virtio-vga-tcg
 
 .PHONY: run
@@ -2774,10 +2891,41 @@ run-smp-kvm: all run-smp-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-smp-kvm
 
-debug-bochs: all debug-hyb-bios-bochs-kernel
+debug-bochs: all debug-mbr-bios-bochs-kernel
 
 .PHONY: debug-bochs
 
 debug-bochs-boot: all debug-hyb-bios-bochs-boot
 
 .PHONY: debug-bochs-boot
+
+#==
+
+check-build:
+	$(MAKE) clean
+	$(MAKE) mbr-bin
+	$(MAKE) clean
+	$(MAKE) boot1-bin
+	$(MAKE) clean
+	$(MAKE) bootfat-bin
+	$(MAKE) clean
+	$(MAKE) bootpxe-bin
+	$(MAKE) clean
+	$(MAKE) bootiso-bin
+	$(MAKE) clean
+	$(MAKE) bootx64.efi
+	$(MAKE) clean
+	$(MAKE) libc.a
+	$(MAKE) clean
+	$(MAKE) libg.a
+	$(MAKE) clean
+	$(MAKE) libm.a
+	$(MAKE) clean
+	$(MAKE) libpng.a
+	$(MAKE) clean
+	$(MAKE) libwing.a
+	$(MAKE) clean
+
+
+
+.PHONY: check-build

@@ -550,7 +550,6 @@ init_SOURCES = \
 
 init_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
-	-ggdb \
 	-isystem $(top_builddir)/sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
@@ -588,7 +587,9 @@ EXTRA_init_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
 	$(top_builddir)/sysroot/lib/libc.a \
 	$(top_builddir)/sysroot/lib/libz.a \
-	$(top_builddir)/sysroot/lib/libpng.a
+	$(top_builddir)/sysroot/lib/libm.a \
+	$(top_builddir)/sysroot/lib/libpng.a \
+	$(ALL_STDLIB_INSTALLED)
 
 #===========
 

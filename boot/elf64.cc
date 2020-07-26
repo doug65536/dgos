@@ -303,7 +303,6 @@ void progress(size_t fsz, size_t msz, elf64_context_t *ctx)
         }
 
         ms = (elap * 10000) / 182;
-        assert(ms);
         int64_t kps = ms ? delta / ms : INT64_MAX;
 
         print_line_at(65, 5, 0x7, TSTR "%" PRId64 "KB/s", kps);

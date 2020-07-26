@@ -23,6 +23,8 @@ entry:
     jmp early_init
 .Linit_ret:
 
+    // If we make it here, the cpu is at least 32 bit with FPU
+
     // Load partition start LBA into edx:eax
     movl ptbl_ent_stsec(%si),%eax
     xor %edx,%edx

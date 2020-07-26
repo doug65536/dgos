@@ -1,53 +1,36 @@
 
 #bootia32.efi
 
-$(top_builddir)/isodisk.img: \
-		$(top_builddir)/dgos-kernel-generic \
-		\
-		$(top_builddir)/dgos-kernel-tracing \
-		\
-		$(top_builddir)/dgos-kernel-asan \
-		\
-		$(top_builddir)/bootx64.efi \
-		\
-		$(top_builddir)/bootpxe-bios-elf \
-		$(top_builddir)/bootpxe-bios-bin \
-		$(top_builddir)/bootpxe-bios.map \
-		\
-		$(top_builddir)/initrd \
+isodisk.iso: \
+		bootiso-bin \
+		fatpart.img \
 		\
 		$(top_srcdir)/mkposixdirs.sh \
-		\
 		$(top_srcdir)/diskiso.mk \
 		$(top_srcdir)/populate_iso.sh \
 		\
-		$(top_builddir)/fatpart.img \
-		\
-		$(shell [[ -d "$(top_builddir)/iso_stage/" ]] && \
-			$(FIND) -L "$(top_builddir)/iso_stage/" -type f || true) \
-		\
-		$(top_builddir)/bootiso-bin
+		fatpart.img
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)
 	size=$$(wc -c < bootiso-bin) && \
-	blocks=$$(( ( (size + 2047) / 2048) * 4 )) && \
-	if ((blocks > 8)); then blocks=8; fi && \
-	size=$$(wc -c < fatpart.img ) && \
-	fatblocks=$$(( ( (size + 2047) / 2048) * 4 )) && \
-	$(MKISOFS) -input-charset utf8 \
-		-o "$@" \
-		-eltorito-alt-boot \
-		-b "bootiso-bin" \
-		-iso-level 2 \
-		-no-emul-boot \
-		-boot-load-size "$$blocks" \
-		-boot-info-table \
-		-boot-load-seg 0x7c0 \
-		-r -J -f \
-		-A 'ea870ef2-2483-11e8-9bba-3f1a71a07f83' \
-		-eltorito-alt-boot \
-		-b efipart.img \
-		-iso-level 2 \
-		-no-emul-boot \
-		-r -J -f \
-		-A 'ea870ef2-2483-11e8-9bba-3f1a71a07f83' \
-		"$(top_builddir)/iso_stage/"
+		blocks=$$(( ( (size + 2047) / 2048) * 4 )) && \
+		if ((blocks > 8)); then blocks=8; fi && \
+		size=$$(wc -c < fatpart.img ) && \
+		fatblocks=$$(( ( (size + 2047) / 2048) * 4 )) && \
+		$(MKISOFS) -input-charset utf8 \
+			-o "$@" \
+			-eltorito-alt-boot \
+			-b "boot/bootiso-bin" \
+			-iso-level 2 \
+			-no-emul-boot \
+			-boot-load-size "$$blocks" \
+			-boot-info-table \
+			-boot-load-seg 0x7c0 \
+			-r -J -f \
+			-A 'ea870ef2-2483-11e8-9bba-3f1a71a07f83' \
+			-eltorito-alt-boot \
+			-b EFI/boot/fatpart.img \
+			-iso-level 2 \
+			-no-emul-boot \
+			-r -J -f \
+			-A 'ea870ef2-2483-11e8-9bba-3f1a71a07f83' \
+			"iso_stage/"

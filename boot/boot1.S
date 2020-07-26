@@ -8,7 +8,7 @@
 //  DL = boot drive
 
 // This does just enough to relocate itself to its link address at 0xF000,
-// load 56KB of code from sector partition_start+2 to 0x1000
+// load ~56KB of code from sector partition_start+2 to 0x1000 less a sector
 // set ds:bx and dl parameters, and jump to 0x7C00
 // Invokes interrupt 0x18 on error
 //
@@ -34,71 +34,84 @@
 #define UNRELOCATED(n) (n)-0xF000+0x7C00
 
 .section .head, "x", @progbits
+// The linker script puts this at the beginning of the image
+
 .global entry
 entry:
+    // Only 3 bytes available here, use shortest possible jump (2 bytes)
+    jmp bootstrap_code
+
+// The linker script puts this after the BPB and stuff (at 0x5A)
+.section .code, "x", @progbits
+bootstrap_code:
+    // Load cs register ASAP
     ljmp $0,$ UNRELOCATED(past_bpb)
 
-.section .code, "x", @progbits
 past_bpb:
     cli
 
     // Load the relevant portion of the partition table entry
     // into registers before writing any memory
+    // with whatever ds the MBR gave us
     // (The CHS parts are discarded)
     movw ptbl_ent_stsec(%si),%bx
     movw ptbl_ent_stsec+2(%si),%cx
     movw ptbl_ent_numsec(%si),%di
     movw ptbl_ent_numsec+2(%si),%bp
-    
+
+    // Initialize the data segment registers and stack
     xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
+    movw %ax,%ss
+    // Put stack right before relocated entry point
+    movw $ entry,%sp
+
+    // Store the information loaded from pointer to partition table entry
     movw %bx,UNRELOCATED(part_st)
     movw %cx,UNRELOCATED(part_st+2)
     movw %di,UNRELOCATED(part_en)
     movw %bp,UNRELOCATED(part_en+2)
     movb %dl,UNRELOCATED(boot_drive)
-    
+
     // Set start sector for stage 2
-    addw $2,%bx
-    adcw $0,%cx
+    addw $ 2,%bx
+    adcw $ 0,%cx
     movw %bx,UNRELOCATED(sector_lba)
     movw %cx,UNRELOCATED(sector_lba+2)
-    
+
     // Relocate 512 bytes
     mov $ entry,%di
     mov $ 0x7C00,%si
     mov $ 256,%cx
     cld
     rep movsw
-    
-    ljmp $0,$ reloc_entry
-reloc_entry:
 
     // Relocation done, no more weird unrelocated offsets
 
+    ljmp $ 0,$ reloc_entry
+reloc_entry:
+
     // Get drive parameters size (for sector size)
-    mov $0x4800,%ax
-    mov $ddp,%si
-    movw $ ddp_length,ddp_struct_size(%si)
-    int $0x13
+    mov $ 0x4800,%ax
+    mov $ ddp,%si
+    // dl must be as it was when entering this code
+    int $ 0x13
     jc fail
-    
+
     // Calculate stage2 sector count
-    // 64KB (of reserved sectors) 
-    // minus 4KB (0x1000 base)
-    // minus 4KB (reserved for this code) = 57344 bytes.
-    movw $ 0x10000 - 4096 - 4096,%ax
+    // Load 60KB
+    movw $ 0xE000,%ax
     xorw %dx,%dx
     divw ddp+ddp_sector_size
     mov %ax,sector_count
-    
+
     // Load stage2
 more_sectors:
-    movw $0x4200,%ax
-    movw $dap,%si
+    movw $ 0x4200,%ax
+    movw $ dap,%si
     movb boot_drive,%dl
-    int $0x13
+    int $ 0x13
 	jnc okay
 
 	// It may be an error, or just a partial success. Check.
@@ -124,21 +137,23 @@ more_sectors:
 	// Advance the address that many bytes
 	addw %ax,dap+dap_address
 	jnc no_ptr_carry
-	addw $0x1000,dap+dap_address+2
+	addw $ 0x1000,dap+dap_address+2
 no_ptr_carry:
-	cmp $0,sector_count
-	jne more_sectors
-    
+	test %si,%si
+  	jnz more_sectors
+
 okay:
     // Setup register parameters for stage 1
     // ds:si -> partition table entry
     // dl = boot drive
-    mov $ ptbl_ent,%si    
-    
+    mov $ ptbl_ent,%si
+
     ljmpw *load_addr
-    
+
 fail:
-    int $0x18
+    int $ 0x18
+
+.section .data
 
 // dap structure for int 0x13, AX=0x4200. see dap.h "dap" for layout
 dap:
@@ -152,17 +167,18 @@ load_addr:
 sector_lba:
     .quad 0
 
-ptbl_ent: 
+ptbl_ent:
     .byte 1
     .space 7,0
+
 part_st:
-    .space 4
+    .space 4,0
 part_en:
-    .space 4
+    .space 4,0
 
-
-boot_drive: .space 1
-ddp: .space ddp_length
+boot_drive: .space 1,0
+ddp: .word ddp_length
+.space (ddp_length - 2),0
 
 .byte 0xEE
 

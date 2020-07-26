@@ -1,5 +1,5 @@
 u switch-mode
-ldsym global "sym/bootfat-elf.sym"
+ldsym global "sym/kernel-generic.sym"
 
 lb "entry"
 lb "cpu_debug_break"

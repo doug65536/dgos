@@ -1,7 +1,13 @@
 define startupbreakpoints
 	set remotetimeout 86400
-	set architecture i386:x86-64
 
+	# For kernel
+	#set architecture i386:x86-64
+
+	# For MBR, boot1, and portions of bootfat, bootiso, bootpxe
+	set architecture i8086
+
+	# For majority of bootfat, bootpxe
 	#set architecture i386
 
 	set osabi none
@@ -249,7 +255,8 @@ define walkunwind
 		set $ctx = threads[$tid].ctx
 		if $ctx
 			printf "\n"
-			printf "Unwinding thread %d runcpu=%d state=0x%x -----------------------------------------------\n", $tid, run_cpu[$tid], threads[$tid].state
+			printf "Unwinding thread %d (%s) runcpu=%d state=0x%x -----------------------------------------------\n", \
+				$tid, threads[$tid].name, run_cpu[$tid], threads[$tid].state
 			python
 try:
 	gdb.execute("walkunwind_ctx $ctx.gpr")

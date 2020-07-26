@@ -2,16 +2,34 @@ ENTRY(entry)
 SECTIONS {
 	.text 0xF000 : AT(0xF000) {
 		*(.head)
+
+		/* oem name */
+		. = 3;
+		mbr_oem_name = .;
+
+		/* bios parameter block */
+		. = 0xB;
+		mbr_bpb = .;
+
+		/* FAT32 extended bios parameter block */
+		. = 0x24;
+		mbr_ext_bpb = .;
+
+		/* End of FAT32 extended bios parameter block */
 		. = 0x5A;
 		*(.code)
 		*(.text)
 		*(.data)
 		*(.bss)
 		*(.rel*)
+
 		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got*)
 		*(.igot*)
 		*(.iplt*)
+
+		/* Error if it does not fit below 0x1C0 */
+		. = 0x1C0;
 
 		. = 0x1FE;
 		SHORT(0x55AA);

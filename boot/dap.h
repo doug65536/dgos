@@ -10,22 +10,6 @@ struct_field 4 dap_address
 struct_field 8 dap_lba
 struct_end dap
 
-//// dap
-//.struct 0
-//dap_start:
-//dap_sizeof_packet:
-//	.struct dap_sizeof_packet + 1
-//dap_reserved:
-//	.struct dap_reserved + 1
-//dap_block_count:
-//	.struct dap_block_count + 2
-//dap_address:
-//	.struct dap_address + 4
-//dap_lba:
-//	.struct dap_lba + 8
-//dap_end:
-//dap_length = dap_end - dap_start
-
 struct_begin ddp
 struct_field 2 ddp_struct_size
 struct_field 2 ddp_info_flags

@@ -1,181 +1,211 @@
-
 #bootia32.efi
 
 # Stitch byte 0-0xA of boot1-bin into offset 0 of partition
-# Stitch byte 0x5A-0x1FD of boot1-bin into offset 0x5A of partition
+# Stitch byte 0x5A-0x1C0 of boot1-bin into offset 0x5A of partition
 #  (Avoids overwriting BPB)
 # Copy the entire bootfat-bin into sector 2 of the partition
 #  (Avoids overwriting FS information sector)
 
 DISK_SIZE_MB=256
 
-$(top_builddir)/fatpart.img: \
-		$(top_srcdir)/diskfat.mk \
-		\
-		dgos-kernel-generic \
-		\
-		dgos-kernel-tracing \
-		\
-		dgos-kernel-asan \
-		\
-		$(top_builddir)/bootx64.efi \
-		\
-		$(top_builddir)/bootpxe-bios-elf \
-		$(top_builddir)/bootpxe-bios-bin \
-		$(top_builddir)/bootpxe-bios.map \
-		\
-		$(top_builddir)/initrd \
-		\
+# 0x10000 (64KB) reserved for boot code
+FATPART_RESERVED_SIZE=0x10000
+
+fatpart.img: \
+		boot1-bin \
+		bootfat-bin \
+		mbr-bin \
 		$(top_srcdir)/mkposixdirs.sh \
-		\
 		$(top_srcdir)/diskfat.mk \
-		$(top_srcdir)/populate_fat.sh \
-		\
-		$(top_builddir)/mbr-bin \
-		\
-		$(top_builddir)/boot1-bin \
-		$(top_builddir)/boot1-elf \
-		\
-		$(top_builddir)/bootfat-bin \
-		\
-		$(generate_symbols_outputs) \
-		\
-		$(MODULE_LIST)
-	$(RM) -f $@ \
-			$(top_builddir)/mbrdisk.img \
-			$(top_builddir)/gptdisk.img && \
-		\
-		$(TRUNCATE) --size="$(DISK_SIZE_MB)M" \
-			"$@" && \
-		\
+		$(top_srcdir)/populate_fat.sh
+	printf "Truncating fatpart.img\n" \
+		&& \
+		$(TRUNCATE) --size=0 "$@" \
+		&& \
+		$(TRUNCATE) --size="$(DISK_SIZE_MB)M" "$@" \
+		&& \
+		printf "Formatting partition\n" \
+		&& \
 		$(MKFS_VFAT) \
 			-F 32 \
-			-S $(SECTOR_SZ) \
-			-R $$(( 0x10000 / $(SECTOR_SZ) )) \
-			-b $$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
+			-S "$(SECTOR_SZ)" \
+			-R "$$(( $(FATPART_RESERVED_SIZE) / $(SECTOR_SZ) ))" \
+			-b "$$(( $(FATPART_RESERVED_SIZE) / $(SECTOR_SZ) - 1 ))" \
 			-n DGOS \
-			$@ && \
-			\
+			"$@" \
+		&& \
+		printf "Stitching short jump into partition boot sector\n" \
+		&& \
 		$(DD) \
-			if=$(top_builddir)/boot1-bin \
-			of=$@ \
-			bs=1 count=$$(( 0xB )) \
-			conv=notrunc && \
-			\
-		$(DD) \
-			if=$(top_builddir)/boot1-bin \
-			of=$@ \
+			if=boot1-bin \
+			of="$@" \
 			bs=1 \
-			seek=$$(( 0x5A )) \
-			skip=$$(( 0x5A )) \
-			count=$$(( 0x1FE - 0x5A )) \
-			conv=notrunc && \
-			\
+			count=$$(( 0x3 )) \
+			conv=notrunc \
+		&& \
+		printf "Stitching 0x5A-0x1FE into partition boot sector\n" \
+		&& \
 		$(DD) \
-			if=$(top_builddir)/bootfat-bin \
-			of=$@ \
-			bs=$(SECTOR_SZ) \
+			if=boot1-bin \
+			of="$@" \
+			bs=1 \
+			seek="$$(( 0x5A ))" \
+			skip="$$(( 0x5A ))" \
+			count="$$(( 0x1FE - 0x5A ))" \
+			conv=notrunc \
+		&& \
+		printf "Stitching signature (stolen from mbr)\n" \
+		&& \
+		$(DD) \
+			if=mbr-bin \
+			of="$@" \
+			bs=1 \
+			seek="$$(( 0x1FE ))" \
+			skip="$$(( 0x1FE ))" \
+			count=2 \
+			conv=notrunc \
+		&& \
+		printf "Installing stage 2\n" \
+		&& \
+		$(DD) \
+			if=bootfat-bin \
+			of="$@" \
+			bs="$(SECTOR_SZ)" \
 			seek=2 \
 			skip=0 \
-			conv=notrunc && \
-			\
+			conv=notrunc \
+		&& \
+		printf "Make a backup copy of the MBR at the end of reserved area\n" \
+		&& \
 		$(DD) \
-			if=$@ \
-			of=$@ \
-			bs=$(SECTOR_SZ) \
+			if="$@" \
+			of="$@" \
+			bs="$(SECTOR_SZ)" \
 			count=1 \
 			skip=0 \
-			seek=$$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
-			conv=notrunc && \
-			\
+			seek="$$(( $(FATPART_RESERVED_SIZE) / $(SECTOR_SZ) - 1 ))" \
+			conv=notrunc \
+		&& \
+		printf "Populating fat partition with files and directories\n" \
+		&& \
 		SRCDIR="$(top_srcdir)" \
-			$(top_srcdir)/populate_fat.sh \
-				$(top_builddir)/fatpart.img "$(top_srcdir)"
+			"$(top_srcdir)/populate_fat.sh" fatpart.img "$(top_srcdir)"
 
 DGOS_MBRID=0x0615151f
 DGOS_UUID=0615151f-d802-4edf-914a-734dc4f03687
+MBR_PART_LBA = 2048
 
-$(top_builddir)/mbrdisk.img: fatpart.img
-	$(TRUNCATE) --size="$$(( $(DISK_SIZE_MB) + 1 ))M" $@ && \
-		\
-		printf 'label: dos\nlabel: dos\nlabel-id: %s\n2048,,U,*' \
+mbrdisk.img: fatpart.img mbr-bin
+	printf "Truncating disk image\n" \
+		&& \
+		"$(TRUNCATE)" --size=0 "$@" \
+		&& \
+		"$(TRUNCATE)" --size="$$(( $(DISK_SIZE_MB) + 2 ))M" "$@" \
+		&& \
+		printf "Creating partition table\n" \
+		&& \
+		printf 'label: dos\nlabel: dos\nlabel-id: %s\n$(MBR_PART_LBA),,U,*' \
 				"$(DGOS_MBRID)" | \
-			$(SFDISK) --no-tell-kernel $@ && \
-			\
-		$(DD) \
-			if=$< \
-			of=$@ \
-			bs=$(SECTOR_SZ) \
-			seek=2048 \
-			conv=notrunc && \
-			\
-		$(DD) \
-			if=$(top_builddir)/mbr-bin \
-			of=$@ \
+			"$(SFDISK)" --no-tell-kernel "$@" \
+		&& \
+		printf "Stitching MBR code into MBR (preserve partition table)\n" \
+		&& \
+		"$(DD)" \
+			if=mbr-bin \
+			of="$@" \
 			bs=1 \
 			count=446 \
-			conv=notrunc && \
-			\
-		$(DD) \
-			if=$(top_builddir)/mbr-bin \
-			of=$@ \
+			conv=notrunc \
+		&& \
+		printf "Copying MBR signature\n" \
+		&& \
+		"$(DD)" \
+			if=mbr-bin \
+			of="$@" \
 			bs=1 \
 			seek=510 \
 			skip=510 \
 			count=2 \
+			conv=notrunc \
+		&& \
+		printf "Copying partition image into disk image\n" \
+		&& \
+		"$(DD)" \
+			if="$<" \
+			of="$@" \
+			bs="$(SECTOR_SZ)" \
+			seek="$$(( $(MBR_PART_LBA) ))" \
 			conv=notrunc
 
-$(top_builddir)/hybdisk.img: fatpart.img
-	$(TRUNCATE) --size=$$(( $(DISK_SIZE_MB) + 2))M $@ && \
-	\
-		printf 'label: gpt\n2048,,U,*' | \
-			$(SFDISK) $@ && \
-		\
-		$(DD) \
-			if=$(top_builddir)/mbr-bin \
-			of=$@ \
+hybdisk.img: fatpart.img mbr-bin
+	printf "Truncating hybrid disk image\n" \
+		&& \
+		"$(TRUNCATE)" --size=0 "$@" \
+		&& \
+		"$(TRUNCATE)" --size=$$(( $(DISK_SIZE_MB) + 2))M "$@" \
+		&& \
+		printf "Creating MBR partition table\n" \
+		&& \
+		printf 'label: gpt\n2048,,U,*' | $(SFDISK) "$@" \
+		&& \
+		printf "Copying boot code into MBR\n" \
+		&& \
+		"$(DD)" \
+			if=mbr-bin \
+			of="$@" \
 			bs=1 \
 			count=446 \
-			conv=notrunc && \
-		\
-		$(SGDISK) -A 1:set:2 -h 1 $@ && \
-		\
-		$(DD) \
-			if=$< \
-			of=$@ \
-			bs=$(SECTOR_SZ) \
-			seek=2048 \
-			conv=notrunc && \
-		\
-		$(DD) \
-			if=$(top_builddir)/mbr-bin \
-			of=$@ \
-			bs=1 seek=510 \
+			conv=notrunc \
+		&& \
+		printf "Copying MBR signature\n" \
+		&& \
+		"$(DD)" \
+			if=mbr-bin \
+			of="$@" \
+			bs=1 \
+			seek=510 \
 			skip=510 \
 			count=2 \
-			conv=notrunc
-
-$(top_builddir)/gptdisk.img: fatpart.img
-	$(TRUNCATE) --size=0 $@ && \
-		\
-		$(TRUNCATE) --size=$$(( $(DISK_SIZE_MB) + 2))M \
-			$@ && \
-		\
-		$(SGDISK) -Z -n 1:2048:0 -t 1:ef00 -A 1:set:2 \
-			$@ && \
-		\
-		$(DD) \
-			if=$< \
-			of=$@ \
+			conv=notrunc \
+		&& \
+		printf "Converting MBR to hybrid GPT protective MBR\n" \
+		&& \
+		"$(SGDISK)" -A 1:set:2 -h 1 "$@" \
+		&& \
+		printf "Copying partition into disk image\n" \
+		&& \
+		"$(DD)" \
+			if="$<" \
+			of="$@" \
 			bs=$(SECTOR_SZ) \
 			seek=2048 \
 			conv=notrunc
 
-$(top_builddir)/mbrdisk.qcow: $(top_builddir)/mbrdisk.img
-	$(QEMU_IMG) convert -f raw -O qcow -p $< $@
+gptdisk.img: fatpart.img
+	printf "Truncating GPT disk image\n" \
+		&& \
+		"$(TRUNCATE)" --size=0 "$@" \
+		&& \
+		"$(TRUNCATE)" --size="$$(( $(DISK_SIZE_MB) + 2))M" "$@" \
+		&& \
+		printf "Creating GPT partition table\n" \
+		&& \
+		"$(SGDISK)" -Z -n 1:2048:0 -t 1:ef00 -A 1:set:2 "$@" \
+		&& \
+		printf "Copying partition into disk image\n" \
+		&& \
+		"$(DD)" \
+			if="$<" \
+			of="$@" \
+			bs=$(SECTOR_SZ) \
+			seek=2048 \
+			conv=notrunc
 
-$(top_builddir)/gptdisk.qcow: $(top_builddir)/gptdisk.img
-	$(QEMU_IMG) convert -f raw -O qcow -p $< $@
+mbrdisk.qcow: $(top_builddir)/mbrdisk.img
+	$(QEMU_IMG) convert -f raw -O qcow -p $< "$@"
 
-$(top_builddir)/gptdisk.qcow.img: $(top_builddir)/gptdisk.qcow
-	$(QEMU_IMG) convert -f qcow -O raw -p $< $@
+gptdisk.qcow: $(top_builddir)/gptdisk.img
+	$(QEMU_IMG) convert -f raw -O qcow -p $< "$@"
+
+gptdisk.qcow.img: $(top_builddir)/gptdisk.qcow
+	$(QEMU_IMG) convert -f qcow -O raw -p $< "$@"
