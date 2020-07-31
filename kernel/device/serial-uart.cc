@@ -588,7 +588,7 @@ isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
         }
     }
 
-    return thread_schedule(ctx);
+    return ctx;
 }
 
 void uart_t::port_irq_handler()
@@ -627,7 +627,7 @@ public:
     bool route_irq(int cpu) override final;
 
 private:
-    using lock_type = ext::irq_mutex;
+    using lock_type = ext::irq_ticketlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
@@ -972,6 +972,11 @@ public:
     virtual bool wait_dsr_until(timeout_t timeout) override final;
 
 private:
+    using lock_type = ext::irq_ticketlock;
+    using scoped_lock = std::unique_lock<lock_type>;
+
+    lock_type port_lock;
+
     bool is_rx_full() const;
 
     _always_inline bool is_rx_empty() const
@@ -996,18 +1001,21 @@ uart_poll_t::uart_poll_t()
 
 bool uart_poll_t::init(port_cfg_t const& cfg, bool use_irq)
 {
+    scoped_lock lock(port_lock);
     return uart_t::init(cfg, use_irq);
 }
 
 ssize_t uart_poll_t::write(void const *buf, size_t size, size_t min_write,
                            clock::time_point timeout)
 {
+    scoped_lock lock(port_lock);
+
     for (size_t i = 0; i < size; ) {
         // Wait for tx holding register to be empty
         for (;;) {
             inp(reg_lsr);
 
-            if (reg_lsr.tx_hold_empty)
+            if (likely(reg_lsr.tx_hold_empty))
                 break;
 
             if (i >= min_write)
@@ -1023,7 +1031,7 @@ ssize_t uart_poll_t::write(void const *buf, size_t size, size_t min_write,
         for (;;) {
             inp(reg_msr);
 
-            if (reg_msr.cts)
+            if (likely(reg_msr.cts))
                 break;
 
             if (i >= min_write)
@@ -1048,6 +1056,8 @@ ssize_t uart_poll_t::write(void const *buf, size_t size, size_t min_write,
 ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read,
                           clock::time_point timeout)
 {
+    scoped_lock lock(port_lock);
+
     // First drain the buffer
     size_t i = 0;
 
@@ -1098,6 +1108,8 @@ ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read,
 
 bool uart_poll_t::wait_dsr_until(timeout_t timeout)
 {
+    scoped_lock lock(port_lock);
+
     for (;;) {
         inp(reg_msr);
 
@@ -1142,8 +1154,10 @@ EXPORT uart_dev_t *uart_dev_t::open(
         return id < uart_defs::uarts.size()
                 ? uart_defs::uarts[id].get()
                 : new (ext::nothrow) uart_defs::uart_async_t();
+
     uart_defs::debug_uart.init({0x3F8, 4, 115200,
-                               data_bits, parity_type, stop_bits}, true);
+                               data_bits, parity_type, stop_bits}, false);
+
     return &uart_defs::debug_uart;
 }
 
