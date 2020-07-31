@@ -51,11 +51,11 @@ enum tui_menu_item_index_t {
 static tui_menu_item_t tui_menu[] = {
     { TSTR "menu timeout (sec)", tui_timeout, 0 },
     { TSTR "kernel debugger", tui_dis_ena, 0 },
-    { TSTR "serial debug output", tui_dis_ena, 0 },
+    { TSTR "serial debug output", tui_dis_ena, 1 },
     { TSTR "serial port", tui_com_port, 0 },
     { TSTR "serial baud rate", tui_baud_rates, 0 },
     { TSTR "display resolution", {}, 0 },
-    { TSTR "port 0xe9 debug output", tui_dis_ena, 1 },
+    { TSTR "port 0xe9 debug output", tui_dis_ena, 0 },
     { TSTR "SMP", tui_dis_ena, 1 },
     { TSTR "ACPI", tui_dis_ena, 1 },
     { TSTR "MPS", tui_dis_ena, 1 },

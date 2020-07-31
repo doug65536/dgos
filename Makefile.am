@@ -2481,10 +2481,11 @@ QEMU_MONITOR = \
 	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet \
 	-mon qemu-monitor,mode=readline
 
+#-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out
+#-device isa-debugcon,chardev=qemu-debug-out
+#
+
 QEMU_DEBUGCON = \
-	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
-	-device isa-debugcon,chardev=qemu-debug-out \
-	\
 	-chardev pipe,path=$(DUMPDIR)/call-trace-out,id=call-trace-out \
 	-device isa-debugcon,iobase=0xEA,chardev=call-trace-out \
 	\
@@ -2494,8 +2495,11 @@ QEMU_DEBUGCON = \
 #-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0
 
 QEMU_SERIAL = \
+	-chardev file,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
+	-device isa-serial,chardev=qemu-debug-out,id=com1 \
+	\
 	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-serial-socket,id=com1 \
+	-device isa-serial,chardev=qemu-serial-socket,id=com3 \
 	\
 	-chardev socket,id=qemu-symsrv-socket,host=localhost,port=7789,server,nowait,nodelay \
 	-device isa-serial,chardev=qemu-symsrv-socket,id=com2
