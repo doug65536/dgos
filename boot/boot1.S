@@ -45,9 +45,9 @@ entry:
 .section .code, "x", @progbits
 bootstrap_code:
     // Load cs register ASAP
-    ljmp $0,$ UNRELOCATED(past_bpb)
+    ljmp $0,$ UNRELOCATED(.Lload_cs)
 
-past_bpb:
+.Lload_cs:
     cli
 
     // Load the relevant portion of the partition table entry
