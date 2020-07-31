@@ -381,19 +381,19 @@ int iso9660_fs_t::name_compare_ascii(
                     ? *chk
                     : ' ';
 
-            printdbg("utf8: compare %c (0x%02x) %c (0x%02x)\n",
-                     !key_codepoint
-                     ? '0'
-                     : key_codepoint >= ' ' && key_codepoint < 126
-                     ? key_codepoint
-                     : '.',
-                     key_codepoint,
-                     !chk_codepoint
-                     ? '0'
-                     : chk_codepoint >= ' ' && chk_codepoint < 126
-                     ? chk_codepoint
-                     : '.',
-                     chk_codepoint);
+//            printdbg("utf8: compare %c (0x%02x) %c (0x%02x)\n",
+//                     !key_codepoint
+//                     ? '0'
+//                     : key_codepoint >= ' ' && key_codepoint < 126
+//                     ? key_codepoint
+//                     : '.',
+//                     key_codepoint,
+//                     !chk_codepoint
+//                     ? '0'
+//                     : chk_codepoint >= ' ' && chk_codepoint < 126
+//                     ? chk_codepoint
+//                     : '.',
+//                     chk_codepoint);
 
             cmp = chk_codepoint - key_codepoint;
 
@@ -429,19 +429,19 @@ int iso9660_fs_t::name_compare_utf16be(
                 ? utf16be_to_ucs4(chk, &chk)
                 : 0;
 
-        printdbg("utf16be: compare %c (0x%02x) %c (0x%02x)\n",
-                 !key_codepoint
-                 ? '0'
-                 : key_codepoint >= ' ' && key_codepoint < 126
-                 ? key_codepoint
-                 : '.',
-                 key_codepoint,
-                 !chk_codepoint
-                 ? '0'
-                 : chk_codepoint >= ' ' && chk_codepoint < 126
-                 ? chk_codepoint
-                 : '.',
-                 chk_codepoint);
+//        printdbg("utf16be: compare %c (0x%02x) %c (0x%02x)\n",
+//                 !key_codepoint
+//                 ? '0'
+//                 : key_codepoint >= ' ' && key_codepoint < 126
+//                 ? key_codepoint
+//                 : '.',
+//                 key_codepoint,
+//                 !chk_codepoint
+//                 ? '0'
+//                 : chk_codepoint >= ' ' && chk_codepoint < 126
+//                 ? chk_codepoint
+//                 : '.',
+//                 chk_codepoint);
 
         cmp = key_codepoint - chk_codepoint;
     }
