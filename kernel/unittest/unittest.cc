@@ -98,7 +98,7 @@ public:
     T m;
 };
 
-int module_main(int argc, char const * const * argv)
+static int test_run_thread(void *)
 {
     unittest::unit_ctx ctx;
     unittest::unit::run_all(&ctx);
@@ -110,6 +110,20 @@ int module_main(int argc, char const * const * argv)
         printdbg("FAILED!\n");
         return 1;
     }
+    return 0;
+}
+
+int module_main(int argc, char const * const * argv)
+{
+#if 1
+    test_run_thread(nullptr);
+#else
+    int tid = thread_create(test_run_thread, nullptr,
+                            "unittest", 0, false, false);
+
+    thread_close(tid);
+#endif
+
     return 0;
 }
 
