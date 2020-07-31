@@ -51,6 +51,30 @@ static constexpr _always_inline _flatten uint8_t bit_msb_set_32(int32_t n)
 #endif
 }
 
+// Return bit number of most significant set bit
+_const
+static constexpr _always_inline _flatten uint8_t bit_clz(int64_t n)
+{
+#if __SIZEOF_LONG__ == 8
+    return __builtin_clzl(n);
+#elif __SIZEOF_LONG_LONG__ == 8
+    return __builtin_clzll(n);
+#else
+#error Unexpected integer sizes
+#endif
+}
+
+// Return bit number of most significant set bit
+_const
+static constexpr _always_inline _flatten uint8_t bit_clz(int32_t n)
+{
+#if __SIZEOF_INT__ == 4
+    return __builtin_clz(n);
+#else
+#error Unexpected integer sizes
+#endif
+}
+
 _const
 static constexpr _always_inline _flatten uint8_t bit_popcnt_64(int64_t n)
 {
