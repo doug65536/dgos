@@ -1,0 +1,4 @@
+#pragma once
+
+__attribute__((__const__))
+void *operator new(size_t size, void *p);
