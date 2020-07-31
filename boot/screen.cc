@@ -199,6 +199,7 @@ void print_line_at(int x, int y, int attr, tchar const *format, ...)
 
 void vprint_line(int attr, tchar const *format, va_list ap)
 {
+    print_xy(0, 24, ' ', attr, 79);
     vprint_line_at(0, 24, attr, format, ap);
 }
 
