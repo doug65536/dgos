@@ -26,8 +26,8 @@ UNITTEST(test_condition_variable_wait_timeout)
     std::chrono::milliseconds elap = en_tp - st_tp;
 
     // Wide 50ms tolerance to avoid spurious test failures
-    le(true, 950 <= elap.count());
-    le(true, 1050 >= elap.count());
+    le(950U, elap.count());
+    ge(1050U, elap.count());
 }
 
 static int test_thread_worker(void *variation)
@@ -149,7 +149,7 @@ static int test_thread_worker(void *variation)
     return 0;
 }
 
-UNITTEST(test_thread_context)
+DISABLED_UNITTEST(test_thread_context)
 {
     size_t count = thread_get_cpu_count();
     for (size_t i = 0; i < count; ++i)
