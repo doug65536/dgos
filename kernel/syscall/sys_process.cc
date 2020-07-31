@@ -444,13 +444,26 @@ void sys_exit(int exitcode)
 void sys_thread_exit(int tid, int exitcode)
 {
     process_t *p = thread_current_process();
+
     p->exit_thread(tid, exitcode);
 }
 
+// Creates a new usermode thread that starts with the specified setup
 long sys_clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
                void *child_stack, int flags,
                void *(*fn)(void *arg), void *arg)
 {
+    // Sanity
+
+    if (unlikely(!mm_is_user_range((void*)bootstrap, 64)))
+        return -int(errno_t::EFAULT);
+
+    if (unlikely(!mm_is_user_range((void*)fn, 64)))
+        return -int(errno_t::EFAULT);
+
+    // Tell the current process to create the specified clone
+
     process_t *this_process = thread_current_process();
+
     return this_process->clone(bootstrap, child_stack, flags, fn, arg);
 }
