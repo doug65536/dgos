@@ -3,8 +3,9 @@
 #define ISR_CTX_CTX_FLAGS_FAST_BIT  7
 #define ISR_CTX_CTX_FLAGS_FAST_QWBIT    (7+8)
 
-#define ISR_CTX_CTX_FLAGS_FIXGS_BIT 6
-#define ISR_CTX_CTX_FLAGS_FIXGS_QWBIT   (6+8)
+// Set when the context had user gsbase
+#define ISR_CTX_CTX_FLAGS_USERGS_BIT 6
+#define ISR_CTX_CTX_FLAGS_USERGS_QWBIT   (6+8)
 
 #define ISR_CTX_OFS_INTERRUPT       (18*8)
 #define ISR_CTX_OFS_RBP             (17*8)
@@ -21,6 +22,7 @@ struct thread_info_t;
 
 #define ISR_CTX_REG_GPR_n(ctx, i)       ((ctx)->gpr.r.r[(i)])
 #define ISR_CTX_REG_SEG_n(ctx, i)       ((ctx)->gpr.s.r[(i)])
+#define ISR_CTX_REG_SEG_IMG(ctx)        ((ctx)->gpr.s.packed)
 
 // isr_context->gpr.r order
 #define ISR_CTX_REG_RDI(ctx)            ((ctx)->gpr.r.n.rdi)
@@ -138,6 +140,7 @@ struct isr_seg_t {
 union isr_seg_union_t {
     isr_seg_t n;
     uint16_t r[4];
+    uint64_t packed;
 };
 
 // Exception handler context

@@ -39,7 +39,7 @@ cpuid: brand_string="              Intel(R) Pentium(R) 4 CPU        "
 cpuid: mmx=1, apic=x2apic, simd=avx2, sse4a=1, misaligned_sse=0, sep=1
 cpuid: movbe=0, adx=0, aes=1, sha=1, xsave=1, xsaveopt=1, avx_f16c=0
 cpuid: avx_fma=1, bmi=0, xop=0, fma4=1, tbm=0, x86_64=1, 1g_pages=1, pcid=1
-cpuid: fsgsbase=1, smep=1, smap=1, mwait=1
+cpuid: fsgsbase=0, smep=1, smap=1, mwait=1
 print_timestamps: enabled=0
 magic_break: enabled=0
 port_e9_hack: enabled=1

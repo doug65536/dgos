@@ -278,4 +278,9 @@ isr_context_t *thread_entering_irq(isr_context_t *ctx);
 
 isr_context_t *thread_finishing_irq(isr_context_t *ctx);
 
+_noreturn
+void arch_jump_to_user(uintptr_t ip, uintptr_t sp,
+                       uintptr_t kernel_sp, bool use64,
+                       uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
+
 __END_DECLS

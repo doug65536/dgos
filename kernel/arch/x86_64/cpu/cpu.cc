@@ -255,6 +255,8 @@ extern "C" void soft_rdgsbase_r14();
 extern "C" void soft_wrfsbase_r13();
 extern "C" void soft_wrgsbase_r14();
 
+bool constexpr force_msr_fsgsbase = true;
+
 extern "C"
 EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                              uint8_t * const *rodata_en)
@@ -297,11 +299,13 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                 // Prevent user code influencing anything
                 if (cpuid_has_ibpb()) {
                     // Call ibpb function
+                    printdbg("Using IBPB mitigation\n");
                     code += is_relaxed_indirect;
                     new_sz = 5;
                     dist = intptr_t(protection_barrier_from_user_ibpb) - next;
                 } else {
                     // nop it out
+                    printdbg("Not using IBPB mitigation\n");
                     new_sz = 0;
                 }
 
@@ -311,11 +315,13 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                 // Clear microarchitectural data (intel)
                 if (cpuid_has_md_clear()) {
                     // Call verw function
+                    printdbg("Using MDS mitigation\n");
                     code += is_relaxed_indirect;
                     new_sz = 5;
                     dist = intptr_t(protection_barrier_to_user_verw) - next;
                 } else {
                     // nop it out
+                    printdbg("Not using MDS mitigation\n");
                     new_sz = 0;
                 }
 
@@ -340,7 +346,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                                  rdgsbase_r14_insn,
                                  sizeof(rdgsbase_r14_insn)))) {
                 // Both at once in one
-                if (cpuid_has_fsgsbase())
+                if (!force_msr_fsgsbase && cpuid_has_fsgsbase())
                     continue;
 
                 old_sz = sizeof(rdfsbase_r13_insn) +
@@ -354,7 +360,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                                         wrgsbase_r14_insn,
                                         sizeof(wrgsbase_r14_insn)))) {
                 // Both at once in one
-                if (cpuid_has_fsgsbase())
+                if (!force_msr_fsgsbase && cpuid_has_fsgsbase())
                     continue;
 
                 old_sz = sizeof(wrfsbase_r13_insn) +
@@ -364,7 +370,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                 dist = uintptr_t(soft_wrfsgsbase_r13r14) - next;
             } else if (unlikely(!memcmp(code, rdfsbase_r13_insn,
                                         sizeof(rdfsbase_r13_insn)))) {
-                if (cpuid_has_fsgsbase())
+                if (!force_msr_fsgsbase && cpuid_has_fsgsbase())
                     continue;
 
                 old_sz = sizeof(rdfsbase_r13_insn);
@@ -373,7 +379,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                 dist = uintptr_t(soft_rdfsbase_r13) - next;
             } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
                                         sizeof(wrfsbase_r13_insn)))) {
-                if (cpuid_has_fsgsbase())
+                if (!force_msr_fsgsbase && cpuid_has_fsgsbase())
                     continue;
 
                 old_sz = sizeof(wrfsbase_r13_insn);
@@ -382,7 +388,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                 dist = uintptr_t(soft_wrfsbase_r13) - next;
             } else if (unlikely(!memcmp(code, rdgsbase_r14_insn,
                                         sizeof(rdgsbase_r14_insn)))) {
-                if (cpuid_has_fsgsbase())
+                if (!force_msr_fsgsbase && cpuid_has_fsgsbase())
                     continue;
 
                 old_sz = sizeof(rdgsbase_r14_insn);
@@ -391,7 +397,7 @@ EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
                 dist = uintptr_t(soft_rdgsbase_r14) - next;
             } else if (unlikely(!memcmp(code, wrgsbase_r14_insn,
                                         sizeof(wrgsbase_r14_insn)))) {
-                if (cpuid_has_fsgsbase())
+                if (!force_msr_fsgsbase && cpuid_has_fsgsbase())
                     continue;
 
                 old_sz = sizeof(wrgsbase_r14_insn);
@@ -515,9 +521,9 @@ void cpu_init_early(int ap)
     cpu_ds_set(GDT_SEL_USER_DATA | 3);
     cpu_es_set(GDT_SEL_USER_DATA | 3);
     cpu_fs_set(GDT_SEL_USER_DATA | 3);
-    void *saved_gsbase = cpu_gsbase_get();
+    cpu_swapgs();
     cpu_gs_set(GDT_SEL_USER_DATA | 3);
-    cpu_gsbase_set(saved_gsbase);
+    cpu_swapgs();
 
     thread_cls_init_early(ap);
 
@@ -677,9 +683,12 @@ void cpu_init(int ap)
     // Disable paging context identifiers feature
     clr |= CPU_CR4_PCIDE;
 
-    // Enable {RD|WR}{FS|GS}BASE instructions
-    if (cpuid_has_fsgsbase())
-        set |= CPU_CR4_FSGSBASE;
+//    // Enable {RD|WR}{FS|GS}BASE instructions
+//    if (cpuid_has_fsgsbase())
+//        set |= CPU_CR4_FSGSBASE;
+
+    // Disable {RD|WR}{FS|GS}BASE instructions
+    clr |= CPU_CR4_FSGSBASE;
 
     if (cpuid_has_umip()) {
         // Enable user mode instruction prevention

@@ -364,6 +364,11 @@ static _always_inline void cpu_cache_flush()
     __asm__ __volatile__ ("wbinvd\n\t" : : : "memory");
 }
 
+static _always_inline void cpu_swapgs()
+{
+    __asm__ __volatile__ ("swapgs\n\t");
+}
+
 static _always_inline void cpu_ds_set(uint16_t selector)
 {
     __asm__ __volatile__ (
@@ -428,6 +433,11 @@ static _always_inline void cpu_fsbase_set(void *fs_base)
     cpu_msr_set(CPU_MSR_FSBASE, (uintptr_t)fs_base);
 }
 
+static _always_inline void *cpu_fsbase_get()
+{
+    return (void*)cpu_msr_get(CPU_MSR_FSBASE);
+}
+
 static _always_inline void cpu_gsbase_set(void *gs_base)
 {
     cpu_msr_set(CPU_MSR_GSBASE, (uintptr_t)gs_base);
@@ -441,6 +451,11 @@ static _always_inline void *cpu_gsbase_get()
 static _always_inline void cpu_altgsbase_set(void *k_gs_base)
 {
     cpu_msr_set(CPU_MSR_KGSBASE, (uintptr_t)k_gs_base);
+}
+
+static _always_inline void *cpu_altgsbase_get()
+{
+    return (void*)cpu_msr_get(CPU_MSR_KGSBASE);
 }
 
 static _always_inline table_register_64_t cpu_gdtr_get()

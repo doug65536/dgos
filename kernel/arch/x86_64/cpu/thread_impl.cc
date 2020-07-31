@@ -155,7 +155,7 @@ struct alignas(256) thread_info_t {
     // --- cache line ---
 
     // 4 64-bit values
-    using lock_type = ext::irq_mutex;   // 32 bytes
+    using lock_type = ext::irq_ticketlock;   // 32 bytes
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 
@@ -281,13 +281,13 @@ struct alignas(256) cpu_info_t {
 
     bool online = false;
     fpu_state_t fpu_state = discarded;
-    uint8_t apic_dcr = {};
+    uint8_t apic_dcr = 0;
 
     // in_irq is incremented after irq entry and decremented before irq exit
     // you can expect setting should_reschedule to work when in_irq is > 0
     // thread_entering_irq() and thread_finishing_irq() adjust the value
     // of in_irq
-    uint8_t in_irq;
+    uint8_t in_irq = 0;
 
     // Which thread's context is in the FPU, or -1 if discarded
     thread_t fpu_owner = -1;
@@ -549,6 +549,25 @@ static char *thread_allocate_stack(
 
 // Returns threads array index or 0 on error
 // Minimum allowable stack space is 4KB
+cpu_info_t & schedule_thread_on_cpu(
+        thread_info_t *thread,
+        uint64_t timeslice_timestamp,
+        size_t cpu_nr, uint64_t preempt_time)
+{
+    cpu_info_t& cpu = cpus[cpu_nr];
+    cpu_info_t::scoped_lock lock(cpu.queue_lock);
+    thread->timeslice_timestamp = timeslice_timestamp;
+    thread->preempt_time = preempt_time;
+    thread->schedule_node = cpu.ready_list
+            .emplace(thread->timeslice_timestamp,
+                     ready_set_t::value_type::second_type(thread))
+            .first;
+    dump_scheduler_list("ready list:", cpu.ready_list);
+    lock.unlock();
+
+    return cpu;
+}
+
 static thread_t thread_create_with_state(
         thread_fn_t fn, void *userdata, char const *name, size_t stack_size,
         thread_state_t state, thread_cpu_mask_t const &affinity,
@@ -742,23 +761,22 @@ static thread_t thread_create_with_state(
         // Idle, lowest possible priority
         now = UINT64_MAX;
 
-    cpu_info_t& cpu = cpus[cpu_nr];
-    cpu_info_t::scoped_lock lock(cpu.queue_lock);
     printdbg("cpu %zu initially scheduling thread %u\n",
              cpu_nr, thread->thread_id);
-    thread->timeslice_timestamp = now;
-    thread->preempt_time = thread->used_time + 64000000;
-    thread->schedule_node = cpu.ready_list
-            .emplace(thread->timeslice_timestamp,
-                     ready_set_t::value_type::second_type(thread))
-            .first;
-    dump_scheduler_list("ready list:", cpu.ready_list);
-    lock.unlock();
+
+    uint64_t timeslice_timestamp = now;
+    uint64_t preempt_time = thread->used_time + 64000000;
+
+    cpu_info_t& cpu = schedule_thread_on_cpu(
+                thread, timeslice_timestamp, cpu_nr, preempt_time);
+
+    thread_info_t *parent = this_thread();
 
     // Kick other cpu if not this cpu
     if (thread_cpu_number() != cpu_nr)
         apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
-    else if (thread->thread_id >= thread_cpu_count())
+//    else if (1 || parent->sched_timestamp >= thread->sched_timestamp)
+    else if (thread->sched_timestamp > 0)
         thread_yield();
 
     return i;
@@ -971,21 +989,18 @@ void thread_init(int ap)
         thread->state = THREAD_IS_RUNNING;
 
         size_t cpu_nr = run_cpu[thread->thread_id];
-        cpu_info_t& cpu = cpus[cpu_nr];
-        cpu_info_t::scoped_lock cpu_lock(cpu.queue_lock);
 
         printdbg("cpu %zu initially scheduling idle thread %u\n",
                  cpu_nr, thread->thread_id);
 
+        schedule_thread_on_cpu(thread, UINT64_MAX, cpu_nr, UINT64_MAX);
+
         thread->preempt_time = UINT64_MAX;
         thread->timeslice_timestamp = UINT64_MAX;
-        thread->schedule_node = cpu.ready_list
+        thread->schedule_node = cpus[cpu_nr].ready_list
                 .emplace(thread->timeslice_timestamp,
                          ready_set_t::value_type::second_type(thread))
                 .first;
-
-        dump_scheduler_list("ready list:", cpu.ready_list);
-        cpu_lock.unlock();
 
         thread_count = 1;
     } else {
@@ -1019,7 +1034,7 @@ static thread_info_t *thread_choose_next(
         // ...don't even think about context switching
         return outgoing;
 
-    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
+//    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
 
     // Service the sleep queue
     for (ready_set_t::const_iterator en = cpu->sleep_list.cend(),
@@ -1225,10 +1240,7 @@ void thread_move_to_other_cpu(cpu_info_t *cpu, thread_info_t *thread)
 
 _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 {
-    //need this if ISRs run with IRQ enabled:
-
     assert(!(cpu_eflags_get() & CPU_EFLAGS_IF));
-    //cpu_scoped_irq_disable intr_dis;
 
     cpu_info_t *cpu = this_cpu();
 
@@ -1247,24 +1259,20 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     }
 
     // Store context pointer for resume later
-    assert(thread->ctx == nullptr);
+    assert(thread->ctx == nullptr ||
+           thread->thread_id < cpu_count);
     thread->ctx = ctx;
 
     uint64_t now = time_ns();
     uint64_t elapsed = now - thread->sched_timestamp;
     thread->sched_timestamp = 0;
 
-//    if (was_timer)
-//        printdbg("Preempted %ss\n", engineering_t(elapsed, -3).ptr());
-
-//    printdbg("\nthread %d %ss elapsed preempt=%#zx, used=%#zx\n",
-//             thread->thread_id, engineering_t(elapsed, -3).ptr(),
-//             thread->preempt_time, thread->used_time);
-
     //
     // Accumulate used and busy time on this CPU
 
     accumulate_time(cpu, thread, elapsed);
+
+    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
 
     // If the thread moved to a different CPU
     if (unlikely(thread_cpu_count() > 1 &&
@@ -1276,8 +1284,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         // A new timeslice is needed
         // and the thread is eligible for timestamp changes
         assert(thread->schedule_node != ready_set_t::const_iterator());
-
-        cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
 
         // Remove, modify, reinsert tree node
 
@@ -1321,9 +1327,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     for ( ; ; ++retries) {
         thread = thread_choose_next(cpu, outgoing, now);
 
-//        if (thread != outgoing)
-//            printdbg("Switching to thread %#x\n", thread->thread_id);
-
         assert((thread >= threads + cpu_count &&
                 thread < threads + countof(threads)) ||
                thread == threads + cpu->cpu_nr);
@@ -1345,12 +1348,13 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         pause();
     }
 
+    ctx = thread->ctx;
+    thread->ctx = nullptr;
+
     // Program rescheduling interrupt for remainder of timeslice
     uint64_t timeslice = thread->preempt_time > thread->used_time
             ? thread->preempt_time - thread->used_time
             : 32000000;
-
-    //dump_ready_list(*cpu);
 
     // If only idle thread or only one thread in addition to idle thread
     // then grant infinite timeslice
@@ -1372,14 +1376,8 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
             timeslice = next_sleep_expiry - now;
     }
 
-    if (timeslice < UINT64_MAX) {
-//        printdbg("Setting timeslice to %" PRIx64 "\n", timeslice);
+    if (timeslice < UINT64_MAX)
         thread_set_timer(cpu->apic_dcr, timeslice);
-//    } else {
-//        printdbg("Setting infinite timeslice\n");
-    }
-    //    else
-//        printdbg("Went tickless on thread %u\n", thread->thread_id);
 
     fpu_state_t& fpu_state = cpu->fpu_state;
 
@@ -1388,7 +1386,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         // FPU context switch save and/or restore, lockout/unlock
 
         unsigned from_cs = ISR_CTX_REG_CS(ctx);
-        unsigned to_cs = ISR_CTX_REG_CS(thread->ctx);
+        unsigned to_cs = ISR_CTX_REG_CS(ctx);
 
         bool from_kern = GDT_SEL_RPL_IS_KERNEL(from_cs);
         bool to_kern = GDT_SEL_RPL_IS_KERNEL(to_cs);
@@ -1443,14 +1441,14 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
             // Save it correctly
             // Don't bother saving FPU for voluntary context switch
             if (ISR_CTX_INTR(ctx) != INTR_THREAD_YIELD) {
-                ISR_CTX_FPU(ctx) = from_cs64
+                ISR_CTX_FPU(outgoing->ctx) = from_cs64
                         ? isr_save_fpu_ctx64(outgoing)
                         : isr_save_fpu_ctx32(outgoing);
             } else {
                 // Only save FPU control words, not data registers
                 outgoing->syscall_mxcsr = cpu_mxcsr_get();
                 outgoing->syscall_fcw87 = cpu_fcw_get();
-                ISR_CTX_FPU(ctx) = nullptr;
+                ISR_CTX_FPU(outgoing->ctx) = nullptr;
             }
 
             fpu_state = saved;
@@ -1459,13 +1457,13 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         case ctrlwords:
             outgoing->syscall_mxcsr = cpu_mxcsr_get();
             outgoing->syscall_fcw87 = cpu_fcw_get();
-            ISR_CTX_FPU(ctx) = nullptr;
+            ISR_CTX_FPU(outgoing->ctx) = nullptr;
             fpu_state = saved;
             break;
 
         case zeros:
         case ignore:
-            assert(ISR_CTX_FPU(ctx) == nullptr);
+            assert(ISR_CTX_FPU(outgoing->ctx) == nullptr);
             break;
         }
 
@@ -1484,14 +1482,14 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
             THREAD_TRACE("Restoring fpu context of thread %#x\n",
                          thread->thread_id);
 
-            if (ISR_CTX_FPU(thread->ctx)) {
+            if (ISR_CTX_FPU(ctx)) {
                 // Use the correct one
                 if (likely(to_cs64))
                     isr_restore_fpu_ctx64(thread);
                 else
                     isr_restore_fpu_ctx32(thread);
 
-            } else if (ISR_CTX_INTR(thread->ctx) == INTR_THREAD_YIELD) {
+            } else if (ISR_CTX_INTR(ctx) == INTR_THREAD_YIELD) {
                 // Restore just control words
                 cpu_mxcsr_set(thread->syscall_mxcsr);
                 cpu_fcw_set(thread->syscall_fcw87);
@@ -1527,13 +1525,64 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         }
     }
 
+    if (thread != outgoing) {
+        // Swap fsgsbase context
+
+        outgoing->fsbase = cpu_fsbase_get();
+        outgoing->gsbase = cpu_altgsbase_get();
+
+        if (outgoing->fsbase != thread->fsbase)
+            cpu_fsbase_set((void*)thread->fsbase);
+
+        // User threads are expected to always have null gsbase
+        if (unlikely(outgoing->gsbase != thread->gsbase))
+            cpu_altgsbase_set((void*)thread->gsbase);
+
+        // If segments changed
+        if (unlikely(ISR_CTX_REG_SEG_IMG(outgoing->ctx) !=
+                     ISR_CTX_REG_SEG_IMG(ctx))) {
+            if (unlikely(ISR_CTX_REG_DS(outgoing->ctx) !=
+                         ISR_CTX_REG_DS(ctx)))
+                cpu_ds_set(ISR_CTX_REG_DS(ctx));
+
+            if (unlikely(ISR_CTX_REG_ES(outgoing->ctx) !=
+                         ISR_CTX_REG_ES(ctx)))
+                cpu_es_set(ISR_CTX_REG_ES(ctx));
+
+            if (unlikely(ISR_CTX_REG_FS(outgoing->ctx) !=
+                         ISR_CTX_REG_FS(ctx))) {
+                cpu_fs_set(ISR_CTX_REG_FS(ctx));
+
+                cpu_fsbase_set((void*)thread->fsbase);
+            }
+
+            if (unlikely(ISR_CTX_REG_GS(outgoing->ctx) !=
+                         ISR_CTX_REG_GS(ctx))) {
+                // Move the kernel gsbase to safety
+                cpu_swapgs();
+
+                // Load the incoming gs
+                cpu_gs_set(ISR_CTX_REG_GS(ctx));
+
+                cpu_gsbase_set((void*)thread->gsbase);
+
+                // Restore kernel gsbase
+                cpu_swapgs();
+            }
+        }
+
+        // Update CR3
+        if (unlikely(ISR_CTX_REG_CR3(outgoing->ctx) !=
+                     ISR_CTX_REG_CR3(ctx)))
+            cpu_page_directory_set(ISR_CTX_REG_CR3(ctx));
+    }
+
     thread->sched_timestamp = now;
 
     assert(thread->state == THREAD_IS_RUNNING);
 
     cpu->tss_ptr->rsp[0] = uintptr_t(thread->priv_chg_stack);
 
-    ctx = thread->ctx;
     thread->ctx = nullptr;
     assert(ctx != nullptr);
     cpu->cur_thread = thread;
@@ -1544,7 +1593,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     assert(ctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
 
     if (thread != outgoing) {
-//        cpu_irq_disable();
         cpu->after_csw_fn = thread_clear_busy;
         cpu->after_csw_vp = outgoing;
     } else {
@@ -2084,6 +2132,7 @@ REGISTER_CALLOUT(thread_tss_ready, nullptr,
 
 void thread_terminate(thread_t tid)
 {
+    printdbg("Fixme: thread_terminate unimplemented\n");
 }
 
 void thread_exit(int exit_code)
@@ -2301,4 +2350,20 @@ isr_context_t *thread_finishing_irq(isr_context_t *ctx)
     if (!--*cpu_gs_ptr<uint8_t, CPU_INFO_IN_IRQ_OFS>())
         return thread_reschedule_if_requested_noirq(ctx);
     return ctx;
+}
+
+void arch_jump_to_user(uintptr_t ip, uintptr_t sp,
+                       uintptr_t kernel_sp, bool use64,
+                       uintptr_t arg0, uintptr_t arg1, uintptr_t arg2)
+{
+    cpu_info_t *cpu = this_cpu();
+    thread_info_t *thread = cpu->cur_thread;
+
+    // Update TSS kernel stack pointer before entering user mode
+    thread->priv_chg_stack = (char*)kernel_sp;
+    cpu->tss_ptr->rsp[0] = kernel_sp;
+    cpu_fsbase_set(thread->fsbase);
+    cpu_altgsbase_set(thread->gsbase);
+
+    isr_sysret(ip, sp, kernel_sp, use64, arg0, arg1, arg2);
 }

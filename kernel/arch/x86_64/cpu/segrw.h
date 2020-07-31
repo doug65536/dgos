@@ -28,13 +28,13 @@ static _always_inline T cpu_gs_read(void)
 template<typename T, ptrdiff_t ofs = 0>
 static _always_inline T *cpu_gs_ptr(void)
 {
-    uintptr_t value;
+    uintptr_t value = 0;
     // Probably better to load a register with zero than use
     // huge absolute memory encoding instruction
     __asm__ __volatile__ (
-        "mov %%gs:(%[src]),%[value]\n\t"
-        : [value] "=r" (value)
-        : [src] "r" (0)
+        "mov %%gs:(%[value]),%[value]\n\t"
+        : [value] "+r" (value)
+        :
         : "memory"
     );
     // Do the addition outside asm to allow constant folding optimization

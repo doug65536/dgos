@@ -2431,7 +2431,7 @@ QEMU_EXTRA_DEPS = \
 QEMU_CPUS = $(shell $(NPROC))
 QEMU_THREADS = 1
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
-QEMU_CPU = host,migratable=false,host-cache-info=true,fsgsbase
+QEMU_CPU = host,migratable=false,host-cache-info=true
 
 QEMU_RAM = 8G
 
@@ -2610,8 +2610,8 @@ QEMU_NP_numa = \
 QEMU_ICOUNT_SHIFT = 1
 
 QEMU_EMU = $(QEMU_EMU_$(1))
-QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand,fsgsbase
-QEMU_EMU_tcg_BASE = -cpu max,migratable=false,fsgsbase,vmware-cpuid-freq
+QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand
+QEMU_EMU_tcg_BASE = -cpu max,migratable=false,vmware-cpuid-freq
 QEMU_EMU_tcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=single
 QEMU_EMU_mttcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=multi
 QEMU_EMU_icount = $(QEMU_EMU_tcg) -icount shift=$(QEMU_ICOUNT_SHIFT),sleep=off

@@ -170,7 +170,7 @@ int process_t::start_clone(clone_data_t const& data)
     if (!__setjmp(buf)) {
         lock.unlock();
 
-        isr_sysret(uintptr_t((void*)data.bootstrap), uintptr_t(data.sp),
+        arch_jump_to_user(uintptr_t((void*)data.bootstrap), uintptr_t(data.sp),
                    uintptr_t(buf->rsp), use64,
                    tid, uintptr_t(data.fn), uintptr_t(data.arg));
     }
@@ -198,7 +198,8 @@ int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
 #ifdef __x86_64__
     // Intel ineptly throws #GP in kernel mode with user's stack if
     // user rip is not canonical. Check.
-    if (unlikely((intptr_t(uintptr_t(kernel_thread_arg->bootstrap) << 16) >> 16) !=
+    if (unlikely((intptr_t(uintptr_t(kernel_thread_arg->bootstrap)
+                           << 16) >> 16) !=
                  intptr_t(kernel_thread_arg->bootstrap)))
         return -int(errno_t::EFAULT);
 #endif
@@ -650,7 +651,7 @@ int process_t::run()
     // Push argc to the stack
     stack_ptr = (uintptr_t*)stack_ptr - 1;
     int argc = argv.size();
-    if (!mm_copy_user(stack_ptr, &argc, sizeof(argc)))
+    if (unlikely(!mm_copy_user(stack_ptr, &argc, sizeof(argc))))
         return -1;
 
     std::vector<auxv_t> auxent;
@@ -707,7 +708,7 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp, bool use64,
         // When interrupts occur, use the stack space we have here
         // isr_sysret does not return
         printdbg("Entering user process\n");
-        isr_sysret(ip, sp, uint64_t(buf->rsp) & -16, use64,
+        arch_jump_to_user(ip, sp, uint64_t(buf->rsp) & -16, use64,
                    thread_get_id(), 0, 0);
     }
 
@@ -791,13 +792,8 @@ void process_t::exit_thread(thread_t tid, int exitcode)
 {
     scoped_lock lock(process_lock);
 
-    size_t i = 0;
-    for (thread_t id: threads) {
-        if (id == tid)
-            break;
-        ++i;
-    }
-
+    size_t i, e;
+    for (i = 0, e = threads.size(); i != e && threads[i] != tid; ++i);
 
     if (likely(i < threads.size())) {
         __exception_jmp_buf_t *jmpbuf = exit_jmpbufs[i];
@@ -805,7 +801,7 @@ void process_t::exit_thread(thread_t tid, int exitcode)
         __longjmp(jmpbuf, 1);
     }
 
-    panic("Thread not found in exit_thread!");
+    panic("Thread %d not found in exit_thread!", tid);
 }
 
 bool process_t::add_thread(thread_t tid)
