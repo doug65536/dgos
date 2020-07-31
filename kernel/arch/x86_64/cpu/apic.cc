@@ -140,7 +140,7 @@ static uint8_t ioapic_msi_base_irq;
 static std::vector<uint8_t> isa_irq_lookup;
 
 static unsigned apic_id_count;
-static uint32_t apic_id_list[64];
+static uint32_t apic_id_list[512];
 // MP tables gives one entry per CPU package, ACPI gives one entry per thread
 static bool apic_id_list_per_pkg;
 
