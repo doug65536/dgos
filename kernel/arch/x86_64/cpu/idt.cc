@@ -405,8 +405,11 @@ int idt_init(int ap)
         for (size_t i = 0; i < 256; ++i) {
             addr = isr_entry_point(i);
 
-            // Sanity check
-            assert(*(uint8_t*)addr == 0x6a);
+            uint8_t first_opcode = 0;
+            memcpy(&first_opcode, (void*)addr, sizeof(first_opcode));
+
+            // Sanity check (tolerate software breakpoint)
+            assert(first_opcode == 0x6a || first_opcode == 0xcc);
 
             idt[i].offset_lo = uint16_t(addr & 0xFFFF);
             idt[i].offset_hi = uint16_t((addr >> 16) & 0xFFFF);
