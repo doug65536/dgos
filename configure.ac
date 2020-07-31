@@ -216,7 +216,7 @@ for flag in \
 		Warray-bounds Wformat-overflow \
 		Wno-address-of-packed-member \
 		Wsuggest-override Wsuggest-attribute=format \
-		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
+		Wduplicated-branches Wduplicated-cond Wc++1z-compat \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
 		mtls-direct-seg-refs fconserve-stack \
 		Wno-unused-parameter \
