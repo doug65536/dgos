@@ -1020,7 +1020,8 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
                              std::vector<ext::string> parameters,
                              char *ret_needed)
 {
-    this->module_name = module_name;
+    char const *last_slash = strrchr(module_name, '/');
+    this->module_name = last_slash ? last_slash + 1 : module_name;
 
     param = std::move(parameters);
 
@@ -1110,6 +1111,7 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
     for (Elf64_Xword name_ofs: dt_needed) {
         char const *name = strs + name_ofs;
         bool already_loaded = false;
+
         for (module_t const* other: loaded_modules) {
             if (other->module_name == name) {
                 already_loaded = true;

@@ -61,6 +61,9 @@ void load_module(char const *path, char const *parameters = nullptr)
         status = init_module(mem, sz, path, nullptr, parameters, needed);
 
         if (needed[0] != 0) {
+            size_t len = strlen(needed);
+            memmove(needed + 5, needed, len + 1);
+            memcpy(needed, "boot/", 5);
             load_module(needed);
         }
     } while (needed[0]);
