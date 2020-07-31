@@ -44,6 +44,11 @@ private:
     uint32_t addr;
 };
 
+struct pci_bar_size_t {
+    int log2_max_addr;
+    int log2_size;
+};
+
 struct pci_config_hdr_t {
     // 0x00
     uint16_t vendor;
@@ -90,18 +95,21 @@ struct pci_config_hdr_t {
     uint8_t min_grant;
     uint8_t max_latency;
 
-    bool is_bar_mmio(ptrdiff_t bar) const;
-    bool is_bar_portio(ptrdiff_t bar) const;
-    bool is_bar_prefetchable(ptrdiff_t bar) const;
+    bool is_bar_mmio(size_t bar) const;
+    bool is_bar_portio(size_t bar) const;
+    bool is_bar_prefetchable(size_t bar) const;
 
     // Returns true if the BAR is MMIO and is 64 bit
-    bool is_bar_64bit(ptrdiff_t bar) const;
+    bool is_bar_64bit(size_t bar) const;
 
-    uint64_t get_bar(ptrdiff_t bar) const;
+    uint64_t get_bar(size_t bar) const;
+
+    pci_bar_size_t get_bar_size(pci_addr_t const &pci_iter,
+                                size_t bar) const;
 
     // Write the specified address to the BAR and read it back, updating
     // config.base_addr[bar] and config.base_addr[bar+1] if it is 64 bit
-    EXPORT void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
+    EXPORT void set_mmio_bar(pci_addr_t pci_addr, size_t bar, uint64_t addr);
 };
 
 C_ASSERT(sizeof(pci_config_hdr_t) == 0x40);
@@ -734,6 +742,36 @@ static _always_inline void mm_copy_rd(
 #undef _MM_RD_IMPL
 
 struct pci_cache_t {
+public:
     std::vector<pci_dev_iterator_t> iters;
     uint64_t updated_at;
+};
+
+class pci_bar_register_t {
+public:
+    uint32_t offset;
+    uint32_t size;
+};
+
+class pci_bar_accessor_t {
+public:
+    pci_bar_accessor_t() = default;
+    pci_bar_accessor_t(pci_dev_iterator_t const &pci_iter,
+                       unsigned bar, size_t length);
+    pci_bar_accessor_t(pci_bar_accessor_t const&) = delete;
+    ~pci_bar_accessor_t();
+
+    void wr_8(pci_bar_register_t reg, uint8_t val);
+    void wr_16(pci_bar_register_t reg, uint16_t val);
+    void wr_32(pci_bar_register_t reg, uint32_t val);
+    void wr_64(pci_bar_register_t reg, uint64_t val);
+
+    uint8_t rd_8(pci_bar_register_t reg);
+    uint16_t rd_16(pci_bar_register_t reg);
+    uint32_t rd_32(pci_bar_register_t reg);
+    uint64_t rd_64(pci_bar_register_t reg);
+
+    uint64_t mmio_base = 0;
+    uint64_t mmio_size = 0;
+    uint16_t port_base = 0;
 };

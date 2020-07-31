@@ -411,60 +411,86 @@
 
 // PCI_BAR
 
-#define PCI_BAR_BA_BIT         4
-#define PCI_BAR_PF_BIT         3
-#define PCI_BAR_TYPE_BIT       1
-#define PCI_BAR_RTE_BIT        0
+#define PCI_BAR_MMIO_BA_BIT         4
+#define PCI_BAR_IO_BA_BIT           2
+#define PCI_BAR_MMIO_PF_BIT         3
+#define PCI_BAR_MMIO_TYPE_BIT       1
+#define PCI_BAR_RTE_BIT             0
 
-#define PCI_BAR_BA_BITS        28
-#define PCI_BAR_PF_BITS        1
-#define PCI_BAR_TYPE_BITS      2
-#define PCI_BAR_RTE_BITS       1
-#define PCI_BAR_BA_MASK        ((1U << PCI_BAR_BA_BITS)-1)
-#define PCI_BAR_PF_MASK        ((1U << PCI_BAR_PF_BITS)-1)
-#define PCI_BAR_TYPE_MASK      ((1U << PCI_BAR_TYPE_BITS)-1)
-#define PCI_BAR_RTE_MASK       ((1U << PCI_BAR_RTE_BITS)-1)
+#define PCI_BAR_MMIO_BA_BITS        28
+#define PCI_BAR_IO_BA_BITS          30
+#define PCI_BAR_MMIO_PF_BITS        1
+#define PCI_BAR_MMIO_TYPE_BITS      2
+#define PCI_BAR_RTE_BITS            1
+#define PCI_BAR_MMIO_BA_MASK        ((1U << PCI_BAR_MMIO_BA_BITS)-1)
+#define PCI_BAR_IO_BA_MASK          ((1U << PCI_BAR_IO_BA_BITS)-1)
+#define PCI_BAR_MMIO_PF_MASK        ((1U << PCI_BAR_MMIO_PF_BITS)-1)
+#define PCI_BAR_MMIO_TYPE_MASK      ((1U << PCI_BAR_MMIO_TYPE_BITS)-1)
+#define PCI_BAR_RTE_MASK            ((1U << PCI_BAR_RTE_BITS)-1)
 
 // Base address
-#define PCI_BAR_BA             (PCI_BAR_BA_MASK << PCI_BAR_BA_BIT)
+#define PCI_BAR_MMIO_BA \
+    (PCI_BAR_MMIO_BA_MASK << PCI_BAR_MMIO_BA_BIT)
+
+// Base address
+#define PCI_BAR_IO_BA               (PCI_BAR_IO_BA_MASK << PCI_BAR_IO_BA_BIT)
 
 // Prefetchable
-#define PCI_BAR_PF             (PCI_BAR_PF_MASK << PCI_BAR_PF_BIT)
+#define PCI_BAR_MMIO_PF \
+    (PCI_BAR_MMIO_PF_MASK << PCI_BAR_MMIO_PF_BIT)
 
 // (0=32-bit, 2=64-bit, 1=reserved, 3=reserved)
-#define PCI_BAR_TYPE           (PCI_BAR_TYPE_MASK << PCI_BAR_TYPE_BIT)
+#define PCI_BAR_MMIO_TYPE \
+    (PCI_BAR_MMIO_TYPE_MASK << PCI_BAR_MMIO_TYPE_BIT)
 
-// Resource type indicator
-#define PCI_BAR_RTE            (PCI_BAR_RTE_MASK << PCI_BAR_RTE_BIT)
+// Resource type indicator (0=MMIO, 1=I/O)
+#define PCI_BAR_RTE                 (PCI_BAR_RTE_MASK << PCI_BAR_RTE_BIT)
 
-#define PCI_BAR_BA_n(n)        ((n) << PCI_BAR_BA_BIT)
-#define PCI_BAR_PF_n(n)        ((n) << PCI_BAR_PF_BIT)
-#define PCI_BAR_TYPE_n(n)      ((n) << PCI_BAR_TYPE_BIT)
-#define PCI_BAR_RTE_n(n)       ((n) << PCI_BAR_RTE_BIT)
+#define PCI_BAR_MMIO_BA_n(n)        ((n) << PCI_BAR_MMIO_BA_BIT)
+#define PCI_BAR_IO_BA_n(n)          ((n) << PCI_BAR_IO_BA_BIT)
+#define PCI_BAR_MMIO_PF_n(n)        ((n) << PCI_BAR_MMIO_PF_BIT)
+#define PCI_BAR_MMIO_TYPE_n(n)      ((n) << PCI_BAR_MMIO_TYPE_BIT)
+#define PCI_BAR_RTE_n(n)            ((n) << PCI_BAR_RTE_BIT)
 
-#define PCI_BAR_BA_GET(n)      (((n) >> PCI_BAR_BA_BIT) & PCI_BAR_BA_MASK)
-#define PCI_BAR_PF_GET(n)      (((n) >> PCI_BAR_PF_BIT) & PCI_BAR_PF_MASK)
-#define PCI_BAR_TYPE_GET(n)    (((n) >> PCI_BAR_TYPE_BIT) & PCI_BAR_TYPE_MASK)
-#define PCI_BAR_RTE_GET(n)     (((n) >> PCI_BAR_RTE_BIT) & PCI_BAR_RTE_MASK)
+#define PCI_BAR_MMIO_BA_GET(n) \
+    (((n) >> PCI_BAR_MMIO_BA_BIT) & PCI_BAR_MMIO_BA_MASK)
+#define PCI_BAR_IO_BA_GET(n) \
+    (((n) >> PCI_BAR_IO_BA_BIT) & PCI_BAR_IO_BA_MASK)
+#define PCI_BAR_MMIO_PF_GET(n) \
+    (((n) >> PCI_BAR_MMIO_PF_BIT) & PCI_BAR_MMIO_PF_MASK)
+#define PCI_BAR_MMIO_TYPE_GET(n) \
+    (((n) >> PCI_BAR_MMIO_TYPE_BIT) & PCI_BAR_MMIO_TYPE_MASK)
+#define PCI_BAR_RTE_GET(n) \
+    (((n) >> PCI_BAR_RTE_BIT) & PCI_BAR_RTE_MASK)
 
-#define PCI_BAR_BA_SET(r,n)    ((r) = ((r) & ~PCI_BAR_BA) | PCI_BAR_BA_n((n)))
-#define PCI_BAR_PF_SET(r,n)    ((r) = ((r) & ~PCI_BAR_PF) | PCI_BAR_PF_n((n)))
-#define PCI_BAR_TYPE_SET(r,n) \
-    ((r) = ((r) & ~PCI_BAR_TYPE) | PCI_BAR_TYPE_n((n)))
+#define PCI_BAR_MMIO_BA_SET(r,n) \
+    ((r) = ((r) & ~PCI_BAR_MMIO_BA) | PCI_BAR_MMIO_BA_n((n)))
+#define PCI_BAR_IO_BA_SET(r,n) \
+    ((r) = ((r) & ~PCI_BAR_IO_BA) | PCI_BAR_IO_BA_n((n)))
+#define PCI_BAR_MMIO_PF_SET(r,n) \
+    ((r) = ((r) & ~PCI_BAR_MMIO_PF) | PCI_BAR_MMIO_PF_n((n)))
+#define PCI_BAR_MMIO_TYPE_SET(r,n) \
+    ((r) = ((r) & ~PCI_BAR_MMIO_TYPE) | PCI_BAR_MMIO_TYPE_n((n)))
 #define PCI_BAR_RTE_SET(r,n) \
     ((r) = ((r) & ~PCI_BAR_RTE) | PCI_BAR_RTE_n((n)))
 
-// PCI_BAR_TYPE_32BIT
-#define PCI_BAR_TYPE_32BIT 0
+// PCI_BAR_MMIO_RTE_MMIO
+#define PCI_BAR_MMIO_RTE_MMIO 0
 
-// PCI_BAR_TYPE_BELOW1M
-#define PCI_BAR_TYPE_BELOW1M 1
+// PCI_BAR_MMIO_RTE_IO
+#define PCI_BAR_MMIO_RTE_IO 1
 
-// PCI_BAR_TYPE_64BIT
-#define PCI_BAR_TYPE_64BIT 2
+// PCI_BAR_MMIO_TYPE_32BIT
+#define PCI_BAR_MMIO_TYPE_32BIT 0
 
-// PCI_BAR_TYPE_RESERVED
-#define PCI_BAR_TYPE_RESERVED 3
+// PCI_BAR_MMIO_TYPE_BELOW1M
+#define PCI_BAR_MMIO_TYPE_BELOW1M 1
+
+// PCI_BAR_MMIO_TYPE_64BIT
+#define PCI_BAR_MMIO_TYPE_64BIT 2
+
+// PCI_BAR_MMIO_TYPE_RESERVED
+#define PCI_BAR_MMIO_TYPE_RESERVED 3
 
 //
 // PCI_SS: Subsystem identifiers

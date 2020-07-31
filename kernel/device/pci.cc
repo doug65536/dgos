@@ -802,7 +802,7 @@ static uint64_t pci_setup_bar(pci_addr_t addr, int bir)
 
     pci_config_copy(addr, &bar, bar_ofs, sizeof(bar));
 
-    bool use32 = (PCI_BAR_TYPE_GET(bar) == 0);
+    bool use32 = (PCI_BAR_MMIO_TYPE_GET(bar) == 0);
 
     if (use32)
         bar &= 0xFFFFFFFF;
@@ -811,13 +811,13 @@ static uint64_t pci_setup_bar(pci_addr_t addr, int bir)
 
     // Autodetect address space needed by writing all bits one in BAR
     uint64_t new_bar = bar;
-    PCI_BAR_BA_SET(new_bar, PCI_BAR_BA_MASK);
+    PCI_BAR_MMIO_BA_SET(new_bar, PCI_BAR_MMIO_BA_MASK);
     pci_config_write(addr, bar_ofs, &new_bar, bar_width);
 
     // Read back BAR, size needed is indicated by number of LSB zero bits
     pci_config_copy(addr, &new_bar, bar_ofs, bar_width);
 
-    uint8_t log2_sz = bit_lsb_set_64(new_bar & PCI_BAR_BA_MASK);
+    uint8_t log2_sz = bit_lsb_set_64(new_bar & PCI_BAR_MMIO_BA_MASK);
 
     uint32_t alloc_sz = 1U << log2_sz;
 
@@ -828,7 +828,7 @@ static uint64_t pci_setup_bar(pci_addr_t addr, int bir)
     uint32_t aligned_addr = (bar_alloc + alloc_sz) & -alloc_sz;
 
     // Update base address
-    PCI_BAR_BA_SET(new_bar, aligned_addr);
+    PCI_BAR_MMIO_BA_SET(new_bar, aligned_addr);
 
     // Give back extra unused space that may open up after alignment
 
@@ -1328,12 +1328,12 @@ void pci_init_ecam_enable()
     pci_accessor = &pci_mmio_accessor;
 }
 
-EXPORT uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
+EXPORT uint64_t pci_config_hdr_t::get_bar(size_t bar) const
 {
     uint64_t addr;
 
     if (is_bar_mmio(bar)) {
-        addr = base_addr[bar] & PCI_BAR_BA;
+        addr = base_addr[bar] & PCI_BAR_MMIO_BA;
 
         if (is_bar_64bit(bar))
             addr |= uint64_t(base_addr[bar + 1]) << 32;
@@ -1345,8 +1345,84 @@ EXPORT uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
     return addr;
 }
 
+pci_bar_size_t pci_config_hdr_t::get_bar_size(
+        pci_addr_t const &pci_addr, size_t bar) const
+{
+    pci_bar_size_t result;
+
+    size_t bar_offset = (char*)(base_addr + bar) - (char*)&vendor;
+
+    uint64_t backup;
+    uint32_t backup32;
+
+    // Make backup
+    if (is_bar_64bit(bar)) {
+        backup = 0;
+        pci_config_copy(pci_addr, &backup, bar_offset, sizeof(backup));
+
+    } else {
+        backup32 = 0;
+        pci_config_copy(pci_addr, &backup32, bar_offset, sizeof(backup32));
+    }
+
+    uint64_t readback = 0;
+
+    if (is_bar_64bit(bar)) {
+        uint64_t probe_val = PCI_BAR_MMIO_BA |
+                (uint64_t(UINT32_MAX) << 32) |
+                (backup & ~PCI_BAR_MMIO_BA);
+
+        pci_config_write(pci_addr, bar_offset,
+                         &probe_val, sizeof(probe_val));
+
+        pci_config_copy(pci_addr, &readback,
+                        bar_offset, sizeof(readback));
+    } else if (is_bar_mmio(bar)) {
+        uint32_t mmio_ones32 = PCI_BAR_MMIO_BA |
+                (backup32 & ~PCI_BAR_MMIO_BA);
+
+        pci_config_write(pci_addr, bar_offset,
+                         &mmio_ones32, sizeof(mmio_ones32));
+
+        uint32_t readback32;
+        pci_config_copy(pci_addr, &readback32,
+                        bar_offset, sizeof(readback32));
+
+        readback = readback32;
+    } else {
+        uint32_t io_ones = PCI_BAR_IO_BA |
+                (backup32 & ~PCI_BAR_IO_BA);
+
+        pci_config_write(pci_addr, bar_offset,
+                         &io_ones, sizeof(io_ones));
+
+        uint32_t readback32;
+        pci_config_copy(pci_addr, &readback32,
+                        bar_offset, sizeof(readback32));
+
+        readback = readback32;
+    }
+
+    uint64_t readback_ba = readback &
+            (PCI_BAR_MMIO_BA | (uint64_t(UINT32_MAX) << 32));
+
+    int log2_max_addr = bit_msb_set(readback_ba) + 1;
+    int log2_size = bit_lsb_set(readback_ba);
+
+    result = { log2_max_addr, log2_size };
+
+    // Restore backup
+    if (is_bar_64bit(bar)) {
+        pci_config_write(pci_addr, bar_offset, &backup, sizeof(backup));
+    } else {
+        pci_config_write(pci_addr, bar_offset, &backup32, sizeof(backup32));
+    }
+
+    return result;
+}
+
 EXPORT void pci_config_hdr_t::set_mmio_bar(
-        pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr)
+        pci_addr_t pci_addr, size_t bar, uint64_t addr)
 {
     // PCI 2.2 section 6.2.5
 
@@ -1492,26 +1568,30 @@ EXPORT bool pci_dev_iterator_t::operator==(pci_dev_iterator_t const& rhs) const
             (func == rhs.func);
 }
 
-EXPORT bool pci_config_hdr_t::is_bar_mmio(ptrdiff_t bar) const
+EXPORT bool pci_config_hdr_t::is_bar_mmio(size_t bar) const
 {
+    assert(bar < countof(base_addr));
     return PCI_BAR_RTE_GET(base_addr[bar]) == 0;
 }
 
-EXPORT bool pci_config_hdr_t::is_bar_portio(ptrdiff_t bar) const
+EXPORT bool pci_config_hdr_t::is_bar_portio(size_t bar) const
 {
+    assert(bar < countof(base_addr));
     return PCI_BAR_RTE_GET(base_addr[bar]) != 0;
 }
 
-EXPORT bool pci_config_hdr_t::is_bar_prefetchable(ptrdiff_t bar) const
+EXPORT bool pci_config_hdr_t::is_bar_prefetchable(size_t bar) const
 {
+    assert(bar < countof(base_addr));
     return (PCI_BAR_RTE_GET(base_addr[bar]) == 0) &&
-            PCI_BAR_PF_GET(base_addr[bar]);
+            PCI_BAR_MMIO_PF_GET(base_addr[bar]);
 }
 
-EXPORT bool pci_config_hdr_t::is_bar_64bit(ptrdiff_t bar) const
+EXPORT bool pci_config_hdr_t::is_bar_64bit(size_t bar) const
 {
+    assert(bar >= 0 && bar < countof(base_addr));
     return (PCI_BAR_RTE_GET(base_addr[bar]) == 0) &&
-            (PCI_BAR_TYPE_GET(base_addr[bar]) == PCI_BAR_TYPE_64BIT);
+            (PCI_BAR_MMIO_TYPE_GET(base_addr[bar]) == PCI_BAR_MMIO_TYPE_64BIT);
 }
 
 EXPORT pci_dev_t::pci_dev_t()
@@ -2020,4 +2100,121 @@ EXPORT char const *pci_describe_device(uint8_t cls, uint8_t sc, uint8_t pif)
     default:
         return "Unknown";
     }
+}
+
+EXPORT pci_bar_accessor_t::pci_bar_accessor_t(
+        const pci_dev_iterator_t &pci_iter, unsigned bar, size_t length)
+{
+    uint64_t addr = pci_iter.config.get_bar(bar);
+
+    pci_bar_size_t bar_size = pci_iter.config.get_bar_size(pci_iter.addr, bar);
+
+    printdbg("pci: bar %d decodes %d bits, size is %zu\n",
+             bar, bar_size.log2_max_addr, size_t(1) << bar_size.log2_size);
+
+    if (pci_iter.config.is_bar_mmio(bar)) {
+        void *mem = mmap((void*)addr, length, PROT_READ | PROT_WRITE,
+                         MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
+
+        if (unlikely(mem == MAP_FAILED))
+            return;
+
+        mmio_base = (uint64_t)mem;
+        mmio_size = length;
+    } else {
+        port_base = addr;
+    }
+}
+
+EXPORT pci_bar_accessor_t::~pci_bar_accessor_t()
+{
+    if (mmio_size)
+        munmap((void*)mmio_base, mmio_size);
+
+    mmio_base = 0;
+    mmio_size = 0;
+}
+
+EXPORT void pci_bar_accessor_t::wr_8(pci_bar_register_t reg, uint8_t val)
+{
+    assert(reg.size == sizeof(val));
+
+    if (likely(mmio_base))
+        return mm_wr(*(uint8_t*)(mmio_base + reg.offset), val);
+
+    return outb(port_base + reg.offset, val);
+}
+
+EXPORT void pci_bar_accessor_t::wr_16(pci_bar_register_t reg, uint16_t val)
+{
+    assert(reg.size == sizeof(val));
+
+    if (likely(mmio_base))
+        return mm_wr(*(uint16_t*)(mmio_base + reg.offset), val);
+
+    return outw(port_base + reg.offset, val);
+}
+
+EXPORT void pci_bar_accessor_t::wr_32(pci_bar_register_t reg, uint32_t val)
+{
+    assert(reg.size == sizeof(val));
+
+    if (likely(mmio_base))
+        return mm_wr(*(uint32_t*)(mmio_base + reg.offset), val);
+
+    return outd(port_base + reg.offset, val);
+}
+
+EXPORT void pci_bar_accessor_t::wr_64(pci_bar_register_t reg, uint64_t val)
+{
+    assert(reg.size == sizeof(val));
+
+    if (likely(mmio_base))
+        return mm_wr(*(uint64_t*)(mmio_base + reg.offset), val);
+
+    outd(port_base + reg.offset, val);
+    return outd(port_base + reg.offset + sizeof(uint32_t), val >> 32);
+}
+
+EXPORT uint8_t pci_bar_accessor_t::rd_8(pci_bar_register_t reg)
+{
+    assert(reg.size == sizeof(uint8_t));
+
+    if (likely(mmio_base))
+        return mm_rd(*(uint8_t*)(mmio_base + reg.offset));
+
+    return inb(port_base + reg.offset);
+}
+
+EXPORT uint16_t pci_bar_accessor_t::rd_16(pci_bar_register_t reg)
+{
+    assert(reg.size == sizeof(uint16_t));
+
+    if (likely(mmio_base))
+        return mm_rd(*(uint16_t*)(mmio_base + reg.offset));
+
+    return inw(port_base + reg.offset);
+}
+
+EXPORT uint32_t pci_bar_accessor_t::rd_32(pci_bar_register_t reg)
+{
+    assert(reg.size == sizeof(uint32_t));
+
+    if (likely(mmio_base))
+        return mm_rd(*(uint32_t*)(mmio_base + reg.offset));
+
+    return ind(port_base + reg.offset);
+}
+
+EXPORT uint64_t pci_bar_accessor_t::rd_64(pci_bar_register_t reg)
+{
+    assert(reg.size == sizeof(uint64_t));
+
+    if (likely(mmio_base))
+        return mm_rd(*(uint64_t*)(mmio_base + reg.offset));
+
+    uint32_t lo = ind(port_base + reg.offset);
+    uint32_t hi = ind(port_base + reg.offset + sizeof(uint32_t));
+
+    return (uint64_t(hi) << 32) | lo;
 }

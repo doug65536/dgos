@@ -51,15 +51,19 @@
 3:0 CC Completion code
 
 -- PCI_BAR
-31:4 BA Base address
-3 PF Prefetchable
-2:1 TYPE (0=32-bit, 2=64-bit, 1=reserved, 3=reserved)
-0 RTE Resource type indicator
+31:4 MMIO_BA Base address
+31:2 IO_BA Base address
+3 MMIO_PF Prefetchable
+2:1 MMIO_TYPE (0=32-bit, 2=64-bit, 1=reserved, 3=reserved)
+0 RTE Resource type indicator (0=MMIO, 1=I/O)
 
--- PCI_BAR_TYPE_32BIT=0
--- PCI_BAR_TYPE_BELOW1M=1
--- PCI_BAR_TYPE_64BIT=2
--- PCI_BAR_TYPE_RESERVED=3
+-- PCI_BAR_MMIO_RTE_MMIO=0
+-- PCI_BAR_MMIO_RTE_IO=1
+
+-- PCI_BAR_MMIO_TYPE_32BIT=0
+-- PCI_BAR_MMIO_TYPE_BELOW1M=1
+-- PCI_BAR_MMIO_TYPE_64BIT=2
+-- PCI_BAR_MMIO_TYPE_RESERVED=3
 
 -- PCI_SS Subsystem identifiers
 31:16 SSID Subsystem identifier
