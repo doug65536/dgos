@@ -240,21 +240,14 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 
     cmos_scoped_lock lock(cmos_lock);
 
+    // To clear the irq pin, the processor program normally reads Register C
+    // - MC146818 datasheet
     uint8_t intr_cause = cmos_read(CMOS_REG_STATUS_C, lock);
 
     if (intr_cause & CMOS_STATUS_C_UEI) {
         // Update ended interrupt
         time_of_day = cmos_read_gettimeofday(lock);
         time_of_day_timestamp = time_ns();
-
-        //char msg[512];
-        //size_t ofs = 0;
-        //for (int i = 0; i < thread_cpu_count(); ++i) {
-        //    ofs += snprintf(msg + ofs, countof(msg) - ofs, "(%d)=%d ",
-        //             i, thread_cpu_usage(i));
-        //}
-
-        //printdbg("CPU usage: %s\n", msg);
 
         // Flush trace
         if (eainst_flush_ready)
