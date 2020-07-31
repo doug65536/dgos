@@ -718,8 +718,8 @@ static Elf64_Addr modload_lookup_name(
     }
 
     if (!expect_missing) {
-        ELF64_TRACE("Failed to find %s %s\n", name,
-                    expect_missing ? " (expected)" : "");
+        printdbg("Failed to find %s %s\n", name,
+                 expect_missing ? " (expected)" : "");
         cpu_debug_break();
     }
 
