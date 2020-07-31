@@ -56,40 +56,40 @@ struct sched_param {
 };
 
 // Used to identify a thread attribute object.
-typedef struct __pthread_attr_t pthread_attr_t;
+typedef struct pthread_attr_t pthread_attr_t;
 
 // Used for condition variables.
-typedef struct __pthread_cond_t pthread_cond_t;
+typedef struct pthread_cond_t pthread_cond_t;
 
 // Used to identify a condition attribute object.
-typedef struct __pthread_condattr_t pthread_condattr_t;
+typedef struct pthread_condattr_t pthread_condattr_t;
 
 // Used for thread-specific data keys.
-typedef struct __pthread_key_t pthread_key_t;
+typedef struct pthread_key_t pthread_key_t;
 
 // Used for mutexes.
-typedef struct __pthread_mutex_t pthread_mutex_t;
+typedef struct pthread_mutex_t pthread_mutex_t;
 
 // Used to identify a mutex attribute object.
-typedef struct __pthread_mutexattr_t pthread_mutexattr_t;
+typedef struct pthread_mutexattr_t pthread_mutexattr_t;
 
 // Used for dynamic package initialisation.
-typedef struct __pthread_once_t pthread_once_t;
+typedef struct pthread_once_t pthread_once_t;
 
 // Used for read-write locks.
-typedef struct __pthread_rwlock_t pthread_rwlock_t;
+typedef struct pthread_rwlock_t pthread_rwlock_t;
 
 // Used for read-write lock attributes.
-typedef struct __pthread_rwlockattr_t pthread_rwlockattr_t;
+typedef struct pthread_rwlockattr_t pthread_rwlockattr_t;
 
 // Used for realtime spinlocks.
-typedef struct __pthread_spinlock_t pthread_spinlock_t;
+typedef struct pthread_spinlock_t pthread_spinlock_t;
 
 // Used for barriers
-typedef struct __pthread_barrier_t pthread_barrier_t;
+typedef struct pthread_barrier_t pthread_barrier_t;
 
 // Used for barrier attributes
-typedef struct __pthread_barrierattr_t pthread_barrierattr_t;
+typedef struct pthread_barrierattr_t pthread_barrierattr_t;
 
 // Used to identify a thread.
 typedef uint32_t pthread_t;

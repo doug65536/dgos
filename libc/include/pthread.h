@@ -11,7 +11,7 @@
 #define __PTHREAD_ATTR_SIG \
     0x50545f417474725f
 
-struct __pthread_attr_t {
+struct pthread_attr_t {
     uint64_t sig;
     size_t guard_sz;
     bool detach;
@@ -22,7 +22,7 @@ struct __pthread_attr_t {
 #define __PTHREAD_BARRIER_SIG \
     0x50545f4261727269
 
-struct __pthread_barrier_t {
+struct pthread_barrier_t {
     uint64_t sig;
 };
 
@@ -30,7 +30,7 @@ struct __pthread_barrier_t {
 #define __PTHREAD_BARRIERATTR_SIG \
     0x50545f4261724174
 
-struct __pthread_barrierattr_t {
+struct pthread_barrierattr_t {
     uint64_t sig;
 };
 
@@ -38,7 +38,7 @@ struct __pthread_barrierattr_t {
 #define __PTHREAD_COND_SIG \
     0x50545f436f6e6456
 
-struct __pthread_cond_t {
+struct pthread_cond_t {
     uint64_t sig;
     int waiters;
 };
@@ -47,13 +47,13 @@ struct __pthread_cond_t {
 
 #define __PTHREAD_CONDATTR_SIG
 
-struct __pthread_condattr_t {
+struct pthread_condattr_t {
     uint64_t sig;
 };
 
 #define __PTHREAD_KEY_SIG
 
-struct __pthread_key_t {
+struct pthread_key_t {
     uint64_t sig;
 };
 
@@ -61,7 +61,7 @@ struct __pthread_key_t {
 #define __PTHREAD_MUTEX_SIG \
     0x50545f4d75746578
 
-struct __pthread_mutex_t {
+struct pthread_mutex_t {
     uint64_t sig;
     int owner;
     int recursions;
@@ -69,21 +69,21 @@ struct __pthread_mutex_t {
 
 #define PTHREAD_MUTEX_INITIALIZER   { __PTHREAD_MUTEX_SIG, -1, -1 }
 
-struct __pthread_mutexattr_t {
+struct pthread_mutexattr_t {
     uint64_t sig;
 };
 
 #define __PTHREAD_ONCE_SIG \
     0x50545f4f6e636520
 
-struct __pthread_once_t {
+struct pthread_once_t {
     uint64_t sig;
 };
 
 #define __PTHREAD_RWLOCK_SIG \
     0x50545f52574c6f63
 
-struct __pthread_rwlock_t {
+struct pthread_rwlock_t {
     uint64_t sig;
 
     // -1 for write lock held, 0 for unlocked, > 0 for reader count
@@ -102,14 +102,14 @@ struct __pthread_rwlock_t {
 #define __PTHREAD_RWLOCKATTR_SIG \
     0x50545f52574c4174
 
-struct __pthread_rwlockattr_t {
+struct pthread_rwlockattr_t {
     uint64_t sig;
 };
 
 #define __PTHREAD_SPINLOCK_SIG \
     0x50545f5370696e4c
 
-struct __pthread_spinlock_t {
+struct pthread_spinlock_t {
     uint64_t sig;
     int owner;
 };
