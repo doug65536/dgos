@@ -215,6 +215,7 @@ pool_t<fat32_fs_t::file_handle_t> fat32_fs_t::handles;
 class fat32_factory_t : public fs_factory_t {
 public:
     fat32_factory_t();
+    _use_result
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
@@ -1410,7 +1411,7 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
                 this, block_size, conn->part_len,
                 PROT_READ | PROT_WRITE, &fat32_fs_t::mm_fault_handler);
 
-    if (!mm_dev)
+    if (unlikely(!mm_dev))
         return false;
 
     fat_size = bpb.sec_per_fat << sector_shift;
@@ -1437,10 +1438,16 @@ fat32_factory_t::fat32_factory_t()
 
 fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 {
-    if (fat32_mounts.empty())
-        fat32_fs_t::handles.create(510);
+    if (fat32_mounts.empty()) {
+        if (unlikely(!fat32_fs_t::handles.create(510)))
+            return nullptr;
+    }
 
     std::unique_ptr<fat32_fs_t> self(new (ext::nothrow) fat32_fs_t());
+
+    if (unlikely(!self))
+        panic_oom();
+
     if (self->mount(conn)) {
         if (unlikely(!fat32_mounts.push_back(self)))
             panic_oom();
@@ -1448,6 +1455,11 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
     }
 
     return nullptr;
+}
+
+char const *fat32_fs_t::name() const noexcept
+{
+    return "fat32fs";
 }
 
 void fat32_fs_t::unmount()

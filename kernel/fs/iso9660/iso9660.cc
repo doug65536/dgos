@@ -738,6 +738,11 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
     return true;
 }
 
+char const *iso9660_fs_t::name() const noexcept
+{
+    return "iso9660";
+}
+
 void iso9660_fs_t::unmount()
 {
     munmap(pt, pt_bytes);

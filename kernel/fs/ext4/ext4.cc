@@ -336,6 +336,11 @@ bool ext4_fs_t::mount(fs_init_info_t *conn)
     return false;
 }
 
+char const *ext4_fs_t::name() const noexcept
+{
+    return "ext4";
+}
+
 void ext4_fs_t::unmount()
 {
 }

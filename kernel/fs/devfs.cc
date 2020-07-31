@@ -14,6 +14,11 @@ public:
 
 static dev_fs_t dev_fs;
 
+char const *dev_fs_t::name() const noexcept
+{
+    return "tmpfs";
+}
+
 void dev_fs_t::unmount()
 {
 
@@ -253,9 +258,9 @@ void devfs_delete(dev_fs_t *dev_fs)
     delete dev_fs;
 }
 
-void devfs_register(dev_fs_file_reg_t *reg)
+bool devfs_register(dev_fs_file_reg_t *reg)
 {
-    devfs_instance->register_file(reg);
+    return devfs_instance->register_file(reg);
 }
 
 dev_fs_file_reg_t::~dev_fs_file_reg_t()

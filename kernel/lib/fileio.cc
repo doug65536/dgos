@@ -216,7 +216,8 @@ EXPORT int file_openat(int dirid, char const *path, int flags, mode_t mode)
 
     int id = fh - file_table.data();
 
-    FILEHANDLE_TRACE("opened %s, fd=%d\n", path, id);
+    FILEHANDLE_TRACE("opened %s, fd=%d on %s filesystem\n", path, id,
+                     fs->name());
 
     return id;
 }
@@ -781,6 +782,7 @@ class socket_fs_t final : public fs_nosys_t {
 
     // fs_base_t interface
 public:
+    char const *name() const noexcept override { return "socket_fs"; }
     int openat(fs_file_info_t **fi, fs_file_info_t *dirfi,
                fs_cpath_t path, int flags, mode_t mode) override;
     int release(fs_file_info_t *fi) override;

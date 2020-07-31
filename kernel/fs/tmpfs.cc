@@ -181,6 +181,11 @@ void* tmpfs_fs_t::mount(fs_init_info_t *conn)
     return this;
 }
 
+char const *tmpfs_fs_t::name() const noexcept
+{
+    return "tmpfs";
+}
+
 void tmpfs_fs_t::unmount()
 {
     decltype(names) replacement_names;

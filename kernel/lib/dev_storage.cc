@@ -139,6 +139,8 @@ EXPORT void fs_add(fs_factory_t *fs_reg, fs_base_t *fs)
     if (unlikely(!fs))
         return;
 
+    printdbg("Adding%s filesystem\n", fs->is_boot() ? " boot" : "");
+
     scoped_lock lock(storage_lock);
     if (unlikely(fs_mounts.insert(fs->is_boot()
                      ? fs_mounts.begin()

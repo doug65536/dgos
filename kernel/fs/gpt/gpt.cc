@@ -88,7 +88,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 
     // Create sector-sized buffer to look at partition header
     std::unique_ptr<uint8_t[]> buffer(new (ext::nothrow)
-                                      uint8_t[sector_size]());
+                                      uint8_t[sector_size]);
 
     if (unlikely(!buffer))
         panic_oom();

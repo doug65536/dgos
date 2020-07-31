@@ -332,6 +332,8 @@ struct fs_base_t {
 
     virtual ~fs_base_t() = 0;
 
+    virtual char const *name() const noexcept = 0;
+
     //
     // Startup and shutdown
 
@@ -509,6 +511,7 @@ struct fs_base_t {
     int flush(fs_file_info_t *fi) override final;
 
 #define FS_BASE_IMPL                                                          \
+    char const *name() const noexcept override final;                         \
     void unmount() override final;                                            \
     bool is_boot() const override final;                                      \
     int resolve(fs_file_info_t *dirfi, fs_cpath_t path,                       \

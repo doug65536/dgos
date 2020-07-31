@@ -43,7 +43,7 @@ public:
 
 dev_fs_t *devfs_create();
 void devfs_delete(dev_fs_t *dev_fs);
-void devfs_register(dev_fs_file_reg_t *reg);
+bool devfs_register(dev_fs_file_reg_t *reg);
 
 struct device_t
 {
