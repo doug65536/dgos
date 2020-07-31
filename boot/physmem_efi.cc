@@ -138,5 +138,5 @@ void take_pages(uint64_t phys_addr, uint64_t size)
                 size >> 12, &addr);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC("Could not take pages");
+        PANIC("Could not take pages, need more memory");
 }
