@@ -47,7 +47,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_readv,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_writev,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_access,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_pipe,
+    (syscall_handler_t*)(void*)sys_pipe,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_select,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sched_yield,
     (syscall_handler_t*)(void*)sys_mremap,

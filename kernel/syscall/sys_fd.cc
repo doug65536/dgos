@@ -796,6 +796,19 @@ char *sys_getcwd(char *buf, size_t size)
     return (char*)-intptr_t(nosys_err());
 }
 
+class pipe_fs_t : public dev_fs_file_reg_t {
+
+};
+
+int sys_pipe(int *user_fds)
+{
+    // Create a pipe,
+    // create readable fd for user_fds[0]
+    // create writable fd for user_fds[1]
+    //
+    return -int(errno_t::ENOSYS);
+}
+
 // Validate the errno and return its negated integer value
 static int err(errno_t errno)
 {

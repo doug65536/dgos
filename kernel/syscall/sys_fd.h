@@ -112,3 +112,5 @@ int sys_fcntl(int fd, int cmd, void *arg);
 
 int sys_statfs(char const *path, fs_statvfs_t *buf);
 int sys_fstatfs(int fd, fs_statvfs_t *buf);
+
+int sys_pipe(int *user_fds);
