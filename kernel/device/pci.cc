@@ -1589,7 +1589,7 @@ EXPORT bool pci_config_hdr_t::is_bar_prefetchable(size_t bar) const
 
 EXPORT bool pci_config_hdr_t::is_bar_64bit(size_t bar) const
 {
-    assert(bar >= 0 && bar < countof(base_addr));
+    assert(bar < countof(base_addr));
     return (PCI_BAR_RTE_GET(base_addr[bar]) == 0) &&
             (PCI_BAR_MMIO_TYPE_GET(base_addr[bar]) == PCI_BAR_MMIO_TYPE_64BIT);
 }
