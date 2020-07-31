@@ -499,74 +499,86 @@ isr_common:
     pushq %rbx
     .cfi_offset rbx,-9*8
 
+    movq %cr3,%rbx
+
     pushq %r15
     .cfi_offset r15,-10*8
+
+    movl %ds,%r15d
 
     pushq %r14
     .cfi_offset r14,-11*8
 
+    movl %es,%r14d
+
     pushq %r13
     .cfi_offset r13,-12*8
 
+    movl %fs,%r13d
+
     pushq %r12
     .cfi_offset r12,-13*8
+
+    movl %gs,%r12d
 
     // Make sure access to user pages is blocked
     insn_fixup
     clac
 
-    movq %cr3,%rbx
-    movl %ds,%r15d
-    movl %es,%r14d
-    movl %fs,%r13d
-    movl %gs,%r12d
-
     pushq %r11
     .cfi_offset r11,-14*8
+
+    shll $ 16,%r14d
 
     pushq %r10
     .cfi_offset r10,-15*8
 
+    shlq $ 32,%r13
+
     pushq %rax
     .cfi_offset rax,-16*8
 
-    shll $ 16,%r14d
-    shlq $ 32,%r13
     cld
-    shlq $ 48,%r12
 
     pushq %r9
     .cfi_offset r9,-17*8
 
+    shlq $ 48,%r12
+
     pushq %r8
     .cfi_offset r8,-18*8
+
+    // Combine r12-r15 into r15
+    orl %r14d,%r15d
 
     pushq %rcx
     .cfi_offset rcx,-19*8
 
-    // Combine
-    orl %r14d,%r15d
-    orq %r12,%r13
-    orq %r13,%r15
+    // Load interrupted cs into ecx
+    movl frame_cs(%rbp),%ecx
 
     /// Register usage:
     ///  r15 now has all segment registers, rbx has cr3
 
+    orq %r12,%r13
+
     pushq %rdx
     .cfi_offset rdx,-20*8
+
+    orq %r13,%r15
 
     pushq %rsi
     .cfi_offset rsi,-21*8
 
+    // Zero constant
+    xorl %esi,%esi
+
     pushq %rdi
     .cfi_offset rdi,-22*8
 
-    // Zero constant
-    xorl %edi,%edi
-
     /// Register usage:
     ///  Finished with rbx, r15 now has all segment registers
-    ///  rdi = 0
+    ///  rsi = 0
 
     // Save CR3
     pushq %rbx
@@ -580,7 +592,7 @@ isr_common:
     rdgsbase %r14
 
     // Guaranteed to swap if came from user mode
-    testl $ 3,frame_cs(%rbp)
+    testl $ 3,%ecx
     jz .Lmaybe_swap
 
     // No branch taken if interrupting user mode
@@ -591,12 +603,26 @@ isr_common:
     swapgs
 .Lno_swap:
 
-    // Now have kernel gsbase...
+    // Now definitely have kernel gsbase...
 
     // See if we are coming from kernel code
     // Handles doublefault nonsense 0 cs too
-    testl $ 3,frame_cs(%rbp)
+    testl $ 3,%ecx
     jz .Lfrom_kernel
+
+    /// Register usage:
+    ///  rsi = 0
+    ///  r12 = this_cpu()->cur_thread
+    ///  r13 = caller fsbase
+    ///  r14 = caller gsbase
+    ///  r15 = state of cpu's segment registers
+
+    // Get current thread into r12
+    movq %gs:CPU_INFO_CURTHREAD_OFS(%rsi),%r12
+
+    // Save user fsbase, gsbase
+    mov %r13,THREAD_FSBASE_OFS(%r12)
+    mov %r14,THREAD_GSBASE_OFS(%r12)
 
     // Flush indirect branch prediction data because the cpu
     // is tainted by user mode process
@@ -604,18 +630,6 @@ isr_common:
     insn_fixup
     call protection_barrier_from_user
 
-    movq %gs:CPU_INFO_CURTHREAD_OFS(%rdi),%r12
-
-    /// Register usage:
-    ///  rdi = 0
-    ///  r12 = this_cpu()->cur_thread
-    ///  r13 = caller fsbase
-    ///  r14 = caller gsbase
-
-    mov %r13,THREAD_FSBASE_OFS(%r12)
-    mov %r14,THREAD_GSBASE_OFS(%r12)
-
-.Lthread_bases_done:
 .Lfrom_kernel:
 
     // Push FPU context pointer field, initially null
@@ -640,8 +654,9 @@ isr_common:
     // If we are restoring a fast context then jump to simpler code
     // Fast context will have sign bit of ctx flag field set
     // (packed in interrupt value)
-    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT, ISR_CTX_OFS_INTERRUPT(%rax)
-    jc .Lrestore_fast_ctx
+    // Fast context restore requires
+    testl $ (1 << ISR_CTX_CTX_FLAGS_FAST_QWBIT), ISR_CTX_OFS_INTERRUPT(%rax)
+    jnz .Lrestore_fast_ctx
 
     // Branches here from fast switcher if we switched to a slow context
 .Lrestore_slow_ctx:
@@ -679,8 +694,8 @@ isr_common:
 .Lno_cleanup_call:
     xor %eax,%eax
 
-    // Pop the pointer to the FPU context
-    popq %rdi
+    // Discard the pointer to the FPU context
+    add $ 8,%rsp
 
     // Pop segments
     popq %rdx
@@ -704,7 +719,7 @@ isr_common:
 
     // If segments are not changing, avoid 136*4 cycles
     cmpq %r15,%rdx
-    jnz .Lsegments_changed
+    jnz isr_common_segments_changed
 .Lsegments_restored:
 
     movq THREAD_GSBASE_OFS(%r13),%r14
@@ -804,8 +819,7 @@ isr_common:
     jmp .Lcr3_done_fast
 
 .balign 16
-.Lsegments_changed:
-    .cfi_restore_state
+isr_common_segments_changed:
     // Restore segments
     movw %dx,%ds
     shrq $16,%rdx
@@ -815,12 +829,6 @@ isr_common:
     shrl $16,%edx
     movw %dx,%gs
     jmp .Lsegments_restored
-
-.balign 16
-.Lthread_bases_changed:
-    mov %r13,THREAD_FSBASE_OFS(%r12)
-    mov %r14,THREAD_GSBASE_OFS(%r12)
-    jmp .Lthread_bases_done
 
 .balign 16
 .Lmaybe_swap:
@@ -853,14 +861,18 @@ thread_yield:
     .cfi_register rsp,rax
 
     // push ss:rsp
+
     push_cfi $(GDT_SEL_KERNEL_DATA)
     .cfi_offset ss,-1*8
+
     push_cfi %rax
     .cfi_offset rsp,-2*8
 
     // push eflags
     pushfq_cfi
     .cfi_offset rflags,-3*8
+
+    // Must be after saving flags
     cli
 
     // rax remains a zero constant for a while
@@ -910,33 +922,34 @@ thread_yield:
     push_cfi $(INTR_THREAD_YIELD|(1<<ISR_CTX_CTX_FLAGS_FAST_QWBIT))
 
     // Save caller rbp
+
     push_cfi %rbp
     .cfi_offset rbp,-8*8
 
     // Switch to rbp-relative frame, avoid CFA adjustments I hope
+
     movq %rsp,%rbp
     .cfi_def_cfa rbp,8*8
-//    .cfi_offset ss,-1*8
-//    .cfi_offset rsp,-2*8
-//    .cfi_offset rflags,-3*8
-//    .cfi_offset cs,-4*8
-//    .cfi_offset rip,-5*8
-
-//    .cfi_offset rbp,-8*8
 
     // Push call preserved registers
+
     pushq %rbx
     .cfi_offset rbx,-9*8
+
     pushq %r15
     .cfi_offset r15,-10*8
+
     pushq %r14
     .cfi_offset r14,-11*8
+
     pushq %r13
     .cfi_offset r13,-12*8
+
     pushq %r12
     .cfi_offset r12,-13*8
 
     // Uninitialized call clobbered save area
+
     sub $ 9*8,%rsp
     .cfi_undefined r11
     .cfi_undefined r10
@@ -966,10 +979,14 @@ thread_yield:
     call thread_schedule
 
     // See if we are restoring a fast context
-    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,ISR_CTX_OFS_INTERRUPT(%rax)
-    jnc .Lrestore_slow_ctx
+    movl $ (1 << ISR_CTX_CTX_FLAGS_FAST_QWBIT),%ecx
+    testl %ecx,ISR_CTX_OFS_INTERRUPT(%rax)
+    jz .Lrestore_slow_ctx
 
     // Could branch here from full interrupt handler to restore a fast context
+    // rbp must point to rbp in incoming context
+    // rsp must point to context
+    // r15 must be the state of the segment registers
 .Lrestore_fast_ctx:
     // Zero constant
     xor %ecx,%ecx
@@ -1028,22 +1045,11 @@ thread_yield:
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
 
+    // Discard interrupt number
+    adj_rsp_cfi 8
+
     // Error code is wakeup return value
-    mov 8(%rsp),%rax
-
-    // Load flags from interrupt frame (reach over intr+errcode+rip+cs)
-    movl 8*4(%rsp),%edi
-
-#ifdef ISR_VALIDATE_FLAGS
-    // Read eflags, toggle always set flag (becomes 0 in valid case),
-    // Mask out all bits that are allowed to be nonzero, make sure it is zero
-    xorl $ CPU_EFLAGS_ALWAYS,%edi
-    testl $(CPU_EFLAGS_NEVER | CPU_EFLAGS_ALWAYS),%edi
-    jz .Lgood_flags1
-    call cpu_debug_break
-.Lgood_flags1:
-    xorl $ CPU_EFLAGS_ALWAYS,%edi
-#endif
+    pop_cfi %rax
 
     // Zero all clobbered registers
     xorl %ecx,%ecx
@@ -1054,10 +1060,9 @@ thread_yield:
     xorl %r10d,%r10d
     xorl %r11d,%r11d
 
-    push_cfi %rdi
+    // Load flags from interrupt frame (reach over intr+errcode+rip+cs)
+    push_cfi 2*8(%rsp)
     popfq_cfi
-
-    adj_rsp_cfi 16
 
     // Return and pop cs, eflags, rsp, ss
     retq $((5-1)*8)
