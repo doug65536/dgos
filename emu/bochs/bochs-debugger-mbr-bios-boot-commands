@@ -1,0 +1,5 @@
+u switch-mode
+ldsym global "sym/boot1-elf.sym"
+
+lb reloc_entry
+c
