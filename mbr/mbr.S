@@ -19,26 +19,10 @@
 // ----------------------------------------------------------------------
 .globl entry
 entry:
+    // Loads cs with 0 if the MBR jumped to 0x7c0:0 instead of 0:0x7c00
+    // Jump over
     ljmp $ 0,$ UNRELOCATED(entry_start)
 
-init_stack:
-    .int 0x0000FFF8
-
-dap:
-    .byte dap_length
-    .byte 0
-    .word 1
-    .word 0x7c00
-    .word 0x0000
-    .quad 0
-
-ptbl_ent_ptr:
-    .word 0
-
-// ----------------------------------------------------------------------
-// The bootstrap code starts here
-.align 64
-.globl entry_start
 entry_start:
     // Incoming registers:
     //  DL = drive
@@ -137,8 +121,8 @@ boot_gpt:
 //.space 220
 
 disk_io_with_lba:
-    movw %ax,dap_lba(%si)
-    movw %cx,dap_lba+2(%si)
+    movw %ax,dap+dap_lba
+    movw %cx,dap+dap_lba+2
     // fall through
 disk_io:
     movw $ dap,%si
@@ -166,6 +150,24 @@ fail_message:
 give_up:
     int $ 0x18
     jmp give_up
+
+
+// ----------------------------------------------------------------------
+// Data
+.section .data
+init_stack:
+    .int 0x0000FFF8
+
+dap:
+    .byte dap_length
+    .byte 0
+    .word 1
+    .word 0x7c00
+    .word 0x0000
+    .quad 0
+
+ptbl_ent_ptr:
+    .word 0
 
 // ----------------------------------------------------------------------
 .section .parttab

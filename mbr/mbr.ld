@@ -2,6 +2,7 @@ ENTRY(entry)
 SECTIONS {
 	.text 0x600 : AT(0x600) {
 		*(.text)
+		. = ALIGN(64);
 		*(.data)
 		*(.bss)
 
