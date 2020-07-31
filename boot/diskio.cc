@@ -8,37 +8,6 @@
 
 extern uint8_t boot_drive;
 
-static int disk_64bit;
-
-static bool disk_support_64bit_addr_bioscall()
-{
-    bios_regs_t regs;
-
-    regs.eax = 0x4100;
-    regs.ebx = 0x55AA;
-    regs.edx = boot_drive;
-
-    bioscall(&regs, 0x13);
-
-    if (regs.flags_CF())
-        return false;
-
-    bool signature = ((regs.ebx & 0xFFFF) == 0xAA55);
-    int version = ((regs.eax >> 8) & 0xFF);
-
-    disk_64bit = (signature && version >= 3) ? 1 : -1;
-
-    return disk_64bit > 0;
-}
-
-bool disk_support_64bit_addr()
-{
-    if (disk_64bit)
-        return disk_64bit > 0;
-
-    return disk_support_64bit_addr_bioscall();
-}
-
 struct disk_drive_parameters_t {
     uint16_t struct_size;
     uint16_t info_flags;
@@ -89,11 +58,6 @@ struct disk_address_packet_t {
     uint16_t block_count;
     uint32_t segoff;
     uint64_t lba;
-} _packed;
-
-struct disk_address_packet_64_t {
-    disk_address_packet_t hdr;
-    uint64_t address;
 } _packed;
 
 static bool disk_read_lba_bouncebuffer(
@@ -156,24 +120,22 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
 {
     // Extended Read LBA sectors
     // INT 13h AH=42h
-    disk_address_packet_64_t pkt;
-    pkt.hdr.reserved = 0;
-    pkt.hdr.lba = lba;
+    disk_address_packet_t pkt;
+    pkt.reserved = 0;
+    pkt.lba = lba;
 
     // Detect crossing a 64KB boundary with one sector read and force
     // bounce buffering in that case (unlikely)
     bool force_bounce_buffer =
             (addr & -(64 << 10)) !=
-            ((addr + (size_t(1) << log2_sector_size)) & -(64 << 10));
+            ((addr + (size_t(1) << log2_sector_size) - 1) & -(64 << 10));
 
-    if (!force_bounce_buffer && addr < 0x100000) {
-        pkt.hdr.sizeof_packet = sizeof(pkt.hdr);
-        pkt.hdr.segoff = ((uint32_t(addr) >> 4) << 16) |
+    if (!force_bounce_buffer &&
+            (addr + (uint64_t(count) << log2_sector_size)) <= 0x100000) {
+        // Read directly to destination
+        pkt.sizeof_packet = sizeof(pkt);
+        pkt.segoff = ((uint32_t(addr) >> 4) << 16) |
                 (uint32_t(addr) & 0xF);
-    } else if (0 && !force_bounce_buffer && disk_support_64bit_addr()) {
-        pkt.hdr.sizeof_packet = sizeof(pkt);
-        pkt.hdr.segoff = 0xFFFFFFFF;
-        pkt.address = addr;
     } else {
         // Automatic bounce buffering
         return disk_read_lba_bouncebuffer(addr, lba, log2_sector_size, count);
@@ -217,7 +179,7 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
 
         assert(read_count <= 0xFFFF);
 
-        pkt.hdr.block_count = read_count;
+        pkt.block_count = read_count;
 
         bios_regs_t regs;
         regs.eax = 0x4200;
@@ -233,11 +195,11 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
             // Error occurred...
 
             // pkt updated with number of sectors successfully transfered
-            read_count = pkt.hdr.block_count;
+            read_count = pkt.block_count;
             read_size = read_count << log2_sector_size;
 
             // Failed if no sectors transferred and already being careful
-            if (unlikely(pkt.hdr.block_count == 0) && unlikely(careful))
+            if (unlikely(pkt.block_count == 0) && unlikely(careful))
                 return false;
 
             // Start being careful
@@ -248,12 +210,10 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
         lba += read_count;
         addr += read_size;
 
-        if (addr < 0x100000) {
-            pkt.hdr.segoff = ((uint32_t(addr) >> 4) << 16) |
-                    (uint32_t(addr) & 0xF);
-        } else {
-            pkt.address = addr;
-        }
+        assert(addr < 0x100000);
+
+        pkt.segoff = ((uint32_t(addr) >> 4) << 16) |
+                (uint32_t(addr) & 0xF);
     }
 
     return true;
