@@ -237,7 +237,7 @@ static long futex_wake_op_locked(int *uaddr2, int op_param,
     futex_tab_ent_t *ent2 = futex_tab.lookup(&addr2);
 
     int old2 = 0;
-    if (!mm_copy_user(&old2, uaddr2, sizeof(old2)))
+    if (unlikely(!mm_copy_user(&old2, uaddr2, sizeof(old2))))
         return -int(errno_t::EFAULT);
 
     for (;; __builtin_ia32_pause()) {
@@ -429,7 +429,7 @@ long sys_posix_spawn(pid_t *restrict pid,
                                    std::move(argv_items),
                                    std::move(envp_items));
 
-    if (!mm_copy_user(pid, &pid_result, sizeof(*pid)))
+    if (unlikely(!mm_copy_user(pid, &pid_result, sizeof(*pid))))
         return -int(errno_t::EFAULT);
 
     return result;

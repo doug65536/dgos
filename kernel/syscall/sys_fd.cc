@@ -7,6 +7,7 @@
 #include "mm.h"
 #include "unique_ptr.h"
 #include "user_mem.h"
+#include "fs/devfs.h"
 
 class unique_memlock
 {
@@ -347,7 +348,7 @@ int sys_ioctl(int fd, int cmd, void* arg)
 
     // Copy the argument to a kernel memory buffer if WRITE
     if ((_IOC_DIR(cmd) & _IOC_WRITE) && size > 0) {
-        if (!mm_copy_user(data, arg, size))
+        if (unlikely(!mm_copy_user(data, arg, size)))
             return fault_err();
     }
 
@@ -355,7 +356,7 @@ int sys_ioctl(int fd, int cmd, void* arg)
 
     // Copy the argument to user buffer if READ
     if ((_IOC_DIR(cmd) & _IOC_READ) && size > 0) {
-        if (!mm_copy_user(arg, data, size))
+        if (unlikely(!mm_copy_user(arg, data, size)))
             return fault_err();
     }
 
