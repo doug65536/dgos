@@ -55,7 +55,7 @@ struct ide_if_factory_t final
 struct ide_if_t final : public storage_if_base_t, public zero_init_t {
     STORAGE_IF_IMPL
 
-    using lock_type = std::mutex;
+    using lock_type = ext::irq_mutex;
     using scoped_lock = std::unique_lock<lock_type>;
 
     struct bmdma_prd_t {

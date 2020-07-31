@@ -217,51 +217,51 @@ private:
     bool irq_was_enabled = false;
 };
 
-//template<>
-//class noirq_lock<mcslock>
-//{
-//public:
-//    using mutex_type = typename mcslock::mutex_type;
+template<>
+class noirq_lock<mcslock>
+{
+public:
+    using mutex_type = typename mcslock::mutex_type;
 
-//    noirq_lock()
-//        : inner_lock()
-//    {
-//    }
+    noirq_lock()
+        : inner_lock()
+    {
+    }
 
-//    noirq_lock(noirq_lock const&) = delete;
-//    noirq_lock(noirq_lock&&) = delete;
-//    noirq_lock &operator=(noirq_lock const&) = delete;
+    noirq_lock(noirq_lock const&) = delete;
+    noirq_lock(noirq_lock&&) = delete;
+    noirq_lock &operator=(noirq_lock const&) = delete;
 
-//    mutex_type& native_handle()
-//    {
-//        return inner_lock.native_handle();
-//    }
+    mutex_type& native_handle()
+    {
+        return inner_lock.native_handle();
+    }
 
-//    void lock(mcs_queue_ent_t *node)
-//    {
-//        irq_was_enabled = cpu_irq_save_disable();
-//        inner_lock.lock(node);
-//    }
+    void lock(mcs_queue_ent_t *node)
+    {
+        irq_was_enabled = cpu_irq_save_disable();
+        inner_lock.lock(node);
+    }
 
-//    bool try_lock(mcs_queue_ent_t *node)
-//    {
-//        irq_was_enabled = cpu_irq_save_disable();
-//        bool ok = inner_lock.try_lock(node);
-//        if (!ok)
-//            cpu_irq_toggle(irq_was_enabled);
-//        return ok;
-//    }
+    bool try_lock(mcs_queue_ent_t *node)
+    {
+        irq_was_enabled = cpu_irq_save_disable();
+        bool ok = inner_lock.try_lock(node);
+        if (!ok)
+            cpu_irq_toggle(irq_was_enabled);
+        return ok;
+    }
 
-//    void unlock(mcs_queue_ent_t *node)
-//    {
-//        inner_lock.unlock(node);
-//        cpu_irq_toggle(irq_was_enabled);
-//    }
+    void unlock(mcs_queue_ent_t *node)
+    {
+        inner_lock.unlock(node);
+        cpu_irq_toggle(irq_was_enabled);
+    }
 
-//private:
-//    mcslock inner_lock;
-//    bool irq_was_enabled = false;
-//};
+private:
+    mcslock inner_lock;
+    bool irq_was_enabled = false;
+};
 
 using irq_mutex = noirq_lock<std::mutex>;
 using irq_shared_mutex = noirq_lock<std::shared_mutex>;

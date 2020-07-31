@@ -8,7 +8,7 @@
 // Contiguous allocator
 
 struct contiguous_allocator_t {
-    using lock_type = ext::irq_mutex;
+    using lock_type = ext::irq_ticketlock;
     using scoped_lock = std::unique_lock<lock_type>;
 public:
     using linaddr_t = uintptr_t;
