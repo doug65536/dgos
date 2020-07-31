@@ -171,6 +171,16 @@ int main(int argc, char **argv, char **envp)
                       PCI_SUBCLASS_MULTIMEDIA_AUDIO, -1))
         load_module("boot/ide.km");
 
+    for (size_t iter = 0; iter < 16; ++iter) {
+        uint64_t st = __builtin_ia32_rdtsc();
+        for (size_t i = 0; i < 1000000; ++i)
+            raise(42);
+        uint64_t en = __builtin_ia32_rdtsc();
+        uint64_t el = en - st;
+        printf("One million syscalls in %lu cycles (%lu/call)\n",
+               el, el/1000000);
+    }
+
     pthread_t mouse_thread{};
     int err = pthread_create(&mouse_thread, nullptr, mouse_test, nullptr);
 
