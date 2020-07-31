@@ -85,15 +85,15 @@ bool cpu_has_bmi()
     // ABM=CPUID[0x80000001].ecx[5]
     // BMI1=CPUID[7].ebx[3]
     // BMI2=CPUID[7].ebx[8]
-    if (!cpuid(&info, 0x80000001, 0))
+    if (unlikely(!cpuid(&info, 0x80000001, 0)))
         result = false;
-    else if (!(info.ecx & (1 << 5)))
+    else if (unlikely(!(info.ecx & (1 << 5))))
         result = false;
-    else if (!cpuid(&info, 7, 0))
+    else if (unlikely(!cpuid(&info, 7, 0)))
         result = false;
-    else if (!(info.ebx & (1 << 3)))
+    else if (unlikely(!(info.ebx & (1 << 3))))
         result = false;
-    else if (!(info.ebx & (1 << 8)))
+    else if (unlikely(!(info.ebx & (1 << 8))))
         result = false;
 
     has = result ? 1 : -1;
@@ -132,20 +132,20 @@ bool cpu_has_upto_avx2()
 {
     cpuid_t cpuinfo;
 
-    if (!cpuid(&cpuinfo, 7U, 0))
+    if (unlikely(!cpuid(&cpuinfo, 7U, 0)))
         return false;
 
     // bit5=avx2
-    if (!(cpuinfo.ebx & (1U<<5)))
+    if (unlikely(!(cpuinfo.ebx & (1U<<5))))
         return false;
 
-    if (!cpuid(&cpuinfo, 1U, 0))
+    if (unlikely(!cpuid(&cpuinfo, 1U, 0)))
         return false;
 
-    if (!(cpuinfo.ecx & (1U<<28)))
+    if (unlikely(!(cpuinfo.ecx & (1U<<28))))
         return false;
 
-    if (!cpuid(&cpuinfo, 0xD, 0))
+    if (unlikely(!cpuid(&cpuinfo, 0xD, 0)))
         return false;
 
     return true;
