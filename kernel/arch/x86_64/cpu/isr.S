@@ -688,17 +688,19 @@ isr_common:
     // r13 = current thread (maybe changed since last loaded)
     movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r13
 
+    testl $(1 << ISR_CTX_CTX_FLAGS_FIXGS_QWBIT),frame_intr(%rbp)
+    jz .Lno_restore_swap
+
+    // No branch taken when returning to user code
+    swapgs
+.Lno_restore_swap:
+
     // See if we're not returning to user code
     // Branch past restoration of segments if not
     testl $ 3,frame_cs(%rbp)
     jz .Lreturning_to_kernel
 
     // ...returning to user code
-
-    btl $(ISR_CTX_CTX_FLAGS_FIXGS_QWBIT),frame_intr(%rbp)
-    jnc .Lno_restore_swap
-    swapgs
-.Lno_restore_swap:
 
     // If segments are not changing, avoid 136*4 cycles
     cmpq %r15,%rdx
@@ -712,22 +714,7 @@ isr_common:
     wrfsbase %r13
     wrgsbase %r14
 
-    //jmp .Lreturning_to_user
-
 .Lreturning_to_kernel:
-
-    .cfi_remember_state
-
-#ifdef ISR_VALIDATE_FLAGS
-    // Read eflags, toggle always set flag (becomes 0 in valid case),
-    // Mask out all bits that are allowed to be nonzero, make sure it is zero
-    movq frame_efl(%rbp),%rdi
-    xor $ CPU_EFLAGS_ALWAYS,%rdi
-    and $(CPU_EFLAGS_NEVER | CPU_EFLAGS_ALWAYS),%rdi
-    jz .Lgood_flags2
-    call cpu_debug_break
-.Lgood_flags2:
-#endif
 
     .cfi_remember_state
 
