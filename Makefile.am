@@ -2895,11 +2895,11 @@ run-smp-kvm: all run-smp-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-smp-kvm
 
-debug-bochs: all debug-mbr-bios-bochs-kernel
+debug-bochs: all debug-gpt-bios-bochs-kernel
 
 .PHONY: debug-bochs
 
-debug-bochs-boot: all debug-hyb-bios-bochs-boot
+debug-bochs-boot: all debug-mbr-bios-bochs-boot
 
 .PHONY: debug-bochs-boot
 
