@@ -82,20 +82,21 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
         bool is_mmio = pci_iter.config.is_bar_mmio(cap_rec.bar);
 
-        // bar is nullptr
-        uint64_t bar;
-        bar = pci_iter.config.get_bar(cap_rec.bar) + cap_rec.offset;
+        uint64_t addr;
+        addr = pci_iter.config.get_bar(cap_rec.bar) + cap_rec.offset;
 
         switch (cap_rec.type) {
         case VIRTIO_PCI_CAP_COMMON_CFG:
+            if (common_cfg_size)
+                break;
+
             common_cfg_size = cap_rec.length;
 
-            // Won't tolerate this being in I/O
-            if (!bar)
-                return false;
+            // Putting this in I/O would be madness
+            assert(is_mmio);
 
             common_cfg = (virtio_pci_common_cfg_t*)mmap(
-                        (void*)bar, cap_rec.length,
+                        (void*)addr, cap_rec.length,
                         PROT_READ | PROT_WRITE, MAP_PHYSICAL);
 
             // 4.1.4.3 Reset the device
@@ -215,9 +216,11 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 uint16_t queue_msix_vector = (use_msi && irq_range.msix)
                         ? i : 0;
 
-                if (!vq.init(i - 1, common_cfg, (char volatile *)notify_cap,
-                             notify_cap->notify_off_multiplier,
-                             queue_msix_vector)) {
+                if (unlikely(!vq.init(i - 1, common_cfg,
+                                      notify_cap_offset,
+                                      notify_accessor,
+                                      notify_off_multiplier,
+                                      queue_msix_vector))) {
                     // Tell the device we gave up
                     common_cfg->device_status |= VIRTIO_STATUS_FAILED;
                     return false;
@@ -234,44 +237,41 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_NOTIFY_CFG:
-            if (notify_cap)
+            if (notify_cap_size)
                 break;
-            notify_cap_size = cap_rec.length;
-            notify_bar = bar;
-            notify_is_mmio = is_mmio;
-            uint64_t notify_paddr;
-            notify_paddr = bar;
-            VIRTIO_TRACE("mapping notify bar %u"
-                         " at physaddr %#" PRIx64
-                         ", mmio=%u",
-                         (unsigned)bar, notify_paddr, (unsigned)notify_is_mmio);
-            notify_cap = (virtio_pci_notify_cap_t *)mmap(
-                        (void*)notify_paddr, cap_rec.length,
-                        PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU);
-            if (unlikely(notify_cap == MAP_FAILED)) {
-                notify_cap = nullptr;
-                notify_cap_size = 0;
-                return false;
-            }
 
-            notify_off_multiplier = notify_cap->notify_off_multiplier;
+            notify_cap_size = cap_rec.length;
+            notify_is_mmio = is_mmio;
+            notify_bar = cap_rec.bar;
+            notify_cap_offset = cap_rec.offset;
+
+            notify_accessor = pci_bar_accessor_t(
+                        pci_iter, notify_bar,
+                        cap_rec.offset + notify_cap_size);
+
+            notify_off_multiplier = 0;
+            pci_config_copy(pci_iter, &notify_off_multiplier,
+                            cap + sizeof(cap_rec),
+                            sizeof(notify_off_multiplier));
 
             break;
 
         case VIRTIO_PCI_CAP_ISR_CFG:
+            assert(is_mmio);
+
             // I wish I could ignore this old crap and just use MSI-X, but
             // no, qemu broke virtio almost entirely, broken all the way
             // to always using pin interrupts
-            isr_status = (uint32_t*)mmap((void*)bar, sizeof(uint32_t),
+            isr_status = (uint32_t*)mmap((void*)addr, sizeof(uint32_t),
                                          PROT_READ, MAP_PHYSICAL);
             break;
 
         case VIRTIO_PCI_CAP_DEVICE_CFG:
             device_cfg_size = cap_rec.length;
 
+            assert(is_mmio);
             device_cfg = (virtio_pci_common_cfg_t*)mmap(
-                        (void*)bar, cap_rec.length, PROT_READ | PROT_WRITE,
+                        (void*)addr, cap_rec.length, PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL);
 
             break;
@@ -284,6 +284,8 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
         }
     }
+
+    VIRTIO_TRACE("Completed %s init successfully\n", isr_name);
 
     return true;
 }
@@ -309,11 +311,16 @@ isr_context_t *virtio_base_t::irq_handler(int irq, isr_context_t *ctx)
 }
 
 bool virtio_virtqueue_t::init(
-        int queue_idx, virtio_pci_common_cfg_t volatile *common_cfg,
-        char volatile *notify_base, uint32_t notify_off_multiplier,
+        int queue_idx,
+        virtio_pci_common_cfg_t volatile *common_cfg,
+        uint32_t cap_offset,
+        pci_bar_accessor_t &notify_accessor,
+        uint32_t notify_off_multiplier,
         uint16_t msix_vector)
 {
     this->queue_idx = queue_idx;
+
+    this->notify_accessor = notify_accessor;
 
     atomic_st_rel(&common_cfg->queue_select, queue_idx);
 
@@ -421,9 +428,13 @@ bool virtio_virtqueue_t::init(
     // Can't reliably read back anymore until enabled
     common_cfg->queue_enable = 1;
 
-    notify_ptr = (uint16_t*)
-            (notify_base + (common_cfg->queue_notify_off *
-                            notify_off_multiplier));
+    uint16_t queue_notify_off = common_cfg->queue_notify_off;
+
+    notify_reg = pci_bar_register_t{
+            cap_offset +
+            queue_notify_off * notify_off_multiplier,
+            sizeof(uint16_t)
+    };
 
     if (unlikely(!(assert(common_cfg->queue_size == (1 << log2_queue_size)) ||
                    assert(common_cfg->queue_avail == avail_paddr) ||
@@ -521,8 +532,9 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
     // Update idx
     atomic_st_rel(&avail_hdr->idx, avail_head);
 
-    if ((int16_t)avail_head - (int16_t)avail_ftr->used_event > 0)
-        atomic_st_rel(notify_ptr, queue_idx);
+    if (int16_t((uint16_t)avail_head - (uint16_t)avail_ftr->used_event) > 0)
+        notify_accessor.wr_16(notify_reg, queue_idx);
+        //atomic_st_rel(notify_ptr, queue_idx);
 }
 
 void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
@@ -537,7 +549,7 @@ void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
 
     if (sent_data && sent_size) {
         range_count = mphysranges(ranges, countof(ranges),
-                                  const_cast<void*>(sent_data), sent_size,
+                                  sent_data, sent_size,
                                   std::numeric_limits<uint32_t>::max());
 
         for (size_t i = 0; i < range_count; ++i, ++out) {

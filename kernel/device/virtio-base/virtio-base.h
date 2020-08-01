@@ -26,6 +26,8 @@ struct virtq_avail {
     // Followed by 'queue_size' uint16_t ring
 };
 
+struct virtio_pci_cap_hdr_t;
+
 class EXPORT virtio_virtqueue_t {
 public:
     class virtio_blocking_iocp_success_t {
@@ -100,8 +102,11 @@ public:
 
     }
 
-    bool init(int queue_idx, virtio_pci_common_cfg_t volatile *common_cfg,
-              char volatile *notify_base, uint32_t notify_off_multiplier,
+    bool init(int queue_idx,
+              virtio_pci_common_cfg_t volatile *common_cfg,
+              uint32_t cap_offset,
+              pci_bar_accessor_t &notify_accessor,
+              uint32_t notify_off_multiplier,
               uint16_t msix_vector);
 
     desc_t *alloc_desc(bool dev_writable);
@@ -153,7 +158,9 @@ private:
     int desc_first_free = -1;
     unsigned desc_free_count = 0;
 
-    uint16_t volatile *notify_ptr = nullptr;
+    //uint16_t volatile *notify_ptr = nullptr;
+    pci_bar_accessor_t notify_accessor;
+    pci_bar_register_t notify_reg;
 
     uint8_t log2_queue_size = 0;
     bool single_page = false;
@@ -395,7 +402,7 @@ protected:
 
     using blocking_iocp_t = virtio_virtqueue_t::virtio_blocking_iocp_t;
     using async_iocp_t = virtio_virtqueue_t::virtio_iocp_t;
-    using lock_type = ext::noirq_lock<ext::spinlock>;
+    using lock_type = ext::irq_ticketlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
@@ -421,13 +428,14 @@ protected:
     void volatile *device_cfg = nullptr;
     size_t device_cfg_size = 0;
 
-    virtio_pci_notify_cap_t volatile *notify_cap = nullptr;
-    uint64_t notify_bar = 0;
+    pci_bar_accessor_t notify_accessor;
+    unsigned notify_bar = 0;
     size_t notify_cap_size = 0;
     bool notify_is_mmio;
 
     uint32_t volatile *isr_status = nullptr;
     uint32_t notify_off_multiplier = 0;
+    uint32_t notify_cap_offset = 0;
 
     static char const *cap_names[];
 };

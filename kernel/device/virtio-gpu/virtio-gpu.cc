@@ -1103,7 +1103,6 @@ int virtio_gpu_dev_t::config_work_thread()
     // ISR also acquiring the config lock. It would deadlock. In practice IRQs
     // will be enabled very soon because .wait will context switch to
     // something that probably has interrupts enabled
-    cpu_scoped_irq_disable irq_dis;
     scoped_lock lock(config_lock);
 
     while (true)
@@ -1115,13 +1114,11 @@ int virtio_gpu_dev_t::config_work_thread()
         config_events = 0;
 
         lock.unlock();
-        irq_dis.restore();
 
         // Handle config change with interrupts enabled
         // and config_lock unlocked
         handle_config_change(events);
 
-        irq_dis.redisable();
         lock.lock();
     }
 }
