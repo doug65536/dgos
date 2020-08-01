@@ -8,6 +8,12 @@
 __attribute__((__noreturn__))
 static void pthread_bootstrap(int tid, void *(fn)(void*), void *arg)
 {
+#ifdef __x86_64__
+    __asm__ ( ".cfi_undefined rip\n" );
+#else
+    __asm__ ( ".cfi_undefined eip\n" );
+#endif
+
     __pthread_set_tid(tid);
     void *result = fn(arg);
     pthread_exit(result);
