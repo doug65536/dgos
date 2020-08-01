@@ -5,7 +5,7 @@
 
 int pthread_mutex_timedlock(pthread_mutex_t *m, timespec const *timeout_time)
 {
-    if (unlikely(m->sig == __PTHREAD_MUTEX_SIG))
+    if (unlikely(m->sig != __PTHREAD_MUTEX_SIG))
         return EINVAL;
 
     int tid = pthread_self();
