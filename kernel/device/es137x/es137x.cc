@@ -87,7 +87,7 @@ bool es1370_t::init(const pci_dev_iterator_t &pci_iter)
 
     base = bar & -4;
 
-    outb(base + ES1370_CONTROL,
+    outd(base + ES1370_CONTROL,
          ES1370_CONTROL_ADC_STOP |
          ES1370_CONTROL_WTSRSEL_n(ES1370_CONTROL_WTSRSEL_44K) |
          ES1370_CONTROL_CDC_EN);
