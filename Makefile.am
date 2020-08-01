@@ -2499,7 +2499,7 @@ QEMU_SERIAL = \
 	-device isa-serial,chardev=qemu-debug-out,id=com1 \
 	\
 	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-serial-socket,id=com3 \
+	-device isa-serial,chardev=qemu-serial-socket,id=com3,irq=5 \
 	\
 	-chardev socket,id=qemu-symsrv-socket,host=localhost,port=7789,server,nowait,nodelay \
 	-device isa-serial,chardev=qemu-symsrv-socket,id=com2
