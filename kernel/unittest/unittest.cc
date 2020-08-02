@@ -115,7 +115,7 @@ static int test_run_thread(void *)
 
 int module_main(int argc, char const * const * argv)
 {
-#if 1
+#if 0
     test_run_thread(nullptr);
 #else
     int tid = thread_create(test_run_thread, nullptr,
