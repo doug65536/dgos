@@ -192,7 +192,7 @@ static _always_inline void memset_byte(char *&d, uint64_t s, ptrdiff_t &ofs)
 {
     __asm__ __volatile__ (
         "movb %b[s],(%[d],%[ofs])\n\t"
-        "add $1,%%rdx\n\t"
+        "add $ 1,%%rdx\n\t"
         : [d] "+D" (d)
         , [ofs] "+d" (ofs)
         : [s] "a" (s)
@@ -278,7 +278,7 @@ static _always_inline void memcpy_byte(char *d, char const *s, uint32_t &ofs)
     __asm__ __volatile__(
         "movzbl (%%rsi,%%rdx),%%eax\n\t"
         "movb %%al,(%%rdi,%%rdx)\n\t"
-        "addl $1,%%edx\n\t"
+        "addl $ 1,%%edx\n\t"
         : "+d" (ofs)
         , "=a" (eax)
         : "D" (d)
@@ -382,7 +382,7 @@ static _always_inline void memcpy_byte_reverse(
     __asm__ __volatile__ (
         "movzbl (%%rsi,%%rdx),%%eax\n"
         "movb %%al,(%%rdi,%%rdx)\n\t"
-        "addq $-1,%%rdx\n\t"
+        "addq $ -1,%%rdx\n\t"
         : "+d" (count)
         , "=a" (eax)
         : "D" (d)

@@ -68,7 +68,7 @@ static uintptr_t eainst_get_current_thread(uint64_t* tsc)
         "mov %%gs:%c[apic_id_ofs],%%ecx\n\t"
 #endif
 
-        "shlq $32,%%rdx\n\t"
+        "shlq $ 32,%%rdx\n\t"
         "orq %%rdx,%%rax\n\t"
         "movq %%rax,(%[tsc_ptr])\n\t"
 

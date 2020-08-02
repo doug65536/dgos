@@ -118,12 +118,12 @@ static _always_inline uint64_t cpu_xcr_change_bits(
     uint32_t edx;
     __asm__ __volatile__ (
         "xgetbv\n\t"
-        "shlq $32,%%rdx\n\t"
+        "shlq $ 32,%%rdx\n\t"
         "orq %%rdx,%%rax\n\t"
         "andq %[clear_mask],%%rax\n\t"
         "orq %[set],%%rax\n\t"
         "movq %%rax,%%rdx\n\t"
-        "shrq $32,%%rdx\n\t"
+        "shrq $ 32,%%rdx\n\t"
         "xsetbv\n\t"
         : "=a" (eax), "=d" (edx)
         : "c" (xcr)

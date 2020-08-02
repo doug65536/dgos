@@ -204,7 +204,7 @@ syscall_entry:
     cmpq $ SYSCALL_COUNT,%rax
     jae 0f
 
-    // Save flags
+    // Save flags (don't care about ones clobbered by cmp above though)
     mov %r11d,%gs:CPU_INFO_SYSCALL_FLAGS_OFS
 
     // Read function pointer from vector table

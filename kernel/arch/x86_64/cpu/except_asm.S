@@ -94,7 +94,7 @@ __exception_longjmp_unwind:
     movq %rsi,%r12
 
     // exception object (1st parameter)
-    mov $1024,%rdi
+    mov $ 1024,%rdi
     call __cxa_allocate_exception
     mov %rax,%rdi
 

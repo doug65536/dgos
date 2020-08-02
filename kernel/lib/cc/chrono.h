@@ -426,7 +426,7 @@ using sys_seconds = sys_time<seconds>;
 //using sys_days = sys_time<days>;
 
 // Inline because it is frequently used to construct infinite timeout timepoint
-// This entire function becomes movq $-1,%reg in an instruction
+// This entire function becomes movq $ -1,%reg in an instruction
 // sending a parameter
 template<typename _Clock, typename _Duration>
 inline constexpr time_point<_Clock, _Duration>

@@ -5,522 +5,522 @@
 // old way 136 cycles
 .global mov_seg_perf
 mov_seg_perf:
-	push $0
-	mov $1000000,%ecx
+	push $ 0
+	mov $ 1000000,%ecx
 
 	xor %eax,%eax
 .balign 16
 0:	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	mov (%rsp),%rax
 	mov %ax,%ds
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%es
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%fs
-	shr $16,%rax
+	shr $ 16,%rax
 	mov %ax,%gs
 	dec %ecx
 	jnz 0b
@@ -530,8 +530,8 @@ mov_seg_perf:
 // Load segments 256,000,000 times from top of stack
 .global str_seg_perf
 str_seg_perf:
-	push $0
-	mov $1000000,%ecx
+	push $ 0
+	mov $ 1000000,%ecx
 
 .balign 16
 0:	mov %ds,(%rsp)
@@ -816,9 +816,9 @@ str_seg_perf:
 
 .macro iter
 	mov (%rsp),%rax
-	mov $CPU_MSR_FSBASE,%ecx
+	mov $ CPU_MSR_FSBASE,%ecx
 	mov %rax,%rdx
-	shr $32,%rdx
+	shr $ 32,%rdx
 	wrmsr
 
 	between
@@ -840,11 +840,11 @@ str_seg_perf:
 
 .global rdfsbase_perf
 rdfsbase_perf:
-	movabs $0xFFFF800042424242,%rax
+	movabs $ 0xFFFF800042424242,%rax
 	mov %rax,%rdi
 	xor %ebx,%ebx
 	push %rax
-	mov $60000000,%esi
+	mov $ 60000000,%esi
 
 .balign 16
 0:	iter_block

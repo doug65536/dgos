@@ -1,5 +1,5 @@
 
-.macro push_cfi val
+.macro push_cfi val:vararg
     pushq \val
     .cfi_adjust_cfa_offset 8
 .endm
@@ -9,7 +9,7 @@
     .cfi_adjust_cfa_offset 8
 .endm
 
-.macro pop_cfi val
+.macro pop_cfi val:vararg
     popq \val
     .cfi_adjust_cfa_offset -8
 .endm
@@ -19,7 +19,7 @@
     .cfi_adjust_cfa_offset -8
 .endm
 
-.macro adj_rsp_cfi	ofs
+.macro adj_rsp_cfi	ofs:vararg
     lea (\ofs)(%rsp),%rsp
     .cfi_adjust_cfa_offset -(\ofs)
 .endm

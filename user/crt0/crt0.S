@@ -37,7 +37,7 @@ _start:
     // Scan through the envp array until the nullptr is encountered
     // Finish the loop pointing to the item after the nullptr
 .Lcheck_envp:
-    cmpq $0,(%r15)
+    cmpq $ 0,(%r15)
     leaq 8(%r15),%r15
     jnz .Lcheck_envp
 
@@ -74,12 +74,12 @@ _start:
     testq %rax,%rax
     jz .Ldone_init
     call *%rax
-    addq $8,%rbx
+    addq $ 8,%rbx
     jmp .Lnext_init
 .Ldone_init:
 
 	mov %rsp,%rbx
-	and $-16,%rsp
+	and $ -16,%rsp
     call main
 	mov %rax,%r12
 	mov %rbx,%rsp

@@ -96,7 +96,7 @@ ap_init:
     // Use the low half of the BSP stack briefly until thread startup
     leaq kernel_stack(%rip),%rdx
     movq kernel_stack_size(%rip),%rbx
-    shrq $1,%rbx
+    shrq $ 1,%rbx
     leaq (%rdx,%rbx),%rsp
 
     xorl %ebp,%ebp
@@ -194,7 +194,7 @@ bsp_init:
 //    movl $ 0x08000,%esi
 //    call __asan_storeN_noabort
 
-    movb $1,asan_ready(%rip)
+    movb $ 1,asan_ready(%rip)
 #endif
 
     // Call the constructors
@@ -217,10 +217,10 @@ bsp_init:
 //    xor %eax,%eax
 //.balign 16
 //0:
-//    add $-1,%eax
+//    add $ -1,%eax
 //    jnz 0b
 //
-//    andq $-16,%rsp
+//    andq $ -16,%rsp
 //
 //    movl %ss,%eax
 //    push %rax
@@ -251,10 +251,10 @@ bsp_init:
 //    rdtsc
 //    sub perfdata-8(%rip),%eax
 //    sbb perfdata-4(%rip),%edx
-//    shlq $32,%rdx
+//    shlq $ 32,%rdx
 //    orq %rdx,%rax
 //    mov %rax,(%r8)
-//    add $8,%r8
+//    add $ 8,%r8
 //    add $ -1,%r9d
 //    jnz 0b
 //
@@ -343,7 +343,7 @@ __invoke_function_array:
     jbe 0f
     mov (%rbx),%rax
     indirect_call rax
-    addq $8,%rbx
+    addq $ 8,%rbx
     jmp 0b
 0:  pop_cfi %rbp
     pop_cfi %rbp

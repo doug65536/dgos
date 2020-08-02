@@ -102,7 +102,7 @@ isr_section_name \int_num
         .cfi_offset cs,-4*8
         .cfi_offset rip,-5*8
         // Push 0 error code to normalize
-        push_cfi $0
+        push_cfi $ 0
         fn_trace \pathname,enter
     .else
         // CFA
@@ -124,7 +124,7 @@ isr_section_name \int_num
     .endif
     // Push the interrupt number below the error code
     // ctx_flags will be zeroed by this too (the upper 32 bits)
-    push_cfi $\int_num
+    push_cfi $(\int_num)
     jmp \pathname
     .cfi_endproc
 .endm
@@ -568,7 +568,7 @@ isr_common:
     .cfi_offset rsi,-21*8
 
     // Avoid giant instruction below
-    movl $(1 << ISR_CTX_CTX_FLAGS_USERGS_QWBIT),%esi
+    movl $ 1 << ISR_CTX_CTX_FLAGS_USERGS_QWBIT,%esi
 
     pushq %rdi
     .cfi_offset rdi,-22*8
@@ -619,7 +619,7 @@ isr_common:
 .Lfrom_kernel:
 
     // Push FPU context pointer field, initially null
-    pushq $0
+    pushq $ 0
 
     /// Register usage:
     ///  Hold isr_context_t pointer in r12
@@ -680,7 +680,7 @@ isr_common:
 .Lno_cleanup_call:
 
     // Avoid giant instruction below
-    movl $(1 << ISR_CTX_CTX_FLAGS_USERGS_QWBIT),%eax
+    movl $ 1 << ISR_CTX_CTX_FLAGS_USERGS_QWBIT,%eax
 
     // Discard the pointer to the FPU context, segments, cr3
     add $ 8*3,%rsp
@@ -999,7 +999,7 @@ thread_yield:
     popfq_cfi
 
     // Return and pop cs, eflags, rsp, ss
-    retq $((5-1)*8)
+    retq $ ((5-1)*8)
 
     .cfi_endproc
 
@@ -1182,7 +1182,7 @@ soft_rdgsbase_r14:
     subq sse_context_size(%rip),%rsi
 
     // Set all bits of edx:eax
-    movl $-1,%eax
+    movl $ -1,%eax
     movl %eax,%edx
 
     // Save context using instruction passed to macro
@@ -1206,7 +1206,7 @@ soft_rdgsbase_r14:
     movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
 
     // Set all bits of edx:eax
-    movl $-1,%eax
+    movl $ -1,%eax
     movl %eax,%edx
 
     // Restore context using instruction passed to macro
@@ -1300,7 +1300,7 @@ protection_barrier_to_user_verw:
     pushfq_cfi
 
     // Must be memory operand
-    push_cfi $GDT_SEL_KERNEL_DATA
+    push_cfi $(GDT_SEL_KERNEL_DATA)
 
     // Stall dispatch until everything up to now retires
     lfence
@@ -1563,7 +1563,7 @@ __module_dynlink_plt_thunk:
     // The call to __module_dynamic_linker will be
     // preserving the rest if necessary
 
-    push_cfi $0
+    push_cfi $(0)
 
     pushfq_cfi
     .cfi_offset rflags,-5*8
@@ -1651,7 +1651,7 @@ __module_dynlink_plt_thunk:
     // an opaque callback context pointer
     // The CPU lands on the dynamically linked function with CPU registers
     // precisely as they were when the caller called the function
-    retq $16
+    retq $ 16
 
     .cfi_endproc
 
@@ -1842,7 +1842,7 @@ nofault_strncpy:
     jb .Lnofault_strncpy_loop
 
     // Failed! String too long (-2 long, get it?)
-    mov $-2,%rax
+    mov $ -2,%rax
 
 .Lnofault_strncpy_faulted:
 .Lnofault_strncpy_done:
@@ -1936,7 +1936,7 @@ nofault_strnlen:
 
     // Max length! Return -2 (to differentiate it from -1 from fault)
     // -2 for "too" long
-    mov $-2,%rax
+    mov $ -2,%rax
 
 .Lnofault_strnlen_done:
 .Lnofault_strnlen_faulted:// crash will resume here with -1 in rax
@@ -2057,7 +2057,7 @@ nofault_memcpy:
 #else
 
     // To test against -64 and to adjust loop counters/pointers
-    mov $-64,%rcx
+    mov $ -64,%rcx
 
     // Becomes nop if cpu does not support SMAP
     insn_fixup
@@ -2069,7 +2069,7 @@ nofault_memcpy:
 
     // branch to alignment loop if not 64-bit aligned
 .Lnofault_memcpy_misaligned_mainloop:
-    test $7,%rdi
+    test $ 7,%rdi
     jnz .Lmisaligned_dest
 
     // At this point, the destination is guaranteed to be 64-bit aligned
@@ -2105,7 +2105,7 @@ nofault_memcpy:
     jnz .Lnofault_memcpy_fast_mainloop
 
 .Lnofault_memcpy_done:
-    mov $1,%eax
+    mov $ 1,%eax
 .Lnofault_memcpy_faulted:
 
     // Becomes nop if cpu does not support SMAP
@@ -2117,35 +2117,35 @@ nofault_memcpy:
 .balign 16
 .Lmisaligned_dest:
     // If destination is not 32 bit aligned, don't bother trying 32 bit
-    test $3,%edi
+    test $ 3,%edi
     jnz .Lmisaligned_dest_tiny
 
     // If there are less than 32 bits to be moved, don't do 32 bit
-    cmp $4,%rdx
+    cmp $ 4,%rdx
     jb .Lmisaligned_dest_tiny
 
     movl (%rsi),%eax
-    add $4,%rsi
+    add $ 4,%rsi
     movl %eax,(%rdi)
-    add $4,%rdi
-    add $-4,%rdx
+    add $ 4,%rdi
+    add $ -4,%rdx
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_misaligned_mainloop
 
 .balign 16
 .Lmisaligned_dest_tiny:
     movzbl (%rsi),%eax
-    add $1,%rsi
+    add $ 1,%rsi
     movb %al,(%rdi)
-    add $1,%rdi
-    add $-1,%rdx
+    add $ 1,%rdi
+    add $ -1,%rdx
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_misaligned_mainloop
 
 .balign 16
 .Lnofault_memcpy_little_remaining:
     // See if any number of 64 bit chunks are remaining
-    test $-8,%rdx
+    test $ -8,%rdx
     jz .Lnofault_memcpy_little_remaining_not64
 
     // Copy a 64 bit chunk
@@ -2153,32 +2153,32 @@ nofault_memcpy:
     add $ 8,%rsi
     mov %rax,(%rdi)
     add $ 8,%rdi
-    add $-8,%rdx
+    add $ -8,%rdx
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_little_remaining
 
 .balign 16
 .Lnofault_memcpy_little_remaining_not64:
     // See if any number of 32 bit chunks are remaining
-    test $-4,%rdx
+    test $ -4,%rdx
     jz .Lnofault_memcpy_little_remaining_not32
 
     // Copy a 32 bit chunk
     mov (%rsi),%eax
-    add $4,%rsi
+    add $ 4,%rsi
     mov %eax,(%rdi)
-    add $4,%rdi
-    add $-4,%rdx
+    add $ 4,%rdi
+    add $ -4,%rdx
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_little_remaining_not64
 
 .balign 16
 .Lnofault_memcpy_little_remaining_not32:
     movzbl (%rsi),%eax
-    add $1,%rsi
+    add $ 1,%rsi
     mov %al,(%rdi)
-    add $1,%rdi
-    add $-1,%rdx
+    add $ 1,%rdi
+    add $ -1,%rdx
     jz .Lnofault_memcpy_done
     jmp .Lnofault_memcpy_little_remaining_not32
 #endif
