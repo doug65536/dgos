@@ -366,7 +366,8 @@ public:
     {
         //perf_init();
 
-        port = uart_dev_t::open(0x2f8, 3, 115200, 8, 'N', 1, false);
+        port = uart_dev_t::open(uart_dev_t::com[3], 5,
+                115200, 8, 'N', 1, false);
 
         tid = thread_create(&symbol_server_t::thread_entry, this,
                             "symbol_server", 0, false, false);

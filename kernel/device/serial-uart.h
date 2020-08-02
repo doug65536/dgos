@@ -8,6 +8,8 @@ class uart_dev_t {
 public:
     using timeout_t = std::chrono::steady_clock::time_point;
 
+    static uint16_t const com[];
+
     uart_dev_t() = default;
     uart_dev_t(uart_dev_t const&) = delete;
     uart_dev_t(uart_dev_t&&) = delete;

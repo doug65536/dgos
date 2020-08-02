@@ -28,6 +28,14 @@
 //   DSR <- DTR : Peer disconnect(ed) deasserts DSR
 //
 
+EXPORT uint16_t const uart_dev_t::com[] = {
+    0,
+    0x3f8,
+    0x2f8,
+    0x3e8,
+    0x2e8
+};
+
 namespace uart_defs {
 
 enum struct special_val_t : uint16_t {
