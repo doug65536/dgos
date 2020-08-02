@@ -8,7 +8,7 @@
 
 noinst_PROGRAMS =
 
-DUMPDIR = $(top_builddir)/dump
+DUMPDIR = dump
 
 STARTUP_FILE_NAMES = crt0 crt0pc80 crt0pc64 crt0pc32
 STARTUP_FILE_NAMES_32 = crt032 crt0pc8032 crt0pc6432 crt0pc3232
@@ -459,7 +459,7 @@ EXTRA_bootpxe_bios_elf_DEPENDENCIES = \
 
 bootpxe-bios.map: bootpxe-bios-elf
 
-# bootpxe-bin
+# bootpxe-bios-bin
 
 bootpxe-bios-bin: bootpxe-bios-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
@@ -2798,10 +2798,11 @@ $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
 	$$(CP) "$$<" "$$@"
 
-debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
-		$(generate_symbols_outputs) \
+debug-$(1)-$(2)-bochs-$(3): $$(QEMU_IMAGE_$(1)) \
+		$$(generate_symbols_outputs) \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
 		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
+	echo Using $$(QEMU_IMAGE_$(1))
 	$$(BOCHS) \
 		-f $$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
 		-rc $$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands \
@@ -2824,11 +2825,11 @@ disks: hybdisk.img gptdisk.img mbrdisk.img isodisk.iso
 
 .PHONY: disks
 
-debug: all debug-up-efi-hd-iso-ahci-vga-tcg
+debug: all debug-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: debug
 
-debug-icount: all debug-up-efi-hd-iso-ahci-vga-icount
+debug-icount: all debug-up-efi-hd-hyb-ahci-vga-icount
 
 .PHONY: debug-icount
 
@@ -2912,13 +2913,25 @@ run-smp-kvm: all run-smp-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-smp-kvm
 
-debug-bochs: all debug-gpt-bios-bochs-kernel
+# ----
 
+debug-bochs: all debug-mbr-bios-bochs-kernel
 .PHONY: debug-bochs
 
 debug-bochs-boot: all debug-mbr-bios-bochs-boot
-
 .PHONY: debug-bochs-boot
+
+debug-bochs-gpt: all debug-gpt-bios-bochs-kernel
+.PHONY: debug-bochs-gpt
+
+debug-bochs-boot-gpt: all debug-gpt-bios-bochs-boot
+.PHONY: debug-bochs-boot-gpt
+
+debug-bochs-hyb: all debug-hyb-bios-bochs-kernel
+.PHONY: debug-bochs-hyb
+
+debug-bochs-boot-hyb: all debug-hyb-bios-bochs-boot
+.PHONY: debug-bochs-boot-hyb
 
 #==
 

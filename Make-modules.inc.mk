@@ -40,17 +40,17 @@ KERNEL_MODULE_LDFLAGS_SHARED = \
 	$(NOSTDLIB_FLAGS)
 
 KERNEL_MODULE_LDADD_SHARED = \
-	$(top_builddir)/libkm.a
+	libkm.a
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/module.ld \
-	$(top_builddir)/libkm.a
+	libkm.a
 
 KERNEL_MODULE_LDFLAGS_FN = \
 	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/$(1).km.map \
+	-Wl,-Map,$(1).km.map \
 	-Wl,-z,now \
-	$(top_builddir)/libkm.a
+	libkm.a
 
 #==========
 # Shared by all modules, provides base startup code, module_main call, etc.
@@ -334,7 +334,7 @@ virtio_blk_km_LDADD = \
 
 EXTRA_virtio_blk_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED) \
-	$(top_builddir)/virtio-base.km
+	virtio-base.km
 
 #==========
 # virtio gl/framebuffer display driver
@@ -358,7 +358,7 @@ virtio_gpu_km_LDADD = \
 
 EXTRA_virtio_gpu_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED) \
-	$(top_builddir)/virtio-base.km
+	virtio-base.km
 
 #==========
 # ext4 filesystem module
@@ -550,7 +550,7 @@ init_SOURCES = \
 
 init_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
-	-isystem $(top_builddir)/sysroot/include \
+	-isystem sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
@@ -559,36 +559,36 @@ init_CXXFLAGS = \
 init_CFLAGS = \
 	-DFROMCFLAGS  \
 	-ggdb \
-	-isystem $(top_builddir)/sysroot/include \
+	-isystem sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS)
 
-init_LDFLAGS = -L$(top_builddir)/sysroot/lib
+init_LDFLAGS = -Lsysroot/lib
 #-Wl,-Bdynamic $(USER64_LDFLAGS) $(ELF64_FLAGS) -nostdlib
 #-Wl,--no-eh-frame-hdr
 
 init_LDADD = \
 	-lgcc -lpng -lz
 
-#$(top_builddir)/sysroot/lib/64/crt0.o
-#$(top_builddir)/sysroot/lib/64/libc.a
-#$(top_builddir)/sysroot/lib/64/libstdc++.a
-#$(top_builddir)/sysroot/lib/64/libm.a
+#sysroot/lib/64/crt0.o
+#sysroot/lib/64/libc.a
+#sysroot/lib/64/libstdc++.a
+#sysroot/lib/64/libm.a
 
 init_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	-isystem $(top_builddir)/sysroot/include
+	-isystem sysroot/include
 
 EXTRA_init_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
-	$(top_builddir)/sysroot/lib/libc.a \
-	$(top_builddir)/sysroot/lib/libz.a \
-	$(top_builddir)/sysroot/lib/libm.a \
-	$(top_builddir)/sysroot/lib/libpng.a \
+	sysroot/lib/libc.a \
+	sysroot/lib/libz.a \
+	sysroot/lib/libm.a \
+	sysroot/lib/libpng.a \
 	$(ALL_STDLIB_INSTALLED)
 
 #===========
@@ -599,7 +599,7 @@ generate_symbols_list += init-shared
 init_shared_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
 	-ggdb \
-	-isystem $(top_builddir)/sysroot/include \
+	-isystem sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
@@ -609,7 +609,7 @@ init_shared_CXXFLAGS = \
 init_shared_CFLAGS = \
 	-DFROMCFLAGS  \
 	-ggdb \
-	-isystem $(top_builddir)/sysroot/include \
+	-isystem sysroot/include \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(USER64_FLAGS) \
@@ -631,12 +631,12 @@ init_shared_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	-isystem $(top_builddir)/sysroot/include
+	-isystem sysroot/include
 
 EXTRA_init_shared_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld
 	EXTRA_init_DEPENDENCIES = \
 		$(top_srcdir)/user/user64_phdrs.ld \
-		$(top_builddir)/sysroot/lib/libz.so \
-		$(top_builddir)/sysroot/lib/libpng.so
+		sysroot/lib/libz.so \
+		sysroot/lib/libpng.so
 

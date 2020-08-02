@@ -192,6 +192,26 @@ gptdisk.img: fatpart.img
 		&& \
 		"$(SGDISK)" -Z -n 1:2048:0 -t 1:ef00 -A 1:set:2 "$@" \
 		&& \
+		printf "Copying boot code into MBR\n" \
+		&& \
+		"$(DD)" \
+			if=mbr-bin \
+			of="$@" \
+			bs=1 \
+			count=446 \
+			conv=notrunc \
+		&& \
+		printf "Copying MBR signature\n" \
+		&& \
+		"$(DD)" \
+			if=mbr-bin \
+			of="$@" \
+			bs=1 \
+			seek=510 \
+			skip=510 \
+			count=2 \
+			conv=notrunc \
+		&& \
 		printf "Copying partition into disk image\n" \
 		&& \
 		"$(DD)" \
@@ -201,11 +221,11 @@ gptdisk.img: fatpart.img
 			seek=2048 \
 			conv=notrunc
 
-mbrdisk.qcow: $(top_builddir)/mbrdisk.img
+mbrdisk.qcow: mbrdisk.img
 	$(QEMU_IMG) convert -f raw -O qcow -p $< "$@"
 
-gptdisk.qcow: $(top_builddir)/gptdisk.img
+gptdisk.qcow: gptdisk.img
 	$(QEMU_IMG) convert -f raw -O qcow -p $< "$@"
 
-gptdisk.qcow.img: $(top_builddir)/gptdisk.qcow
+gptdisk.qcow.img: gptdisk.qcow
 	$(QEMU_IMG) convert -f qcow -O raw -p $< "$@"
