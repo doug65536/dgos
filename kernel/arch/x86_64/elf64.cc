@@ -349,21 +349,25 @@ static constexpr char const *get_relocation_type(size_t type) {
 // This function's purpose is to act as a place to put a breakpoint
 // with commands that magically load the symbols for a module when loaded
 
+bool use_bochs_autoloader = false;
+
 _noinline
 void modload_load_symbols(char const *path,
                           uintptr_t text_addr, uintptr_t base_addr)
 {
-    uint32_t cpu_nr = thread_cpu_number();
+    if (unlikely(use_bochs_autoloader)) {
+        uint32_t cpu_nr = thread_cpu_number();
 
-    // Automated breakpoint is placed here to load symbols
-    // bochs hack, autoload symbols using rdi and rsi as string ptr and adj
-    __asm__ __volatile__ ("outl %%eax,%%dx\n"
-                          ".global modload_symbols_autoloaded\n"
-                          "modload_symbols_autoloaded:\n"
-                          :
-                          : "a" (cpu_nr), "d" (0x8A02), "D" (path)
-                          , "S" (text_addr), "c" (base_addr)
-                          : "memory");
+        // Automated breakpoint is placed here to load symbols
+        // bochs hack, autoload symbols using rdi and rsi as string ptr and adj
+        __asm__ __volatile__ ("outl %%eax,%%dx\n"
+                              ".global modload_symbols_autoloaded\n"
+                              "modload_symbols_autoloaded:\n"
+                              :
+                              : "a" (cpu_nr), "d" (0x8A02), "D" (path)
+                              , "S" (text_addr), "c" (base_addr)
+                              : "memory");
+    }
 
     printdbg("gdb: add-symbol-file %s %#zx\n", path, text_addr);
 }
