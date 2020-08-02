@@ -6,7 +6,7 @@
 
 int unlink(char const *path)
 {
-    long status = syscall1(uintptr_t(path), SYS_unlink);
+    long status = syscall2(AT_FDCWD, uintptr_t(path), SYS_unlinkat);
 
     if (status >= 0)
         return status;

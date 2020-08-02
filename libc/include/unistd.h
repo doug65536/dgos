@@ -986,4 +986,6 @@ ssize_t      write(int, void const *, size_t);
 extern char  *optarg;
 extern int    opterr, optind, optopt;
 
+#define AT_FDCWD  -100
+
 __END_DECLS

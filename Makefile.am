@@ -1510,6 +1510,7 @@ libc_a_SOURCES = \
 	libc/src/stdio/fdopen.cc \
 	libc/src/stdio/fprintf.cc \
 	libc/src/stdio/fputc.cc \
+	libc/src/stdio/putchar.cc \
 	libc/src/stdio/fgets.cc \
 	libc/src/stdio/printf.cc \
 	libc/src/stdio/vfprintf.cc \
@@ -1714,6 +1715,22 @@ libc_a_SOURCES = \
 	libc/src/aio/aio_return.cc \
 	libc/src/aio/aio_suspend.cc \
 	libc/src/aio/aio_write.cc \
+	libc/src/stat/chmod.cc \
+	libc/src/stat/fchmodat.cc \
+	libc/src/stat/fchmod.cc \
+	libc/src/stat/fstatat.cc \
+	libc/src/stat/fstat.cc \
+	libc/src/stat/futimens.cc \
+	libc/src/stat/lstat.cc \
+	libc/src/stat/mkdirat.cc \
+	libc/src/stat/mkdir.cc \
+	libc/src/stat/mkfifoat.cc \
+	libc/src/stat/mkfifo.cc \
+	libc/src/stat/mknodat.cc \
+	libc/src/stat/mknod.cc \
+	libc/src/stat/stat.cc \
+	libc/src/stat/umask.cc \
+	libc/src/stat/utimensat.cc \
 	libc/src/signal/sigaction.cc \
 	libc/src/signal/sigaddset.cc \
 	libc/src/signal/kill.cc \

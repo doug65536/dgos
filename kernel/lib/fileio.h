@@ -48,7 +48,7 @@ int file_chown(int id, int uid, int gid);
 
 int file_fstatfs(int id, fs_statvfs_t *buf);
 
-#define AT_FDCWD -1
+#define AT_FDCWD -100
 
 class file_t {
 public:
