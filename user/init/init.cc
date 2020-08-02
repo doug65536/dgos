@@ -80,12 +80,22 @@ static void *mouse_test(void*)
     int mouse = open("/dev/mousein", O_RDONLY | O_NBLOCK);
 
     if (mouse >= 0) {
+        size_t offset = 0;
         char buf[16];
-        int packet = read(mouse, &buf, sizeof(buf));
+        int packet;
 
-        for (size_t i = 0; packet > 0 && i < size_t(packet); ++i)
-            printf(" %02x", (unsigned char)buf[i]);
-        puts("");
+        while ((packet = read(mouse, buf + offset, sizeof(buf) - offset))) {
+            offset += packet;
+
+            if (offset == sizeof(buf)) {
+                for (size_t i = 0; packet > 0 && i < size_t(packet); ++i)
+                    printf(" %02x", (unsigned char)buf[i]);
+
+                printf("\n");
+
+                offset = 0;
+            }
+        }
 
         close(mouse);
         mouse = -1;
@@ -94,10 +104,8 @@ static void *mouse_test(void*)
     return nullptr;
 }
 
-int main(int argc, char **argv, char **envp)
+static void *stress_fs(void *)
 {
-    printf("init startup complete\n");
-
     DIR *dir = opendir("/");
 
     dirent *ent;
@@ -106,6 +114,66 @@ int main(int argc, char **argv, char **envp)
     }
 
     closedir(dir);
+
+    // Create this many files
+    size_t iters = 10000;
+
+    // Keep the number of files that exist less than or equal to this many
+    size_t depth = 400;
+
+    int mds = mkdir("stress", 0755);
+
+    if (mds < 0 && errno == EROFS) {
+        printf("Cannot run mkdir test on readonly filesystem\n");
+        return nullptr;
+    }
+
+    if (mds < 0) {
+        printf("mkdir failed\n");
+        return nullptr;
+    }
+
+    for (size_t i = 0; i < iters + depth; ++i) {
+        char name[NAME_MAX];
+        if (i < iters) {
+            int name_len = snprintf(name, sizeof(name), "stress/name%zu", i);
+            printf("Creating %s\n", name);
+            int fd = open(name, O_CREAT | O_EXCL);
+            if (write(fd, name, name_len) != name_len)
+                printf("Write error writing \"%s\" to fd %d\n", name, fd);
+            close(fd);
+        }
+
+        if (i >= depth) {
+            snprintf(name, sizeof(name), "stress/name%zu", i - depth);
+            printf("Unlinking %s\n", name);
+            unlink(name);
+        }
+    }
+
+    return nullptr;
+}
+
+void start_fs_stress()
+{
+    pthread_t stress_tid{};
+    int sts = pthread_create(&stress_tid, nullptr, stress_fs, nullptr);
+
+    if (sts != 0)
+        printf("pthread_create failed\n");
+}
+
+void start_mouse_thread()
+{
+    pthread_t mouse_thread{};
+    int err = pthread_create(&mouse_thread, nullptr, mouse_test, nullptr);
+    if (unlikely(err))
+        printf("Error creating mouse thread\n");
+}
+
+int main(int argc, char **argv, char **envp)
+{
+    printf("init startup complete\n");
 
     load_module("boot/symsrv.km");
 
@@ -181,8 +249,9 @@ int main(int argc, char **argv, char **envp)
                el, el/1000000);
     }
 
-    pthread_t mouse_thread{};
-    int err = pthread_create(&mouse_thread, nullptr, mouse_test, nullptr);
+    //start_fs_stress();
+
+    start_mouse_thread();
 
     return start_framebuffer();
 }

@@ -170,7 +170,7 @@ static uint32_t png_process_idata(
 
     memset(prev, 0, sizeof(prev));
 
-    uint8_t *out = (uint8_t*)(state->img + 1) +
+    uint8_t *out = ((uint8_t*)surface_pixels(state->img)) +
             state->cur_row * state->scanline_bytes;
 
     for ( ; state->cur_row < state->img->height; ++state->cur_row) {
@@ -384,8 +384,8 @@ surface_t *surface_from_png(char const *path)
                     (ihdr.bit_depth >> 3);
             state.scanline_bytes = state.pixel_bytes * ihdr.width;
 
-            img = /*.reset*/((surface_t*)malloc(sizeof(*img) +
-                         ihdr.width * ihdr.height * sizeof(uint32_t)));
+            img = new (ihdr.width, ihdr.height)
+                    surface_t(ihdr.width, ihdr.height);
 
             img->width = ihdr.width;
             img->height = ihdr.height;
