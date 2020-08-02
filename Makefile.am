@@ -2930,13 +2930,15 @@ check-build:
 	$(MAKE) clean
 	$(MAKE) bootfat-bin
 	$(MAKE) clean
-	$(MAKE) bootpxe-bin
+	$(MAKE) bootpxe-bios-bin
 	$(MAKE) clean
 	$(MAKE) bootiso-bin
 	$(MAKE) clean
 	$(MAKE) bootx64.efi
 	$(MAKE) clean
 	$(MAKE) libc.a
+	$(MAKE) clean
+	$(MAKE) libstdc++.a
 	$(MAKE) clean
 	$(MAKE) libg.a
 	$(MAKE) clean
@@ -2946,6 +2948,49 @@ check-build:
 	$(MAKE) clean
 	$(MAKE) libwing.a
 	$(MAKE) clean
+	$(MAKE) init
+	$(MAKE) clean
+	$(MAKE) kernel-generic
+	$(MAKE) clean
+	$(MAKE) kernel-tracing
+	$(MAKE) clean
+	$(MAKE) kernel-asan
+	$(MAKE) clean
+	$(MAKE) fat32.km
+	$(MAKE) clean
+	$(MAKE) ext4.km
+	$(MAKE) clean
+	$(MAKE) iso9660.km
+	$(MAKE) clean
+	$(MAKE) gpt.km
+	$(MAKE) clean
+	$(MAKE) mbr.km
+	$(MAKE) clean
+	$(MAKE) symsrv.km
+	$(MAKE) clean
+	$(MAKE) unittest.km
+	$(MAKE) clean
+	$(MAKE) es137x.km
+	$(MAKE) clean
+	$(MAKE) virtio-gpu.km
+	$(MAKE) clean
+	$(MAKE) virtio-blk.km
+	$(MAKE) clean
+	$(MAKE) virtio-base.km
+	$(MAKE) clean
+	$(MAKE) ahci.km
+	$(MAKE) clean
+	$(MAKE) nvme.km
+	$(MAKE) clean
+	$(MAKE) usbmsc.km
+	$(MAKE) clean
+	$(MAKE) usbxhci.km
+	$(MAKE) clean
+	$(MAKE) ide.km
+	$(MAKE) clean
+	$(MAKE) rtl8139.km
+	$(MAKE) clean
+	$(MAKE) ahci.km
 
 
 
