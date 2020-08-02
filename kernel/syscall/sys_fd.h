@@ -45,7 +45,7 @@ int sys_openat(int dirfd, char const *pathname, int flags, mode_t mode);
 int sys_creatat(int dirfd, char const *pathname, mode_t mode);
 int sys_renameat(int olddirfd, char const *old_pathname,
                  int newdirfd, char const *new_pathname);
-int sys_mkdirat(int dirfd, char const *path, mode_t mode);
+int sys_mkdirat(int dirfd, char const *user_path, mode_t mode);
 int sys_rmdirat(int dirfd, char const *path);
 int sys_unlinkat(int dirfd, char const *path);
 int sys_truncateat(int dirfd, char const *path, off_t size);

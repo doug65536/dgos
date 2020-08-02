@@ -542,8 +542,13 @@ int sys_renameat(int olddirfd, char const *old_pathname,
     return status;
 }
 
-int sys_mkdirat(int dirfd, char const *path, mode_t mode)
+int sys_mkdirat(int dirfd, char const *user_path, mode_t mode)
 {
+    user_str_t path(user_path);
+
+    if (unlikely(!path))
+        return fault_err();
+
     process_t *p = fast_cur_process();
 
     int dirid = p->dirfd_to_id(dirfd);
@@ -575,6 +580,7 @@ int sys_unlinkat(int dirfd, char const *path)
     int dirid = p->dirfd_to_id(dirfd);
 
     int status = file_unlinkat(dirid, path);
+
     if (likely(status >= 0))
         return status;
 
