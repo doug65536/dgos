@@ -39,13 +39,14 @@
 .global entry
 entry:
     // Only 3 bytes available here, use shortest possible jump (2 bytes)
+    // This type of jmp is position independent
     jmp bootstrap_code
 
 // The linker script puts this after the BPB and stuff (at 0x5A)
 .section .code, "x", @progbits
 bootstrap_code:
     // Load cs register ASAP
-    ljmp $0,$ UNRELOCATED(.Lload_cs)
+    ljmp $ 0,$ UNRELOCATED(.Lload_cs)
 
 .Lload_cs:
     cli
@@ -63,9 +64,15 @@ bootstrap_code:
     xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
-    movw %ax,%ss
-    // Put stack right before relocated entry point
-    movw $ entry,%sp
+
+    // Entire 64KB from 0x10000 thru 0x1FFFF is the stack
+    // (1st push will wrap it around to 0x1000:0xFFFE (0x1FFFE))
+    // Tolerate the most stack hungry firmware
+    // Be careful! Use of bp in a memory address calculation causes
+    // the cpu to default to ss segment instead of ds
+    movw $ 0x1000,%ax
+    mov %ax,%ss
+    xor %sp,%sp
 
     // Store the information loaded from pointer to partition table entry
     movw %bx,UNRELOCATED(part_st)
@@ -89,13 +96,13 @@ bootstrap_code:
 
     // Relocation done, no more weird unrelocated offsets
 
-    ljmp $ 0,$ reloc_entry
-reloc_entry:
+    ljmp $ 0,$ relocated_boot1_entry
+relocated_boot1_entry:
 
     // Get drive parameters size (for sector size)
     mov $ 0x4800,%ax
     mov $ ddp,%si
-    // dl must be as it was when entering this code
+    movb boot_drive,%dl
     int $ 0x13
     jc fail
 
@@ -135,10 +142,10 @@ more_sectors:
 	mulw ddp+ddp_sector_size
 
 	// Advance the address that many bytes
-	addw %ax,dap+dap_address
-	jnc no_ptr_carry
-	addw $ 0x1000,dap+dap_address+2
-no_ptr_carry:
+    // (by advancing the segment 1/16th as much)
+    // Makes sense because the smallest sectors are much larger than 16 bytes
+    shrw $ 4,%ax
+	addw %ax,dap+dap_address+2
 	test %si,%si
   	jnz more_sectors
 
@@ -160,25 +167,25 @@ dap:
     .byte 16
     .byte 0
 sector_count:
-    .word 0
+    .hword 0
 load_addr:
-    .word 0x1000
-    .word 0x0000
+    .hword 0x1000
+    .hword 0x0000
 sector_lba:
     .quad 0
 
 ptbl_ent:
     .byte 1
-    .space 7,0
+    .skip 7,0
 
 part_st:
-    .space 4,0
+    .skip 4,0
 part_en:
-    .space 4,0
+    .skip 4,0
 
-boot_drive: .space 1,0
-ddp: .word ddp_length
-.space (ddp_length - 2),0
+boot_drive: .skip 1,0
+ddp: .hword ddp_length
+.skip (ddp_length - 2),0
 
 .byte 0xEE
 

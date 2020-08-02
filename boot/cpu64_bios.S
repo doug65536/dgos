@@ -8,7 +8,7 @@
 
 .global code64_run_kernel
 code64_run_kernel:
-	mov $0x4B,%eax
+	mov $ 0x4B,%eax
 	movw %ax,%ds
 	movw %ax,%es
 	movw %ax,%fs
@@ -39,7 +39,7 @@ code64_reloc_kernel:
 	// Write relocated value to relocated offset
 	movq %r12,(%r8,%r11)
 
-	addq $24,%r9
+	addq $ 24,%r9
 	decl %r10d
 	jnz 0b
 

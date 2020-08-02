@@ -5,6 +5,8 @@
 // eax points to bios_regs_t structure,
 // edx contains interrupt number,
 // cl is true if A20 should be toggled
+// void bioscall(bios_regs_t *regs, uint32_t intr,
+//               bool cpu_a20_toggle = true);
 .global bioscall
 bioscall:
     pushl %ebp
@@ -42,8 +44,8 @@ bioscall:
     // In case esp is outside first 64KB range
 0:  lea -4096(%esp),%edx
     mov %edx,%ebp
-    shr $4,%edx
-    and $0xF,%ebp
+    shr $ 4,%edx
+    and $ 0xF,%ebp
 
     // Jump to 16 bit protected mode to load 64KB segment limits
     ljmp $ GDT_SEL_PM_CODE16,$ 0f
@@ -60,11 +62,11 @@ bioscall:
 
     // Turn off protected mode
     movl %cr0,%eax
-    and $-2,%eax
+    and $ -2,%eax
     mov %eax,%cr0
 
     // Real mode
-    ljmp $0,$0f
+    ljmp $ 0,$ 0f
 0:  xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
@@ -119,10 +121,10 @@ bioscall:
 
     // Turn on protected mode
     movl %cr0,%eax
-    or $1,%eax
+    or $ 1,%eax
     movl %eax,%cr0
 
-    ljmpw $ GDT_SEL_PM_CODE32,$0f
+    ljmpw $ GDT_SEL_PM_CODE32,$ 0f
 
 .code32
 0:  movl $ GDT_SEL_KERNEL_DATA,%eax
@@ -133,7 +135,7 @@ bioscall:
 
     // Translate real mode ss:sp back to flat esp
     mov %ss,%edx
-    shl $4,%edx
+    shl $ 4,%edx
     movzx %sp,%ebp
     movw %ax,%ss
     lea (%edx,%ebp),%esp
@@ -151,7 +153,7 @@ bioscall:
     popl 4(%eax)
     popl (%eax)
 
-    addl $8,%esp
+    addl $ 8,%esp
 
     // Restore A20 toggle parameter
     popl %ecx

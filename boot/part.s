@@ -9,12 +9,12 @@
 	.endif
 
 	.byte 0
-	.word 0
+	.hword 0
 
 	.byte \type
 
 	.byte 0
-	.word 0
+	.hword 0
 
 	.int \lba_start
 	.int \lba_sectors
@@ -23,10 +23,10 @@
 .macro partition_table_entry_unused
 	.byte 0
 	.byte 0
-	.word 0
+	.hword 0
 	.byte 0
 	.byte 0
-	.word 0
+	.hword 0
 	.int 0
 	.int 0
 .endm
@@ -36,5 +36,5 @@ partition_table_entry_unused
 partition_table_entry_unused
 partition_table_entry_unused
 
-.word 0xAA55
+.hword 0xAA55
 

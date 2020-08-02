@@ -75,10 +75,10 @@ bool cpu_a20_toggle(bool enabled)
     case a20_method::port92:
         uint8_t temp;
         __asm__ __volatile__ (
-            "inb $0x92,%b[temp]\n\t"
-            "andb $~2,%b[temp]\n\t"
+            "inb $ 0x92,%b[temp]\n\t"
+            "andb $ ~2,%b[temp]\n\t"
             "orb %b[bit],%b[temp]\n\t"
-            "outb %b[temp],$0x92\n\t"
+            "outb %b[temp],$ 0x92\n\t"
             : [temp] "=&a" (temp)
             : [bit] "ri" (enabled ? 2 : 0)
         );
@@ -126,7 +126,7 @@ void run_code64(void (*fn)(void *), void *arg)
     __asm__ __volatile__ (
         // Enable CR4.PAE (bit 5)
         "movl %%cr4,%%eax\n\t"
-        "btsl $%c[cr4_pae_bit],%%eax\n\t"
+        "btsl $ %c[cr4_pae_bit],%%eax\n\t"
         "orl %[gp_available],%%eax\n\t"
         "movl %%eax,%%cr4\n\t"
 
@@ -136,25 +136,25 @@ void run_code64(void (*fn)(void *), void *arg)
 
         // Enable long mode IA32_EFER.LME (bit 8) MSR 0xC0000080
         // and if available, enable no-execute bit in paging
-        "movl $%c[msr_efer],%%ecx\n"
+        "movl $ %c[msr_efer],%%ecx\n"
         "rdmsr\n\t"
-        "btsl $%c[msr_efer_lme_bit],%%eax\n\t"
-        "cmpw $0,%[nx_available]\n\t"
+        "btsl $ %c[msr_efer_lme_bit],%%eax\n\t"
+        "cmpw $ 0,%[nx_available]\n\t"
         "jz 0f\n\t"
-        "btsl $%c[msr_efer_nx_bit],%%eax\n\t"
+        "btsl $ %c[msr_efer_nx_bit],%%eax\n\t"
         "0:"
         "wrmsr\n\t"
 
         // Enable paging (CR0.PG (bit 31)
         "movl %%cr0,%%eax\n\t"
-        "btsl $%c[cr0_pg_bit],%%eax\n\t"
+        "btsl $ %c[cr0_pg_bit],%%eax\n\t"
         "movl %%eax,%%cr0\n\t"
 
         // Now in 64 bit compatibility mode (still really 32 bit)
 
         // Far call to selector that has L bit set (64 bit)
         "lea 6+idtr_64,%%eax\n\t"
-        "lcall %[gdt_code64],$0f\n\t"
+        "lcall %[gdt_code64],$ 0f\n\t"
 
         // Returned from long mode, back to compatibility mode
 
@@ -179,7 +179,7 @@ void run_code64(void (*fn)(void *), void *arg)
         "movl %c[arg_ofs](%[params]),%%edi\n\t"
 
         "mov %%rsp,%%r15\n\t"
-        "andq $-16,%%rsp\n\t"
+        "andq $ -16,%%rsp\n\t"
         "call *%%rax\n\t"
         "mov %%r15,%%rsp\n\t"
 
@@ -191,13 +191,13 @@ void run_code64(void (*fn)(void *), void *arg)
 
         // Disable paging
         "mov %%cr0,%%eax\n\t"
-        "btr $%c[cr0_pg_bit],%%eax\n\t"
+        "btr $ %c[cr0_pg_bit],%%eax\n\t"
         "mov %%eax,%%cr0\n\t"
 
         // Disable long mode
-        "movl $%c[msr_efer],%%ecx\n"
+        "movl $ %c[msr_efer],%%ecx\n"
         "rdmsr\n\t"
-        "btr $%c[msr_efer_lme_bit],%%eax\n\t"
+        "btr $ %c[msr_efer_lme_bit],%%eax\n\t"
         "wrmsr\n\t"
 
         // Load 32 bit selectors
@@ -208,7 +208,7 @@ void run_code64(void (*fn)(void *), void *arg)
         "movw %%ax,%%ss\n\t"
 
         // Load 32-bit code segment
-        "ljmp %[gdt_code32],$0f\n\t"
+        "ljmp %[gdt_code32],$ 0f\n\t"
         "nop\n\t"
 
         // 32-bit addressing mode reenabled

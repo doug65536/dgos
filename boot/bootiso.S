@@ -20,7 +20,7 @@
 .global entry
 entry:
     // Jump to the unrelocated "entry_start"
-    ljmpw $0,$ UNRELOCATED(entry_start)
+    ljmpw $ 0,$ UNRELOCATED(entry_start)
 
 .balign 8
 .global bootinfo_primary_volume_desc
@@ -72,8 +72,8 @@ entry_start:
     // Calculate unrelocated seg:off of "___end" symbol into ax:edi
     movl $ UNRELOCATED(___end),%edi
     movl %edi,%eax
-    andw $0xF,%di
-    shrl $4,%eax
+    andw $ 0xF,%di
+    shrl $ 4,%eax
     movw %ax,%es
 
     // Store the far pointer to the relocated "relocate" to relocate_farptr
@@ -106,21 +106,21 @@ relocate_farptr:
 relocate:
     xorw %cx,%cx
     movw %cx,%es
-    movw $4096,%cx
+    movw $ 4096,%cx
     movw $ ___text_st,%di
-    shrw $2,%cx
+    shrw $ 2,%cx
     movw $ UNRELOCATED(___text_st),%si
     cld
     rep movsl
 
     // Jump into relocate. All the craziness is now over, symbols are correct
     // and everything is < 64KB line
-    ljmpw $0,$reloc_entry
+    ljmpw $ 0,$ relocated_bootiso_entry
 relocate_end:
 
 // This is linked after head
 .section .early, "wx", @progbits
-reloc_entry:
+relocated_bootiso_entry:
     callw clear_bss
 
 .Lretry_io:
@@ -134,19 +134,19 @@ reloc_entry:
     movw %cx,dap_block_count(%si)
     movl $ ___text_st + 4096,%edx
     movw %dx,%ax
-    andw $0xF,%ax
+    andw $ 0xF,%ax
     shrl $ 4,%edx
     movw %ax,dap_address(%si)
     movw %dx,dap_address+2(%si)
     movl bootinfo_file_location,%eax
-    add $2,%eax
+    add $ 2,%eax
     xorl %edx,%edx
     movl %eax,dap_lba(%si)
     movl %edx,dap_lba+4(%si)
 
-    movw $0x4200,%ax
+    movw $ 0x4200,%ax
     movb boot_drive,%dl
-    int $0x13
+    int $ 0x13
     jnc load_done
 
 load_done:	// utility label for placing debugger breakpoint
@@ -158,7 +158,7 @@ load_done:	// utility label for placing debugger breakpoint
     movl bootinfo_primary_volume_desc,%eax
     xorl %edx,%edx
     movl $ iso9660_boot_partition,%ecx
-    gs movb $'!',80*25*2-2
+    gs movb $ '!',80*25*2-2
     movl $ 0f,%ebx
     jmp boot
 0:  hlt

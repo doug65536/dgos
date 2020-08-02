@@ -1,8 +1,8 @@
 .macro gdt_seg priv, exec, rw, gran, is32, is64, limit_hi
     // limit 15:0
-    .word 0xFFFF
+    .hword 0xFFFF
     // base 15:0
-    .word 0
+    .hword 0
     // base 23:16
     .byte 0
     // present, privilege, 1, executable, rw, 0
@@ -58,10 +58,10 @@
 .macro gdt_emit gdt_label gdtr_label
     .balign 8
 	\gdt_label :
-		.word 0
+		.hword 0
 	\gdtr_label :
 		// Base must be initialized, 32 bit reloc is problematic in 64 bit PE
-		.word 8 * 24 - 1
+		.hword 8 * 24 - 1
 		.int 0
 
 		gdt_emit_desc GDT_SEL_PM_CODE16

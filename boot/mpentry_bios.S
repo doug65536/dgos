@@ -19,16 +19,16 @@ ap_entry:
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%ss
-    movl $0x0000FFF0,%esp
+    movl $ 0x0000FFF0,%esp
 
     lgdtl gdtr
 
     // Calculate the linear address of this trampoline from cs register
     mov %cs,%ecx
-    shl $4,%ecx
+    shl $ 4,%ecx
 
     // Calculate address of protected mode entry point below
-    add $0f - ap_entry,%ecx
+    add $ 0f - ap_entry,%ecx
 
     // ecx now holds address of ap_entry, push a far pointer to the stack
     pushl $ GDT_SEL_PM_CODE32
@@ -37,7 +37,7 @@ ap_entry:
     // Enter protected mode, enable cache and cache coherency,
     // and jump into protected mode immediately after setting CR0.PE
     mov %cr0,%eax
-    or $1,%eax
+    or $ 1,%eax
     and $ ~CPU_CR0_CD & ~CPU_CR0_NW,%eax
     mov %eax,%cr0
     ljmpl *(%esp)
@@ -51,7 +51,7 @@ ap_entry:
     mov %cx,%ss
     movl smp_entry_point,%eax
     movl smp_entry_point+4,%edx
-    mov $enter_kernel,%ecx
+    mov $ enter_kernel,%ecx
     jmp *%ecx
 0:  cli
     hlt

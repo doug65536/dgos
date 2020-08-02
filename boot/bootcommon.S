@@ -22,8 +22,8 @@ early_init:
     jmpw *%bx
 
 initial_stack_ptr:
-    .word ___initial_stack
-    .word 0
+    .hword ___initial_stack
+    .hword 0
 
 // Inputs:
 //  edx:eax: parameter to partition boot call
@@ -78,7 +78,7 @@ pmode_entry:
     lldt %ax
 
     // Clean eflags
-    pushl $2
+    pushl $ 2
     popfl
 
     call cpu_a20_enterpm
@@ -88,7 +88,7 @@ pmode_entry:
     movl %ebx,%eax
     movl %esi,%edx
     mov %esp,%ebp
-    and $-16,%esp
+    and $ -16,%esp
     call *%edi
     mov %ebp,%esp
 
@@ -106,11 +106,11 @@ pmode_entry:
 
     // Turn off protected mode
     movl %cr0,%eax
-    btrl $0,%eax
+    btrl $ 0,%eax
     movl %eax,%cr0
 
     // Jump to real mode
-    ljmp $0,$ 0f
+    ljmp $ 0,$ 0f
 0:  xorw %dx,%dx
     movw %dx,%ds
     movw %dx,%es
@@ -131,23 +131,23 @@ pmode_entry:
 .global detect_ancient_cpu
 detect_ancient_cpu:
     // An 8086 has flags 15:12 permanently set
-    mov $0x0FFF,%cx
+    mov $ 0x0FFF,%cx
     xor %dx,%dx
     call change_flags
-    test $0xF000,%ax
+    test $ 0xF000,%ax
     jnz detected_8086
 
     // An 80286 has flags 15:12 permanently clear in real mode
-    or $-1,%cx
-    mov $0xF000,%dx
+    or $ -1,%cx
+    mov $ 0xF000,%dx
     call change_flags
-    test $0xF000,%ax
+    test $ 0xF000,%ax
     jz detected_80286
 
     // It is safe to use 32 bit instructions now...
 
     // An 80386 has eflags 18 (AC) permanently clear
-    or $-1,%ecx
+    or $ -1,%ecx
     mov $ 1 << 18,%edx
     call change_eflags
     test $ 1 << 18,%eax
@@ -161,7 +161,7 @@ detect_ancient_cpu:
     push %eax
 
     // Clear nothing, set nothing
-    or $-1,%ecx
+    or $ -1,%ecx
     xor %edx,%edx
 
     // Clear it if it was set
@@ -229,9 +229,9 @@ detection_failed:
 
 // Clobbers si, di
 fail_str:
-    mov $0xb800,%ax
+    mov $ 0xb800,%ax
     mov %ax,%es
-    mov $0x0800,%ax
+    mov $ 0x0800,%ax
 0:  lodsb
     test %al,%al
     jz 0f
@@ -275,22 +275,22 @@ update_eflags:
 
 .global idt_init
 idt_init:
-    mov $idt,%edx
-    mov $0,%ecx
+    mov $ idt,%edx
+    mov $ 0,%ecx
 
 0:  movw isr_table(,%ecx,4),%ax
     movw %ax,(%edx,%ecx,8)
     movw $ GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
-    movw $0,4(%edx,%ecx,8)
-    movw $0x8e,5(%edx,%ecx,8)
-    movw $0,6(%edx,%ecx,8)
+    movw $ 0,4(%edx,%ecx,8)
+    movw $ 0x8e,5(%edx,%ecx,8)
+    movw $ 0,6(%edx,%ecx,8)
     incl %ecx
-    cmpl $32,%ecx
+    cmpl $ 32,%ecx
     jb 0b
 
     // Set limit
-    movw $32 * 8 - 1,idtr_64 + 6
-    movw $idt,idtr_64 + 8
+    movw $ 32 * 8 - 1,idtr_64 + 6
+    movw $ idt,idtr_64 + 8
 
     ret
 

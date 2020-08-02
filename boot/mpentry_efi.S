@@ -15,18 +15,18 @@ ap_entry:
     cld
     xor %ax,%ax
     mov %ax,%ss
-    mov $0xFFF0,%sp
+    mov $ 0xFFF0,%sp
 
     // Enable the cache immediately, in case the BIOS is bad
     // Enable write protection and configure FPU to modern operation
     movl %cr0,%eax
-    andl $~CPU_CR0_CD & ~CPU_CR0_NW & ~CPU_CR0_EM,%eax
+    andl $ ~CPU_CR0_CD & ~CPU_CR0_NW & ~CPU_CR0_EM,%eax
     orl $ CPU_CR0_WP | CPU_CR0_MP | CPU_CR0_NE,%eax
     movl %eax,%cr0
 
     // Get linear address of ap_entry into ebx
     movl %cs,%ebx
-    shll $4,%ebx
+    shll $ 4,%ebx
 
     //
     // Patch the linear address of the trampoline GDT into the trampoline GDTR
@@ -71,7 +71,7 @@ pm_entry:
     movw %ax,%fs
     movw %ax,%gs
     movw %ax,%ss
-    movl $0xFFF0,%esp
+    movl $ 0xFFF0,%esp
 
     //
     // Patch the linear address of lm_entry into lm_entry_vector
@@ -127,7 +127,7 @@ lm_entry:
 
     // Calculate linear address of smp_entry_point
     leal smp_entry_point - ap_entry(%rbx),%edi
-                           
+
     // rdi = entry point
     movq (%rdi),%rdi
 
@@ -139,7 +139,7 @@ lm_entry:
 
     // set cr3 parameter
     movq %cr3,%rdx
-                                  
+
     // rcx = nx_available
     leal nx_available - ap_entry(%rbx),%ecx
     movzbl (%rcx),%ecx
@@ -150,12 +150,12 @@ lm_entry:
 .balign 8
 pm_entry_vector:
     .int 0
-    .word GDT_SEL_PM_CODE32
+    .hword GDT_SEL_PM_CODE32
 
 .balign 8
 lm_entry_vector:
     .int 0
-    .word GDT_SEL_KERNEL_CODE64
+    .hword GDT_SEL_KERNEL_CODE64
 
     // Emit a copy of the GDT here so it ends up in low memory
     // The BSP GDT is relocated far above 1MB boundary

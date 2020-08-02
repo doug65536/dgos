@@ -1,13 +1,7 @@
 u switch-mode
+ldsym global "sym/mbr-elf.sym"
+ldsym global "sym/boot1-elf.sym"
 ldsym global "sym/bootfat-elf.sym"
 
-lb "entry"
-lb "cpu_debug_break"
-lb "assert_failed"
-lb "unhandled_exception_handler"
-lb "apic_spurious_handler"
-lb "isr_entry_8"
-lb "vpanic"
-lb "unittest::unit::fail"
-lb "unittest::unit::failed"
-lb "validate_failed"
+lb reloc_entry
+c

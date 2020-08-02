@@ -12,6 +12,7 @@
 early_entry:
     movw %sp,%bp
     // Copy !PXE pointer from stack
+    // (%bp) dereferences will use ss segment
     movw 4(%bp),%ax
     movw 6(%bp),%dx
     movw %ax,%cs:UNRELOCATED(bangpxe_ofs)
@@ -23,7 +24,7 @@ early_entry:
 
     movw %sp,%cs:UNRELOCATED(orig_ss_sp)
     movw %ss,%cs:UNRELOCATED(orig_ss_sp+2)
-    ljmp $0xC00,$ UNRELOCATED(reloc_self) - 0xC000
+    ljmp $ 0xC00,$ UNRELOCATED(reloc_self) - 0xC000
 
 orig_ss_sp:
     .space 4
@@ -50,7 +51,7 @@ reloc_self:
     movw %ax,%es
     mov $ ZEROBASED(___initialized_data_en),%cx
     sub $ ZEROBASED(___text_st),%cx
-    shrw $1,%cx
+    shrw $ 1,%cx
     xorw %si,%si
     xorw %di,%di
     cld
@@ -72,8 +73,8 @@ entry:
 
     movzwl pxenv_seg,%eax
     movzwl bangpxe_seg,%edx
-    shll $4,%eax
-    shll $4,%edx
+    shll $ 4,%eax
+    shll $ 4,%edx
     movzwl pxenv_ofs,%ecx
     addl %ecx,%eax
     movzwl bangpxe_ofs,%ecx
@@ -114,7 +115,7 @@ pxe_call_rm:
     movw %ax,%ss
 
     movl %cr0,%eax
-    andl $~1,%eax
+    andl $ ~1,%eax
     movl %eax,%cr0
 
     // Enter real mode
@@ -141,7 +142,7 @@ pxe_call_rm:
     lgdtl gdtr
 
     movl %cr0,%eax
-    orl $1,%eax
+    orl $ 1,%eax
     movl %eax,%cr0
 
     ljmp $ GDT_SEL_PM_CODE32,$ 0f
@@ -199,7 +200,7 @@ pxe_call_bangpxe_pm:
     // Update GDT entry base to point to argument
     mov $ gdt + GDT_SEL_PXE_TEMP*8,%edi
     mov %dx,2(%edi)
-    shr $16,%edx
+    shr $ 16,%edx
     mov %dl,4(%edi)
     mov %dh,7(%edi)
 
@@ -207,10 +208,10 @@ pxe_call_bangpxe_pm:
     pushw bang_pxe_ptr+2
     pushw bang_pxe_ptr
     pushw $ GDT_SEL_PXE_TEMP
-    pushw $0
+    pushw $ 0
     pushw %ax
     lcallw *pxe_entry_vec
-    add $10,%sp
+    add $ 10,%sp
 
     movw $ GDT_SEL_PM_DATA32,%di
     movw %di,%ss
@@ -229,8 +230,8 @@ pxe_rm_call_pxenv:
     mov %ax,%bx
     // es:di -> arg_struct
     mov %edx,%edi
-    shr $4,%edx
-    and $0xF,%edi
+    shr $ 4,%edx
+    and $ 0xF,%edi
     mov %dx,%es
     lcallw *pxe_entry_vec
     ret
@@ -240,13 +241,13 @@ pxe_rm_call_pxenv:
 pxe_rm_call_bangpxe:
     // dx:di -> arg_struct
     mov %edx,%edi
-    shr $4,%edx
-    and $0xF,%di
+    shr $ 4,%edx
+    and $ 0xF,%di
     pushw bang_pxe_ptr+2
     pushw bang_pxe_ptr
     pushw %dx
     pushw %di
     pushw %ax
     lcallw *pxe_entry_vec
-    add $10,%sp
+    add $ 10,%sp
     ret

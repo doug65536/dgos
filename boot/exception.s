@@ -6,9 +6,9 @@
 .global isr_entry_\int_num\()
 isr_entry_\int_num\():
 	.if \has_code == 0
-		pushq $0
+		pushq $ 0
 	.endif
-	pushq $\int_num
+	pushq $ \int_num
 	jmp isr_common
 .endm
 
@@ -64,7 +64,7 @@ isr_common:
 	push %rax
 
 	# Save segment registers
-	sub $8,%rsp
+	sub $ 8,%rsp
 	movw %ds,(%rsp)
 	movw %es,2(%rsp)
 	movw %fs,4(%rsp)
@@ -95,7 +95,7 @@ isr_common:
 	pop %r14
 	pop %r15
 
-	addq $16,%rsp
+	addq $ 16,%rsp
 
 	iretq
 
@@ -115,12 +115,12 @@ msg_CR2:
 
 isr_handler:
 	# Black on red
-	movb $0x0C,%ah
+	movb $ 0x0C,%ah
 	# Text video memory
-	movl $0xb8000,%edi
+	movl $ 0xb8000,%edi
 
 	# Exception=
-	movl $msg_exception,%esi
+	movl $ msg_exception,%esi
 	call text_out
 
 	# Exception number
@@ -128,7 +128,7 @@ isr_handler:
 	call hex2_out
 
 	# Code=
-	movl $msg_code,%esi
+	movl $ msg_code,%esi
 	call text_out
 
 	# Error code
@@ -136,7 +136,7 @@ isr_handler:
 	call hex8_out
 
 	# Addr=
-	movl $msg_address,%esi
+	movl $ msg_address,%esi
 	call text_out
 
 	# Address
@@ -145,7 +145,7 @@ isr_handler:
 
 	# CR2=
 
-	movl $msg_CR2,%esi
+	movl $ msg_CR2,%esi
 	call text_out
 
 	# Page fault address
@@ -157,27 +157,27 @@ isr_handler:
 
 	# Name of exception
 	movzbq 16*8(%r10),%r12
-	movl $isr_name_invalid,%esi
-	cmpl $32,%r12d
+	movl $ isr_name_invalid,%esi
+	cmpl $ 32,%r12d
 	ja 0f
-	movl $isr_names,%r11d
+	movl $ isr_names,%r11d
 	movzwl (%r11,%r12,2),%esi
 0:	call text_out
 
 	# Registers
 
 	xor %r13d,%r13d
-	
+
 	# Line
-1:	imul $160,%r13d,%edi
-	add $0xb8000 + 80*4,%edi
+1:	imul $ 160,%r13d,%edi
+	add $ 0xb8000 + 80*4,%edi
 
 	# Register name
-	movl $reg_names,%r14d
+	movl $ reg_names,%r14d
 	lea (%r14,%r13,4),%rsi
 	call text_out
 
-	mov $equal_separator,%esi
+	mov $ equal_separator,%esi
 	call text_out
 
 	# Register value
@@ -185,7 +185,7 @@ isr_handler:
 	call hex16_out
 
 	inc %r13d
-	cmp $14,%r13d
+	cmp $ 14,%r13d
 	jb 1b
 
 
@@ -205,28 +205,28 @@ text_out:
 	movw %ax,(%rdi)
 	leaq 2(%rdi),%rdi
 	push %rax
-	in $0xe9,%al
-	cmp $0xe9,%al
+	in $ 0xe9,%al
+	cmp $ 0xe9,%al
 	pop %rax
 	jnz text_out
-	out %al,$0xe9
+	out %al,$ 0xe9
 	jmp text_out
 0:	ret
 
 # print 2 digit hex (8 bits), see hex_common
 hex2_out:
 	shl $ 64-8,%rsi
-	mov $2,%r8b
+	mov $ 2,%r8b
 	jmp hex_common
 
 # print 8 digit hex (16 bits), see hex_common
 hex8_out:
 	shl $ 64-32,%rsi
-	mov $8,%r8b
+	mov $ 8,%r8b
 	jmp hex_common
 
 hex16_out:
-	mov $16,%r8b
+	mov $ 16,%r8b
 
 #  in: %ah=attribute, %rsi=number, %rdi=video memory
 #  in: %r8b number of hex digits
@@ -235,18 +235,18 @@ hex16_out:
 #      %al=0
 # clobber: %rdx %r8b
 hex_common:
-	mov $hexlookup,%r9d
+	mov $ hexlookup,%r9d
 0:	xorq %rdx,%rdx
-	shld $4,%rsi,%rdx
-	shl $4,%rsi
+	shld $ 4,%rsi,%rdx
+	shl $ 4,%rsi
 	movb (%r9,%rdx,1),%al
 	movw %ax,(%rdi)
 	push %rax
-	in $0xe9,%al
-	cmp $0xe9,%al
+	in $ 0xe9,%al
+	cmp $ 0xe9,%al
 	pop %rax
 	jnz 0f
-	out %al,$0xe9
+	out %al,$ 0xe9
 0:	leaq 2(%rdi),%rdi
 	decb %r8b
 	jnz 0b
@@ -255,38 +255,38 @@ hex_common:
 # Table for populating IDT
 .global isr_table
 isr_table:
-.word isr_entry_0
-.word isr_entry_1
-.word isr_entry_2
-.word isr_entry_3
-.word isr_entry_4
-.word isr_entry_5
-.word isr_entry_6
-.word isr_entry_7
-.word isr_entry_8
-.word isr_entry_9
-.word isr_entry_10
-.word isr_entry_11
-.word isr_entry_12
-.word isr_entry_13
-.word isr_entry_14
-.word isr_entry_15
-.word isr_entry_16
-.word isr_entry_17
-.word isr_entry_18
-.word isr_entry_19
-.word isr_entry_20
-.word isr_entry_21
-.word isr_entry_22
-.word isr_entry_23
-.word isr_entry_24
-.word isr_entry_25
-.word isr_entry_26
-.word isr_entry_27
-.word isr_entry_28
-.word isr_entry_29
-.word isr_entry_30
-.word isr_entry_31
+.hword isr_entry_0
+.hword isr_entry_1
+.hword isr_entry_2
+.hword isr_entry_3
+.hword isr_entry_4
+.hword isr_entry_5
+.hword isr_entry_6
+.hword isr_entry_7
+.hword isr_entry_8
+.hword isr_entry_9
+.hword isr_entry_10
+.hword isr_entry_11
+.hword isr_entry_12
+.hword isr_entry_13
+.hword isr_entry_14
+.hword isr_entry_15
+.hword isr_entry_16
+.hword isr_entry_17
+.hword isr_entry_18
+.hword isr_entry_19
+.hword isr_entry_20
+.hword isr_entry_21
+.hword isr_entry_22
+.hword isr_entry_23
+.hword isr_entry_24
+.hword isr_entry_25
+.hword isr_entry_26
+.hword isr_entry_27
+.hword isr_entry_28
+.hword isr_entry_29
+.hword isr_entry_30
+.hword isr_entry_31
 
 isr_name_invalid: .string "(Invalid!)"
 isr_name_reserved: .string "(Reserved)"
@@ -312,38 +312,38 @@ isr_name_20: .string "#VE Virtualization"
 
 .global isr_names
 isr_names:
-.word isr_name_0
-.word isr_name_1
-.word isr_name_2
-.word isr_name_3
-.word isr_name_4
-.word isr_name_5
-.word isr_name_6
-.word isr_name_reserved
-.word isr_name_8
-.word isr_name_reserved
-.word isr_name_10
-.word isr_name_11
-.word isr_name_12
-.word isr_name_13
-.word isr_name_14
-.word isr_name_reserved
-.word isr_name_16
-.word isr_name_17
-.word isr_name_18
-.word isr_name_19
-.word isr_name_20
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
-.word isr_name_reserved
+.hword isr_name_0
+.hword isr_name_1
+.hword isr_name_2
+.hword isr_name_3
+.hword isr_name_4
+.hword isr_name_5
+.hword isr_name_6
+.hword isr_name_reserved
+.hword isr_name_8
+.hword isr_name_reserved
+.hword isr_name_10
+.hword isr_name_11
+.hword isr_name_12
+.hword isr_name_13
+.hword isr_name_14
+.hword isr_name_reserved
+.hword isr_name_16
+.hword isr_name_17
+.hword isr_name_18
+.hword isr_name_19
+.hword isr_name_20
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
+.hword isr_name_reserved
 
 # Register names
 reg_names:

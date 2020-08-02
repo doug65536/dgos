@@ -12,7 +12,7 @@ __asm__(
 ".balign 16\n"
 ".global __int15_handler\n"
 "__int15_handler:"
-"cmp $0x5305,%ax\n"
+"cmp $ 0x5305,%ax\n"
 "jnz 0f\n"
 "hlt\n"
 "0:\n"
