@@ -39,7 +39,7 @@ entry_start:
     movw %ax,%ds
     movw %ax,%es
 
-    // Initialize stack to top of first 64KB
+    // Initialize stack to second 64KB
     // Could do this: lss UNRELOCATED(init_stack),%sp
     // but I want code running this early to be 8088 compatible
     movw UNRELOCATED(init_stack+2),%ss
@@ -51,8 +51,8 @@ entry_start:
     movw $ 256,%cx
     cld
     rep movsw
-    ljmpw $ 0,$ relocated_entry
-relocated_entry:
+    ljmpw $ 0,$ relocated_mbr_entry
+relocated_mbr_entry:
 
     // Search for first bootable partition
     movw $ partition_table,%bx
@@ -143,6 +143,8 @@ no_active_partition:
     movw $ 'p'+0xF00,%ax
 
 fail_message:
+    // Put one character and attribute in text mode video memory
+    // at the top left corner of the screen
     pushw $ 0xb800
     popw %ds
     movw %ax,0
@@ -156,18 +158,19 @@ give_up:
 // Data
 .section .data
 init_stack:
-    .int 0x0000FFF8
+    .hword 0x1000
+    .hword 0x0000
 
 dap:
     .byte dap_length
     .byte 0
-    .word 1
-    .word 0x7c00
-    .word 0x0000
+    .hword 1
+    .hword 0x7c00
+    .hword 0x0000
     .quad 0
 
 ptbl_ent_ptr:
-    .word 0
+    .hword 0
 
 // ----------------------------------------------------------------------
 .section .parttab
@@ -180,12 +183,12 @@ ptbl_ent_ptr:
     .endif
 
     .byte 0
-    .word 0
+    .hword 0
 
     .byte \type
 
     .byte 0
-    .word 0
+    .hword 0
 
     .int \lba_start
     .int \lba_sectors
@@ -194,10 +197,10 @@ ptbl_ent_ptr:
 .macro partition_table_entry_unused
     .byte 0
     .byte 0
-    .word 0
+    .hword 0
     .byte 0
     .byte 0
-    .word 0
+    .hword 0
     .int 0
     .int 0
 .endm
