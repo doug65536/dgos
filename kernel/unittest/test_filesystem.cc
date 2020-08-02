@@ -8,7 +8,7 @@ UNITTEST(test_filesystem_opendir)
 {
     printk("Opening root directory\n");
 
-    int od = file_opendirat(-1, "/");
+    int od = file_opendirat(AT_FDCWD, "/");
     lt(0, od);
     dirent_t de;
     dirent_t *dep;
