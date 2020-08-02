@@ -104,7 +104,7 @@ int sys_fstatfs(int fd, fs_statvfs_t *buf)
 
     if (likely(status >= 0)) {
         if (unlikely(!mm_copy_user(buf, &tmp, sizeof(tmp))))
-            status = -int(errno_t::EFAULT);
+            return fault_err();
     }
 
     return status;
@@ -269,7 +269,7 @@ int sys_readdir_r(int fd, dirent_t *buf)
         return int(status);
 
     if (unlikely(!mm_copy_user(buf, &ent, sizeof(*buf))))
-        return -int(errno_t::EFAULT);
+        return fault_err();
 
     return sizeof(*buf);
 }
@@ -436,7 +436,7 @@ int sys_statfs(char const *pathname, fs_statvfs_t *buf)
 
     if (likely(status >= 0)) {
         if (unlikely(!mm_copy_user(buf, &tmp, sizeof(tmp))))
-            status = -int(errno_t::EFAULT);
+            return fault_err();
     }
 
     return status;
