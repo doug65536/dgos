@@ -330,8 +330,6 @@ extern "C" void cpu_init();
 
 _noreturn
 void run_kernel(uint64_t entry, void *param);
-void copy_kernel(uint64_t dest_addr, void *src, size_t sz);
-void reloc_kernel(uint64_t distance, const Elf64_Rela *elf_rela, size_t relcnt);
 
 extern "C" uint8_t xcr0_value;
 

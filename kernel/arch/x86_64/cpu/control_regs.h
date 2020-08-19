@@ -75,32 +75,6 @@ static _always_inline void cpu_msr_set(uint32_t msr, uint64_t value)
     );
 }
 
-static _always_inline void cpu_msr_lo_set(uint32_t msr, uint32_t value)
-{
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        "movl %k[value],%%eax\n\t"
-        "wrmsr"
-        :
-        : [value] "S" (value)
-        , "c" (msr)
-        : "rdx"
-    );
-}
-
-static _always_inline void cpu_msr_hi_set(uint32_t msr, uint32_t value)
-{
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        "movl %k[value],%%edx\n\t"
-        "wrmsr"
-        :
-        : [value] "S" (value)
-        , "c" (msr)
-        : "rdx"
-    );
-}
-
 static _always_inline uint64_t cpu_msr_change_bits(
         uint32_t msr, uint64_t clr, uint64_t set)
 {

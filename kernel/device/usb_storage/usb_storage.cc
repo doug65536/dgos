@@ -372,6 +372,9 @@ long usb_msc_dev_t::info(storage_dev_info_t key)
     case STORAGE_INFO_BLOCKSIZE:
         return 1L << log2_blk_size;
 
+    case STORAGE_INFO_BLOCKSIZE_LOG2:
+        return log2_blk_size;
+
     case STORAGE_INFO_HAVE_TRIM:
         return 0;
 

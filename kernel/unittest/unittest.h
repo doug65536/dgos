@@ -42,6 +42,10 @@ public:
     _noinline
     void fail(const char *file, int line);
 
+    void fail(char const *message,
+        char const *file = __builtin_FILE(),
+        int line = __builtin_LINE());
+
     void set_ctx(unit_ctx *ctx);
 
     bool enabled() const {

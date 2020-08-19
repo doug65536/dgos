@@ -18,6 +18,7 @@ UNITTEST(test_filesystem_opendir)
     file_closedir(od);
 }
 
+// Disabled because this now runs too early for a writable filesystem
 DISABLED_UNITTEST(test_filesystem_create_unlink_churn)
 {
     rand_lfs113_t r;

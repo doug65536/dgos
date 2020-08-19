@@ -21,21 +21,39 @@ static uint32_t physalloc_64bit_st;
 // Keep track of the first free block in 20 bit range
 static uint32_t physalloc_20bit_1st;
 
-// Special block for taking pages from the top of 32 bit range
-static uint32_t physalloc_20bit_pt;
-
 static uint64_t physmap_top;
 
 static void physmap_realloc(uint32_t capacity_hint);
 static uint32_t physmap_replace(uint32_t index, physmem_range_t const& entry);
 static void physmap_delete(uint32_t index);
 
+static uint64_t physmap_check_freespace()
+{
+    uint64_t total = 0;
+    for (size_t i = 0; i < physalloc_count; ++i)
+        total += (physalloc_ranges[i].size &
+                  -(physalloc_ranges[i].type == PHYSMEM_TYPE_NORMAL));
+    return total;
+}
+
 static bool physmap_init()
 {
-    physalloc_20bit_pt = -1;
-
     if (unlikely(!get_ram_regions()))
         return false;
+
+    size_t count = 0;
+    physmem_range_t *ranges = physmap_get(&count);
+
+    physmap_top = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (ranges[i].type != PHYSMEM_TYPE_NORMAL)
+            continue;
+
+        if (physmap_top < ranges[i].base + ranges[i].size)
+            physmap_top = ranges[i].base + ranges[i].size;
+    }
+
+    return true;
 
     // Perform fixups
     bool did_something;
@@ -196,6 +214,76 @@ physmem_range_t *physmap_get(size_t *ret_count)
     return physalloc_ranges;
 }
 
+_noinline
+static char const *physmap_validate_failed(char const *reason)
+{
+    cpu_debug_break();
+
+    return reason;
+}
+
+char const *physmap_validate(bool fix)
+{
+    for (size_t i = 0; i < physalloc_count; ++i) {
+        physmem_range_t const &range = physalloc_ranges[i];
+
+        if (i > 0) {
+            physmem_range_t &prev = physalloc_ranges[i - 1];
+
+            if (unlikely(prev.base > range.base))
+                return physmap_validate_failed("Blocks are not sorted");
+
+            if (unlikely(prev.base == range.base))
+                return physmap_validate_failed(
+                            "Multiple blocks start at the same address");
+
+            if (unlikely(prev.base + prev.size > range.base))
+                return physmap_validate_failed("Block overlap");
+
+            if (unlikely(prev.type == range.type &&
+                         prev.base + prev.size == range.base)) {
+                if (likely(!fix))
+                    return physmap_validate_failed(
+                                "Uncoalesced adjacent blocks of same type");
+
+                uint64_t adjusted_size = range.base + range.size - prev.base;
+
+                // Fix it
+                PRINT("Coalescing adjacent memory ranges of same type"
+                      " {%#" PRIx64 ",%#" PRIx64 "}"
+                      " and"
+                      " {%#" PRIx64 ",%#" PRIx64 "}"
+                      " now"
+                      " {%#" PRIx64 ",%#" PRIx64 "}",
+                      prev.base, prev.size,
+                      range.base, range.size,
+                      prev.base, adjusted_size);
+
+                prev.size = adjusted_size;
+
+                physmap_delete(i);
+                --i;
+
+                continue;
+            }
+        }
+
+        if (unlikely(physalloc_20bit_st > i && range.base >= 0x100000))
+            return physmap_validate_failed("physalloc_20bit_st is wrong");
+
+        if (unlikely(physalloc_64bit_st < i && range.base >= 0x100000000))
+            return physmap_validate_failed("physalloc_64bit_st is wrong");
+
+        if (unlikely((range.base & -PAGE_SIZE) != range.base))
+            return physmap_validate_failed("Misaligned block base");
+
+        if (unlikely((range.size & -PAGE_SIZE) != range.size))
+            return physmap_validate_failed("Misaligning block size");
+    }
+
+    return nullptr;
+}
+
 static void physmap_realloc(uint32_t capacity_hint)
 {
     if (capacity_hint < 16)
@@ -221,12 +309,14 @@ static void physmap_delete(uint32_t index)
 {
     assert(index < physalloc_count);
 
-    physalloc_64bit_st -= (physalloc_64bit_st < index);
-    physalloc_20bit_st -= (physalloc_20bit_st < index);
-    physalloc_20bit_pt -= (physalloc_20bit_pt < index);
+    physalloc_64bit_st -= (index < physalloc_64bit_st);
+    physalloc_20bit_1st -= (index < physalloc_20bit_st);
+    physalloc_20bit_st -= (index < physalloc_20bit_st);
 
-    memmove(physalloc_ranges + index, physalloc_ranges + index + 1,
-            sizeof(*physalloc_ranges) * --physalloc_count - index);
+    --physalloc_count;
+
+    memmove(physalloc_ranges + index, physalloc_ranges + (index + 1),
+            sizeof(*physalloc_ranges) * (physalloc_count - index));
 }
 
 static uint32_t physmap_replace(uint32_t index, physmem_range_t const& entry)
@@ -240,26 +330,29 @@ static int physmap_insert_at(uint32_t index, physmem_range_t const& entry)
     assert(index <= physalloc_count);
 
     // Grow the map if necessary
-    if (unlikely(physalloc_count + 1 > physalloc_capacity))
+    if (unlikely(physalloc_count + 1 >= physalloc_capacity))
         physmap_grow();
 
-    // Insert the item
+    // Shift items forward, starting at the insertion point
     memmove(physalloc_ranges + index + 1, physalloc_ranges + index,
             sizeof(*physalloc_ranges) * (physalloc_count - index));
+
     physalloc_ranges[index] = entry;
+
     ++physalloc_count;
 
     physalloc_20bit_st += (entry.base < 0x100000);
+    physalloc_20bit_1st += (entry.base < 0x100000);
     physalloc_64bit_st += (entry.base < 0x100000000);
 
     return index;
 }
 
 _pure
-static int physmap_find_insertion_point(uint64_t base)
+static uint32_t physmap_find_insertion_point(uint64_t base)
 {
-    int st = 0;
-    int en = physalloc_count;
+    uint32_t st = 0;
+    uint32_t en = physalloc_count;
 
     if (!physalloc_count || physalloc_ranges[physalloc_count-1].base +
             physalloc_ranges[physalloc_count-1].size <= base) {
@@ -271,10 +364,8 @@ static int physmap_find_insertion_point(uint64_t base)
             int mid = ((en - st) >> 1) + st;
             physmem_range_t const& candidate = physalloc_ranges[mid];
 
-            if (candidate.base <= base)
-                st = mid + 1;
-            else
-                en = mid;
+            st = (candidate.base < base) ? mid + 1 : st;
+            en = (candidate.base < base) ? en : mid;
         }
     }
 
@@ -284,7 +375,7 @@ static int physmap_find_insertion_point(uint64_t base)
 // Sorted insertion into physical map, sort by base
 int physmap_insert(physmem_range_t const& entry)
 {
-    int index = physmap_find_insertion_point(entry.base);
+    uint32_t index = physmap_find_insertion_point(entry.base);
     return physmap_insert_at(index, entry);
 }
 
@@ -302,49 +393,111 @@ static char const *physmap_types[] = {
     "BOOTLOADER"
 };
 
-void physmap_dump()
+ATTRIBUTE_FORMAT(1, 0)
+static void vphysmap_dump(tchar const *format, va_list ap)
 {
-    PRINT("--- physmap dump:");
-    for (int i = 0; i < physalloc_count; ++i) {
+    vprint_line(0x7, format, ap);
+    for (size_t i = 0; i < physalloc_count; ++i) {
         physmem_range_t &ent = physalloc_ranges[i];
-        PRINT("base=%" PRIx64", size=%" PRIx64 ", type=%s",
-              ent.base, ent.size, ent.type < countof(physmap_types)
+        PRINT("[%zu] base=%" PRIx64
+              ", end=%" PRIx64
+              ", size=%" PRIx64
+              ", type=%s",
+              i, ent.base, ent.base + ent.size, ent.size,
+              ent.type < countof(physmap_types)
               ? physmap_types[ent.type] : "<invalid>");
     }
+    PRINT("State"
+          ": 1st_20=%" PRIu32
+          ", p64=%" PRIu32
+          "?",
+          physalloc_20bit_1st, physalloc_64bit_st);
+
     PRINT("---");
+}
+
+ATTRIBUTE_FORMAT(1, 2)
+static void physmap_dump(tchar const *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vphysmap_dump(format, ap);
+    va_end(ap);
 }
 #endif
 
-phys_alloc_t alloc_phys(uint64_t size)
+phys_alloc_t alloc_phys(uint64_t size, uint64_t for_addr, bool insist)
 {
+    uint64_t space_before = physmap_check_freespace();
+
+    size = (size + (PAGE_SIZE - 1)) & -PAGE_SIZE;
+
 #if DEBUG_PHYSMAP
-    physmap_dump();
+    PRINT("-");
+    physmap_dump(TSTR "alloc_phys allocating 0x%" PRIx64 " bytes", size);
 #endif
 
-    phys_alloc_t result;
+    // AMD zen TLBs can hold a contiguous 16KB aligned 16KB region with the
+    // same permission in a single TLB entry (4x efficiency)
+    // Try to make the low 14 bits of the linear address and
+    // physical address the same to leverage that capability
+
+    phys_alloc_t result{};
+
+    // A portion may be returned to the pool to provide
+    // allocations that are aligned with the virtual address
+    phys_alloc_t unwanted{};
 
     if (unlikely(physalloc_20bit_1st == 0))
         physalloc_20bit_1st = physalloc_20bit_st;
 
-    size = (size + (PAGE_SIZE - 1)) & -PAGE_SIZE;
-
-    for (uint32_t i = physalloc_20bit_1st; i < physalloc_64bit_st; ++i) {
+    uint32_t i;
+    for (i = physalloc_20bit_1st; likely(i < physalloc_64bit_st); ++i) {
         physmem_range_t &entry1 = physalloc_ranges[i];
 
-        if (entry1.type == PHYSMEM_TYPE_NORMAL) {
-            result.base = entry1.base;
+        if (likely(entry1.type == PHYSMEM_TYPE_NORMAL)) {
+            // See how much you would have to advance the block base
+            // physical address to make it 16KB aligned with
+            // the linear address
+            // Will be 0, 4096, 8192, or 12288
+            // virt - phys
+            // 0xxx - 3xxx = 01... : phys needs to be advanced 1000
+            // 0xxx - 2xxx = 10... : phys needs to be advanced 2000
+            // 0xxx - 1xxx = 11... : phys needs to be advanced 3000
+            // 0xxx - 0xxx = 00... : already aligned
+            unsigned realign = for_addr
+                    ? (for_addr - entry1.base) & 0x3000
+                    : 0;
 
-            if (i > 0) {
+            // Don't bother realigning if the block is smaller than 16KB
+            realign &= -(size >= 0x4000);
+
+            // Move on if this block is so small it can't even provide one
+            // page after realignment
+            if (unlikely(entry1.size <= realign))
+                continue;
+
+            // Increase size by amount needed to realign
+            size += realign;
+
+            result.base = entry1.base + realign;
+
+            unwanted.base = entry1.base;
+            unwanted.size = realign;
+
+            if (likely(i > 0)) {
                 // Peek at previous entry
                 physmem_range_t &prev = physalloc_ranges[i - 1];
 
                 // If previous entry is allocated and reaches all the way
                 // up to the base of this entry...
-                if (prev.type == PHYSMEM_TYPE_ALLOCATED &&
-                        prev.base + prev.size == entry1.base) {
+                if (likely(prev.type == PHYSMEM_TYPE_ALLOCATED &&
+                        prev.base + prev.size == entry1.base)) {
                     // ...then we can just adjust the ranges
 
-                    if (size < entry1.size) {
+                    if (likely(size < entry1.size)) {
+                        // Falls through straight to here in most common case
+
                         // Expand previous range to cover allocated range
                         prev.size += size;
                         // Move the base of the free range forward
@@ -352,21 +505,35 @@ phys_alloc_t alloc_phys(uint64_t size)
                         // Reduce the size of the free range
                         entry1.size -= size;
 
-                        result.size = size;
+                        result.size = size - unwanted.size;
+
+                        break;
+                    } else if (insist) {
+                        // Block is not large enough, keep looking
+                        continue;
                     } else {
-                        // We have consumed this entire free range, delete it
-                        result.size = entry1.size;
+                        // Consumed this entire free range, delete it
+                        result.size = entry1.size - realign;
                         prev.size += entry1.size;
                         physmap_delete(i);
-                    }
 
-                    break;
+                        while (i < physalloc_count &&
+                               prev.type ==
+                               physalloc_ranges[i].type &&
+                               prev.base + prev.size ==
+                               physalloc_ranges[i].base) {
+                            prev.size += physalloc_ranges[i].size;
+                            physmap_delete(i);
+                        }
+
+                        break;
+                    }
                 }
             }
 
             if (entry1.size > size) {
                 // Take some, create new free range after it
-                result.size = size;
+                result.size = size - unwanted.size;
 
                 physmem_range_t entry2{};
                 entry2.base = entry1.base + size;
@@ -379,7 +546,7 @@ phys_alloc_t alloc_phys(uint64_t size)
 
                 physmap_insert_at(i + 1, entry2);
             } else if (entry1.size <= size) {
-                result.size = entry1.size;
+                result.size = entry1.size - unwanted.size;
                 entry1.type = PHYSMEM_TYPE_ALLOCATED;
             }
 
@@ -391,11 +558,174 @@ phys_alloc_t alloc_phys(uint64_t size)
     assert((result.base & 0xFFF) == 0);
     assert(result.base >= 0x100000);
     assert(result.base < INT64_C(0x100000000));
-    //assert(result.size == size);
 
-    take_pages(result.base, result.size);
+    //physmap_validate();
+
+    if (unwanted.size)
+        free_phys(unwanted, i);
+
+    if (likely(result.size))
+        take_pages(result.base, result.size);
+
+#if DEBUG_PHYSMAP
+    physmap_dump(TSTR "alloc_phys returning"
+                      " 0x%" PRIx64 " bytes at 0x%" PRIx64,
+                 result.size, result.base);
+#endif
+
+    uint64_t space_taken = space_before - physmap_check_freespace();
+
+    // Verify that the amount of free space changed the correct amount
+    assert(space_taken == result.size);
 
     return result;
+}
+
+void free_phys(phys_alloc_t freed, size_t hint)
+{
+    uint64_t space_before = physmap_check_freespace();
+
+    assert((freed.base & -PAGE_SIZE) == freed.base);
+    freed.size = (freed.size + (PAGE_SIZE - 1)) & -PAGE_SIZE;
+
+#if DEBUG_PHYSMAP
+    PRINT("-");
+    PRINT("Freeing 0x%" PRIx64 " from 0x%" PRIx64 " to 0x%" PRIx64,
+          freed.size, freed.base, freed.base + freed.size);
+#endif
+
+    uint64_t freed_end = freed.base + freed.size;
+
+    assert(freed.base >= 0x100000 && freed.base + freed.size <= 0x100000000);
+
+    // Binary search to find insertion point above 1MB and below 4GB
+    size_t st;
+    size_t en;
+
+    if (1 || hint == -1U) {
+        st = physalloc_20bit_1st;
+        en = physalloc_64bit_st;
+        while (st < en) {
+            size_t md = st + ((en - st) >> 1);
+            physmem_range_t const& block = physalloc_ranges[md];
+
+            st = (freed.base > block.base) ? md + 1 : st;
+            en = (freed.base > block.base) ? en : md;
+        }
+    } else {
+        st = hint;
+    }
+
+    // If we went one past it, bump back one
+    if (st > 0 && physalloc_ranges[st].base > freed.base)
+        --st;
+
+    // See if we found the exact allocation
+    if (st < physalloc_count &&
+            physalloc_ranges[st].type == PHYSMEM_TYPE_ALLOCATED &&
+            physalloc_ranges[st].base == freed.base &&
+            physalloc_ranges[st].size == freed.size) {
+        PRINT("Found exact allocated match in free_phys");
+
+        // Delete the whole thing
+        physmap_delete(st);
+    } else if (st < physalloc_count &&
+               physalloc_ranges[st].type == PHYSMEM_TYPE_ALLOCATED &&
+               physalloc_ranges[st].base + physalloc_ranges[st].size ==
+               freed_end) {
+        PRINT("Taking the end off allocated range\n");
+
+        // Reduce the size of the allocated block
+        physalloc_ranges[st].size = freed.base - physalloc_ranges[st].base;
+    } else if (st < physalloc_count &&
+               physalloc_ranges[st].type == PHYSMEM_TYPE_ALLOCATED &&
+               physalloc_ranges[st].base == freed.base) {
+        PRINT("Taking the beginning off allocated range\n");
+
+        // Move the start of the block forward and reduce its size
+        physalloc_ranges[st].size -= freed.size;
+        physalloc_ranges[st].base += freed.size;
+    } else if (st < physalloc_count &&
+               physalloc_ranges[st].type == PHYSMEM_TYPE_ALLOCATED &&
+               physalloc_ranges[st].base < freed.base &&
+               physalloc_ranges[st].base +
+               physalloc_ranges[st].size > freed_end) {
+        PRINT("Punch a hole in the middle of allocated block");
+
+        physmem_range_t after;
+        physmem_range_t &block = physalloc_ranges[st];
+
+        // Compute the remaining piece after the freed region
+        after.base = freed_end;
+        after.size = block.base + block.size - freed_end;
+        after.type = PHYSMEM_TYPE_ALLOCATED;
+        after.valid = 1;
+
+        // Reduce the size of the block before the freed region
+        block.size = freed.base - block.base;
+
+        // Insert the second half of the split block and advance current index
+        physmap_insert_at(++st, after);
+    } else {
+        PRINT("Uh oh, what is happening");
+        assert(false);
+    }
+
+    // If sane, previous entry is before freed block
+    assert(st <= 0 || physalloc_ranges[st-1].base < freed.base);
+
+    uint64_t prev_en = st > 0 && st < physalloc_count
+            ? physalloc_ranges[st-1].base + physalloc_ranges[st-1].size
+            : 0;
+
+    uint64_t next_st = st < physalloc_count
+            ? physalloc_ranges[st].base
+            : UINT64_MAX;
+
+    // Only simple operations are allowed, no complex multiple block overlaps
+    assert(prev_en <= freed.base);
+    assert(next_st >= freed_end);
+
+    bool adjacent_to_prev = st > 0 &&
+            st < physalloc_count &&
+            physalloc_ranges[st-1].type == PHYSMEM_TYPE_NORMAL &&
+            prev_en == freed.base;
+
+    bool adjacent_to_next = st < physalloc_count &&
+            freed_end == next_st &&
+            physalloc_ranges[st-1].type == PHYSMEM_TYPE_NORMAL;
+
+    if (adjacent_to_prev && !adjacent_to_next) {
+        // It coalesces only with previous block
+        physalloc_ranges[st-1].size += freed.size;
+    } else if (!adjacent_to_prev && adjacent_to_next) {
+        // It coalesces only with next block
+        physalloc_ranges[st].base -= freed.size;
+        physalloc_ranges[st].size += freed.size;
+    } else if (adjacent_to_prev && adjacent_to_next) {
+        // Close a hole
+        physalloc_ranges[st-1].size += freed.size;
+        physmap_delete(st);
+    } else {
+        // Free range in non-adjacent empty space
+        physmem_range_t entry;
+        entry.base = freed.base;
+        entry.size = freed.size;
+        entry.type = PHYSMEM_TYPE_NORMAL;
+        entry.valid = 1;
+        physmap_insert_at(st, entry);
+    }
+
+#if DEBUG_PHYSMAP
+    physmap_dump(TSTR "After freeing 0x%" PRIx64 " at 0x%" PRIx64,
+                 freed.size, freed.base);
+#endif
+
+    //physmap_validate();
+
+    uint64_t space_freed = physmap_check_freespace() - space_before;
+
+    assert(space_freed == freed.size);
 }
 
 int physmap_take_range(uint64_t base, uint64_t size, uint32_t type)

@@ -24,7 +24,10 @@
 
 uint8_t pxe_server_ip[4];
 
+_section(".lowdata")
 uint16_t pxe_entry_vec[2];  // [ off16, seg16 ] 16-bit far pointer
+
+_section(".lowdata")
 uint16_t bang_pxe_ptr[2];   // [ off16, seg16 ] 16-bit far pointer
 
 uint16_t (*pxe_call)(uint16_t op, pxenv_base_t *arg_struct);

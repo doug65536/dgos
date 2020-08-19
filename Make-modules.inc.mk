@@ -20,6 +20,7 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
+	-I$(top_srcdir)/user/libutf \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -66,6 +67,9 @@ libkm_a_SOURCES = \
 
 libkm_a_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
+
+libkm_a_CCASFLAGS = \
+	$(libkm_a_CXXFLAGS)
 
 EXTRA_libkm_a_DEPENDENCIES =
 
@@ -536,7 +540,8 @@ user_shell_CCASFLAGS = \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	-isystem sysroot/include
 
-EXTRA_user_shell_DEPENDENCIES =
+EXTRA_user_shell_DEPENDENCIES = \
+	$(ALL_STDLIB_INSTALLED)
 
 #==========
 
@@ -570,7 +575,7 @@ init_LDFLAGS = -Lsysroot/lib
 #-Wl,--no-eh-frame-hdr
 
 init_LDADD = \
-	-lgcc -lpng -lz
+	libpng.a libutf.a libz.a u_vga16.o
 
 #sysroot/lib/64/crt0.o
 #sysroot/lib/64/libc.a
@@ -585,10 +590,6 @@ init_CCASFLAGS = \
 
 EXTRA_init_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
-	sysroot/lib/libc.a \
-	sysroot/lib/libz.a \
-	sysroot/lib/libm.a \
-	sysroot/lib/libpng.a \
 	$(ALL_STDLIB_INSTALLED)
 
 #===========
@@ -625,7 +626,7 @@ init_shared_LDFLAGS = -static
 #init_shared_LDADD = libc.so -lpng -lz
 #endif
 
-init_shared_LDADD = -lpng -lz
+init_shared_LDADD = -lpng -lz libutf.a u_vga16.o
 
 init_shared_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -634,9 +635,6 @@ init_shared_CCASFLAGS = \
 	-isystem sysroot/include
 
 EXTRA_init_shared_DEPENDENCIES = \
-	$(top_srcdir)/user/user64_phdrs.ld
-	EXTRA_init_DEPENDENCIES = \
-		$(top_srcdir)/user/user64_phdrs.ld \
-		sysroot/lib/libz.so \
-		sysroot/lib/libpng.so
-
+	$(top_srcdir)/user/user64_phdrs.ld \
+	libutf.a \
+	$(ALL_STDLIB_INSTALLED)

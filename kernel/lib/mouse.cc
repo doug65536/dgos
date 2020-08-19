@@ -7,7 +7,7 @@
 #include "cpu/atomic.h"
 #include "user_mem.h"
 
-#define DEBUG_MOUSE 1
+#define DEBUG_MOUSE 0
 #if DEBUG_MOUSE
 #define MOUSE_TRACE(...) printdbg("mouse: " __VA_ARGS__)
 #else
@@ -123,8 +123,8 @@ mouse_file_reg_t *mouse_file_instance()
 
 EXPORT void mouse_event(mouse_raw_event_t event)
 {
-    MOUSE_TRACE("hdist=%+d, vdist=%+d, buttons=0x%x\n",
-                event.hdist, event.vdist, event.buttons);
+    MOUSE_TRACE("hdist=%+d, vdist=%+d, buttons=0x%x, wheel=%+d\n",
+                event.hdist, event.vdist, event.buttons, event.wdist);
 
     mouse_file_instance()->add_event(event);
 }

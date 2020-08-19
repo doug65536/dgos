@@ -37,24 +37,9 @@ struct fat32_sector_iterator_t {
         close();
     }
 
-    void reset()
-    {
-        start_cluster = 0;
-        cluster = 0;
-        position = 0;
-        sector_offset = 0;
-        ok = false;
-        clusters = nullptr;
-        cluster_count = 0;
-    }
+    void reset();
 
-    int close()
-    {
-        int result = ok ? 0 : 1;
-        delete[] clusters;
-        reset();
-        return result;
-    }
+    int close();
 };
 
 // Handles iterating a directory and advancing

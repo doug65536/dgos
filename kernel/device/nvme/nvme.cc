@@ -23,6 +23,8 @@ PCI_DRIVER_BY_CLASS(
 #include "mutex.h"
 #include "inttypes.h"
 #include "work_queue.h"
+#include "hash_table.h"
+#include "hash.h"
 
 #define NVME_DEBUG	1
 #if NVME_DEBUG
@@ -436,6 +438,16 @@ public:
             (owner->*member)(data, packet, cmd_id, status_type, status);
     }
 
+    void reset()
+    {
+        data = nullptr;
+    }
+
+    bool data_equals(void *value) const
+    {
+        return data == value;
+    }
+
 private:
     member_t member;
     void *data;
@@ -480,6 +492,8 @@ public:
     void init(size_t count,
               nvme_cmd_t *sub_queue_ptr, uint32_t volatile *sub_doorbell,
               nvme_cmp_t *cmp_queue_ptr, uint32_t volatile *cmp_doorbell);
+
+    errno_t cancel_io(iocp_t *iocp);
 
     template<typename T>
     void submit_multiple();
@@ -549,6 +563,8 @@ private:
 
     unsigned io(uint8_t ns, nvme_request_t &request, uint8_t log2_sectorsize);
 
+    errno_t cancel_io(nvme_dev_t *dev, iocp_t *iocp);
+
     // Handle setting the queue count
     void setfeat_queues_handler(void *data, nvme_cmp_t &packet,
                                 uint16_t cmd_id, int status_type, int status);
@@ -590,6 +606,14 @@ private:
     uintptr_t host_buffer_physaddr;
 
     std::vector<uint32_t> namespaces;
+
+    using iocp_table_t = hashtbl_t<
+        nvme_request_t,
+        iocp_t *,
+        &nvme_request_t::iocp
+    >;
+
+    iocp_table_t iocp_table;
 
     std::unique_ptr<nvme_queue_state_t[]> queues;
     bool use_msi;
@@ -1074,7 +1098,8 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
 
             lba_count = chunk >> log2_sectorsize;
             request.count -= lba_count;
-            request.data = (char*)request.data + (lba_count << log2_sectorsize);
+            request.data = (char*)request.data +
+                    (lba_count << log2_sectorsize);
             break;
 
         case nvme_op_t::flush:
@@ -1114,6 +1139,22 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
     }
 
     return expect;
+}
+
+errno_t nvme_if_t::cancel_io(nvme_dev_t *dev, iocp_t *iocp)
+{
+    errno_t err = errno_t::OK;
+
+    for (size_t qi = 0; qi < queue_count; ++qi) {
+        nvme_queue_state_t& q = queues[qi];
+
+        errno_t err2 = q.cancel_io(iocp);
+
+        if (err2 != errno_t::OK)
+            err = err2;
+    }
+
+    return err;
 }
 
 void nvme_if_t::io_handler(void *data, nvme_cmp_t& cmp,
@@ -1183,7 +1224,7 @@ errno_t nvme_dev_t::io(
 
 errno_t nvme_dev_t::cancel_io(iocp_t *iocp)
 {
-    return errno_t::ENOSYS;
+    return parent->cancel_io(this, iocp);
 }
 
 errno_t nvme_dev_t::read_async(
@@ -1219,6 +1260,9 @@ long nvme_dev_t::info(storage_dev_info_t key)
     case STORAGE_INFO_BLOCKSIZE:
         return 1L << log2_sectorsize;
 
+    case STORAGE_INFO_BLOCKSIZE_LOG2:
+        return log2_sectorsize;
+
     case STORAGE_INFO_HAVE_TRIM:
         return 1;
 
@@ -1245,6 +1289,22 @@ void nvme_queue_state_t::init(
     prp_lists = (uint64_t*)mmap(
                 nullptr, count * sizeof(*prp_lists) * 16,
                 PROT_READ | PROT_WRITE, MAP_POPULATE);
+}
+
+errno_t nvme_queue_state_t::cancel_io(iocp_t *iocp)
+{
+    scoped_lock hold(lock);
+
+    errno_t result = errno_t::ENOENT;
+
+    for (size_t i = 0, e = cmp_handlers.size(); i != e; ++i) {
+        if (cmp_handlers[i].data_equals((void*)iocp)) {
+            cmp_handlers[i].reset();
+            result = errno_t::OK;
+        }
+    }
+
+    return result;
 }
 
 void nvme_queue_state_t::submit_cmd(

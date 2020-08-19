@@ -7,6 +7,7 @@
 #include <spawn.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <surface.h>
 
 #include <sys/mman.h>
 #include <sys/likely.h>
@@ -75,34 +76,6 @@ void load_module(char const *path, char const *parameters = nullptr)
     close(fd);
 }
 
-static void *mouse_test(void*)
-{
-    int mouse = open("/dev/mousein", O_RDONLY | O_NBLOCK);
-
-    if (mouse >= 0) {
-        size_t offset = 0;
-        char buf[16];
-        int packet;
-
-        while ((packet = read(mouse, buf + offset, sizeof(buf) - offset))) {
-            offset += packet;
-
-            if (offset == sizeof(buf)) {
-                for (size_t i = 0; packet > 0 && i < size_t(packet); ++i)
-                    printf(" %02x", (unsigned char)buf[i]);
-
-                printf("\n");
-
-                offset = 0;
-            }
-        }
-
-        close(mouse);
-        mouse = -1;
-    }
-
-    return nullptr;
-}
 
 static void *stress_fs(void *)
 {
@@ -163,19 +136,17 @@ void start_fs_stress()
         printf("pthread_create failed\n");
 }
 
-void start_mouse_thread()
-{
-    pthread_t mouse_thread{};
-    int err = pthread_create(&mouse_thread, nullptr, mouse_test, nullptr);
-    if (unlikely(err))
-        printf("Error creating mouse thread\n");
-}
+//void start_mouse_thread()
+//{
+//    pthread_t mouse_thread{};
+//    int err = pthread_create(&mouse_thread, nullptr, mouse_test, nullptr);
+//    if (unlikely(err))
+//        printf("Error creating mouse thread\n");
+//}
 
 int main(int argc, char **argv, char **envp)
 {
     printf("init startup complete\n");
-
-    load_module("boot/symsrv.km");
 
     load_module("boot/unittest.km");
 
@@ -239,6 +210,8 @@ int main(int argc, char **argv, char **envp)
                       PCI_SUBCLASS_MULTIMEDIA_AUDIO, -1))
         load_module("boot/ide.km");
 
+    load_module("boot/symsrv.km");
+
     for (size_t iter = 0; iter < 16; ++iter) {
         uint64_t st = __builtin_ia32_rdtsc();
         for (size_t i = 0; i < 1000000; ++i)
@@ -251,7 +224,7 @@ int main(int argc, char **argv, char **envp)
 
     //start_fs_stress();
 
-    start_mouse_thread();
+    //start_mouse_thread();
 
     return start_framebuffer();
 }

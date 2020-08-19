@@ -2,15 +2,8 @@
 
 .code16
 
-// Note that before relocate is executed, all addresses are off by 0x6C00
-// because the code is linked at 0x1000 but loaded at 0x7C00
-//
-// The BIOS is told by the el-torito PVD to only load the first 4KB
-// before jumping to entry at 0x7C00
-// We need to relocate it to 0x1000 then load the remaining code at 0x2000
-
-// Apply an adjustment to a symbol to get its address before relocation
-#define UNRELOCATED(n) n + 0x7C00 - 0x1000
+// The BIOS is told by the el-torito PVD to only load the first 4KB to 0x1000
+// We need to load the remaining code at 0x2000
 
 // Apply an adjustment to get its offset from the relocated base
 #define ZEROBASED(n) n - 0x1000
@@ -19,8 +12,9 @@
 .section .head, "wx", @progbits
 .global entry
 entry:
-    // Jump to the unrelocated "entry_start"
-    ljmpw $ 0,$ UNRELOCATED(entry_start)
+    // Load cs with zero and use 0x1000 offset
+    // Just in case the bios actually jumped to cs=0x100,ip=0
+    ljmpw $ 0,$ entry_start
 
 .balign 8
 .global bootinfo_primary_volume_desc
@@ -52,71 +46,15 @@ entry_start:
     movw %ax,%ds
     movw %ax,%es
 
-    // Store boot drive passed in from BIOS to unrelocated "boot_drive"
-    movb %dl,UNRELOCATED(boot_drive)
+    // Store boot drive passed in from BIOS
+    movb %dl,boot_drive
 
     // Initialize relocated stack
-    movw %ax,%ss
-    movl $ ___initial_stack,%esp
+    mov $ 0x2000,%ax
+    mov %ax,%ss
+    xor %sp,%sp
 
-    // Don't touch the stack until "relocate" is done!
-
-    // Calculate unrelocated linear address of relocate_farptr -> bx
-    movw $ UNRELOCATED(relocate_farptr),%bx
-
-    //
-    // Copy the code between "relocate" and "relocate_end"
-    // to unrelocated ___end
-    //
-
-    // Calculate unrelocated seg:off of "___end" symbol into ax:edi
-    movl $ UNRELOCATED(___end),%edi
-    movl %edi,%eax
-    andw $ 0xF,%di
-    shrl $ 4,%eax
-    movw %ax,%es
-
-    // Store the far pointer to the relocated "relocate" to relocate_farptr
-    movw %di,(%bx)
-    movw %ax,2(%bx)
-
-    // Destination segment is ax
-    movw %ax,%es
-
-    // es:di now points to unrelocated ___end
-
-    // Copy code
-    movw $ UNRELOCATED(relocate),%si
-    movw $ ZEROBASED(relocate_end),%cx
-    subw $ ZEROBASED(relocate),%cx
-    cld
-    rep movsb
-
-    // Far jump into copied relocate code
-    // Note that we went to all this trouble because it ends up above 64KB line
-    // and we move it to utterly guarantee relocate won't overwrite itself in
-    // the middle of its execution
-    ljmpw *(%bx)
-
-.balign 4
-relocate_farptr:
-    .space 4
-
-// Relocate the first 4KB (0x7C00-0x8BFF) to (0x1000-0x1FFF)
-relocate:
-    xorw %cx,%cx
-    movw %cx,%es
-    movw $ 4096,%cx
-    movw $ ___text_st,%di
-    shrw $ 2,%cx
-    movw $ UNRELOCATED(___text_st),%si
-    cld
-    rep movsl
-
-    // Jump into relocate. All the craziness is now over, symbols are correct
-    // and everything is < 64KB line
     ljmpw $ 0,$ relocated_bootiso_entry
-relocate_end:
 
 // This is linked after head
 .section .early, "wx", @progbits
@@ -125,29 +63,61 @@ relocated_bootiso_entry:
 
 .Lretry_io:
     // Load the rest of bootiso-bin
+
+    // Load pointer to dap so we don't repeat the offset in memory accesses
     movw $ dap,%si
+
+    // Initialize constant fields
     movb $ dap_length,dap_sizeof_packet(%si)
     movb $ 0,dap_reserved(%si)
-    movl $ ___initialized_data_en,%ecx
-    subl $ ___text_st + 4096,%ecx
-    shrl $ 11,%ecx
-    movw %cx,dap_block_count(%si)
+
+    // Translate destination address to a far pointer with minimal offset
     movl $ ___text_st + 4096,%edx
     movw %dx,%ax
     andw $ 0xF,%ax
     shrl $ 4,%edx
     movw %ax,dap_address(%si)
     movw %dx,dap_address+2(%si)
+
+    // Calculate the LBA
     movl bootinfo_file_location,%eax
     add $ 2,%eax
     xorl %edx,%edx
     movl %eax,dap_lba(%si)
     movl %edx,dap_lba+4(%si)
 
+    // Calculate how many 2KB sectors we need to load and set block count
+    movl $ ___initialized_data_en,%ecx
+    subl $ ___text_st + 4096,%ecx
+    shrl $ 11,%ecx
+
+.Lread_more:
+    movw %cx,dap_block_count(%si)
+
+    // Read the sectors
     movw $ 0x4200,%ax
     movb boot_drive,%dl
     int $ 0x13
     jnc load_done
+
+    // Failed
+
+    // Read back how many blocks actually transferred
+    movzwl dap_block_count(%si),%eax
+
+    // Advance LBA
+    addl %eax,dap_lba(%si)
+    adcl $ 0,dap_lba+4(%si)
+
+    // Advance destination segment
+    // (2KB sectors -> 16 byte real mode paragraphs)
+    shll $ 11 - 4,%eax
+    addw %ax,dap_address+2(%si)
+
+    // Reduce remaining block count
+    sub %eax,%ecx
+
+    jnz .Lread_more
 
 load_done:	// utility label for placing debugger breakpoint
 
@@ -157,6 +127,8 @@ load_done:	// utility label for placing debugger breakpoint
 
     movl bootinfo_primary_volume_desc,%eax
     xorl %edx,%edx
+    mov $ 0xb800,%ecx
+    mov %cx,%gs
     movl $ iso9660_boot_partition,%ecx
     gs movb $ '!',80*25*2-2
     movl $ 0f,%ebx

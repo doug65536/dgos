@@ -118,10 +118,9 @@ public:
         this->devid = devid;
         this->indicator = indicator;
         this->index = index;
-        tid = thread_create(&read_stress_thread_t::worker, this,
+        return thread_create(&tid, &read_stress_thread_t::worker, this,
                             "read_stress", 0,
                             false, false);
-        return tid;
     }
 
 private:
@@ -790,15 +789,6 @@ static int init_thread(void *)
 
     modload_init();
 
-    printk("Spawning init\n");
-
-    pid_t init_pid = -1;
-    if (unlikely(process_t::spawn(&init_pid, "sbin/init", {}, {}) != 0))
-        panic("spawn init failed!");
-
-    if (unlikely(process_t::wait_for_exit(init_pid) < 0))
-        panic("failed to wait for init");
-
     printk("Initializing late devices\n");
     callout_call(callout_type_t::late_dev);
 
@@ -877,12 +867,21 @@ static int init_thread(void *)
     printk("Running heap stress with %d threads\n",
              ENABLE_HEAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_HEAP_STRESS_THREAD; ++i) {
-        thread_create(stress_heap_thread, nullptr,
+        thread_create(nullptr, stress_heap_thread, nullptr,
                       "heap_stress", 0, false, false);
     }
 #endif
 
     callout_call(callout_type_t::init_thread_done, false);
+
+    printk("Spawning init\n");
+
+    pid_t init_pid = -1;
+    if (unlikely(process_t::spawn(&init_pid, "sbin/init", {}, {}) != 0))
+        panic("spawn init failed!");
+
+    if (unlikely(process_t::wait_for_exit(init_pid) < 0))
+        panic("failed to wait for init");
 
     printk("init_thread completed\n");
 
@@ -893,8 +892,8 @@ int debugger_thread(void *)
 {
     printk("Starting GDB stub\n");
     gdb_init();
-    thread_create(init_thread, nullptr, "init_thread", 0, false, true,
-                  thread_cpu_mask_t(0));
+    thread_create(nullptr, init_thread, nullptr, "init_thread",
+                  0, false, true, thread_cpu_mask_t(0));
 
     return 0;
 }
@@ -1254,10 +1253,10 @@ extern "C" _noreturn void kernel_main(void)
     // Become the idle thread for the boot processor
 
     if (likely(!kernel_params->wait_gdb))
-        thread_create(init_thread, nullptr,
+        thread_create(nullptr, init_thread, nullptr,
                       "init_thread", 0, false, false);
     else
-        thread_create(debugger_thread, nullptr,
+        thread_create(nullptr, debugger_thread, nullptr,
                       "debugger_thread", 0, false, false,
                       thread_cpu_mask_t(thread_cpu_count() - 1));
 

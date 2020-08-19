@@ -635,7 +635,7 @@ public:
     bool route_irq(int cpu) override final;
 
 private:
-    using lock_type = ext::irq_ticketlock;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
@@ -664,6 +664,9 @@ private:
     uint16_t tx_peek_value() const;
     void tx_take_value();
 
+    _noinline
+    bool send_fifo_burst();
+
     std::condition_variable tx_not_full;
     std::condition_variable rx_not_empty;
     std::condition_variable status_change;
@@ -678,6 +681,7 @@ private:
     size_t tx_head;
     size_t tx_tail;
     size_t tx_level;
+    size_t tx_bytes_until_check;
 
     uint8_t log2_buffer_size;
 
@@ -689,6 +693,7 @@ uart_async_t::uart_async_t()
     : uart_t()
     , tx_head(0)
     , tx_tail(0)
+    , tx_bytes_until_check(0)
     , log2_buffer_size(16)
     , sending_break(false)
     , sending_data(false)
@@ -791,13 +796,51 @@ bool uart_async_t::route_irq(int cpu)
     return irq_setcpu(irq, cpu);
 }
 
+// Returns true if we are done until the next tx_empty interrupt
+bool uart_async_t::send_fifo_burst()
+{
+    uint8_t burst[64];
+    size_t burst_size = 0;
+
+    uint_fast16_t tx_value;
+
+    while (burst_size < sizeof(burst) &&
+           tx_level &&
+           tx_bytes_until_check &&
+           (tx_value = tx_peek_value()) < 0x100) {
+        burst[burst_size++] = tx_value;
+        tx_take_value();
+        --tx_bytes_until_check;
+    }
+
+    if (burst_size) {
+        outs(port_t::DAT, burst, burst_size);
+
+        if (!tx_bytes_until_check) {
+            tx_bytes_until_check = fifo_size;
+
+            return true;
+        }
+
+        return is_tx_empty();
+    }
+
+    return false;
+}
+
 void uart_async_t::send_some(scoped_lock const&)
 {
     sending_data = !is_tx_empty();
 
     for (size_t i = 0; i < fifo_size && !is_tx_empty(); ++i) {
+        // Try to burst out enough to fill the tx fifo
+        if (send_fifo_burst())
+            break;
+
+        uint_fast16_t tx_value;
+
         // Peek at next value without removing it from the queue
-        uint_fast16_t tx_value = tx_peek_value();
+        tx_value = tx_peek_value();
 
         switch (tx_value) {
         default:
@@ -910,6 +953,9 @@ void uart_async_t::port_irq_handler()
             break;
 
         case uint8_t(iir_source_t::TX_EMPTY):
+            if (!tx_bytes_until_check)
+                tx_bytes_until_check = fifo_size;
+
             send_some(lock_);
             wake_tx = true;
 
@@ -980,7 +1026,7 @@ public:
     virtual bool wait_dsr_until(timeout_t timeout) override final;
 
 private:
-    using lock_type = ext::irq_ticketlock;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type port_lock;
@@ -995,15 +1041,26 @@ private:
     uint8_t rx_dequeue();
     void rx_enqueue(uint8_t value);
 
+    _noinline
+    bool poll_cts(bool past_min, clock::time_point timeout);
+
+    _noinline
+    bool poll_tx_empty(bool past_min, clock::time_point timeout);
+
+    _noinline
+    void send_block(const void *buf, size_t block_size);
+
     static constexpr uint8_t log2_buffer_size = 7;
     uint8_t rx_buffer[1 << log2_buffer_size];
     uint8_t rx_head;
     uint8_t rx_tail;
+    uint8_t bytes_until_next_poll;
 };
 
 uart_poll_t::uart_poll_t()
     : rx_head(0)
     , rx_tail(0)
+    , bytes_until_next_poll(0)
 {
 }
 
@@ -1013,49 +1070,72 @@ bool uart_poll_t::init(port_cfg_t const& cfg, bool use_irq)
     return uart_t::init(cfg, use_irq);
 }
 
+bool uart_poll_t::poll_tx_empty(bool past_min, clock::time_point timeout)
+{
+    for (;;) {
+        inp(reg_lsr);
+
+        if (likely(reg_lsr.tx_hold_empty))
+            return false;
+
+        if (past_min)
+            return true;
+
+        if (clock::now() > timeout)
+            return true;
+
+        pause();
+    }
+}
+
+bool uart_poll_t::poll_cts(bool past_min, clock::time_point timeout)
+{
+    for (;;) {
+        inp(reg_msr);
+
+        if (likely(reg_msr.cts))
+            return false;
+
+        if (past_min)
+            return true;
+
+        if (clock::now() > timeout)
+            return true;
+
+        pause();
+    }
+}
+
+void uart_poll_t::send_block(void const *buf, size_t block_size)
+{
+    outs(port_t::DAT, buf, block_size);
+}
+
 ssize_t uart_poll_t::write(void const *buf, size_t size, size_t min_write,
                            clock::time_point timeout)
 {
     scoped_lock lock(port_lock);
 
     for (size_t i = 0; i < size; ) {
-        // Wait for tx holding register to be empty
-        for (;;) {
-            inp(reg_lsr);
-
-            if (likely(reg_lsr.tx_hold_empty))
-                break;
-
-            if (i >= min_write)
-                return ssize_t(i);
-
-            if (clock::now() > timeout)
+        if (bytes_until_next_poll == 0) {
+            // Wait for tx holding register to be empty
+            if (poll_tx_empty(i >= min_write, timeout))
                 return i;
 
-            pause();
-        }
-
-        // Wait for CTS
-        for (;;) {
-            inp(reg_msr);
-
-            if (likely(reg_msr.cts))
-                break;
-
-            if (i >= min_write)
-                return ssize_t(i);
-
-            if (clock::now() > timeout)
+            // Wait for CTS
+            if (poll_cts(i >= min_write, timeout))
                 return i;
 
-            pause();
+            bytes_until_next_poll = fifo_size;
         }
 
         // Fill the FIFO or send the remainder
-        size_t block_size = std::min(size_t(fifo_size), size - i);
+        size_t block_size = std::min(size_t(bytes_until_next_poll),
+                                     size - i);
 
-        outs(port_t::DAT, (char*)buf + i, block_size);
+        send_block((char*)buf + i, block_size);
         i += block_size;
+        bytes_until_next_poll -= block_size;
     }
 
     return size;

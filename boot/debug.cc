@@ -2,15 +2,30 @@
 #include "string.h"
 #include "utf.h"
 
+static bool use_serial = true;
+
 static void e9out(void const *data, size_t len)
 {
-    __asm__ __volatile__ (
-        "rep outsb\n\t"
-        "out %%al,%%dx\n\t"
-        :
-        : "S" (data), "c" (len), "d" (0xe9), "a" ('\n')
-        : "memory"
-    );
+    if (use_serial) {
+       //while (len) {
+            __asm__ __volatile__ (
+                "rep outsb\n\t"
+                "out %%al,%%dx\n\t"
+                : "+S" (data), "+c" (len)
+                : "d" (0x3f8), "a" ('\n')
+                : "memory"
+            );
+     //   }
+    } else {
+        __asm__ __volatile__ (
+            "rep outsb\n\t"
+            "out %%al,%%dx\n\t"
+            : "+S" (data), "+c" (len)
+            : "d" (0xe9), "a" ('\n')
+            : "memory"
+        );
+
+    }
 }
 
 void debug_out(char const *s, ptrdiff_t len)
@@ -22,7 +37,6 @@ void debug_out(char const *s, ptrdiff_t len)
 
 void debug_out(char16_t const *s, ptrdiff_t len)
 {
-
     if (len < 0)
         len = strlen(s);
 

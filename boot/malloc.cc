@@ -1,4 +1,5 @@
 #include "malloc.h"
+#include "assert.h"
 #include "screen.h"
 #include "string.h"
 #include "diskio.h"
@@ -67,6 +68,7 @@ struct blk_hdr_t {
 
 static_assert(sizeof(blk_hdr_t) == 16, "Unexpected malloc block header size");
 
+size_t heap_free;
 static blk_hdr_t *heap_st, *heap_en;
 static blk_hdr_t *first_free;
 
@@ -88,6 +90,8 @@ void malloc_init(void *st, void *en)
     heap_st->set_size(uintptr_t(heap_en) - uintptr_t(heap_st));
     heap_st->make_valid();
     heap_st->sig = blk_hdr_t::FREE;
+
+    heap_free = heap_st->size;
 }
 
 static blk_hdr_t *next_blk(blk_hdr_t *blk)
@@ -114,6 +118,8 @@ static blk_hdr_t *malloc_coalesce(blk_hdr_t *blk, blk_hdr_t *next)
             first_free = blk;
 
         next = next_blk(blk);
+
+        heap_free += sizeof(blk_hdr_t);
     }
 
     return next;
@@ -307,6 +313,10 @@ void free(void *p)
     if (unlikely(blk->sig != blk_hdr_t::USED))
         PANIC("Bad free call, block signature is not USED");
 
+    // Clear freed memory with freed canary to ruin all use after free
+    // as much as possible
+    memset(blk + 1, 0xFE, blk->size - sizeof(blk_hdr_t));
+
     if (unlikely(blk->invalid()))
         malloc_panic();
 
@@ -336,6 +346,13 @@ bool malloc_validate_or_panic()
     return true;
 }
 
+_noinline
+bool malloc_validate_failed()
+{
+    assert(!"Heap validation failed");
+    return false;
+}
+
 bool malloc_validate()
 {
     for (blk_hdr_t *blk = heap_st; ;
@@ -343,23 +360,23 @@ bool malloc_validate()
         if (blk->invalid() ||
                 (blk->sig != blk_hdr_t::FREE && blk->sig != blk_hdr_t::USED)) {
             PRINT("Invalid block header at %zx\n", uintptr_t(blk));
-            return false;
+            return malloc_validate_failed();
         }
 
         if (blk->size & 15) {
             PRINT("Block size is not a multiple of 16\n");
-            return false;
+            return malloc_validate_failed();
         }
 
         if (blk < heap_st || blk > heap_en) {
             PRINT("Went off the the heap into the weeds\n");
-            return false;
+            return malloc_validate_failed();
         }
 
         if (blk == heap_en) {
             if (blk->size != 0) {
                 PRINT("Heap end sentinel has invalid size\n");
-                return false;
+                return malloc_validate_failed();
             }
 
             break;

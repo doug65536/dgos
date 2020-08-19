@@ -1,6 +1,9 @@
 define startupbreakpoints
 	set remotetimeout 86400
 
+	#file
+	#add-symbol-file kernel-generic 0xffffff00000001a0
+
 	# For kernel
 	set architecture i386:x86-64
 
@@ -20,7 +23,7 @@ define startupbreakpoints
 	#set may-call-functions off
 
 	#good for TCG
-	#set breakpoint always-inserted on
+	set breakpoint always-inserted on
 
 	#exec-file kernel-generic
 	#symbol-file kernel-generic -o -0x000000ff80000000
@@ -339,4 +342,14 @@ define dumptree
 			end
 		end
 	end
+end
+
+define sid
+	if $argc == 1
+		si $arg0
+	else
+		si
+	end
+
+	monitor x /10i $cs.base+$eip
 end

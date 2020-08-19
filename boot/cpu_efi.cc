@@ -12,18 +12,6 @@ extern "C" _noreturn void code64_run_kernel(
 
 extern char code64_run_kernel_end[];
 
-void reloc_kernel(uint64_t distance, Elf64_Rela const *elf_rela, size_t relcnt)
-{
-    while (relcnt--) {
-        uint64_t offset = elf_rela->r_offset;
-        uint64_t addend = elf_rela->r_addend;
-        ++elf_rela;
-        uint64_t value = distance + addend;
-        void *spot = (void*)(offset + distance);
-        memcpy(spot, &value, sizeof(value));
-    }
-}
-
 // This only runs on the BSP
 void run_kernel(uint64_t entry, void *param)
 {
@@ -54,10 +42,4 @@ void run_kernel(uint64_t entry, void *param)
         PANIC("Error exiting boot services");
 
     code64_run_kernel(entry, param, paging_root_addr(), nx_available);
-}
-
-// Not used
-void copy_kernel(uint64_t dest_addr, void *src, size_t sz)
-{
-    assert(!"Should not be called");
 }

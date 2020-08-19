@@ -20,7 +20,7 @@ static void buffer_char(tchar *buf, tchar **pptr, tchar c, void *arg)
         *(*pptr) = 0;
 
         print_at(info[0], info[1], info[2], len, buf);
-        debug_out(buf, len);
+        //debug_out(buf, len);
         *pptr = buf;
     }
     if (likely(c >= 32))
@@ -232,17 +232,25 @@ void print_str_xy(int x, int y, tchar const *s, size_t len,
                   uint16_t attr, size_t min_len)
 {
     tchar lbuf[81];
+
     tchar *fbuf = nullptr;
-    size_t alloc_len = len > min_len ? len : min_len;
-    if (alloc_len > 80)
-        fbuf = (tchar*)malloc(alloc_len+1);
+
+    size_t alloc_len = min_len;// len > min_len ? len : min_len;
+
+    if (alloc_len > sizeof(lbuf))
+        fbuf = (tchar*)malloc((alloc_len+1) * sizeof(tchar));
+
     tchar *buf = fbuf ? fbuf : lbuf;
+
     size_t ofs;
-    for (ofs = 0; ofs < len; ++ ofs)
+    for (ofs = 0; ofs < len && ofs < min_len; ++ ofs)
         buf[ofs] = s[ofs];
+
     while (ofs < min_len)
         buf[ofs++] = ' ';
+
     buf[ofs] = 0;
+
     print_at(x, y, attr, ofs, buf);
 
     if (fbuf)

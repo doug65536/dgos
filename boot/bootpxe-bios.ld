@@ -2,9 +2,16 @@ ENTRY(early_entry)
 
 SECTIONS {
 	.text 0x1000 : AT(0x1000) {
+		/* Some portion of things need to be forced to be below
+		 * 64KB boundary so their relocation can fit 16 bits,
+		 */
+
 		___text_st = .;
 		KEEP(*(.head))
 		KEEP(*(.early))
+		KEEP(*(.low))
+		KEEP(*(.lowdata))
+
 		*(.text)
 		*(.text.*)
 		*(.text.unlikely)
@@ -52,19 +59,18 @@ SECTIONS {
 
 	.bss : {
 		___bss_st = .;
+
 		*(.bss)
 		*(.bss.*)
-		*(COMMON)
-		*(COMMON.*)
-		*(COMMON*)
 
 		. = ALIGN(16);
 		. += 8;
 		___bss_en = .;
 	}
 
+	. = ABSOLUTE(0x20000);
 	___initial_stack_limit = .;
-	. = ABSOLUTE(0xFFF0);
+	. = ABSOLUTE(0x30000);
 	___initial_stack = .;
 	___heap_st = .;
 	___end = .;

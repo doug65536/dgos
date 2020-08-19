@@ -9,12 +9,12 @@
 DISK_SIZE_MB=256
 
 # 0x10000 (64KB) reserved for boot code
-FATPART_RESERVED_SIZE=0x10000
+FATPART_RESERVED_SIZE=0x100000
 
 fatpart.img: \
+		mbr-bin \
 		boot1-bin \
 		bootfat-bin \
-		mbr-bin \
 		$(top_srcdir)/mkposixdirs.sh \
 		$(top_srcdir)/diskfat.mk \
 		$(top_srcdir)/populate_fat.sh
@@ -89,13 +89,18 @@ fatpart.img: \
 		printf "Populating fat partition with files and directories\n" \
 		&& \
 		SRCDIR="$(top_srcdir)" \
-			"$(top_srcdir)/populate_fat.sh" fatpart.img "$(top_srcdir)"
+			"$(top_srcdir)/populate_fat.sh" fatpart.img "$(top_srcdir)" && \
+		$(TOUCH) fatpart.img
 
 DGOS_MBRID=0x0615151f
 DGOS_UUID=0615151f-d802-4edf-914a-734dc4f03687
 MBR_PART_LBA = 2048
 
-mbrdisk.img: fatpart.img mbr-bin
+mbrdisk.img: \
+		fatpart.img \
+		mbr-bin \
+		boot1-bin \
+		bootfat-bin
 	printf "Truncating disk image\n" \
 		&& \
 		"$(TRUNCATE)" --size=0 "$@" \
@@ -137,7 +142,11 @@ mbrdisk.img: fatpart.img mbr-bin
 			seek="$$(( $(MBR_PART_LBA) ))" \
 			conv=notrunc
 
-hybdisk.img: fatpart.img mbr-bin
+hybdisk.img: \
+		fatpart.img \
+		mbr-bin \
+		boot1-bin \
+		bootfat-bin
 	printf "Truncating hybrid disk image\n" \
 		&& \
 		"$(TRUNCATE)" --size=0 "$@" \
@@ -181,7 +190,11 @@ hybdisk.img: fatpart.img mbr-bin
 			seek=2048 \
 			conv=notrunc
 
-gptdisk.img: fatpart.img
+gptdisk.img: \
+		fatpart.img \
+		mbr-bin \
+		boot1-bin \
+		bootfat-bin
 	printf "Truncating GPT disk image\n" \
 		&& \
 		"$(TRUNCATE)" --size=0 "$@" \

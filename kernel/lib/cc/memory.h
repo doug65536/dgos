@@ -308,13 +308,19 @@ public:
     {
     }
 
-    value_type *allocate(size_t __n)
+    void create()
     {
         if (unlikely(!impl)) {
             void *mem = _Allocator().allocate(
                         sizeof(bump_allocator_impl<_T, _Alloc>));
             impl = new (mem) bump_allocator_impl<_T, _Alloc>();
         }
+    }
+
+    value_type *allocate(size_t __n)
+    {
+        if (unlikely(!impl))
+            create();
 
         value_type *mem = impl->allocate(__n);
 

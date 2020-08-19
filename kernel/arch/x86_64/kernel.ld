@@ -28,7 +28,7 @@ SECTIONS {
 	. = 0xFFFFFFFF80000000;
 
 	/* r-- begins */
-	. = ALIGN(4K);
+	. = ALIGN(16K);
 
 	PROVIDE(__image_start = .);
 
@@ -164,7 +164,7 @@ SECTIONS {
 	} :readonly
 
 	/* r-x begins */
-	. = ALIGN(4K);
+	. = ALIGN(16K);
 
 	.text : {
 		PROVIDE_HIDDEN(___text_st = .);
@@ -198,7 +198,7 @@ SECTIONS {
 	} :text
 
 	/* rw- begins */
-	. = ALIGN(4K);
+	. = ALIGN(16K);
 
 	.cpus : {
 		*(.data.cpus)
@@ -269,14 +269,14 @@ SECTIONS {
 	} :data
 
 	/* --- begins */
-	. = ALIGN(4K);
+	. = ALIGN(16K);
 
 	.bspguard (NOLOAD) : {
 		. += 4K;
 	} :guard
 
 	/* rw- begins */
-	. = ALIGN(4K);
+	. = ALIGN(16K);
 
 	.bspstk (NOLOAD) : {
 		PROVIDE_HIDDEN(__bspstk_st = .);
@@ -292,7 +292,7 @@ SECTIONS {
 		KEEP(*(.asanbss))
 	} :asan
 
-	. = ALIGN(4K);
+	. = ALIGN(16K);
 	PROVIDE_HIDDEN(___init_brk = .);
 
 /*

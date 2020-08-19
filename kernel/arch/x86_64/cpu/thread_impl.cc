@@ -1,4 +1,4 @@
-#include "cpu/thread_impl.h"
+﻿#include "cpu/thread_impl.h"
 #include "debug.h"
 #include "process.h"
 #include "types.h"
@@ -155,7 +155,7 @@ struct alignas(256) thread_info_t {
     // --- cache line ---
 
     // 4 64-bit values
-    using lock_type = ext::irq_ticketlock;   // 32 bytes
+    using lock_type = ext::irq_spinlock;   // 32 bytes
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 
@@ -309,7 +309,7 @@ struct alignas(256) cpu_info_t {
     uint32_t time_ratio = 0;
 
     uint32_t busy_ratio = 0;
-    uint32_t busy_percent_x1k = 0;
+    uint32_t busy_percent_x1M = 0;
 
     uint32_t cr0_shadow = 0;
     uint32_t cpu_nr = 0;
@@ -450,6 +450,7 @@ static void thread_signal_completion(thread_info_t *thread);
 static uint32_t get_apic_id_slow()
 {
     cpuid_t cpuid_info;
+
     cpuid(&cpuid_info, CPUID_INFO_FEATURES, 0);
     uint32_t apic_id = cpuid_info.ebx >> 24;
     return apic_id;
@@ -562,13 +563,14 @@ cpu_info_t & schedule_thread_on_cpu(
             .emplace(thread->timeslice_timestamp,
                      ready_set_t::value_type::second_type(thread))
             .first;
-    dump_scheduler_list("ready list:", cpu.ready_list);
+    //dump_scheduler_list("ready list:", cpu.ready_list);
     lock.unlock();
 
     return cpu;
 }
 
 static thread_t thread_create_with_state(
+        thread_t *ret_tid,
         thread_fn_t fn, void *userdata, char const *name, size_t stack_size,
         thread_state_t state, thread_cpu_mask_t const &affinity,
         thread_priority_t priority, bool user, bool is_float)
@@ -599,6 +601,9 @@ static thread_t thread_create_with_state(
                                   THREAD_IS_INITIALIZING) ==
                    THREAD_IS_UNINITIALIZED))
         {
+            if (ret_tid)
+                *ret_tid = i;
+
             break;
         }
 
@@ -775,14 +780,15 @@ static thread_t thread_create_with_state(
     // Kick other cpu if not this cpu
     if (thread_cpu_number() != cpu_nr)
         apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
-//    else if (1 || parent->sched_timestamp >= thread->sched_timestamp)
-    else if (thread->sched_timestamp > 0)
+    else if (thread->sched_timestamp > 0 &&
+             parent->sched_timestamp >= thread->sched_timestamp)
         thread_yield();
 
     return i;
 }
 
-EXPORT thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
+EXPORT thread_t thread_create(thread_t *ret_tid,
+                              thread_fn_t fn, void *userdata, char const *name,
                               size_t stack_size, bool user, bool is_float,
                               thread_cpu_mask_t const& affinity)
 {
@@ -791,6 +797,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
     info.userdata = userdata;
     info.name = name;
     info.stack_size = stack_size;
+    info.ret_tid = ret_tid;
     info.user = user;
     info.is_float = is_float;
     info.affinity = affinity;
@@ -801,6 +808,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
 EXPORT thread_t thread_create_with_info(thread_create_info_t const* info)
 {
     return thread_create_with_state(
+                info->ret_tid,
                 info->fn, info->userdata, info->name, info->stack_size,
                 info->suspended ? THREAD_IS_SLEEPING : THREAD_IS_READY,
                 info->affinity, 0, info->user, info->is_float);
@@ -921,6 +929,8 @@ void thread_init(int ap)
     uint32_t cpu_nr = atomic_xadd(&cpu_count, 1);
     cpu_info_t *cpu = cpus + cpu_nr;
 
+    cpu->ready_list.get_allocator().create();
+
     cpu->cpu_nr = cpu_nr;
     cpu->sleep_list.share_allocator(cpu->ready_list);
 
@@ -1007,6 +1017,7 @@ void thread_init(int ap)
         cpu_irq_disable();
 
         thread = threads + thread_create_with_state(
+                    nullptr,
                     smp_idle_thread, nullptr, "Idle(AP)", 0,
                     THREAD_IS_INITIALIZING,
                     thread_cpu_mask_t(cpu_nr),
@@ -1205,10 +1216,11 @@ void accumulate_time(cpu_info_t *cpu, thread_info_t *thread, uint64_t elapsed)
 
     if (likely(cpu->time_ratio)) {
         // 1032 == 1.032%
-        int busy_percent = 100000 * cpu->busy_ratio / cpu->time_ratio;
-        cpu->busy_percent_x1k = busy_percent;
+        int busy_percent = (int)(UINT64_C(100000000) *
+                                 cpu->busy_ratio / cpu->time_ratio);
+        cpu->busy_percent_x1M = busy_percent;
     } else {
-        cpu->busy_percent_x1k = 0;
+        cpu->busy_percent_x1M = 0;
     }
 }
 
@@ -1260,7 +1272,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
 
     // Store context pointer for resume later
     assert(thread->ctx == nullptr ||
-           thread->thread_id < cpu_count);
+           thread->thread_id < thread_t(cpu_count));
     thread->ctx = ctx;
 
     uint64_t now = time_ns();
@@ -1766,7 +1778,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
                 resumed_thread->schedule_node = cpu.ready_list
                         .insert(std::move(node)).first;
 
-                dump_scheduler_list("ready list:", cpu.ready_list);
+                //dump_scheduler_list("ready list:", cpu.ready_list);
 
                 // Should be a fast, voluntarily yielded context
                 assert(ISR_CTX_CTX_FLAGS(resumed_thread->ctx) &
@@ -2217,9 +2229,9 @@ void thread_pcid_free(int pcid)
     pcid_alloc_map[0] &= ~(UINT64_C(1) << word);
 }
 
-EXPORT unsigned thread_cpu_usage_x1k(size_t cpu)
+EXPORT unsigned thread_cpu_usage_x1M(size_t cpu)
 {
-    return 100000 - cpus[cpu].busy_percent_x1k;
+    return 100000000 - cpus[cpu].busy_percent_x1M;
 }
 
 void thread_add_cpu_irq_time(uint64_t tsc_ticks)

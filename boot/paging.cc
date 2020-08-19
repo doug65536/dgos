@@ -144,19 +144,23 @@ void paging_map_range(
 
     pte = nullptr;
 
-    // Rescan the region and assign pages to uncommitted page table entries
+    // This holds a contiguous chunk
     phys_alloc_t allocation{};
+
+    // Rescan the region and assign pages to uncommitted page table entries
     for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE, ++pte) {
         // Calculate pte pointer at start and at 2MB boundaries
-        if (!pte || ((addr & -(1<<21)) == addr))
+        if (unlikely(!pte || ((addr & -(1<<21)) == addr)))
             pte = paging_find_pte(addr, 12, false);
 
-        if ((*pte & PTE_PRESENT))
+        if (unlikely((*pte & PTE_PRESENT)))
             continue;
 
         // At start and when allocation runs out of space, allocate more
-        if (!allocation.size) {
-            allocation = allocator->alloc(needed);
+        // This is likely to happen once and not again until loop is finished
+        if (unlikely(!allocation.size)) {
+            allocation = allocator->alloc(needed, addr);
+            assert(needed >= allocation.size);
             needed -= allocation.size;
         }
 
@@ -164,6 +168,9 @@ void paging_map_range(
         allocation.base += PAGE_SIZE;
         allocation.size -= PAGE_SIZE;
     }
+
+    // Make sure it was perfect
+    assert(allocation.size == 0);
 }
 
 size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
@@ -464,19 +471,19 @@ void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
         paging_map_physical_impl(A, A + phys_to_virt, r, pte_flags);
 
     // 2MB page region
-    if (s > 0)
+    if (unlikely(s > 0))
         paging_map_physical_impl(B, B + phys_to_virt, s, pte_flags);
 
     // 1GB page region
-    if (t > 0)
+    if (unlikely(t > 0))
         paging_map_physical_impl(C, C + phys_to_virt, t, pte_flags);
 
     // 2MB page region
-    if (u > 0)
+    if (unlikely(u > 0))
         paging_map_physical_impl(D, D + phys_to_virt, u, pte_flags);
 
     // 4KB page region
-    if (v > 0)
+    if (unlikely(v > 0))
         paging_map_physical_impl(E, E + phys_to_virt, v, pte_flags);
 }
 
@@ -581,6 +588,39 @@ uint64_t paging_physaddr_of(uint64_t linear_addr)
     pte_t *p = paging_find_pte(linear_addr - misalignment, 12, false);
 
     return (p && (*p & PTE_PRESENT)) ? (*p & PTE_ADDR) + misalignment : -1U;
+}
+
+// last parameter chosen so (1)nput from loaded os is "1" (true),
+// and (0)utput to the loaded os is "0" (false)
+bool paging_access_virtual_memory(uint64_t vaddr, void *data, size_t data_sz,
+                                  int is_read)
+{
+    // Handle spanning pages and multi-page transfers
+    while (data_sz) {
+        uintptr_t spot_physaddr = paging_physaddr_of(vaddr);
+
+        if (unlikely(spot_physaddr == uintptr_t(-1)))
+            return false;
+
+        uintptr_t spot_pageend = (spot_physaddr + PAGE_SIZE) & -PAGE_SIZE;
+
+        uintptr_t spot_space = spot_pageend - spot_physaddr;
+
+        spot_space = (spot_space <= data_sz)
+                ? spot_space
+                : data_sz;
+
+        if (is_read)
+            memcpy(data, (void*)spot_physaddr, spot_space);
+        else
+            memcpy((void*)spot_physaddr, data, spot_space);
+
+        vaddr += spot_space;
+        data = (char*)data + spot_space;
+        data_sz -= spot_space;
+    }
+
+    return true;
 }
 
 page_factory_t::~page_factory_t() noexcept

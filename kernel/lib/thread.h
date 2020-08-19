@@ -165,6 +165,7 @@ struct thread_create_info_t
 
     size_t stack_size;
     thread_priority_t priority;
+    thread_t *ret_tid;
     bool user;
     bool is_float;
     bool suspended;
@@ -183,7 +184,8 @@ extern int spincount_mask;
 extern int use_mwait;
 
 // Implemented in arch
-thread_t thread_create(thread_fn_t fn, void *userdata, char const *name,
+thread_t thread_create(thread_t *ret_tid,
+                       thread_fn_t fn, void *userdata, char const *name,
                        size_t stack_size, bool user, bool is_float,
                        thread_cpu_mask_t const& affinity = thread_cpu_mask_t());
 
@@ -202,7 +204,9 @@ thread_cpu_mask_t const* thread_get_affinity(int id);
 
 size_t thread_get_cpu_count();
 uint32_t thread_cpu_number();
-unsigned thread_cpu_usage_x1k(size_t cpu);
+
+// 100,000,000 == 100% usage
+unsigned thread_cpu_usage_x1M(size_t cpu);
 
 thread_t thread_get_id(void);
 

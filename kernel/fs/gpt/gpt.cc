@@ -81,14 +81,16 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 
     char const *drive_name = (char const *)drive->info(STORAGE_INFO_NAME);
 
-    long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
+    long log2_sector_size = drive->info(STORAGE_INFO_BLOCKSIZE_LOG2);
 
-    if (unlikely(sector_size < 128))
+    // Require at least 128 byte sectors
+    if (unlikely(log2_sector_size < 7))
         return list;
 
+    size_t sector_size = 1UL << log2_sector_size;
+
     // Create sector-sized buffer to look at partition header
-    std::unique_ptr<uint8_t[]> buffer(new (ext::nothrow)
-                                      uint8_t[sector_size]);
+    std::unique_ptr<uint8_t[]> buffer(new (ext::nothrow) uint8_t[sector_size]);
 
     if (unlikely(!buffer))
         panic_oom();
@@ -96,6 +98,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     GPT_TRACE("Reading 1 %lu byte block at LBA 1 from %s\n",
               sector_size, drive_name);
 
+    // Read primary GPT header
     if (unlikely(drive->read_blocks(buffer, 1, 1) < 0))
         return list;
 
@@ -105,18 +108,23 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     if (unlikely(hdr.sig != hdr.sig_expected))
         return list;
 
+    size_t part_tbl_size = hdr.part_ent_sz * hdr.part_ent_count;
+
     gpt_part_tbl_ent_t ptent;
 
     buffer.reset();
-    buffer.reset(new (ext::nothrow) uint8_t[sector_size * hdr.part_ent_count]);
+    buffer.reset(new (ext::nothrow) uint8_t[part_tbl_size]);
 
     if (unlikely(!buffer))
         panic_oom();
 
-    GPT_TRACE("Reading %u %ld byte blocks at LBA %" PRIu64 " from %s\n",
-              hdr.part_ent_count, sector_size, hdr.part_ent_lba, drive_name);
+    size_t part_tbl_sector_count = part_tbl_size >> log2_sector_size;
 
-    if (unlikely(drive->read_blocks(buffer, hdr.part_ent_count,
+    GPT_TRACE("Reading %zu %zd byte blocks at LBA %" PRIu64 " from %s\n",
+              part_tbl_sector_count, sector_size,
+              hdr.part_ent_lba, drive_name);
+
+    if (unlikely(drive->read_blocks(buffer, part_tbl_sector_count,
                                     hdr.part_ent_lba)) < 0)
         return list;
 
@@ -124,7 +132,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
         std::unique_ptr<part_dev_t> part;
 
         // Copy into aligned object
-        memcpy(&ptent, &buffer.get()[i * sector_size], sizeof(ptent));
+        memcpy(&ptent, &buffer.get()[i * hdr.part_ent_sz], sizeof(ptent));
 
         if (ptent.type_guid == efi_part) {
             part.reset(new (ext::nothrow) part_dev_t{});
@@ -135,13 +143,17 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
             GPT_TRACE("Found %" PRIu64 " block partition at LBA"
                       " %" PRIu64 "\n", part->lba_len, part->lba_st);
 
-            if (unlikely(!partitions.push_back(part)))
+            if (unlikely(!partitions.push_back(part))) {
                 panic_oom();
+                continue;
+            }
 
-            if (likely(list.push_back(part.get())))
-                part.release();
-            else
+            if (unlikely(!list.push_back(part.get()))) {
                 panic_oom();
+                continue;
+            }
+
+            part.release();
         }
     }
 

@@ -402,7 +402,7 @@ protected:
 
     using blocking_iocp_t = virtio_virtqueue_t::virtio_blocking_iocp_t;
     using async_iocp_t = virtio_virtqueue_t::virtio_iocp_t;
-    using lock_type = ext::irq_ticketlock;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);

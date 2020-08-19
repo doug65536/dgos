@@ -603,3 +603,34 @@ int sigtimedwait(sigset_t const *restrict, siginfo_t *restrict,
            const struct timespec *restrict);
 int sigwait(sigset_t const *restrict, int *restrict);
 int sigwaitinfo(sigset_t const *restrict, siginfo_t *restrict);
+
+/// Each signal has a current disposition
+/// Term  Terminate process
+/// Ign   Ignore
+/// Core  Dump core
+/// Stop  Stop the process
+/// Cont  Continue the process if it is stopped
+///
+/// By default, uses the normal process stack, another
+/// stack may be used for signal handling by calling
+/// sigaltstack
+///
+/// Signal disposition is a per-process attribute. The disposition
+/// of a signal is the same for all threads
+///
+/// Children created by fork inherit a copy of the parent's
+/// signal dispositions. Processes executed with execve have
+/// their signal dispositions reset to default.
+///
+/// Sending signals
+///
+/// raise  Send a signal to the calling thread
+/// kill   Send a signal to the specified pid or all pids
+/// killpg Send a signal to all processes in a process group
+/// pthread_kill Send a signal to a specific pthread
+/// tgkill Send a system to a specific thread in a specific process
+/// sigqueue Send a realtime signal with data to a specific process
+///
+///
+
+

@@ -1141,6 +1141,9 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
     err = apply_relocs();
 
+    if (unlikely(err != errno_t::OK))
+        return err;
+
     // Lookup __dso_handle
 //    Elf64_Addr sym;
 //    sym = modload_lookup_name(&ht, "__dso_handle_export", true, false);

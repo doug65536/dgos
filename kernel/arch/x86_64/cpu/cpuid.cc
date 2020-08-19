@@ -172,7 +172,10 @@ void cpuid_init()
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
     // Automatically check for support for the leaf
-    if ((eax & 0xF0000000) != 0x40000000 && (eax & 0x7FFFFFFF) != 0) {
+    // Don't cache CPUID_INFO_FEATURES because it has per-cpu value in ebx
+    if ((eax & 0xF0000000) != 0x40000000 &&
+            ((eax & 0x7FFFFFFF) != 0) &&
+            (eax != CPUID_INFO_FEATURES)) {
         // Try to use cached information
         uint32_t i = eax >> 31;
         if (max_leaf[i] != 0) {

@@ -50,5 +50,6 @@ static inline tchar boxchar_solid()
 //void dump_regs(bios_regs_t& regs, bool show_flags = false);
 
 #define PRINT(...) print_line(TSTR __VA_ARGS__)
+#define VPRINT(...) vprint_line(0x7, TSTR __VA_ARGS__)
 
 __END_DECLS

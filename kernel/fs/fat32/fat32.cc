@@ -437,7 +437,7 @@ void fat32_fs_t::dirents_from_name(
 
 char *fat32_fs_t::name_from_lfns(char *pathname, full_lfn_t const *full)
 {
-    uint16_t chunk[(sizeof(full->fragments[0].long_entry.name) +
+    char16_t chunk[(sizeof(full->fragments[0].long_entry.name) +
             sizeof(full->fragments[0].long_entry.name2) +
             sizeof(full->fragments[0].long_entry.name3)) /
             sizeof(uint16_t)];
@@ -460,7 +460,7 @@ char *fat32_fs_t::name_from_lfns(char *pathname, full_lfn_t const *full)
                frag->long_entry.name3,
                sizeof(frag->long_entry.name3));
 
-        uint16_t const *in = chunk;
+        char16_t const *in = chunk;
         while ((in < (chunk + countof(chunk))) &&
                *in && (*in != 0xFFFFU)) {
             int codepoint = utf16_to_ucs4(in, &in);

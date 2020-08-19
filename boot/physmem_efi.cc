@@ -119,6 +119,8 @@ bool get_ram_regions()
 
     free(memdesc_buf);
 
+    physmap_validate(true);
+
     return true;
 }
 
@@ -131,12 +133,40 @@ void take_pages(uint64_t phys_addr, uint64_t size)
 
     assert(size > 0);
 
-    //PRINT("Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
+    PRINT("Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
 
     status = efi_systab->BootServices->AllocatePages(
                 AllocateAddress, EfiLoaderData,
                 size >> 12, &addr);
 
+    switch (status) {
+    case EFI_SUCCESS:
+        break;
+
+    case EFI_OUT_OF_RESOURCES:
+        PANIC("The pages could not be allocated");
+        break;
+    case EFI_INVALID_PARAMETER:
+        PANIC("Invalid parameter");
+        break;
+    case EFI_NOT_FOUND:
+        PANIC("The pages could not be found");
+        break;
+    }
+}
+
+void return_pages(uint64_t phys_addr, uint64_t size)
+{
+    EFI_STATUS status;
+
+    EFI_PHYSICAL_ADDRESS addr = phys_addr;
+
+    assert(size > 0);
+
+    //PRINT("Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
+
+    status = efi_systab->BootServices->FreePages(addr, size >> 12);
+
     if (unlikely(EFI_ERROR(status)))
-        PANIC("Could not take pages, need more memory");
+        PANIC("Could not return pages!");
 }

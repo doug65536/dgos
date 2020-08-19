@@ -4,7 +4,7 @@
 
 extern "C" _noreturn void panic(tchar const *s)
 {
-    debug_out(s, -1);
+    //debug_out(s, -1);
     PRINT("%s", s);
 
     for (;;)

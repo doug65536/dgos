@@ -492,189 +492,25 @@ void mmu_gc_pt(int limit)
 // Align sizes to multiples of page size
 // Sort by base address
 // Fix overlaps
-static size_t mmu_fixup_mem_map(physmem_range_t *list)
+static size_t mmu_fixup_mem_map(physmem_range_t *list, size_t count)
 {
-    int did_something;
     size_t usable_count = 0;
 
-    // Might need multiple passes to fully fixup the list
-    do {
-        did_something = 0;
+    for (size_t i = 0; i < count; ++i) {
+        physmem_range_t const& item = list[i];
 
-//        // Make invalid and zero size entries get removed
-//        for (size_t i = 1; i < phys_mem_map_count; ++i) {
-//            if (list[i].size == 0 || !list[i].valid) {
-//                list[i].base = ~0UL;
-//                list[i].size = ~0UL;
-//            }
-//        }
+        usable_count += (item.type == PHYSMEM_TYPE_NORMAL);
 
-//        // Simple sort algorithm for small list.
-//        // Bubble sort is actually fast for nearly-sorted
-//        // or already-sorted list. The list is probably
-//        // already sorted
-//        for (size_t i = 1; i < phys_mem_map_count; ++i) {
-//            // Slide it back to where it should be
-//            for (size_t j = i; j > 0; --j) {
-//                if (list[j - 1].base < list[j].base)
-//                    break;
+        // Sanity
+        if (i > 0) {
+            physmem_range_t const &prev = list[i-1];
 
-//                mmu_mem_map_swap(list + j - 1, list + j);
-//                did_something = 1;
-//            }
-//        }
-
-//        if (did_something) {
-//            printk("Memory map order fixed up\n");
-//            continue;
-//        }
-
-//        // Discard entries marked for removal from the end
-//        while (phys_mem_map_count > 0 &&
-//               list[phys_mem_map_count-1].base == ~0UL &&
-//               list[phys_mem_map_count-1].size == ~0UL) {
-//            --phys_mem_map_count;
-//            did_something = 1;
-//        }
-
-//        if (did_something) {
-//            printk("Memory map entries were eliminated\n");
-//            continue;
-//        }
-
-//        // Fixup overlaps
-//        for (size_t i = 1; i < phys_mem_map_count; ++i) {
-//            if (list[i-1].base + list[i-1].size > list[i].base) {
-//                // Overlap
-
-//                did_something = 1;
-
-//                // Compute bounds of prev
-//                physaddr_t prev_st = list[i-1].base;
-//                physaddr_t prev_en = prev_st + list[i-1].size;
-
-//                // Compute bounds of this
-//                physaddr_t this_st = list[i].base;
-//                physaddr_t this_en = this_st + list[i].size;
-
-//                // Start at lowest bound, end at highest bound
-//                physaddr_t st = prev_st < this_st ? prev_st : this_st;
-//                physaddr_t en = prev_en > this_en ? prev_en : this_en;
-
-//                if (list[i-1].type == list[i].type) {
-//                    // Both same type,
-//                    // make one cover combined range
-
-//                    printk("Combining overlapping ranges of same type\n");
-
-//                    // Remove previous entry
-//                    list[i-1].base = ~0UL;
-//                    list[i-1].size = ~0UL;
-
-//                    list[i].base = st;
-//                    list[i].size = en - st;
-
-//                    break;
-//                } else if (list[i-1].type == PHYSMEM_TYPE_NORMAL) {
-//                    // This entry takes precedence over prev entry
-
-//                    if (st < this_st && en > this_en) {
-//                        // Punching a hole in the prev entry
-
-//                        printk("Punching hole in memory range\n");
-
-//                        // Reduce size of prev one to not overlap
-//                        list[i-1].size = this_st - prev_st;
-
-//                        // Make new entry with normal memory after this one
-//                        // Sort will put it in the right position later
-//                        list[phys_mem_map_count].base = this_en;
-//                        list[phys_mem_map_count].size = en - this_en;
-//                        list[phys_mem_map_count].type = PHYSMEM_TYPE_NORMAL;
-//                        list[phys_mem_map_count].valid = 1;
-//                        ++phys_mem_map_count;
-
-//                        break;
-//                    } else if (st < this_st && en >= this_en) {
-//                        // Prev entry partially overlaps this entry
-
-//                        printk("Correcting overlap\n");
-
-//                        list[i-1].size = this_st - prev_st;
-//                    }
-//                } else {
-//                    // Prev entry takes precedence over this entry
-
-//                    if (st < this_st && en > this_en) {
-//                        // Prev entry eliminates this entry
-//                        list[i].base = ~0UL;
-//                        list[i].size = ~0UL;
-
-//                        printk("Removing completely overlapped range\n");
-//                    } else if (st < this_st && en >= this_en) {
-//                        // Prev entry partially overlaps this entry
-
-//                        printk("Correcting overlap\n");
-
-//                        list[i].base = prev_en;
-//                        list[i].size = this_en - prev_en;
-//                    }
-//                }
-//            } else if (list[i-1].type == list[i].type &&
-//                       list[i-1].base + list[i-1].size == list[i].base) {
-//                // Merge adjacent ranges of the same type
-//                list[i].size += list[i-1].size;
-//                list[i].base -= list[i-1].size;
-//                list[i-1].base = ~0;
-//                list[i-1].size = ~0;
-
-//                did_something = 1;
-
-//                printk("Merging adjacent range of same type\n");
-//            }
-//        }
-
-//        if (did_something)
-//            continue;
-
-        usable_count = 0;
-
-//        // Fixup page alignment
-        for (size_t i = 0; i < phys_mem_map_count; ++i) {
-            if (list[i].type == PHYSMEM_TYPE_NORMAL) {
-                ++usable_count;
-
-//                physaddr_t st = list[i].base;
-//                physaddr_t en = list[i].base + list[i].size;
-
-//                // Align start to a page boundary
-//                st += PAGE_MASK;
-//                st -= st & PAGE_MASK;
-
-//                // Align end to a page boundary
-//                en -= en & PAGE_MASK;
-
-//                if (st == en || st != list[i].base ||
-//                        en != list[i].base + list[i].size) {
-//                    if (en > st) {
-//                        list[i].base = st;
-//                        list[i].size = en - st;
-//                    } else {
-//                        list[i].base = ~0UL;
-//                        list[i].size = ~0UL;
-//                    }
-//                    did_something = 1;
-//                }
-            }
+            assert_msg(prev.base + prev.size <= item.base, "block overlap");
+            assert_msg(prev.base < item.base, "blocks not in order");
+            assert_msg(prev.type != item.type ||
+                    prev.base + prev.size < item.base, "uncoalesced");
         }
-
-        if (did_something) {
-            printk("Memory map entry was not page aligned\n");
-            continue;
-        }
-    } while (did_something);
-
-    printk("Memory map fixup complete\n");
+    }
 
     return usable_count;
 }
@@ -702,10 +538,10 @@ static physaddr_t init_take_page()
     if (unlikely(!range))
         return 0;
 
-    physaddr_t addr = range->base + range->size - PAGE_SIZE;
-
     // Take a page off the end of the range
     range->size -= PAGE_SIZE;
+
+    physaddr_t addr = range->base + range->size;
 
 #if DEBUG_PHYS_ALLOC
     printdbg("Took early page @ %" PRIx64 "\n", addr);
@@ -1281,24 +1117,27 @@ void mmu_init()
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
            std::min(sizeof(phys_mem_map), sizeof(*phys_mem_map) *
                            kernel_params->phys_mem_table_size));
-    phys_mem_map_count = kernel_params->phys_mem_table_size;
 
-    usable_early_mem_ranges = mmu_fixup_mem_map(phys_mem_map);
+    if (unlikely(kernel_params->phys_mem_table_size > countof(phys_mem_map)))
+        printdbg("Memory map exceeded static sized in-kernel buffer\n");
 
-    if (usable_early_mem_ranges > countof(early_mem_ranges)) {
+    phys_mem_map_count = std::min(kernel_params->phys_mem_table_size,
+                                  countof(phys_mem_map));
+
+    usable_early_mem_ranges = mmu_fixup_mem_map(
+                phys_mem_map, phys_mem_map_count);
+
+    if (unlikely(usable_early_mem_ranges > countof(early_mem_ranges))) {
         printdbg("Physical memory is incredibly fragmented!\n");
         usable_early_mem_ranges = countof(early_mem_ranges);
     }
 
     for (physmem_range_t *ranges_in = phys_mem_map,
          *ranges_out = early_mem_ranges;
-         ranges_in < phys_mem_map + phys_mem_map_count; ++ranges_in) {
+         ranges_out < early_mem_ranges + usable_early_mem_ranges;
+         ++ranges_in) {
         if (ranges_in->type == PHYSMEM_TYPE_NORMAL)
             *ranges_out++ = *ranges_in;
-
-        // Cap
-        if (ranges_out >= early_mem_ranges + usable_early_mem_ranges)
-            break;
     }
 
     size_t usable_pages = 0;
@@ -1324,6 +1163,7 @@ void mmu_init()
 
     // Compute number of slots needed
     highest_usable >>= PAGE_SIZE_BIT;
+
     printdbg("Usable pages = %" PRIu64 " (%" PRIu64 "MB)"
              " range_pages=%" PRId64 "\n",
              usable_pages, usable_pages >> (20 - PAGE_SIZE_BIT),
@@ -1417,7 +1257,8 @@ void mmu_init()
     uintptr_t free_count = 0;
 
     while (usable_early_mem_ranges) {
-        physmem_range_t range = early_mem_ranges[usable_early_mem_ranges-1];
+        physmem_range_t const& range =
+                early_mem_ranges[usable_early_mem_ranges-1];
 
         if (range.base >= 0x100000 && range.size > 0) {
             printdbg("...Adding base=%#zx, size=%#zx\n",
@@ -2571,7 +2412,11 @@ EXPORT int madvise(void *addr, size_t len, int advice)
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
+    bool any_invalidate = false;
+
     while (pt[3] < end && pte_list_present(pt)) {
+        bool need_invalidate = false;
+
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
             if (order_bits == pte_t(-1)) {
@@ -2579,11 +2424,16 @@ EXPORT int madvise(void *addr, size_t len, int advice)
                 physaddr_t page = 0;
                 if (pte_is_sysmem(expect)) {
                     page = expect & PTE_ADDR;
+
                     // Replace with demand paged entry
                     replace = (expect | PTE_ADDR) & ~PTE_PRESENT;
 
-                    if (unlikely(!atomic_cmpxchg_upd(pt[3], &expect, replace)))
+                    if (unlikely(!atomic_cmpxchg_upd(
+                                     pt[3], &expect, replace))) {
                         continue;
+                    }
+
+                    need_invalidate = (bool)(expect & PTE_ACCESSED);
 
                     free_batch.free(page);
                 }
@@ -2668,18 +2518,30 @@ EXPORT int madvise(void *addr, size_t len, int advice)
                 replace = (expect & ~(PTE_PTEPAT | PTE_PCD | PTE_PWT)) |
                         order_bits;
 
-                if (likely(atomic_cmpxchg_upd(pt[3], &expect, replace)))
+                if (likely(atomic_cmpxchg_upd(pt[3], &expect, replace))) {
+                    need_invalidate = (bool)(expect & PTE_ACCESSED);
+
                     break;
+                }
             }
         }
 
-        cpu_page_invalidate((uintptr_t)addr);
+        if (need_invalidate) {
+            any_invalidate = true;
+            cpu_page_invalidate((uintptr_t)addr);
+        } else {
+            printdbg("Skipped an invlpg!\n");
+        }
+
         addr = (char*)addr + PAGE_SIZE;
 
         ptes_step(pt);
     }
 
-    mmu_send_tlb_shootdown();
+    if (any_invalidate)
+        mmu_send_tlb_shootdown();
+    else
+        printdbg("Skipped a TLB shootdown!\n");
 
     return 0;
 }

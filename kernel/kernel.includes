@@ -21,3 +21,4 @@ device
 unittest
 ../user
 ../emu/qemu
+../user/libutf

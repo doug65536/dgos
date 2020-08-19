@@ -1280,6 +1280,9 @@ long ide_dev_t::info(storage_dev_info_t key)
     case STORAGE_INFO_BLOCKSIZE:
         return !is_atapi ? 512 : 2048;
 
+    case STORAGE_INFO_BLOCKSIZE_LOG2:
+        return !is_atapi ? 9 : 11;
+
     case STORAGE_INFO_HAVE_TRIM:
         return 0;
 

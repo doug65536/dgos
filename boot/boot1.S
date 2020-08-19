@@ -65,12 +65,12 @@ bootstrap_code:
     movw %ax,%ds
     movw %ax,%es
 
-    // Entire 64KB from 0x10000 thru 0x1FFFF is the stack
+    // Entire 64KB from 0x20000 thru 0x2FFFF is the stack
     // (1st push will wrap it around to 0x1000:0xFFFE (0x1FFFE))
     // Tolerate the most stack hungry firmware
     // Be careful! Use of bp in a memory address calculation causes
     // the cpu to default to ss segment instead of ds
-    movw $ 0x1000,%ax
+    movw $ 0x2000,%ax
     mov %ax,%ss
     xor %sp,%sp
 

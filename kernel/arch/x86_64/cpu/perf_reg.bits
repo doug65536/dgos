@@ -1,7 +1,7 @@
 -- CPU_MSR_PERFEVTSEL
 
-41:40 HG_ONLY Host/Guest only mask
-35:32 EVT_SEL_HI_4 Event select bits 11:8
+41:40 HG_ONLY Host/Guest only mask (AMD)
+35:32 EVT_SEL_HI_4 Event select bits 11:8 (AMD)
 31:24 CNT_MASK Counter mask
 23 INV Invert
 22 EN Enable

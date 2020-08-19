@@ -46,6 +46,7 @@ enum tui_menu_item_index_t {
     mps_enable,
     msi_enable,
     msix_enable,
+    command_line
 };
 
 static tui_menu_item_t tui_menu[] = {
@@ -60,7 +61,8 @@ static tui_menu_item_t tui_menu[] = {
     { TSTR "ACPI", tui_dis_ena, 1 },
     { TSTR "MPS", tui_dis_ena, 1 },
     { TSTR "MSI", tui_dis_ena, 1 },
-    { TSTR "MSI-X", tui_dis_ena, 1 }
+    { TSTR "MSI-X", tui_dis_ena, 1 },
+    { TSTR "command line", 511 }
 };
 
 template<typename T>
@@ -126,7 +128,7 @@ void boot_menu_show(kernel_params_t &params)
 {
     tui_list_t<tui_menu_item_t> boot_menu_items(tui_menu);
 
-    tui_menu_renderer_t boot_menu(&boot_menu_items);
+    tui_menu_renderer_t boot_menu(boot_menu_items);
 
     vbe_mode_list_t const& vbe_modes =
             vbe_enumerate_modes();
@@ -152,7 +154,10 @@ void boot_menu_show(kernel_params_t &params)
     //
     // allocate enough for that "mode" times
 
-    tchar *mode_text_buf = new (ext::nothrow) tchar[vbe_modes.count * 64]();
+    tchar *mode_text_buf = new (ext::nothrow) tchar[vbe_modes.count * 64];
+
+    if (unlikely(!mode_text_buf))
+        PANIC_OOM();
 
     for (size_t i = 0; i < vbe_modes.count; ++i) {
         tchar *res = mode_text_buf + i * 64;
@@ -215,7 +220,7 @@ void boot_menu_show(kernel_params_t &params)
 
     tui_list_t<tui_str_t> mode_list;
     mode_list.count = vbe_modes.count;
-    mode_list.items = new (ext::nothrow) tui_str_t[vbe_modes.count]();
+    mode_list.items = new (ext::nothrow) tui_str_t[vbe_modes.count];
 
     for (size_t i = 0; i < vbe_modes.count; ++i) {
         auto str = mode_text_buf + i * 64;
@@ -246,4 +251,6 @@ void boot_menu_show(kernel_params_t &params)
     params.msi_enable = tui_menu[msi_enable].index;
     params.msix_enable = tui_menu[msix_enable].index;
     params.e9_enable = tui_menu[e9_enable].index;
+    params.command_line = utf8_from_tchar(
+                tui_menu[command_line].text);
 }

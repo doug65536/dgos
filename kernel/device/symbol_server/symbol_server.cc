@@ -128,7 +128,7 @@ class symbol_server_t {
             self->port->write(buf, size_t(sz));
     }
 
-    static void perf_top_callback(void *arg, int percent, int millipercent,
+    static void perf_top_callback(void *arg, int percent, int micropercent,
                                   char const *name)
     {
         symbol_server_t *self = (symbol_server_t*)arg;
@@ -158,56 +158,133 @@ class symbol_server_t {
         char buf[128];
         int sz = snprintf(buf, sizeof(buf),
                           "\x1b" "[%zu;1H"
-                          "\x1b" "[K"
-                          "%3d.%02d%% %.96s\n",
+                          "\x1b" "[0K"
+                          "%3d.%06d%% %.96s\n",
                           top_rows,
-                          percent, millipercent / 10, name);
+                          percent, micropercent, name);
         if (sz > 0)
             self->port->write(buf, size_t(sz));
     }
+
+    void clear_to_eol()
+    {
+        port->wrstr("\x1b" "[0K");
+    }
+
+    static ext::string leading_zeros(ext::string const& digits, size_t length)
+    {
+        assert(length >= digits.length());
+        return ext::string(length - digits.length(), '0');
+    }
+
+#define YELLOW_STR(str) "\x1b" "[33m" str "\x1b" "[0m"
 
     void modal_top(uint64_t total_samples, char command)
     {
         port->write(ext::string(16, '\n'));
 
+        uint64_t last_samples;
+        uint64_t delta_samples;
+
+        int auto_divisor = 1;
+
         for (bool done = false ; !done;) {
             // up 16 lines
             port->wrstr("\x1b" "[16A");
 
+            last_samples = total_samples;
+
             top_rows = 0;
             total_samples = perf_gather_samples(perf_top_callback, this);
 
-            while (top_rows < 16) {
+            if (perf_get_zeroing())
+                delta_samples = total_samples;
+            else
+                delta_samples = total_samples - last_samples;
+
+            while (top_rows <= 16) {
                 port->wrstr("\x1b" "[");
                 port->write(ext::to_string(top_rows++));
-                port->wrstr(";1H"
-                            "\x1b" "[K");
+                port->wrstr(";1H");
+                clear_to_eol();
             }
 
-            port->wrstr("\r" "\x1b" "[K");
+            port->wrstr("\r\n");
+
+            port->wrstr("\r" "\x1b" "[2K");
             port->write(ext::to_string(total_samples));
-            port->wrstr(" samples\r\n");
+            port->wrstr(" samples (+");
+            port->write(ext::to_string(delta_samples));
+            port->wrstr(")");
+
+            port->wrstr("\r\n");
+
+            port->wrstr("  (" YELLOW_STR(",.-+/*") ") divisor: ");
+            port->write(ext::to_string(perf_adj_divisor(0)));
+
+            port->wrstr("  (" YELLOW_STR("aA") ") auto divisor: ");
+            port->write(ext::to_string(auto_divisor));
+
+            port->wrstr("  (" YELLOW_STR("zZ") ") zeroing: ");
+            port->write(ext::to_string(perf_get_zeroing()));
+
+            clear_to_eol();
+
+            port->wrstr("\r\n");
+
+            port->wrstr("  (" YELLOW_STR("x") ") complex event: ");
+            port->write(ext::to_hex((perf_get_all())));
+
+            port->wrstr("  (" YELLOW_STR("e") ") event: ");
+            port->write(ext::to_hex(perf_get_event()));
+
+            clear_to_eol();
+
+            port->wrstr("\r\n");
+
+            port->wrstr("  (" YELLOW_STR("m") ") unit_mask: ");
+            port->write(ext::to_hex(perf_get_unit_mask()));
+
+            port->wrstr("  (" YELLOW_STR("c") ") count_mask: ");
+            port->write(ext::to_hex(perf_get_count_mask()));
+
+            port->wrstr("  (" YELLOW_STR("i") ") invert: ");
+            port->write(ext::to_hex(perf_get_invert()));
+
+            port->wrstr("  (" YELLOW_STR("e") ") edge: ");
+            port->write(ext::to_hex(perf_get_edge()));
+
+            port->wrstr("\r\n");
 
             size_t cpu_count;
             cpu_count = thread_get_cpu_count();
-            unsigned usage_1k_total = 0;
+            unsigned usage_x1M_total = 0;
+            unsigned cpus_active = 0;
             for (size_t cpu_nr = 0; cpu_nr < cpu_count; ++cpu_nr) {
-                unsigned usage_1k = thread_cpu_usage_x1k(cpu_nr);
-                usage_1k_total += usage_1k;
+                unsigned usage_1M = 100000000 - thread_cpu_usage_x1M(cpu_nr);
+                usage_x1M_total += usage_1M;
+                cpus_active += (usage_1M != 0);
             }
-            usage_1k_total /= cpu_count;
-            port->wrstr("\x1b" "[K");
+            //usage_1k_total /= cpu_count;
+            // Erase to EOL
+            clear_to_eol();
             port->wrstr("CPU usage: ");
 
-            unsigned usage_fixed = usage_1k_total / 1000;
-            unsigned usage_frac = usage_1k_total % 1000;
+            unsigned usage_fixed = usage_x1M_total / 1000000;
+            unsigned usage_frac = usage_x1M_total % 1000000;
 
             ext::string fixed = ext::to_string(usage_fixed);
             ext::string frac = ext::to_string(usage_frac);
             port->write(std::move(fixed));
             port->wrstr(".");
+            port->write(leading_zeros(frac, 6));
             port->write(std::move(frac));
-            port->wrstr("%\r\n");
+            port->wrstr("% (");
+            port->write(ext::to_string(cpus_active));
+            port->wrstr(" CPUs active)\r\n");
+
+            // Clear to end of display
+            port->wrstr("\x1b" "[0J");
 
             char input = 0;
             uart_dev_t::clock::time_point now =
@@ -215,13 +292,82 @@ class symbol_server_t {
             uart_dev_t::clock::time_point timeout =
                     now + std::chrono::seconds(1);
 
+            if (auto_divisor) {
+                if (delta_samples <= 1000)
+                    perf_set_divisor(std::max(UINT64_C(1),
+                                              perf_adj_divisor(0) / 4));
+                else if (delta_samples <= 2000)
+                    perf_set_divisor(std::max(UINT64_C(1),
+                                              perf_adj_divisor(0) / 2));
+                else if (delta_samples >= 32000)
+                    perf_set_divisor(std::max(UINT64_C(1),
+                                              perf_adj_divisor(0) * 8));
+                else if (delta_samples >= 16000)
+                    perf_set_divisor(std::max(UINT64_C(1),
+                                              perf_adj_divisor(0) * 4));
+                else if (delta_samples >= 8000)
+                    perf_set_divisor(std::max(UINT64_C(1),
+                                              perf_adj_divisor(0) * 2));
+            }
+
             ssize_t read_sz = port->read(&input, 1, 1, timeout);
 
             if (read_sz == 1) {
                 switch (input) {
                 case 'q':
                     done = true;
-                    port->wrstr("\r\x1b" "[K" "(symsrv) ");
+                    port->wrstr("\r");
+                    clear_to_eol();
+                    port->wrstr("(symsrv) ");
+                    break;
+
+                case 'a':
+                    auto_divisor = 1;
+                    break;
+
+                case 'A':
+                    auto_divisor = 0;
+                    break;
+
+                case '+':
+                    perf_adj_divisor(1000);
+                    break;
+
+                case '-':
+                    perf_adj_divisor(-1000);
+                    break;
+
+                case '.':
+                    perf_adj_divisor(1);
+                    break;
+
+                case ',':
+                    perf_adj_divisor(-1);
+                    break;
+
+                case '*':
+                    perf_set_divisor(perf_adj_divisor(0) * 2);
+                    break;
+
+                case '/':
+                    perf_set_divisor(perf_adj_divisor(0) / 2);
+                    break;
+
+                case 'd':
+                case 'e':
+                case 'm':
+                case 'c':
+                case 'x':
+                    prompt_change_event(input);
+                    break;
+
+
+                case 'z':
+                    enable_zeroing();
+                    break;
+
+                case 'Z':
+                    disable_zeroing();
                     break;
 
                 case '\x1b':
@@ -241,6 +387,107 @@ class symbol_server_t {
                 }
             }
         }
+    }
+
+    void prompt_change_event(char kind)
+    {
+        uint64_t value;
+        char event_char;
+        value = 0;
+        event_char = 0;
+
+        port->wrstr("enter event ");
+
+        port->write(kind == 'e'
+                    ? ""
+                    : kind == 'm'
+                    ? " unit mask"
+                    : kind == 'c'
+                    ? " count mask"
+                    : kind == 'd'
+                    ? " divisor"
+                    : kind == 'x'
+                    ? " Event[]"
+                    : "???");
+
+        port->wrstr("(hex digits): ");
+
+        int cursor_pos = 0;
+
+        for (;;) {
+            port->read(&event_char, 1);
+
+            if (event_char >= '0' && event_char <= '9') {
+                value <<= 4;
+                value |= event_char - '0';
+                port->write(event_char);
+                ++cursor_pos;
+            } else if (event_char >= 'A' && event_char <= 'F') {
+                value <<= 4;
+                value |= 10 + event_char - 'A';
+                port->write(event_char);
+                ++cursor_pos;
+            } else if (event_char >= 'a' && event_char <= 'f') {
+                value <<= 4;
+                value |= 10 + event_char - 'a';
+                port->write(event_char);
+                ++cursor_pos;
+            } else if (cursor_pos &&
+                       (event_char == '\b' ||
+                       event_char == 0x7f)) {
+                value >>= 4;
+                port->wrstr("\b \b");
+                --cursor_pos;
+            } else if (event_char == '\r' || event_char == '\n') {
+                break;
+            } else {
+                printdbg("Broke out of hex number editor because %x\n",
+                         (uint8_t)event_char);
+                value = -1;
+                break;
+            }
+        }
+
+        if (value != size_t(-1)) {
+            switch (kind) {
+            case 'd':
+                perf_set_divisor(value);
+                break;
+
+            case 'e':
+                perf_set_event(value);
+                break;
+
+            case 'm':
+                perf_set_event_mask(uint32_t(value));
+                break;
+
+            case 'c':
+                perf_set_count_mask(uint32_t(value));
+                break;
+
+            case 'x':
+                perf_set_all(value);
+                break;
+
+            }
+
+            port->write("\r\nSet to ");
+            port->write(ext::to_hex(value));
+            port->write("\r\n");
+        }
+    }
+
+    void enable_zeroing()
+    {
+        perf_set_zeroing(true);
+        port->write("\r\nZeroing enabled\r\n");
+    }
+
+    void disable_zeroing()
+    {
+        perf_set_zeroing(false);
+        port->write("\r\nZeroing disabled\r\n");
     }
 
     int worker()
@@ -290,7 +537,7 @@ class symbol_server_t {
 
                 break;
 
-            case 'm':
+            case 'l':
 
                 size_t kernel_sz;
                 kernel_sz = kernel_get_size();
@@ -329,27 +576,28 @@ class symbol_server_t {
                 port->wrstr(" samples\n");
                 break;
 
+            case 'd':
+                prompt_change_event('d');
+                break;
+
             case 'e':
-                size_t event;
-                char event_char;
-                event = 0;
-                event_char = 0;
-                for (;;) {
-                    port->read(&event_char, 1);
-                    if (event_char >= '0' && event_char <= '9') {
-                        event <<= 4;
-                        event |= event_char - '0';
-                    } else if (event_char >= 'A' && event_char <= 'F') {
-                        event <<= 4;
-                        event |= 10 + event_char - 'A';
-                    } else if (event_char >= 'a' && event_char <= 'f') {
-                        event <<= 4;
-                        event |= 10 + event_char - 'a';
-                    } else {
-                        break;
-                    }
-                }
-                perf_set_event(event >> 8, event & 0xF);
+                prompt_change_event('e');
+                break;
+
+            case 'm':
+                prompt_change_event('m');
+                break;
+
+            case 'c':
+                prompt_change_event('c');
+                break;
+
+            case 'z':
+                enable_zeroing();
+                break;
+
+            case 'Z':
+                disable_zeroing();
                 break;
 
             case 't':
@@ -364,12 +612,11 @@ class symbol_server_t {
 public:
     symbol_server_t()
     {
-        //perf_init();
-
         port = uart_dev_t::open(uart_dev_t::com[3], 5,
                 115200, 8, 'N', 1, false);
 
-        tid = thread_create(&symbol_server_t::thread_entry, this,
+        tid = thread_create(nullptr,
+                            &symbol_server_t::thread_entry, this,
                             "symbol_server", 0, false, false);
     }
 

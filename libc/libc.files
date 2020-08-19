@@ -97,6 +97,8 @@ src/stdlib/calloc.cc
 src/stdlib/free.cc
 src/stdlib/malloc.cc
 src/stdlib/realloc.cc
+src/stdlib/malloc_arena.cc
+src/stdlib/malloc_arena.h
 src/stdlib/new.cc
 src/string/__bytebitmap.cc
 src/string/__bytebitmap.h

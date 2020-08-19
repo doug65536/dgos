@@ -29,7 +29,7 @@ C_ASSERT(SYSCALL_RFLAGS == (CPU_EFLAGS_IF | 2));
 // will be cleared anyway on sysret
 C_ASSERT((SYSCALL_RFLAGS & ~uintptr_t(0x3C7FD7)) == 0);
 
-intr_handler_t isr_lookup[256];
+irq_dispatcher_handler_t isr_lookup[256];
 
 idt_entry_64_t idt[256];
 

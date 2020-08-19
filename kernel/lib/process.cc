@@ -104,6 +104,8 @@ int process_t::spawn(pid_t * pid_result,
 
     process_t *process = process_t::add();
 
+    processes_scoped_lock lock(process->process_lock);
+
     process->path = std::move(path);
     process->argv = std::move(argv);
     process->env = std::move(env);
@@ -111,18 +113,15 @@ int process_t::spawn(pid_t * pid_result,
     // Return the assigned PID
     *pid_result = process->pid;
 
-    thread_t tid = thread_create(&process_t::run, process,
-                                 "user-process", 0,
-                                 true, true);
-
-    if (unlikely(tid < 0))
+    if (unlikely(!process->add_thread(-1, lock)))
         return -int(errno_t::ENOMEM);
 
-    if (unlikely(!process->add_thread(tid)))
-        return -int(errno_t::ENOMEM);
+    if (unlikely(thread_create(&process->threads.back(),
+                               &process_t::run, process,
+                               "user-process", 0, true, true) < 0))
+        return -int(errno_t::EAGAIN);
 
     // Wait for it to finish starting
-    processes_scoped_lock lock(process->process_lock);
     while (process->state == process_t::state_t::starting)
         process->cond.wait(lock);
 
@@ -207,16 +206,14 @@ int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
     scoped_lock lock(processes_lock);
 
     // Add a new jmpbuf for thread exit
-    if (unlikely(!exit_jmpbufs.push_back(
-                     new (ext::nothrow) __exception_jmp_buf_t())))
-        panic_oom();
+    std::unique_ptr<__exception_jmp_buf_t> new_jmpbuf(
+            new (ext::nothrow) __exception_jmp_buf_t());
 
-    // Check for oom
-    if (unlikely(exit_jmpbufs.back() == nullptr)) {
-        exit_jmpbufs.pop_back();
-        panic_oom();
+    if (unlikely(!new_jmpbuf))
         return -1;
-    }
+
+    if (unlikely(!exit_jmpbufs.push_back(new_jmpbuf.get())))
+        return -1;
 
     if (unlikely(!threads.push_back(-1))) {
         exit_jmpbufs.pop_back();
@@ -224,13 +221,47 @@ int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
         return -1;
     }
 
-    thread_t tid = thread_create(
-                &process_t::start_clone_thunk, kernel_thread_arg,
-                "user_thread", 0, true, true);
+    // Safely stored, keep it
+    new_jmpbuf.release();
 
-    threads.back() = tid;
+    if (thread_create(&threads.back(),
+                      &process_t::start_clone_thunk, kernel_thread_arg,
+                      "user_thread", 0, true, true) < 0)
+        return -1;
 
-    return tid;
+    return threads.back();
+}
+
+int process_t::kill(int pid, int sig)
+{
+    if (unlikely(pid < 0))
+        return -int(errno_t::ESRCH);
+
+    if (pid >= processes.size())
+        return -int(errno_t::ESRCH);
+
+    if (unlikely(sig < 0))
+        return -int(errno_t::EINVAL);
+
+    if (unlikely(sig >= 32))
+        return -int(errno_t::EINVAL);
+
+    process_t *p = processes[pid].p;
+
+    if (unlikely(!p))
+        return -int(errno_t::ESRCH);
+
+    return p->send_signal(sig);
+}
+
+int process_t::send_signal(int sig)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int process_t::send_signal_to_self(int sig)
+{
+    return -int(errno_t::ENOSYS);
 }
 
 // Hack to reuse module loader symbol auto-load hook for processes too
@@ -804,9 +835,8 @@ void process_t::exit_thread(thread_t tid, int exitcode)
     panic("Thread %d not found in exit_thread!", tid);
 }
 
-bool process_t::add_thread(thread_t tid)
+bool process_t::add_thread(thread_t tid, scoped_lock &lock)
 {
-    scoped_lock lock(process_lock);
     return threads.push_back(tid);
 }
 

@@ -38,21 +38,21 @@ typedef int64_t off_t;
 #define _use_result             __attribute__((__warn_unused_result__))
 #define _leaf                   __attribute__((__leaf__))
 #define _aligned(n)             __attribute__((__aligned__(n)))
-#define _always_inline         inline __attribute__((__always_inline__))
-#define _noreturn              __attribute__((__noreturn__))
-#define _used                  __attribute__((__used__))
-#define _returns_twice         __attribute__((__returns_twice__))
-#define _vector_size(n)        __attribute__((__vector_size__(n)))
-#define _noinline              __attribute__((__noinline__))
-#define _flatten               __attribute__((__flatten__))
-#define _assume_aligned(n)     __attribute__((__assume_aligned__(n)))
-#define _printf_format(m,n)    __attribute__((__format__(__printf__, m, n)))
+#define _always_inline          inline __attribute__((__always_inline__))
+#define _noreturn               __attribute__((__noreturn__))
+#define _used                   __attribute__((__used__))
+#define _returns_twice          __attribute__((__returns_twice__))
+#define _vector_size(n)         __attribute__((__vector_size__(n)))
+#define _noinline               __attribute__((__noinline__))
+#define _flatten                __attribute__((__flatten__))
+#define _assume_aligned(n)      __attribute__((__assume_aligned__(n)))
+#define _printf_format(m,n)     __attribute__((__format__(__printf__, m, n)))
 
-#define _constructor(prio)     __attribute__((__constructor__(prio)))
-#define _destructor(prio)      __attribute__((__destructor__(prio)))
+#define _constructor(prio)      __attribute__((__constructor__(prio)))
+#define _destructor(prio)       __attribute__((__destructor__(prio)))
 
-#define _section(name)         __attribute__((__section__(name)))
-
+#define _section(name)          __attribute__((__section__(name)))
+#define _hot                    __attribute__((__hot__))
 #define _assume(expr) \
     do { \
         if (!(expr)) \

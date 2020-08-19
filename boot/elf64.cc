@@ -197,9 +197,6 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     //
     // Build physical memory table
 
-    size_t phys_mem_table_size = 0;
-    void *phys_mem_table = physmap_get(&phys_mem_table_size);
-
     uint64_t top_addr = physmap_top_addr();
 
     assert(top_addr != 0);
@@ -219,6 +216,10 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     paging_map_physical(0, physmap_addr, top_addr,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
+    // Identity map the real mode bootloader stack area for long mode entry
+    paging_map_physical(0x20000, 0x20000, 0x10000,
+                        PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
+
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
     paging_map_physical(0, (base - PAGE_SIZE) + base_adj,
@@ -231,6 +232,9 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     paging_map_physical(uint64_t(heap_st), uint64_t(heap_st),
                         uint64_t(heap_en) - uint64_t(heap_st),
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
+
+    size_t phys_mem_table_size = 0;
+    void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
     kernel_params_t *params = prompt_kernel_param(
                 phys_mem_table, ap_entry_ptr, phys_mem_table_size);
@@ -339,6 +343,80 @@ void load_initrd(int initrd_fd, off_t initrd_filesize, elf64_context_t *ctx)
     }
 }
 
+static void reloc_kernel(uint64_t distance,
+                         Elf64_Rela const *elf_rela, size_t relcnt)
+{
+    while (relcnt--) {
+        uint64_t offset = elf_rela->r_offset;
+        uint64_t addend = elf_rela->r_addend;
+        ++elf_rela;
+        uint64_t value = distance + addend;
+        uint64_t spot = offset + distance;
+
+        // Map virtual address to physical address
+        paging_access_virtual_memory(spot, &value, sizeof(value), 0);
+    }
+}
+
+void apply_relocations(int file, Elf64_Ehdr const &file_hdr, Elf64_Shdr *shdrs)
+{
+    message_bar_draw(10, 7, 70, TSTR "Applying relocations");
+
+    for (size_t i = 0; i < file_hdr.e_shnum; ++i) {
+        // If no adjustment, don't bother
+        if (!base_adj)
+            break;
+
+        if (shdrs[i].sh_type != SHT_RELA)
+            continue;
+
+        // 512 entries is 12KB of stack
+        constexpr size_t rela_buf_cnt = 12288 / sizeof(Elf64_Rela);
+        Elf64_Rela rela_buf[rela_buf_cnt];
+
+        size_t relcnt = shdrs[i].sh_size / sizeof(*rela_buf);
+
+        // Read up to 16KB at a time each loop and apply each chunk
+        for (size_t rel_done = 0; rel_done < relcnt; ) {
+            size_t read_cnt = relcnt - rel_done;
+
+            if (read_cnt > rela_buf_cnt)
+                read_cnt = rela_buf_cnt;
+
+            if (unlikely(ssize_t(sizeof(*rela_buf) * read_cnt) != boot_pread(
+                             file, rela_buf,
+                             sizeof(*rela_buf) * read_cnt,
+                             shdrs[i].sh_offset +
+                             sizeof(*rela_buf) * rel_done)))
+                PANIC("Could not read relocation section");
+
+            rel_done += read_cnt;
+
+            // Apply the relocations to memory
+            reloc_kernel(base_adj, rela_buf, read_cnt);
+        }
+    }
+}
+
+void validate_executable(Elf64_Ehdr file_hdr)
+{
+    if (unlikely(file_hdr.e_ehsize != sizeof(Elf64_Ehdr)))
+        PANIC("Executable has unexpected elf header size");
+
+    if (unlikely(memcmp(&file_hdr.e_ident[EI_MAG0],
+                        elf_magic, sizeof(elf_magic))))
+        PANIC("Executable has incorrect magic number");
+
+    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr)))
+        PANIC("Executable has unexpected program header size");
+
+    if (unlikely(file_hdr.e_shentsize != sizeof(Elf64_Shdr)))
+        PANIC("Executable has unexpected section header size");
+
+    if (unlikely(file_hdr.e_machine != EM_AMD64))
+        PANIC("Executable is for an unexpected machine id");
+}
+
 void elf64_run(tchar const *filename)
 {
     cpu_init();
@@ -354,9 +432,15 @@ void elf64_run(tchar const *filename)
     message_bar_draw(10, 7, 70, TSTR "Getting initrd size");
 
     int initrd_fd = boot_open(TSTR "boot/initrd");
+
     if (unlikely(initrd_fd < 0))
         PANIC("Unable to open initrd");
+
     initrd_size = boot_filesize(initrd_fd);
+
+    if (initrd_size < 0)
+        PANIC("Unable to determine initrd size");
+
     boot_close(initrd_fd);
     initrd_fd = -1;
 
@@ -378,21 +462,7 @@ void elf64_run(tchar const *filename)
     //
     // Check magic number and other excuses not to work
 
-    if (unlikely(file_hdr.e_ehsize != sizeof(Elf64_Ehdr)))
-        PANIC("Executable has unexpected elf header size");
-
-    if (unlikely(memcmp(&file_hdr.e_ident[EI_MAG0],
-                        elf_magic, sizeof(elf_magic))))
-        PANIC("Executable has incorrect magic number");
-
-    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr)))
-        PANIC("Executable has unexpected program header size");
-
-    if (unlikely(file_hdr.e_shentsize != sizeof(Elf64_Shdr)))
-        PANIC("Executable has unexpected section header size");
-
-    if (unlikely(file_hdr.e_machine != EM_AMD64))
-        PANIC("Executable is for an unexpected machine id");
+    validate_executable(file_hdr);
 
     // Load program headers
     Elf64_Phdr *program_hdrs;
@@ -426,19 +496,24 @@ void elf64_run(tchar const *filename)
           (ctx->total_mem_bytes & ~-(1 << 10)) ? "~" : "",
           ctx->total_mem_bytes >> 10);
 
-    // Load relocations
+    // Allocate memory for section headers
     ssize_t shbytes = file_hdr.e_shentsize * file_hdr.e_shnum;
+
     Elf64_Shdr *shdrs = (Elf64_Shdr*)malloc(shbytes);
 
     if (unlikely(!shdrs))
         PANIC("Insufficient memory for section headers");
 
+    // Read section headers
+
     if (unlikely(shbytes != boot_pread(
                      file, shdrs, shbytes, file_hdr.e_shoff)))
         PANIC("Could not read section headers\n");
 
-    // OOM if relocated!
-    uint64_t new_base = 0xFFFFFFFF80000000; // - 0x000000ff80000000;
+    // FIXME: OOM if relocated! relocations are too much now for heap
+    // Fix applied, not tested
+    uint64_t new_base = 0xFFFFFFFF80000000;
+    //uint64_t new_base = 0xFFFFFF0000000000;
     base_adj = new_base - 0xFFFFFFFF80000000;
 
     message_bar_draw(10, 7, 70, TSTR "Loading kernel");
@@ -483,31 +558,7 @@ void elf64_run(tchar const *filename)
         progress(blk->p_filesz, blk->p_memsz, ctx);
     }
 
-    message_bar_draw(10, 7, 70, TSTR "Applying relocations");
-
-    for (size_t i = 0; i < file_hdr.e_shnum; ++i) {
-        // If no adjustment, don't bother
-        if (!base_adj)
-            break;
-
-        if (shdrs[i].sh_type == SHT_RELA) {
-            Elf64_Rela *rela = (Elf64_Rela*)malloc(shdrs[i].sh_size);
-
-            if (unlikely(!rela))
-                PANIC("Insufficient memory for relocation section");
-
-            size_t relcnt = shdrs[i].sh_size / sizeof(*rela);
-
-            if (unlikely(ssize_t(shdrs[i].sh_size) != boot_pread(
-                             file, rela,
-                             shdrs[i].sh_size, shdrs[i].sh_offset)))
-                PANIC("Could not read relocation section");
-
-            reloc_kernel(base_adj, rela, relcnt);
-
-            free(rela);
-        }
-    }
+    apply_relocations(file, file_hdr, shdrs);
 
     boot_close(file);
 

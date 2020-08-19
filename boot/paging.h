@@ -74,7 +74,8 @@ struct phys_alloc_t {
 
 class page_factory_t {
 public:
-    virtual phys_alloc_t alloc(size64_t size) noexcept = 0;
+    virtual phys_alloc_t alloc(size64_t size,
+                               uint64_t for_addr = 0) noexcept = 0;
 
 protected:
     virtual ~page_factory_t() noexcept = 0;
@@ -101,6 +102,9 @@ void paging_modify_flags(addr64_t addr, size64_t size,
                          pte_t clear, pte_t set);
 
 uint64_t paging_physaddr_of(uint64_t linear_addr);
+
+bool paging_access_virtual_memory(uint64_t vaddr, void *data,
+                                  size_t data_sz, int is_read);
 
 struct iovec_t {
     uint64_t base;

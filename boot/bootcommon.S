@@ -6,12 +6,13 @@
 // Return address in bx
 .global early_init
 early_init:
-    mov initial_stack_ptr+2,%ss
-    mov initial_stack_ptr,%sp
-
-    call clear_bss
+    mov $ .Ldone_init_stack,%si
+    jmp init_stack
+.Ldone_init_stack:
 
     call detect_ancient_cpu
+
+    call clear_bss
 
     // It is at least a 486 with CPUID instruction if it made it to here
     // without freezing with unsupported CPU message
@@ -21,9 +22,26 @@ early_init:
     movzwl %sp,%esp
     jmpw *%bx
 
+.global init_stack
+init_stack:
+    // Convert absolute address to seg:off (because the linker cannot)
+    mov %cs:initial_stack_ptr,%ax
+    mov %cs:initial_stack_ptr+2,%dx
+
+    // shift dx:ax right 4 bits (with 8088 instructions)
+    mov $ 4,%cl
+.Ldoubleword_shift:
+    shr $ 1,%dx
+    rcr $ 1,%ax
+    dec %cl
+    jnz .Ldoubleword_shift
+    sub $ 0x1000,%ax
+    mov %ax,%ss
+    xor %sp,%sp
+    jmp *%si
+
 initial_stack_ptr:
-    .hword ___initial_stack
-    .hword 0
+    .int ___initial_stack
 
 // Inputs:
 //  edx:eax: parameter to partition boot call
@@ -32,7 +50,6 @@ initial_stack_ptr:
 
 .global boot
 boot:
-    movl $ ___initial_stack,%esp
     pushl %ebx
     pushl %ebp
     movl %esp,%ebp
@@ -72,7 +89,20 @@ pmode_entry:
     movw %dx,%es
     movw %dx,%fs
     movw %dx,%gs
+
+    // Setup 32 bit stack pointing to same place it was in real mode
+    // Add 64KB to final pointer if sp was 0
+    // (and 1st push would wrap around 64KB forward)
+    movl %ss,%eax
     movw %dx,%ss
+    movl $ 0x10000,%edx
+    shl $ 4,%eax
+    add %edx,%eax
+    test %sp,%sp
+    jz .Lwraparound_sp
+    sub %edx,%eax
+.Lwraparound_sp:
+    add %eax,%esp
 
     xorl %eax,%eax
     lldt %ax
@@ -188,6 +218,7 @@ detect_ancient_cpu:
     // CPUID instruction will work
     ret
 
+.pushsection .lowdata
 str_prefix:	.asciz "An "
 str_8086:	.asciz "8086"
 str_80286:	.asciz "80286"
@@ -195,6 +226,7 @@ str_80386:	.asciz "80386"
 str_80486:	.asciz "early 80486"
 str_80486sx:.asciz "80486sx"
 str_suffix:	.asciz " cannot run this operating system"
+.popsection
 
 detected_8086:
     mov $ str_8086,%bx
@@ -276,9 +308,13 @@ update_eflags:
 .global idt_init
 idt_init:
     mov $ idt,%edx
+    mov %edx,%ecx
+    shr $ 4,%ecx
+    and $ 0xF,%edx
+    mov %cx,%ds
     mov $ 0,%ecx
 
-0:  movw isr_table(,%ecx,4),%ax
+0:  movw %cs:isr_table(,%ecx,4),%ax
     movw %ax,(%edx,%ecx,8)
     movw $ GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
     movw $ 0,4(%edx,%ecx,8)
@@ -288,11 +324,22 @@ idt_init:
     cmpl $ 32,%ecx
     jb 0b
 
+    mov $ idtr_64,%ecx
+    mov %ecx,%eax
+    shr $ 4,%ecx
+    and $ 0xF,%eax
+    movw %cx,%ds
+    xor %eax,%eax
+
     // Set limit
-    movw $ 32 * 8 - 1,idtr_64 + 6
-    movw $ idt,idtr_64 + 8
+    movw $ 32 * 8 - 1,6(%eax)
+    movl $ idt,8(%eax)
+    mov %ax,%ds
 
     ret
+
+.Lidt_ptr:
+    .int idt
 
 // Returns true if a20 is on
 .global cpu_a20_check
@@ -347,18 +394,24 @@ cpu_a20_wait:
 
 .global clear_bss
 clear_bss:
-    pushw %di
-    pushw %cx
-    pushw %ax
-    movw $ ___bss_st,%di
-    movw $ ___bss_en,%cx
-    subw %di,%cx
-    xorb %al,%al
+    push %edi
+    push %ecx
+    push %eax
+    movl $ ___bss_st,%edi
+    movl $ ___bss_en,%ecx
+    subl %edi,%ecx
+    // Translate flat edi to es:di
+    mov %edi,%eax
+    shr $ 4,%eax
+    mov %ax,%es
+    and $ 0xF,%di
+    xor %ax,%ax
     cld
     rep stosb
-    popw %ax
-    popw %cx
-    popw %di
+    mov %ax,%es
+    pop %eax
+    pop %ecx
+    pop %edi
     ret
 
 .code32
@@ -367,7 +420,7 @@ clear_bss:
 __cxa_atexit:
     ret
 
-.section .bss, "aw", @nobits
+.section .early
 cpu_a20_chk: .space 1
 
 .section .early, "wx", @progbits

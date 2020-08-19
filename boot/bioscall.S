@@ -20,7 +20,7 @@ bioscall:
     // Save pointer to bios_regs_t parameter on stack
     pushl %eax
 
-    // Save interrupt vector (read from real mode IDT) on the stack
+    // Save interrupt vector (cs:ip from real mode IDT) on the stack
     pushl (,%edx,4)
 
     // Copy bios_regs_t to the stack, in case eax is outside first 1MB
@@ -39,13 +39,14 @@ bioscall:
     jz 0f
     call cpu_a20_exitpm
 
-    // Set up %dx:%bp to be a real mode far pointer to the same place as %esp
-    // With 4KB of stack space available before sp underflows
-    // In case esp is outside first 64KB range
-0:  lea -4096(%esp),%edx
-    mov %edx,%ebp
+    // Setup %ss close to 64KB below esp (alignment permitting)
+    // setup esp to the distance from ebp to esp,
+    // so nothing really changed
+    // the stack frame for this function is reachable from real mode stack
+0:  lea (-(64 * 1024) + 15 + 16*4)(%esp),%ebp
+    and $ -16,%ebp
+    mov %ebp,%edx
     shr $ 4,%edx
-    and $ 0xF,%ebp
 
     // Jump to 16 bit protected mode to load 64KB segment limits
     ljmp $ GDT_SEL_PM_CODE16,$ 0f
@@ -67,20 +68,24 @@ bioscall:
 
     // Real mode
     ljmp $ 0,$ 0f
-0:  xorw %ax,%ax
+
+    // Point ss:esp to where %esp was, where we copied the bios_regs_t
+0:  mov %dx,%ss
+    sub %ebp,%esp
+
+    // If it got a perfect 64KB stack size, clear bit 16 (which would be 1)
+    movzwl %sp,%esp
+
+    xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs
     movw %ax,%gs
-    movw %ax,%ss
-
-    // Point ss:sp to where %esp was, where we copied the bios_regs_t
-    mov %dx,%ss
-    lea 4096(%bp),%sp
 
     // Sane enough to allow BIOS to handle IRQs now
     sti
 
+    // Load the context from the bios_regs_t structure copy we pushed
     popl %eax
     popl %ebx
     popl %ecx
@@ -99,18 +104,18 @@ bioscall:
     lcallw *2(%esp)
 
     // Copy the returned context to the stack
-    pushl %eax
-    pushl %ebx
-    pushl %ecx
-    pushl %edx
-    pushl %esi
-    pushl %edi
-    pushl %ebp
-    pushw %ds
-    pushw %es
-    pushw %fs
-    pushw %gs
     pushfl
+    pushw %gs
+    pushw %fs
+    pushw %es
+    pushw %ds
+    pushl %ebp
+    pushl %edi
+    pushl %esi
+    pushl %edx
+    pushl %ecx
+    pushl %ebx
+    pushl %eax
 
     // Go back into protected mode
     cli
@@ -136,22 +141,23 @@ bioscall:
     // Translate real mode ss:sp back to flat esp
     mov %ss,%edx
     shl $ 4,%edx
-    movzx %sp,%ebp
+    // There's no way sp could be zero here, don't waste space handling it
+    movzwl %sp,%ebp
     movw %ax,%ss
     lea (%edx,%ebp),%esp
 
     // Copy saved outgoing context back into bios_regs_t structure
     mov 44(%esp),%eax
-    popl 36(%eax)
-    popl 32(%eax)
-    popl 28(%eax)
-    popl 24(%eax)
-    popl 20(%eax)
-    popl 16(%eax)
-    popl 12(%eax)
-    popl 8(%eax)
-    popl 4(%eax)
     popl (%eax)
+    popl 4(%eax)
+    popl 8(%eax)
+    popl 12(%eax)
+    popl 16(%eax)
+    popl 20(%eax)
+    popl 24(%eax)
+    popl 28(%eax)
+    popl 32(%eax)
+    popl 36(%eax)
 
     addl $ 8,%esp
 

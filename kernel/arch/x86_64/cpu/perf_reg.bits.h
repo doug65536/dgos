@@ -49,11 +49,11 @@
 #define CPU_MSR_PERFEVTSEL_EVT_SEL_LO_8_MASK \
     ((1UL << CPU_MSR_PERFEVTSEL_EVT_SEL_LO_8_BITS)-1)
 
-// Host/Guest only mask
+// Host/Guest only mask (AMD)
 #define CPU_MSR_PERFEVTSEL_HG_ONLY \
     (CPU_MSR_PERFEVTSEL_HG_ONLY_MASK << CPU_MSR_PERFEVTSEL_HG_ONLY_BIT)
 
-// Event select bits 11:8
+// Event select bits 11:8 (AMD)
 #define CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4 \
     (CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_MASK \
     << CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_BIT)

@@ -6,6 +6,7 @@
 extern gdt_entry_t gdt[];
 
 table_register_64_t idtr_64;
+
 table_register_t idtr_16 _used = {
     0,
     4 * 256,

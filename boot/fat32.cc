@@ -11,6 +11,7 @@
 #include "assert.h"
 #include "log2.h"
 #include "halt.h"
+#include "physmem.h"
 
 #include "../kernel/fs/fat32/fat32_decl.h"
 
@@ -90,6 +91,8 @@ static int fat32_sector_iterator_begin(
     iter->position = 0;
     iter->sector_offset = 0;
 
+    PRINT("Counting the clusters in the chain");
+
     // Cache cluster chain
     int cluster_count = 0;
     for (int walk = cluster; walk; ++cluster_count) {
@@ -98,11 +101,20 @@ static int fat32_sector_iterator_begin(
             return -1;
     }
 
+    PRINT("Allocating %d entry 32-bit cluster list", cluster_count);
+
     iter->cluster_count = cluster_count;
-    iter->clusters = new (ext::nothrow) uint32_t[cluster_count]();
+
+    if (cluster_count <= 1024)
+        iter->clusters = new (ext::nothrow) uint32_t[cluster_count];
+    else
+        iter->clusters = (uint32_t*)alloc_phys(
+                    sizeof(uint32_t) * cluster_count, true).base;
 
     if (unlikely(!iter->clusters))
         PANIC_OOM();
+
+    PRINT("Populating %d entry 32-bit cluster list", cluster_count);
 
     cluster_count = 0;
     for (int walk = cluster; walk; ++cluster_count) {
@@ -126,9 +138,18 @@ static int fat32_sector_iterator_begin(
     return 0;
 }
 
+static bool read_fat(uint64_t lba)
+{
+    bool ok = disk_read_lba(uint64_t(fat_buffer), lba, log2_sector_sz, 1);
+    // Update buffered lba, and on failure, mark it with impossible lba
+    fat_buffer_lba = ok ? lba : -1;
+    return ok;
+}
+
 // Reads the FAT, finds next cluster, and reads cluster
 // Returns new cluster number, returns 0 at end of file
 // Returns 0xFFFFFFFF on error
+_hot
 static uint32_t next_cluster(
         uint32_t current_cluster, char *sector, bool *ok_ptr)
 {
@@ -139,14 +160,14 @@ static uint32_t next_cluster(
     uint64_t lba = bpb.first_fat_lba + fat_sector_index;
 
     bool ok = true;
-    if (fat_buffer_lba != lba) {
-        ok = disk_read_lba(uint64_t(fat_buffer), lba, log2_sector_sz, 1);
+    if (unlikely(fat_buffer_lba != lba)) {
+        ok = read_fat(lba);
         if (ok_ptr)
             *ok_ptr = ok;
         if (unlikely(!ok))
             return 0xFFFFFFFF;
-        fat_buffer_lba = lba;
     }
+
     fat_array = (uint32_t*)fat_buffer;
     if (sector)
         memcpy(sector, fat_buffer, sector_sz);
@@ -437,10 +458,10 @@ static void fill_short_filename(fat32_dir_union_t *match, char const *filename)
 // Returns new value of encoded_src caller should use
 // Uses/updates done_name flag which the caller needs to
 // carry across fragment calls
-static uint16_t const *encode_lfn_name_fragment(
+static char16_t const *encode_lfn_name_fragment(
         uint8_t *lfn_fragment,
         size_t fragment_size,
-        uint16_t const *encoded_src,
+        char16_t const *encoded_src,
         uint_fast16_t *done_name)
 {
     for (size_t i = 0; i < fragment_size; ++i) {
@@ -547,10 +568,10 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
 
     if (info.lowercase_flags == 0) {
         // Needs long filename
-        uint16_t encoded_name[255];
+        char16_t encoded_name[255];
         uint_fast16_t encoded_len = utf8_to_utf16(
                     encoded_name, 255, filename);
-        uint16_t const *encoded_src;
+        char16_t const *encoded_src;
 
         // Check for bad UTF-8
         if (encoded_len == 0)
@@ -719,23 +740,33 @@ static int fat32_boot_open(char const *filename)
     uint32_t cluster;
     uint32_t file_size = 0;
 
+    PRINT("Finding file by pathname: %s", filename);
+
     // Find the start of the file
     cluster = find_file_by_pathname(filename, bpb.root_dir_start, &file_size);
     if (cluster == 0)
         return -1;
+
+    PRINT("Finding available file handle");
 
     // Allocate a file handle
     int file = fat32_find_available_file_handle();
     if (file < 0)
         return -1;
 
+    PRINT("Storing file size: %" PRIu32, file_size);
+
     file_handles[file].file_size = file_size;
+
+    PRINT("Starting iterator");
 
     // Get ready to read the file
     int16_t status = fat32_sector_iterator_begin(
                 file_handles + file, sector_buffer, cluster);
     if (status < 0)
         return -1;
+
+    PRINT("Open complete");
 
     // Return file handle
     return file;
@@ -869,4 +900,29 @@ void fat32_boot_partition(uint64_t partition_lba)
     fs_api.boot_drv_serial = fat32_boot_serial;
 
     elf64_run(cpu_choose_kernel());
+}
+
+void fat32_sector_iterator_t::reset()
+{
+    start_cluster = 0;
+    cluster = 0;
+    position = 0;
+    sector_offset = 0;
+    ok = false;
+    clusters = nullptr;
+    cluster_count = 0;
+}
+
+int fat32_sector_iterator_t::close()
+{
+    int result = ok ? 0 : 1;
+
+    if (cluster_count <= 1024)
+        delete[] clusters;
+    else
+        free_phys({(uint64_t)clusters, cluster_count * sizeof(uint32_t)});
+
+    reset();
+
+    return result;
 }

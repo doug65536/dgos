@@ -89,6 +89,8 @@ struct alignas(8) kernel_params_t {
     uint64_t initrd_sz;
     uint64_t phys_mapping;
     uint64_t phys_mapping_sz;
+    ptr64_t<char> command_line;
+
     uint8_t wait_gdb;
     uint8_t serial_debugout;
     uint8_t serial_baud;
@@ -102,4 +104,4 @@ struct alignas(8) kernel_params_t {
 } _packed;
 
 // Ensure that all of the architectures have the same layout
-C_ASSERT(sizeof(kernel_params_t) == 21 * 8);
+C_ASSERT(sizeof(kernel_params_t) == 22 * 8);

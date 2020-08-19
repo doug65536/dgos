@@ -326,6 +326,7 @@ UNITTEST(test_contiguous_alloc_take_taken)
             eq(size_t(0x001000), range.size);
             break;
         default:
+            fail("Should have one entry");
             break;
         }
         return true;

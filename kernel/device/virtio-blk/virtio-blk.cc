@@ -454,6 +454,9 @@ long virtio_blk_if_t::info(storage_dev_info_t key)
     case STORAGE_INFO_BLOCKSIZE:
         return blk_config->blk_size;
 
+    case STORAGE_INFO_BLOCKSIZE_LOG2:
+        return bit_log2(blk_config->blk_size);
+
     case STORAGE_INFO_HAVE_TRIM:
         return 0;
 

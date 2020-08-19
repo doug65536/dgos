@@ -19,3 +19,5 @@ extern "C" _noinline int __assert_failed(tchar const *expr, tchar const *msg,
 #endif
 
 #define C_ASSERT(e) static_assert(e, #e)
+
+_noinline void cpu_debug_break();

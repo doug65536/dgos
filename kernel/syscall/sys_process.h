@@ -24,3 +24,7 @@ long sys_posix_spawn(pid_t *restrict pid,
 
 long sys_clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
                void *child_stack, int flags, void *(*fn)(void *), void *arg);
+
+int sys_kill(int pid, int sig);
+
+unsigned sys_sleep(unsigned ms);

@@ -4,6 +4,7 @@
 #include "types.h"
 #else
 #include <stdint.h>
+#include <stddef.h>
 #endif
 #include "type_traits.h"
 #include "memory.h"

@@ -20,7 +20,7 @@ static uint16_t get_e820_region(physmem_range_t *range,
 
     range->valid = 1;
 
-    bios_regs_t regs;
+    bios_regs_t regs{};
     regs.eax = 0xE820;
     regs.edx = 0x534D4150;
     regs.ebx = *continuation_ptr;

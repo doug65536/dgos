@@ -41,7 +41,7 @@ size_t callout_call(callout_type_t type, bool as_thread)
                     callout->userarg,
                     0
                 };
-                work.tid = thread_create(thread_callout_worker,
+                work.tid = thread_create(nullptr, thread_callout_worker,
                                          &work, "callout_worker",
                                          0, false, false);
 

@@ -65,9 +65,11 @@ ALL_USRLIB_INSTALLED = \
 	$(USRLIB_STATIC_FILES_INSTALLED) \
 	$(USRLIB_STATIC_FILES_INSTALLED_32)
 
-BUILT_SOURCES = \
-	$(ALL_STDLIB_INSTALLED) \
-	$(ALL_USRLIB_INSTALLED)
+BUILT_SOURCES = $(generated_headers)
+
+
+#	$(ALL_STDLIB_INSTALLED)
+#	$(ALL_USRLIB_INSTALLED)
 
 BOOTLOADER_COMMON_FLAGS = \
 	-D__DGOS__
@@ -107,10 +109,11 @@ mbr_elf_CXXFLAGS = \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(NO_LTO_FLAGS) -static \
-	$(OPTIMIZE_SIZE_FLAGS)
+	$(NO_LTO_FLAGS) -static -DS00 \
+	$(OPTIMIZE_SIZE_FLAGS) \
+	-D__DGOS_BOOTLOADER__
 
-mbr_elf_CFLAGS =
+mbr_elf_CFLAGS = \
 	$(mbr_elf_CXXFLAGS)
 
 mbr_elf_CCASFLAGS = \
@@ -158,10 +161,11 @@ boot1_elf_CXXFLAGS = \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(NO_LTO_FLAGS) -static \
-	$(OPTIMIZE_SIZE_FLAGS)
+	$(NO_LTO_FLAGS) -static -DS01 \
+	$(OPTIMIZE_SIZE_FLAGS) \
+	-D__DGOS_BOOTLOADER__
 
-boot1_elf_CFLAGS =
+boot1_elf_CFLAGS = $(boot1_elf_CXXFLAGS)
 
 boot1_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
@@ -179,7 +183,7 @@ boot1_elf_LDFLAGS = \
 	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/boot/boot1.ld \
 	$(LINKER_DEBUG) \
-	$(LINKER_SEL) -static \
+	$(LINKER_SEL) -static -DS02 \
 	$(NOSTDLIB_FLAGS)
 
 EXTRA_boot1_elf_DEPENDENCIES = \
@@ -220,7 +224,6 @@ libbootsect_a_SOURCES = \
 	boot/malloc.cc \
 	boot/string.cc \
 	boot/string_char16.cc \
-	boot/utf.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
 	boot/rand.cc \
@@ -244,7 +247,6 @@ libbootsect_a_SOURCES = \
 	boot/iso9660.h \
 	boot/debug.h \
 	boot/cpu.h \
-	boot/utf.h \
 	boot/elf64.h \
 	boot/exception.h \
 	boot/elf64decl.h \
@@ -267,11 +269,13 @@ libbootsect_a_SOURCES = \
 	boot/boottable_bios.cc \
 	boot/log2.h \
 	boot/qemu.cc \
-	boot/qemu.h
+	boot/qemu.h \
+	user/libutf/utf.cc
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot \
-	-I$(top_srcdir)/boot/include
+	-I$(top_srcdir)/boot/include \
+	-I$(top_srcdir)/user/libutf
 
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
@@ -282,7 +286,7 @@ libbootsect_a_CXXFLAGS = \
 	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
-	$(NO_PIC_FLAGS) -static \
+	$(NO_PIC_FLAGS) -static -DS03 \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
@@ -290,9 +294,9 @@ libbootsect_a_CXXFLAGS = \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS)
+	$(OPTIMIZE_SIZE_FLAGS) \
+	-D__DGOS_BOOTLOADER__
 
 #$(RETPOLINE_FLAGS)
 
@@ -336,7 +340,7 @@ bootfat_elf_CCASFLAGS = \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) -static \
+	$(NO_PIC_FLAGS) -static -DS04 \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
@@ -351,7 +355,7 @@ bootfat_elf_LDFLAGS = \
 	-Wl,-Map,bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
-	$(LINKER_SEL) -static \
+	$(LINKER_SEL) -static -DS05 \
 	$(NOSTDLIB_FLAGS)
 
 EXTRA_bootfat_elf_DEPENDENCIES = \
@@ -398,7 +402,7 @@ bootiso_elf_LDFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	$(LINKER_SEL) -static \
+	$(LINKER_SEL) -static -DS06 \
 	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
@@ -445,8 +449,8 @@ bootpxe_bios_elf_LDFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
-	-Wl,-Map,bootpxe-bios.map
-	$(LINKER_SEL) -static -Bsymbolic \
+	-Wl,-Map,bootpxe-bios.map \
+	$(LINKER_SEL) -static -DS07 \
 	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -473,6 +477,7 @@ BOOTLOADER_EFI_FLAGS = \
 	-fshort-wchar \
 	-I$(top_srcdir)/boot \
 	-I$(top_srcdir)/boot/include \
+	-I$(top_srcdir)/user/libutf \
 	-Wl,--no-dynamic-linker \
 	-mcmodel=large \
 	$(INVISIBILITY_FLAGS) \
@@ -532,24 +537,15 @@ bootefi_amd64_SOURCES = \
 	boot/boottable_efi.cc \
 	boot/qemu.cc \
 	boot/qemu.h \
-	boot/utf.cc \
-	boot/utf.h
-
-#bootefi_i386_SOURCES = \
-	$(bootefi_amd64_SOURCES)
+	user/libutf/utf.cc
 
 bootefi_amd64_CFLAGS = \
 	-DFROM_CFLAGS \
 	-nostdlib \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS)
-
-#bootefi_i386_CFLAGS = \
-	$(BOOTLOADER_COMMON_FLAGS) \
-	-DFROM_CFLAGS \
-	$(PE32_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS)
+	$(BOOTLOADER_EFI_FLAGS) \
+	-I$(top_srcdir)/user/libutf
 
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
@@ -557,22 +553,15 @@ bootefi_amd64_CXXFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS)
-
-#bootefi_i386_CXXFLAGS = \
-	-DFROM_CXXFLAGS \
-	$(BOOTLOADER_COMMON_FLAGS) \
-	$(PE32_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS)
+	$(BOOTLOADER_EFI_FLAGS) \
+	-D__DGOS_BOOTLOADER__
 
 bootefi_amd64_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
-	$(bootefi_amd64_CXXFLAGS)
-
-#bootefi_i386_CCASFLAGS = \
-	$(bootefi_amd64_CCASFLAGS)
+	$(bootefi_amd64_CXXFLAGS) \
+	-D__DGOS_BOOTLOADER__
 
 bootefi_amd64_LDFLAGS = \
 	-DFROM_LDFLAGS \
@@ -582,11 +571,6 @@ bootefi_amd64_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
 	-Wl,-Map,bootefi-amd64.map \
 	$(NOSTDLIB_FLAGS)
-
-#-Wl,--subsystem,10 \
-#-Wl,-pie \
-#-Wl,-N \
-#-Wl,-m,i386pep
 
 #bootefi_i386_LDFLAGS = \
 	-DFROM_LDFLAGS \
@@ -924,7 +908,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/vt100.cc \
 	kernel/device/vt100.h \
 	kernel/device/vt100_out.cc \
-	kernel/device/vt100_out.h
+	kernel/device/vt100_out.h \
+	user/libutf/utf.cc
 
 KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/boot/include \
@@ -939,6 +924,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	-DFROM_CXXFLAGS \
 	-D__DGOS__ \
 	-D__DGOS_KERNEL__=0x00000001 \
+	-I$(top_srcdir)/user/libutf \
 	-fPIE \
 	$(FREESTANDING_FLAGS) \
 	$(COMPILER_FLAGS) \
@@ -966,6 +952,8 @@ KERNEL_CXXFLAGS_SHARED = \
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
+	-D__DGOS__ \
+	-D__DGOS_KERNEL__ \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -989,12 +977,9 @@ KERNEL_LDFLAGS_SHARED = \
 
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
-	u_vga16.o \
-	libkei.a \
-	$(DUMPDIR) \
-	$(generated_headers)
+	libkei.a
 
-KERNEL_LDADD_SHARED = -lgcc u_vga16.o
+KERNEL_LDADD_SHARED = -lgcc
 
 # Separate debug info for kernels
 
@@ -1245,10 +1230,10 @@ $(eval $(call \
 define deploy_stdlib=
 
 sysroot/lib/lib$(1).a: lib$(1).a
-	$$(MKDIR) -p $$(@D) && $$(CP) "$$<" "$$@"
+	$$(MKDIR) -p $$(@D) && "$$(CP)" -T "$$<" "$$@"
 
 sysroot/lib/32/lib$(1).a: lib$(1)32.a
-	$$(MKDIR) -p $$(@D) && $$(CP) "$$<" "$$@"
+	$$(MKDIR) -p $$(@D) && "$$(CP)" -T "$$<" "$$@"
 
 endef
 
@@ -1263,14 +1248,14 @@ $(foreach name,$(USRLIB_FILE_NAMES), \
 define deploy_stdlib_header=
 sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
 	$(MKDIR) -p $$(@D)
-	$(CP) -f "$$<" "$$@"
+	"$(CP)" -T "$$<" "$$@"
 
 endef
 
 define deploy_usrlib_header=
 sysroot/include/$(1): $$(top_srcdir)/user/include/$(1)
 	$(MKDIR) -p $$(@D)
-	$(CP) -f "$$<" "$$@"
+	"$(CP)" -T "$$<" "$$@"
 
 endef
 
@@ -1489,6 +1474,8 @@ libc_a_SOURCES = \
 	libc/src/dirent/readdir_r.cc \
 	libc/src/dirent/seekdir.cc \
 	libc/src/stdlib/new.cc \
+	libc/src/stdlib/malloc_arena.cc	\
+	libc/src/stdlib/malloc_arena.h	\
 	libc/src/stdlib/_Exit.cc \
 	libc/src/stdlib/abort.cc \
 	libc/src/stdlib/abs.cc \
@@ -2039,8 +2026,9 @@ dhcpclient_SOURCES = \
 
 dhcpclient_CXXFLAGS = -isystem sysroot/include
 
+dhcpclient_LDADD =
+
 EXTRA_dhcpclient_DEPENDENCIES = \
-	$(ALL_STDLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 bin_PROGRAMS += ls
@@ -2052,7 +2040,6 @@ ls_SOURCES = \
 ls_CXXFLAGS = -isystem sysroot/include
 
 EXTRA_ls_DEPENDENCIES = \
-	$(ALL_STDLIB_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 include Make-modules.inc.mk
@@ -2077,6 +2064,24 @@ EXTRA_libwing_a_DEPENDENCIES =
 
 #===========
 
+noinst_LIBRARIES += libutf.a
+
+libutf_a_SOURCES = \
+	user/libutf/utf.cc
+
+libutf_a_CXXFLAGS = \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS) \
+	$(USER64_EXE_FLAGS)
+
+libutf_a_CFLAGS = $(libutf_a_CXXFLAGS)
+libutf_a_CCASFLAGS = $(libutf_a_CXXFLAGS)
+
+EXTRA_libutf_a_DEPENDENCIES = \
+	$(INCLUDES_DEPLOYED)
+
+#===========
+
 noinst_LIBRARIES += libpng.a
 
 libpng_a_SOURCES = \
@@ -2089,7 +2094,8 @@ libpng_a_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
-	$(USER64_EXE_FLAGS)
+	$(USER64_EXE_FLAGS) \
+	-I$(top_srcdir)/user/libutf
 
 libpng_a_CFLAGS = \
 	-DFROMCFLAGS  \
@@ -2214,40 +2220,40 @@ include $(top_srcdir)/diskfat.mk
 include $(top_srcdir)/diskiso.mk
 
 clean-local:
-	rm -f mbr-bin
-	rm -f bootfat-bin
-	rm -f bootiso-bin
-	rm -f bootpxe-bios-bin
-	rm -f bootpxe-bios-elf
-	rm -f trace-tool
+	$(RM) -f mbr-bin
+	$(RM) -f bootfat-bin
+	$(RM) -f bootiso-bin
+	$(RM) -f bootpxe-bios-bin
+	$(RM) -f bootpxe-bios-elf
+	$(RM) -f trace-tool
 
-	rm -f bootefi-pe
-	rm -f boot*.efi
+	$(RM) -f bootefi-pe
+	$(RM) -f boot*.efi
 
-	rm -f *.sym
+	$(RM) -f *.sym
 
-	rm -f *.map
-	rm -f background.png
+	$(RM) -f *.map
+	$(RM) -f background.png
 
-	rm -f "*.dis.gz"
-	rm -f "bochs-debuglog"
-	rm -f "mbrdisk.img"
-	rm -f "gptdisk.img"
-	rm -f "hybdisk.img"
-	rm -f "fatpart.img"
-	rm -f "isodisk.iso"
-	rm -f "initrd"
+	$(RM) -f "*.dis.gz"
+	$(RM) -f "bochs-debuglog"
+	$(RM) -f "mbrdisk.img"
+	$(RM) -f "gptdisk.img"
+	$(RM) -f "hybdisk.img"
+	$(RM) -f "fatpart.img"
+	$(RM) -f "isodisk.iso"
+	$(RM) -f "initrd"
 
-	rm -f "boot1-bin"
-	rm -f "dgos-kernel-asan"
-	rm -f "dgos-kernel-generic"
-	rm -f "dgos-kernel-tracing"
-	rm -f "u_vga16.raw"
-	rm -rf "stage"
-	rm -rf "iso_stage"
+	$(RM) -f "boot1-bin"
+	$(RM) -f "dgos-kernel-asan"
+	$(RM) -f "dgos-kernel-generic"
+	$(RM) -f "dgos-kernel-tracing"
+	$(RM) -f "u_vga16.raw"
+	$(RM) -rf "stage"
+	$(RM) -rf "iso_stage"
 
 distclean-local:
-	rm -rf extern
+	$(RM) -rf extern
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -2271,7 +2277,7 @@ BITFIELD_FILES = \
 # 1=path to bits file
 define bitfield_gen =
 $(1).h: $(1)
-	rm -f "$$@"
+	$(RM) -f "$$@"
 	$$(top_srcdir)/genregs.py "$$<" "$$(top_srcdir)" > "$$@"
 
 $(1).h: $$(top_srcdir)/genregs.py
@@ -2328,10 +2334,13 @@ define stage_file_to=
 
 $(2): $(1)
 	$$(MKDIR) -p $$(@D)
-	$$(LN) -fsTr $$< $$@
+	$$(CP) -T $$< $$@
 
 fatpart.img: $(2)
+
 isodisk.iso: $(2)
+
+#$$(info Staging $(1) to $(2))
 
 endef
 
@@ -2342,16 +2351,22 @@ $(eval $(call stage_file_to,$(1),iso_stage$(2)/$(1)))
 
 endef
 
-$(foreach staged_boot_file,$(MODULE_FILENAMES), \
-	$(eval $(call stage_file,$(staged_boot_file),/boot)) \
+$(foreach name,$(MODULE_FILENAMES), \
+	$(eval $(call stage_file,$(name),/boot)) \
 )
 
 $(foreach name,$(KERNEL_NAMES_STRIPPED), \
 	$(eval $(call stage_file,$(name),/boot)) \
 )
 
+$(foreach name,$(noinst_LIBRARIES), \
+	$(eval $(call stage_file,$(name),/usr/lib)) \
+)
+
 $(eval $(call stage_file,init,/boot))
 $(eval $(call stage_file,background.png,/usr/share))
+
+$(eval $(call stage_file,bootpxe-bios-bin,/boot))
 
 BOOT_FILES = \
 	mbr-elf \
@@ -2397,7 +2412,8 @@ $(eval $(call stage_file,bootx64.efi,/EFI/boot))
 CPIO_LIST = $(MODULES_STAGED_HD) \
 	$(generate_symbols_outputs)
 
-STAGED_SYMS = $(patsubst %,stage/sym/%.sym,$(generate_symbols_list)) \
+STAGED_SYMS = \
+	$(patsubst %,stage/sym/%.sym,$(generate_symbols_list)) \
 	$(patsubst %,stage/sym/%-kallsyms,$(generate_kallsym_list)) \
 	$(patsubst %,stage/sym/%-klinesyms,$(generate_kallsym_list))
 
@@ -2414,7 +2430,7 @@ all-kernel: $(KERNEL_NAMES) $(MODULE_LIST) initrd
 .PHONY: all-kernel
 
 background.png: $(top_srcdir)/user/background.png
-	$(LN) -fsTr "$<" "$@"
+	$(CP) -T "$<" "$@"
 
 CPIO_PATHS = \
 	$(MODULE_CPIO_PATHS) \
@@ -2515,11 +2531,11 @@ QEMU_SERIAL = \
 	-chardev file,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
 	-device isa-serial,chardev=qemu-debug-out,id=com1 \
 	\
-	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-serial-socket,id=com3,irq=5 \
-	\
 	-chardev socket,id=qemu-symsrv-socket,host=localhost,port=7789,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-symsrv-socket,id=com2
+	-device isa-serial,chardev=qemu-symsrv-socket,id=com2 \
+	\
+	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
+	-device isa-serial,chardev=qemu-serial-socket,id=com3,irq=5
 
 QEMU_SOUND = -soundhw es1370
 
@@ -2627,7 +2643,7 @@ QEMU_NP_numa = \
 QEMU_ICOUNT_SHIFT = 1
 
 QEMU_EMU = $(QEMU_EMU_$(1))
-QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand
+QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand,perfctr-core,ibpb,kvm-pv-eoi
 QEMU_EMU_tcg_BASE = -cpu max,migratable=false,vmware-cpuid-freq
 QEMU_EMU_tcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=single
 QEMU_EMU_mttcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=multi
@@ -2825,43 +2841,59 @@ disks: hybdisk.img gptdisk.img mbrdisk.img isodisk.iso
 
 .PHONY: disks
 
-debug: all debug-up-efi-hd-hyb-ahci-vga-tcg
+debug: debug-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: debug
 
-debug-icount: all debug-up-efi-hd-hyb-ahci-vga-icount
+debug-icount: debug-up-efi-hd-hyb-ahci-vga-icount
 
 .PHONY: debug-icount
 
-debug-mbr: all debug-up-bios-hd-mbr-ahci-vga-tcg
+debug-iso-bios: debug-up-bios-hd-iso-ahci-vga-tcg
+
+.PHONY: debug-iso-bios
+
+debug-iso-efi: debug-up-efi-hd-iso-ahci-vga-tcg
+
+.PHONY: debug-iso-efi
+
+run-iso-bios: run-up-bios-hd-iso-ahci-vga-tcg
+
+.PHONY: run-iso-bios
+
+run-iso-efi: run-up-efi-hd-iso-ahci-vga-tcg
+
+.PHONY: run-iso-efi
+
+debug-mbr: debug-up-bios-hd-mbr-ahci-vga-tcg
 
 .PHONY: debug-mbr
 
-debug-hyb: all debug-up-efi-hd-hyb-ahci-vga-tcg
+debug-hyb: debug-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: debug-hyb
 
-debug-pxe: all debug-up-bios-pxe-hyb-ahci-vga-tcg
+debug-pxe: debug-up-bios-pxe-hyb-ahci-vga-tcg
 
 .PHONY: debug-pxe
 
-debug-smp: all debug-smp-efi-hd-iso-ahci-vga-tcg
+debug-smp: debug-smp-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: debug-smp
 
-debug-bios: all debug-up-bios-hd-iso-ahci-vga-tcg
+debug-bios: debug-up-bios-hd-iso-ahci-vga-tcg
 
 .PHONY: debug-bios
 
-debug-kvm: all debug-up-efi-hd-iso-ahci-vga-kvm
+debug-kvm: debug-up-efi-hd-iso-ahci-vga-kvm
 
 .PHONY: debug-kvm
 
-debug-virtio: all debug-up-efi-hd-iso-virtio-gl-tcg
+debug-virtio: debug-up-efi-hd-iso-virtio-gl-tcg
 
 .PHONY: debug-virtio
 
-run: all run-up-efi-hd-hyb-ahci-vga-tcg
+run: run-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: run
 
@@ -2869,68 +2901,88 @@ run-all: $(QEMU_LAUNCHERS)
 
 .PHONY: run
 
-run-icount: all run-up-efi-hd-hyb-ahci-vga-icount
+run-icount: run-up-efi-hd-hyb-ahci-vga-icount
 
 .PHONY: run-icount
 
-run-mbr: all run-up-efi-hd-mbr-ahci-vga-tcg
+run-mbr: run-up-efi-hd-mbr-ahci-vga-tcg
 
 .PHONY: run-mbr
 
-run-mbr-icount: all run-up-efi-hd-mbr-ahci-vga-icount
+run-mbr-bios: run-up-bios-hd-mbr-ahci-vga-tcg
+
+.PHONY: run-mbr-bios
+
+debug-mbr-bios: debug-up-bios-hd-mbr-ahci-vga-tcg
+
+.PHONY: debug-mbr-bios
+
+run-mbr-icount: run-up-efi-hd-mbr-ahci-vga-icount
 
 .PHONY: run-mbr-icount
 
-debug-hyb: all run-up-efi-hd-hyb-ahci-vga-tcg
+run-hyb: run-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: run-hyb
 
-run-virtio: all run-up-efi-hd-hyb-virtio-vga-tcg
+run-virtio: run-up-efi-hd-hyb-virtio-vga-tcg
 
 .PHONY: run
 
-run-smp: all run-smp-efi-hd-hyb-ahci-vga-tcg
+run-smp: run-smp-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: run-smp
 
-run-bios: all run-up-bios-hd-hyb-ahci-vga-tcg
+run-bios: run-up-bios-hd-hyb-ahci-vga-tcg
 
 .PHONY: run-bios
 
-run-bios-kvm: all run-up-bios-hd-hyb-ahci-vga-kvm
+run-bios-kvm: run-up-bios-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-bios-kvm
 
-run-pxe: all run-up-bios-pxe-hyb-ahci-vga-tcg
+run-pxe: run-up-bios-pxe-hyb-ahci-vga-tcg
 
 .PHONY: run-pxe
 
-run-kvm: all run-up-efi-hd-hyb-ahci-vga-kvm
+run-kvm: run-up-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-kvm
 
-run-smp-kvm: all run-smp-efi-hd-hyb-ahci-vga-kvm
+run-smp-kvm: run-smp-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: run-smp-kvm
 
+debug-smp-kvm: debug-smp-efi-hd-hyb-ahci-vga-kvm
+
+.PHONY: debug-smp-kvm
+
+run-nvme: run-up-efi-hd-hyb-nvme-vga-tcg
+
+.PHONY: run-nvme
+
+debug-nvme: debug-up-efi-hd-hyb-nvme-vga-tcg
+
+.PHONY: debug-nvme
+
 # ----
 
-debug-bochs: all debug-mbr-bios-bochs-kernel
+debug-bochs: debug-mbr-bios-bochs-kernel
 .PHONY: debug-bochs
 
-debug-bochs-boot: all debug-mbr-bios-bochs-boot
+debug-bochs-boot: debug-mbr-bios-bochs-boot
 .PHONY: debug-bochs-boot
 
-debug-bochs-gpt: all debug-gpt-bios-bochs-kernel
+debug-bochs-gpt: debug-gpt-bios-bochs-kernel
 .PHONY: debug-bochs-gpt
 
-debug-bochs-boot-gpt: all debug-gpt-bios-bochs-boot
+debug-bochs-boot-gpt: debug-gpt-bios-bochs-boot
 .PHONY: debug-bochs-boot-gpt
 
-debug-bochs-hyb: all debug-hyb-bios-bochs-kernel
+debug-bochs-hyb: debug-hyb-bios-bochs-kernel
 .PHONY: debug-bochs-hyb
 
-debug-bochs-boot-hyb: all debug-hyb-bios-bochs-boot
+debug-bochs-boot-hyb: debug-hyb-bios-bochs-boot
 .PHONY: debug-bochs-boot-hyb
 
 #==
@@ -3004,7 +3056,5 @@ check-build:
 	$(MAKE) rtl8139.km
 	$(MAKE) clean
 	$(MAKE) ahci.km
-
-
 
 .PHONY: check-build

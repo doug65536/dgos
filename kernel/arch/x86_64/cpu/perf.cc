@@ -39,7 +39,7 @@ static perf_module_lookup_t perf_module_lookup;
 // Incremented before and after updates
 
 struct perf_trace_cpu_t {
-    static constexpr const size_t ring_cnt = 1 << 12;
+    static constexpr const size_t ring_cnt = 1 << 8;
     size_t level = 0;
     uint64_t last_aperf = 0;
     uint64_t last_tsc = 0;
@@ -49,7 +49,7 @@ struct perf_trace_cpu_t {
 
 static uintptr_t *perf_trace_buf;
 static uint64_t *perf_sample_buf;
-static bool perf_zeroing;
+static bool perf_zeroing = false;
 
 struct perf_work_value_t {
     size_t name_token;
@@ -62,8 +62,21 @@ static std::vector<perf_trace_cpu_t> perf_data;
 
 static std::vector<padded_rand_lfs113_t> perf_rand;
 
-static uint32_t volatile perf_event = 0xC0;
-static uint8_t volatile perf_event_scale = 21;
+struct perf_ctr_def_t {
+    uint32_t event;
+    char const *name;
+    uint32_t mask_defined;
+} perf_counters[] = {
+    {  },
+    {  },
+};
+
+static uint32_t volatile perf_event = 0x76;
+static uint32_t volatile perf_unit_mask = 0xFF;
+static uint32_t volatile perf_count_mask = 0;
+static uint64_t volatile perf_event_divisor = 1048576;
+static bool perf_event_invert = false;
+static bool perf_event_edge = false;
 
 using token_map_t = std::map<ext::string, size_t>;
 static token_map_t token_map;
@@ -97,7 +110,8 @@ static size_t perf_tokenize(char const *st, char const *en, bool force = true)
 
 static bool perf_add_symbols(char const *filename,
                              size_t size, uintptr_t base = 0,
-                             intptr_t natural_load_addr = 0)
+                             intptr_t natural_load_addr = 0,
+                             bool has_type_field = true)
 {
     file_t syms_fid;
 
@@ -161,16 +175,27 @@ static bool perf_add_symbols(char const *filename,
         char *line_iter = line;
 
         unsigned long addr = strtoul(line_iter, &line_iter, 16);
+
+        // Fail if strtoul parse failed
         if (unlikely(!line_iter))
             return false;
+
         bool is_absolute = false;
-        for ( ; line_iter < eol; ++line_iter) {
-            if (*line_iter == 'a' || *line_iter == 'A') {
-                is_absolute = true;
-                break;
-            } else if (*line_iter != ' ') {
-                break;
+
+        if (has_type_field) {
+            while (*line_iter == ' ')
+                ++line_iter;
+
+            for ( ; line_iter < eol; ++line_iter) {
+                if (*line_iter == 'a' || *line_iter == 'A') {
+                    is_absolute = true;
+                    break;
+                } else if (*line_iter != ' ') {
+                    break;
+                }
             }
+
+            ++line_iter;
         }
 
         // Discard absolute symbols
@@ -178,9 +203,6 @@ static bool perf_add_symbols(char const *filename,
             continue;
 
         addr -= natural_load_addr;
-
-        if (*line_iter)
-            ++line_iter;
 
         while (*line_iter == ' ')
             ++line_iter;
@@ -203,40 +225,45 @@ static bool perf_add_symbols(char const *filename,
 static int last_batch_time;
 static int rate_adj;
 
-void setup_sample(size_t cpu_nr)
+static void setup_sample(size_t cpu_nr)
 {
     if (perf_rand.empty()) {
         printdbg("No performance counters, can't select event\n");
         return;
 
     }
-    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE, 0);
 
-    // Lower result = higher rate
-    // higher shift = higher rage
+    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE+0, 0);
 
-    // Random value in (0, 1<<10] range (1024)
-    //int8_t shift = 32 - (13 - (rate_adj >> 3));
-    int8_t shift = 32 - perf_event_scale;
+    // higher scale = higher rate
+    // lower shift = higher rate
 
-    int32_t random_interval = perf_rand[cpu_nr].lfsr113_rand() >> shift;
+    int32_t random_offset = (perf_rand[cpu_nr].lfsr113_rand() & 0x3F) - 0x20;
 
-    cpu_msr_set(CPU_MSR_PERFCTR_BASE, -250 - random_interval);
+    int64_t count = - perf_event_divisor - random_offset;
+
+    count = count < -1 ? count : -1;
+
+    cpu_msr_set(CPU_MSR_PERFCTR_BASE, count);
 
     uint32_t evt = perf_event;
-    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE,
+    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE+0,
                 CPU_MSR_PERFEVTSEL_EN |
                 CPU_MSR_PERFEVTSEL_IRQ |
                 CPU_MSR_PERFEVTSEL_USR |
                 CPU_MSR_PERFEVTSEL_OS |
+                CPU_MSR_PERFEVTSEL_INV_n(perf_event_invert) |
+                CPU_MSR_PERFEVTSEL_EDGE_n(perf_event_edge) |
+                CPU_MSR_PERFEVTSEL_UNIT_MASK_n(
+                    perf_unit_mask & CPU_MSR_PERFEVTSEL_UNIT_MASK_MASK) |
+                CPU_MSR_PERFEVTSEL_CNT_MASK_n(
+                    perf_count_mask & CPU_MSR_PERFEVTSEL_CNT_MASK) |
                 CPU_MSR_PERFEVTSEL_EVT_SEL_LO_8_n(evt & 0xFF) |
-                CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_n(evt >> 8));
-
-//    perf_data[cpu_nr].last_aperf = cpu_msr_get(CPU_MSR_APERF);
-//    perf_data[cpu_nr].last_tsc = cpu_rdtsc();
+                CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_n(
+                    (evt >> 8) & CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_MASK));
 }
 
-perf_symbol_table_t::const_iterator lookup_symbol(uintptr_t addr)
+static perf_symbol_table_t::const_iterator lookup_symbol(uintptr_t addr)
 {
     perf_module_lookup_t::const_iterator
             it = perf_module_lookup.lower_bound(addr);
@@ -348,12 +375,15 @@ EXPORT uint64_t perf_gather_samples(
         return rhs.value < lhs.value;
     });
 
-    for (size_t i = 0; i < perf_tokens.size(); ++i) {
+    for (size_t i = 0; i < 16 && i < perf_tokens.size(); ++i) {
         perf_work_value_t &item = perf_work_buf[i];
+
         if (item.value == 0)
             break;
-        uint64_t fixed = grand ? 100000 * item.value / grand : 0;
-        callback(arg, int(fixed / 1000), int(fixed % 1000),
+
+        uint64_t fixed = grand ? 100000000 * item.value / grand : 0;
+
+        callback(arg, int(fixed / 1000000), int(fixed % 1000000),
                  perf_tokens[item.name_token].c_str());
     }
 
@@ -389,6 +419,14 @@ static void stacktrace_xlat(void *arg, void * const *ips, size_t count)
     }
 }
 
+static void perf_update_all_cpus()
+
+{
+    workq::enqueue_on_all_barrier([](size_t cpu_nr) {
+        setup_sample(cpu_nr);
+    });
+}
+
 EXPORT void perf_init()
 {
     size_t kernel_sz;
@@ -397,6 +435,10 @@ EXPORT void perf_init()
     perf_add_symbols("sym/kernel-generic-kallsyms",
                      kernel_sz, uintptr_t(__image_start),
                      0xffffffff80000000);
+
+    perf_add_symbols("sym/init.sym",
+                     4<<20, uintptr_t(0x401000),
+                     0x401000, false);
 
     size_t mod_count = modload_get_count();
 
@@ -416,12 +458,6 @@ EXPORT void perf_init()
     }
 
     perf_set_stacktrace_xlat_fn(stacktrace_xlat, nullptr);
-
-//    printdbg("Modules:\n");
-//    for (perf_module_table_t::value_type const& item: perf_module_syms) {
-//        printdbg("base=0x%016zx +0x%08zx %s\n",
-//                 item.second.base, item.second.size, item.first.c_str());
-//    }
 
     size_t cpu_count = thread_get_cpu_count();
 
@@ -460,38 +496,95 @@ EXPORT void perf_init()
         return;
     }
 
-    apic_hook_perf_local_irq(perf_nmi_handler, "perf_nmi");
+    apic_hook_perf_local_irq(perf_nmi_handler, "perf_nmi", true);
 
     perf_rand.resize(cpu_count);
 
-    workq::enqueue_on_all_barrier([](size_t cpu_nr) {
-        setup_sample(cpu_nr);
-    });
+    uint64_t setup_st = time_ns();
+
+    perf_update_all_cpus();
+
+    uint64_t setup_en = time_ns();
+
+    setup_en -= setup_st;
+
+    printdbg("Setup perf sampling on all cpus took %" PRIu64 "ns\n", setup_en);
 }
 
-EXPORT void perf_set_event(uint32_t event, uint8_t event_scale)
+EXPORT void perf_set_zeroing(bool zeroing_enabled)
+{
+    perf_zeroing = zeroing_enabled;
+}
+
+EXPORT bool perf_get_zeroing()
+{
+    return perf_zeroing;
+}
+
+EXPORT uint32_t perf_set_event(uint32_t event)
 {
     perf_event = event;
-    perf_event_scale = event_scale;
 
-    workq::enqueue_on_all_barrier([](size_t cpu_nr) {
-        setup_sample(cpu_nr);
-    });
+    perf_update_all_cpus();
+
+    return event;
 }
 
-void perf_set_stacktrace_xlat_fn(stacktrace_xlat_fn_t fn, void *arg)
+EXPORT uint64_t perf_set_divisor(uint64_t event_divisor)
+{
+    perf_event_divisor = event_divisor;
+
+    perf_update_all_cpus();
+
+    return event_divisor;
+}
+
+EXPORT uint32_t perf_set_event_mask(uint32_t event_mask)
+{
+    perf_unit_mask = event_mask;
+
+    perf_update_all_cpus();
+
+    return event_mask;
+}
+
+EXPORT uint32_t perf_set_count_mask(uint32_t count_mask)
+{
+    perf_count_mask = count_mask;
+
+    perf_update_all_cpus();
+
+    return count_mask;
+}
+
+EXPORT uint32_t perf_get_event()
+{
+    return perf_event;
+}
+
+EXPORT uint32_t perf_get_unit_mask()
+{
+    return perf_unit_mask;
+}
+
+EXPORT uint32_t perf_get_count_mask()
+{
+    return perf_count_mask;
+}
+
+EXPORT void perf_set_stacktrace_xlat_fn(stacktrace_xlat_fn_t fn, void *arg)
 {
     stacktrace_xlat_fn = fn;
     stacktrace_xlat_fn_arg = arg;
 }
 
-void perf_stacktrace_xlat(void * const *ips, size_t count)
+EXPORT void perf_stacktrace_xlat(void * const *ips, size_t count)
 {
     if (stacktrace_xlat_fn)
         stacktrace_xlat_fn(stacktrace_xlat_fn_arg, ips, count);
 }
 
-void perf_stacktrace_decoded()
+EXPORT void perf_stacktrace_decoded()
 {
     printdbg("-------------------------------------------\n");
 
@@ -508,4 +601,68 @@ void perf_stacktrace_decoded()
     perf_stacktrace_xlat(stacktrace_addrs, frame_cnt);
 
     printdbg("-------------------------------------------\n");
+}
+
+EXPORT uint64_t perf_adj_divisor(int64_t adjustment)
+{
+    perf_event_divisor += adjustment;
+
+    if (adjustment)
+        return perf_set_divisor(perf_event_divisor);
+
+    return perf_event_divisor;
+}
+
+EXPORT uint64_t perf_get_divisor()
+{
+    return perf_event_divisor;
+}
+
+EXPORT bool perf_set_invert(bool invert)
+{
+    perf_event_invert = invert;
+
+    return invert;
+}
+
+EXPORT bool perf_get_invert()
+{
+    return perf_event_invert;
+}
+
+EXPORT uint64_t perf_get_all()
+{
+    return CPU_MSR_PERFEVTSEL_EN |
+            CPU_MSR_PERFEVTSEL_OS |
+            CPU_MSR_PERFEVTSEL_USR |
+            CPU_MSR_PERFEVTSEL_EDGE_n(perf_event_edge) |
+            CPU_MSR_PERFEVTSEL_INV_n(perf_event_invert) |
+            CPU_MSR_PERFEVTSEL_CNT_MASK_n(perf_count_mask) |
+            CPU_MSR_PERFEVTSEL_UNIT_MASK_n(perf_unit_mask) |
+            CPU_MSR_PERFEVTSEL_EVT_SEL_LO_8_n(perf_event) |
+            CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_n(perf_event >> 8);
+}
+
+EXPORT uint64_t perf_set_all(uint64_t value)
+{
+    perf_event_invert = CPU_MSR_PERFEVTSEL_INV_GET(value);
+    perf_unit_mask = CPU_MSR_PERFEVTSEL_UNIT_MASK_GET(value);
+    perf_event = CPU_MSR_PERFEVTSEL_EVT_SEL_LO_8_GET(value) |
+            (CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_GET(value) << 8);
+    perf_count_mask = CPU_MSR_PERFEVTSEL_CNT_MASK_GET(value);
+
+    perf_update_all_cpus();
+
+    return perf_get_all();
+}
+
+EXPORT bool perf_set_edge(bool edge)
+{
+    perf_event_edge = edge;
+    return edge;
+}
+
+EXPORT bool perf_get_edge()
+{
+    return perf_event_edge;
 }

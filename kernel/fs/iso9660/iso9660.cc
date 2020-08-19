@@ -261,14 +261,14 @@ int iso9660_fs_t::name_to_utf16be(
         void *utf16be_buf,
         char const *utf8)
 {
-    uint16_t *utf16be = (uint16_t*)utf16be_buf;
+    char16_t *utf16be = (char16_t*)utf16be_buf;
     int codepoint;
     char16_t utf16buf[3];
     int utf16sz;
     int out = 0;
 
     for (int i = 0; *utf8 && i < ISO9660_MAX_NAME; ++i) {
-        codepoint = utf8_to_ucs4(utf8, &utf8);
+        codepoint = utf8_to_ucs4_upd(utf8);
 
         utf16sz = ucs4_to_utf16(utf16buf, codepoint);
 
@@ -302,9 +302,9 @@ char *iso9660_fs_t::name_copy_ascii(
 char *iso9660_fs_t::name_copy_utf16be(
         char *out, void *in, size_t len)
 {
-    uint16_t const *name = (uint16_t const*)in;
+    char16_t const *name = (char16_t const*)in;
     size_t name_len = len >> 1;
-    uint16_t const *name_end = name + name_len;
+    char16_t const *name_end = name + name_len;
 
     while (name < name_end) {
         int codepoint = utf16be_to_ucs4(name, &name);
@@ -375,7 +375,7 @@ int iso9660_fs_t::name_compare_ascii(
     for (int pass = 0; pass < 2; ++pass) {
         while (find < find_limit || chk < chk_limit) {
             char32_t key_codepoint = find < find_limit
-                    ? utf8_to_ucs4(find, &find)
+                    ? utf8_to_ucs4_upd(find)
                     : ' ';
             char32_t chk_codepoint = chk < chk_limit
                     ? *chk
@@ -413,15 +413,15 @@ int iso9660_fs_t::name_compare_utf16be(
         char const *find, size_t find_len)
 {
     char const *find_end = find + find_len;
-    uint16_t const *chk = (uint16_t const *)name;
-    uint16_t const *chk_end = chk + (name_len >> 1);
+    char16_t const *chk = (char16_t const *)name;
+    char16_t const *chk_end = chk + (name_len >> 1);
 
     int cmp = 0;
 
     while ((cmp == 0) && (find < find_end || chk < chk_end)) {
         char32_t key_codepoint =
                 find < find_end
-                ? utf8_to_ucs4(find, &find)
+                ? utf8_to_ucs4_upd(find)
                 : 0;
 
         char32_t chk_codepoint =
@@ -918,12 +918,16 @@ int iso9660_fs_t::openat(fs_file_info_t **fi,
     file_handle_t *file = (file_handle_t *)handles.alloc(std::true_type());
     *fi = file;
 
+    file->fs = this;
+
     file->dirent = lookup_dirent(path + (path[0] == '/'));
 
     if (!file->dirent)
         return -int(errno_t::ENOENT);
 
-    file->content = (char*)lookup_sector(dirent_lba(file->dirent));
+    uint64_t lba = dirent_lba(file->dirent);
+
+    file->content = (char*)lookup_sector(lba);
 
     return 0;
 }

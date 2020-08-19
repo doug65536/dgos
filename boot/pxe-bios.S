@@ -22,8 +22,11 @@ early_entry:
     movw %bx,%cs:UNRELOCATED(pxenv_ofs)
     movw %es,%cs:UNRELOCATED(pxenv_seg)
 
+    // Save original stack pointer
     movw %sp,%cs:UNRELOCATED(orig_ss_sp)
     movw %ss,%cs:UNRELOCATED(orig_ss_sp+2)
+
+    // Jump to relocation code with 0xC000 cs base
     ljmp $ 0xC00,$ UNRELOCATED(reloc_self) - 0xC000
 
 orig_ss_sp:
@@ -43,19 +46,75 @@ pxenv_seg:
 
 // Linker script puts this at the end to avoid overwriting itself
 .section .text.reloc, "ax", @progbits
+.global reloc_self
 reloc_self:
 
+    // Copy potentially large quantity of data from 0x7c00 down to 0x1000
     movw $ 0x7c0,%ax
     movw %ax,%ds
     movw $ 0x100,%ax
     movw %ax,%es
-    mov $ ZEROBASED(___initialized_data_en),%cx
-    sub $ ZEROBASED(___text_st),%cx
-    shrw $ 1,%cx
+
+    // Weird offset because cs relative
+    // Use 32 bit addressing mode to allow relocation, but
+    // should resolve to value under 64KB limit though
+    // We'll find out if not when this raises #GP!
+    addr32 movl %cs:UNRELOCATED(___reloc_move_size - 0xC000),%eax
+
+    // Word count ("word" meaning 16-bit word, throughout this function)
+    // Only need to handle up to 128KB, ax is a 16 bit value now
+    shr $ 1,%eax
+
+    // dx keeps actual word count remaining
+    mov %ax,%dx
+
+.Lreloc_more:
+    // ax gets how many words we did this pass
+    mov %dx,%ax
+
+    // Skip rounding to a multiple of 8 words if it is too small
+    cmp $ 8,%ax
+    jbe .Lnot_too_large
+
+    // Round toward negative infinity to a multiple of 8 words
+    // (so advancing segments is not subject to roundoff error)
+    and $ -8,%ax
+
+    // Cap at 0x4000 16-bit words (32KB)
+    cmp $ 0x4000,%ax
+    jbe .Lnot_too_large
+
+    mov $ 0x4000,%ax
+
+.Lnot_too_large:
+
+    // Move up to 32KB from ds:0 to es:0
+    mov %ax,%cx
     xorw %si,%si
     xorw %di,%di
     cld
     rep movsw
+
+    // Subtract words done from words remaining
+    sub %ax,%dx
+    jz .Lreloc_done
+
+    // How many words divided by 8 is how many 16 byte segment paragraphs
+    shr $ 3,%ax
+
+    // Advance the segment registers that much
+    mov %ds,%si
+    mov %es,%di
+
+    add %ax,%si
+    add %ax,%di
+
+    mov %si,%ds
+    mov %di,%es
+
+    jmp .Lreloc_more
+
+.Lreloc_done:
     xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
@@ -63,6 +122,11 @@ reloc_self:
     movw %ax,%gs
 
     ljmp $ 0, $ entry
+
+.pushsection .rodata
+___reloc_move_size:
+.int ZEROBASED(___initialized_data_en)
+.popsection
 
 .section .early, "wx", @progbits
 .global entry
@@ -85,7 +149,7 @@ entry:
     jmp boot
 
 0:  lss orig_ss_sp,%sp
-    retf
+    lret
 
 .code32
 .section .text, "ax", @progbits

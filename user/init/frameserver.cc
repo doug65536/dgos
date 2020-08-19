@@ -9,7 +9,10 @@
 #include <png.h>
 #include <sys/likely.h>
 #include <sys/time.h>
+#include <fcntl.h>
+#include <inttypes.h>
 #include <assert.h>
+#include <unistd.h>
 
 #define BLITTER_DEBUG 0
 #if BLITTER_DEBUG
@@ -1653,16 +1656,16 @@ static int stress(fb_info_t const& info)
 
             int64_t fps = ns_per_sec / ns_per_frame;
 
-            printf("blitter stress, %u.%05u fps=%zu\n",
-                   (unsigned)now.tv_sec, unsigned(now.tv_nsec / 10000),
-                   (size_t)fps);
-
             // Readjust divisor each update,
             /// so we adaptively do this once per second
             divisor = fps;
             divisor_countdown = divisor;
 
-            memcpy(&since, &now, sizeof(since));
+            since = now;
+
+            printf("blitter stress, %u.%05u fps=%zu\n",
+                   (unsigned)now.tv_sec, unsigned(now.tv_nsec / 10000),
+                   (size_t)fps);
         }
 
         x += direction;
@@ -1684,6 +1687,63 @@ static int stress(fb_info_t const& info)
     return 0;
 }
 
+struct mouse_raw_event_t {
+    uint64_t timestamp;
+    int16_t hdist;
+    int16_t vdist;
+    int16_t wdist;
+    int16_t buttons;
+};
+
+static void *mouse_test(void *arg)
+{
+    fb_info_t *info = (fb_info_t*)arg;
+
+    surface_t *img = surface_from_png("/usr/share/background.png");
+
+    if (unlikely(!img))
+        return (void*)-1;
+
+    int mouse = open("/dev/mousein", O_RDONLY | O_NBLOCK);
+
+    int pos_x = 0, pos_y = 0;
+
+    if (mouse >= 0) {
+        size_t offset = 0;
+        int packet;
+
+        mouse_raw_event_t event;
+
+        while ((packet = read(mouse, (char*)&event + offset,
+                              sizeof(event) - offset))) {
+            offset += packet;
+
+            if (offset == sizeof(event)) {
+                offset = 0;
+
+//                printf("user mouse input: h=%+d, v=%+d, w=%+d"
+//                       ", buttons=%#x, ts=%#" PRIx64 "\n",
+//                       event.hdist, event.vdist, event.wdist,
+//                       event.buttons, event.timestamp);
+
+                pos_x += event.hdist;
+                pos_y -= event.vdist;
+
+                surface_draw(pos_x, pos_y,
+                             img->width, img->height,
+                             0, 0, img, info);
+            }
+        }
+
+        printf("Mouse stream closed?!\n");
+
+        close(mouse);
+        mouse = -1;
+    }
+
+    return nullptr;
+}
+
 int start_framebuffer()
 {
     fb_info_t info;
@@ -1701,5 +1761,14 @@ int start_framebuffer()
 
     translate_pixels = translate_pixels_resolver(&info);
 
-    return stress(info);
+    vga_console_ring_t *console = new (80 * 9, 25 * 16)
+            vga_console_ring_t(80 * 9, 25 * 16);
+
+    console->reset();
+
+    mouse_test(&info);
+
+    //return stress(info);
+    while (true)
+        sleep(4000);
 }

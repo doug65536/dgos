@@ -30,8 +30,6 @@ entry:
     .cfi_undefined r14
     .cfi_undefined r15
 
-    cld
-
     // Save parameter in call-preserved register
     movl %ecx,%r15d
     xorl %ebp,%ebp
@@ -59,6 +57,12 @@ entry:
     cpuid
     cmpl $ 0xB,%eax
     jb .Lapic8bit
+
+    // See if x2apic is supported
+    mov $ 1,%eax
+    cpuid
+    test $ (1 << 21),%ecx
+    jz .Lapic8bit
 
     // Read cpuid leaf 0xB, edx[31:0] contains the x2APIC ID
     movl $ 0xB,%eax

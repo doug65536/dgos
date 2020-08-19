@@ -734,7 +734,7 @@ int pci_init(void)
                 pci_iter.config.set_mmio_bar(pci_iter, bar, orig);
 
                 // Keep info
-                uint_fast8_t info = readback & ~-16;
+                //uint_fast8_t info = readback & ~-16;
 
                 // Mask off information bits 3:0
                 readback &= -16;

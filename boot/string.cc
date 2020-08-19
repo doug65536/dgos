@@ -1,4 +1,8 @@
 #include "string.h"
+#include "utf.h"
+#include "likely.h"
+#include "malloc.h"
+#include "assert.h"
 
 size_t strlen(char const *src)
 {
@@ -240,4 +244,44 @@ void *memcpy(void *dest, void const *src, size_t n)
         *d++ = *s++;
 #endif
     return dest;
+}
+
+char *utf8_from_tchar(char *block)
+{
+    return block;
+}
+
+char *utf8_from_tchar(char16_t *block)
+{
+    if (unlikely(!block))
+        return nullptr;
+
+    size_t len = 0;
+
+    char32_t codepoint;
+
+    // Measure the buffer size needed
+    for (char16_t const *in = block;
+         (codepoint = utf16_to_ucs4(in, &in)) != 0;
+         len += ucs4_to_utf8(nullptr, codepoint));
+
+    // Allocate output buffer
+    char *result = (char*)malloc(len + 1);
+
+    if (unlikely(!result))
+        return nullptr;
+
+    char *out = result;
+    if (likely(len)) {
+        for (char16_t const *in = block;
+             (codepoint = utf16_to_ucs4_upd(in)) != 0;
+             out += ucs4_to_utf8(out, codepoint));
+    } else {
+        *out = 0;
+    }
+
+    assert(result + len == out);
+    assert(result[len] == 0);
+
+    return result;
 }

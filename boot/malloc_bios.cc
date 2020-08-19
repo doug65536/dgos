@@ -26,6 +26,7 @@ _constructor(ctor_malloc) static void malloc_init_auto()
 {
     // Memory map
     //
+    // Higher address
     // +-------------------------+ <- End of free base memory below 1M
     // |  blk_hdr_t with 0 size  |
     // +-------------------------+ <- 16 byte aligned
@@ -37,6 +38,7 @@ _constructor(ctor_malloc) static void malloc_init_auto()
     // |         .data           |
     // |         .text           |
     // +-------------------------+ <- 0x1000
+    // Lower address
 
     void *st = (void*)((uintptr_t(___heap_st) + 4095) & -4096U);
     void *en = get_top_of_low_memory(st);

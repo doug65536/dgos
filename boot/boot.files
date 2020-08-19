@@ -111,7 +111,6 @@ string.cc
 string.h
 types.h
 utf.cc
-utf.h
 elf64decl.h
 exception.s
 physmem.h

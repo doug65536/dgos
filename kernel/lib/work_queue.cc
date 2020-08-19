@@ -17,8 +17,10 @@ EXPORT workq_impl* workq::percpu;
 
 void workq::init(int cpu_count)
 {
+    // Get raw memory for percpu array
     percpu = (workq_impl*)malloc(sizeof(*percpu) * cpu_count);
 
+    // Placement construct each
     for (int i = 0; i < cpu_count; ++i)
         new (percpu + i) workq_impl(i);
 }
@@ -191,7 +193,8 @@ void workq_alloc::free_slot(size_t i)
 
 workq_impl::workq_impl(uint32_t cpu_nr)
 {
-    tid = thread_create(worker, this, "workq", 0, false, false,
+    tid = thread_create(nullptr,
+                        worker, this, "workq", 0, false, false,
                         thread_cpu_mask_t(cpu_nr));
 }
 

@@ -38,9 +38,14 @@ EXPORT void mmu_phys_allocator_t::add_free_space(
     entry_t index = index_from_addr(free_end) - 1;
     while (size != 0) {
         assert(index < highest_usable);
-        assert(entries[index] == entry_t(-1));
+
+        if (unlikely(!assert(entries[index] == entry_t(-1))))
+            panic("Invald memory map overlap\n");
+
         entries[index] = next_free;
+
         next_free = index;
+
         --index;
         size -= pagesz;
         ++free_page_count;

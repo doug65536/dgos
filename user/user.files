@@ -24,6 +24,8 @@ libwing/window.cc
 include/png.h
 include/surface.h
 libpng/surface.cc
+libutf/utf.cc
+libutf/utf.h
 zlib/adler32.c
 zlib/compress.c
 zlib/crc32.c

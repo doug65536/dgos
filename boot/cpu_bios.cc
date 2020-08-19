@@ -5,6 +5,7 @@
 #include "bioscall.h"
 #include "elf64decl.h"
 
+_section(".lowdata")
 bool cpu_a20_need_toggle;
 
 void cpu_a20_enterpm()
@@ -153,8 +154,12 @@ void run_code64(void (*fn)(void *), void *arg)
         // Now in 64 bit compatibility mode (still really 32 bit)
 
         // Far call to selector that has L bit set (64 bit)
-        "lea 6+idtr_64,%%eax\n\t"
-        "lcall %[gdt_code64],$ 0f\n\t"
+        "mov $ 6+idtr_64,%%eax\n\t"
+        "push $ 2f\n\t"
+        "push %[gdt_code64]\n\t"
+        "push $ 0f\n\t"
+        "lret\n\t"
+        "2:\n\t"
 
         // Returned from long mode, back to compatibility mode
 
@@ -171,6 +176,10 @@ void run_code64(void (*fn)(void *), void *arg)
         // Long mode
         ".code64\n\t"
         "0:\n\t"
+
+        // For debugger use
+        ".global long_mode_entry\n\t"
+        "long_mode_entry:"
 
         "lidtq (%%eax)\n\t"
 
@@ -215,7 +224,7 @@ void run_code64(void (*fn)(void *), void *arg)
         ".code32\n\t"
         "0:\n\t"
 
-        "lea 2+idtr_16,%%esi\n\t"
+        "mov $ 2+idtr_16,%%esi\n\t"
         "lidt (%%esi)\n\t"
         :
         : [params] "b" (&params)
@@ -244,23 +253,6 @@ void run_code64(void (*fn)(void *), void *arg)
 // 64-bit assembly code
 
 extern "C" void code64_run_kernel(void *p);
-extern "C" void code64_reloc_kernel(void *p);
-extern "C" void code64_copy_kernel(void *p);
-
-void reloc_kernel(uint64_t distance, Elf64_Rela const *elf_rela, size_t relcnt)
-{
-    struct {
-        uint64_t distance;
-        void const *elf_rela;
-        size_t relcnt;
-    } arg = {
-        distance,
-        elf_rela,
-        relcnt
-    };
-
-    run_code64(code64_reloc_kernel, &arg);
-}
 
 void run_kernel(uint64_t entry, void *param)
 {
@@ -275,19 +267,4 @@ void run_kernel(uint64_t entry, void *param)
     run_code64(code64_run_kernel, &arg);
 
     __builtin_unreachable();
-}
-
-void copy_kernel(uint64_t dest_addr, void *src, size_t sz)
-{
-    struct {
-        uint64_t dest_addr;
-        void *src;
-        size_t sz;
-    } arg = {
-        dest_addr,
-        src,
-        sz
-    };
-
-    run_code64(code64_copy_kernel, &arg);
 }

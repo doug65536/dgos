@@ -233,7 +233,7 @@ struct process_t
     _noreturn
     void exit_thread(thread_t tid, int exitcode);
 
-    bool add_thread(thread_t tid);
+    bool add_thread(thread_t tid, scoped_lock& lock);
     bool del_thread(thread_t tid);
 
     static int wait_for_exit(int pid);
@@ -246,6 +246,11 @@ struct process_t
     int clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
               void *child_stack, int flags,
               void *(*fn)(void *), void *arg);
+
+    static int kill(int pid, int sig);
+
+    int send_signal(int sig);
+    int send_signal_to_self(int sig);
 
     void *create_tls();
 

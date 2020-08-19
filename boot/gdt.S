@@ -1,7 +1,7 @@
 #include "gdt_sel.h"
 #include "gdt_macros.h"
 
-.section .data, "aw", @progbits
+.section .low, "aw", @progbits
 
 .global gdt
 .global gdtr

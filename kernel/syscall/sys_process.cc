@@ -467,3 +467,19 @@ long sys_clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
 
     return this_process->clone(bootstrap, child_stack, flags, fn, arg);
 }
+
+int sys_kill(int pid, int sig)
+{
+    return process_t::kill(pid, sig);
+}
+
+unsigned sys_sleep(unsigned ms)
+{
+    uint64_t st = time_ns();
+
+    thread_sleep_for(ms);
+
+    uint64_t en = time_ns();
+
+    return (en - st) / 1000000;
+}

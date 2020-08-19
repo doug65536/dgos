@@ -107,7 +107,7 @@ static int test_run_thread(void *)
         printdbg("All tests passed!\n");
 
     } else {
-        printdbg("FAILED!\n");
+        printdbg("Test failures: %zu!\n", ctx.failure_count());
         return 1;
     }
     return 0;
@@ -118,7 +118,8 @@ int module_main(int argc, char const * const * argv)
 #if 0
     test_run_thread(nullptr);
 #else
-    int tid = thread_create(test_run_thread, nullptr,
+    int tid = thread_create(nullptr,
+                            test_run_thread, nullptr,
                             "unittest", 0, false, false);
 
     thread_close(tid);
@@ -160,6 +161,12 @@ unittest::unit::unit(const char *name, const char *test_file,
 void unittest::unit::fail(char const *file, int line)
 {
     printk("Test failed: %s %s(%d)\n", name, file, line);
+    ctx->fail(this, file, line);
+}
+
+void unittest::unit::fail(const char *message, const char *file, int line)
+{
+    printk("Test failed: %s %s(%d): %s\n", name, file, line, message);
     ctx->fail(this, file, line);
 }
 
@@ -207,7 +214,8 @@ void unittest::unit::run_all(unit_ctx *ctx)
         if (likely(!it->float_thread())) {
             it->invoke();
         } else {
-            thread_t tid = thread_create(&unit::thread_fn, it,
+            thread_t tid = thread_create(nullptr,
+                    &unit::thread_fn, it,
                     "threaded_unit_test", 0, true, true);
             int cpu_nr = thread_current_cpu(tid);
             printdbg("Test thread cpu nr %d\n", cpu_nr);

@@ -37,7 +37,8 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
 
 void apic_config_cpu();
 
-void apic_hook_perf_local_irq(intr_handler_t handler, char const *name);
+void apic_hook_perf_local_irq(intr_handler_t handler, char const *name,
+                              bool direct);
 
 int acpi_have8259pic(void);
 

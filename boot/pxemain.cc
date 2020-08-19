@@ -156,11 +156,19 @@ public:
         return true;
     }
 
-    bool open(char const *filename)
+    static char const *drop_path(char const *filename)
     {
         char const *first_slash;
+
         while ((first_slash = strchr(filename, '/')) != nullptr)
-            filename = first_slash + 1;;
+            filename = first_slash + 1;
+
+        return filename;
+    }
+
+    bool open(char const *filename)
+    {
+        filename = drop_path(filename);
 
         if (unlikely(!set_filename(filename)))
             return false;
@@ -172,9 +180,6 @@ public:
         block_size = pxe_api_tftp_open(filename, 1024);
         if (unlikely(block_size < 0))
             return false;
-
-        // Don't know size until we get a packet smaller than the block size
-        size = -1;
 
         return block_size > 0;
     }

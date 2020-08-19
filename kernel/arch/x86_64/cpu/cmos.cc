@@ -263,8 +263,8 @@ EXPORT time_of_day_t cmos_gettimeofday()
 
     time_of_day_t result = time_of_day;
     uint64_t now = time_ns();
-    uint64_t adj = now - time_of_day_timestamp;
-    result.centisec = adj / 10000000;
+    uint64_t since_known_tod = now - time_of_day_timestamp;
+    result.centisec = since_known_tod / 10000000;
 
     if (unlikely(result.centisec >= 100))
         result.centisec = 99;

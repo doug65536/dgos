@@ -892,7 +892,7 @@ public:
     int port_trim(unsigned port_num, void *data, size_t size, iocp_t *iocp);
     void port_set_offline(unsigned port_num, bool offline);
 
-    unsigned get_sector_size(unsigned port);
+    unsigned get_log2_sector_size(unsigned port);
     void configure_trim(unsigned port_num, bool enable);
     void configure_ncq(unsigned port_num, bool enable, uint8_t queue_depth);
     void configure_48bit(unsigned port_num, bool enable);
@@ -1307,9 +1307,9 @@ void ahci_if_t::port_start_all()
     }
 }
 
-unsigned ahci_if_t::get_sector_size(unsigned port)
+unsigned ahci_if_t::get_log2_sector_size(unsigned port)
 {
-    return UINT32_C(1) << port_info[port].log2_sector_size;
+    return port_info[port].log2_sector_size;
 }
 
 void ahci_if_t::configure_trim(unsigned port_num, bool enable)
@@ -2233,7 +2233,10 @@ long ahci_dev_t::info(storage_dev_info_t key)
 {
     switch (key) {
     case STORAGE_INFO_BLOCKSIZE:
-        return iface->get_sector_size(port);
+        return 1L << iface->get_log2_sector_size(port);
+
+    case STORAGE_INFO_BLOCKSIZE_LOG2:
+        return iface->get_log2_sector_size(port);
 
     case STORAGE_INFO_HAVE_TRIM:
         return 0;

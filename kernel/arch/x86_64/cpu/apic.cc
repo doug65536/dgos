@@ -36,6 +36,7 @@
 #include "inttypes.h"
 #include "work_queue.h"
 #include "stdlib.h"
+#include "idt.h"
 
 #define ENABLE_ACPI 1
 
@@ -57,7 +58,7 @@
 
 #define MPS_ERROR(...) printk("mp: " __VA_ARGS__)
 
-#define DEBUG_APIC  1
+#define DEBUG_APIC  0
 #if DEBUG_APIC
 #define APIC_TRACE(...) printdbg("lapic: " __VA_ARGS__)
 #else
@@ -1865,7 +1866,7 @@ int apic_init(int ap)
     if (!apic_base)
         apic_base = apic_base_msr & CPU_APIC_BASE_ADDR;
 
-    if (!(apic_base_msr & CPU_APIC_BASE_GENABLE)) {
+    if (unlikely(!(apic_base_msr & CPU_APIC_BASE_GENABLE))) {
         APIC_TRACE("APIC was globally disabled!"
                    " Enabling...\n");
     }
@@ -1952,10 +1953,19 @@ static void apic_detect_topology_amd(void)
 {
     cpuid_t info;
 
+    // Assume single core in the very unlikely case of no topology info
+    topo_core_bits = 0;
+    topo_thread_bits = 0;
+    topo_core_count = 1;
+    topo_thread_count = 1;
+    topo_cpu_count = 1;
+
     if (unlikely(!cpuid(&info, 1, 0)))
         return;
 
-    topo_thread_count = ((info.ebx >> 16) & 0xFF) + 1;
+    // Read the total number of logical processors in the package
+    topo_thread_count = ((info.ebx >> 16) & 0xFF);
+    topo_thread_count = topo_thread_count ? topo_thread_count : 1;
 
     if (cpuid(&info, 0x80000008, 0)) {
         // First check ECX bits 12 to 15,
@@ -1971,6 +1981,8 @@ static void apic_detect_topology_amd(void)
             // topo_core_count = ecx[15:12]
             topo_core_count = (info.ecx & 0xFF) + 1;
             topo_core_bits = bit_log2(topo_core_count);
+        } else {
+            topo_core_count = 1 << topo_core_bits;
         }
 
         topo_thread_bits = bit_log2(topo_thread_count >> topo_core_bits);
@@ -2968,13 +2980,22 @@ void lapic_kvm_t::paravirt_eoi() noexcept
 {
     uint32_t cpu_nr = thread_cpu_number();
     // It was not set, cannot do paravirtualized EOI
-    if (unlikely(!atomic_btr(&cpus[cpu_nr].values[0], 0)))
+    if (unlikely(!atomic_btr(&cpus[cpu_nr].values[0], 0))) {
+        printdbg("Paravirtualized EOI took slow path!\n");
         lapic_x2_t::write32(APIC_REG_EOI, 0);
+    } else {
+        printdbg("Paravirtualized EOI!\n");
+    }
 }
 
-void apic_hook_perf_local_irq(intr_handler_t handler, char const *name)
+void apic_hook_perf_local_irq(intr_handler_t handler, char const *name,
+                              bool direct)
 {
-    intr_hook(INTR_EX_NMI, handler, name, eoi_none);
+    if (!direct)
+        intr_hook(INTR_EX_NMI, handler, name, eoi_none);
+    else
+        isr_lookup[INTR_EX_NMI] = handler;
+
     apic->write32(APIC_REG_LVT_PMCR,
                   APIC_LVT_VECTOR_n(INTR_EX_NMI) |
                   APIC_LVT_DELIVERY_n(APIC_LVT_DELIVERY_NMI));

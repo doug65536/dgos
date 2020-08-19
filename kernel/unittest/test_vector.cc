@@ -412,7 +412,6 @@ DISABLED_UNITTEST(test_vector_lifecycle)
 #include "rand.h"
 #include "hash.h"
 
-
 _const
 static size_t mem_fill_value(size_t input)
 {

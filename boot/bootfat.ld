@@ -8,9 +8,8 @@ SECTIONS {
 		KEEP(*(.early))
 
 		/* --- additional sectors --- */
-		*(.text)
-		*(.text.*)
-		*(.text.unlikely)
+		KEEP(*(.low))
+		KEEP(*(.lowdata))
 
 		. = ALIGN(4);
 		PROVIDE(__init_array_start = .);
@@ -33,11 +32,6 @@ SECTIONS {
 		/* Place 64 bit code high enough to be outside first 4KB */
 		*(.text.code64)
 
-		*(.data)
-		*(.data.*)
-		*(.rodata)
-		*(.rodata.*)
-
 		___smp_st = .;
 		KEEP(*(.smp.entry))
 		KEEP(*(.smp.text))
@@ -51,9 +45,7 @@ SECTIONS {
 		/* sector align end */
 		. = ALIGN(512);
 		___initialized_data_en = .;
-	} = 0
 
-	.bss : {
 		___bss_st = .;
 		*(.bss)
 		*(.bss.*)
@@ -61,10 +53,20 @@ SECTIONS {
 		*(COMMON.*)
 		*(COMMON*)
 		___bss_en = .;
-	}
 
+		*(.text)
+		*(.text.*)
+		*(.text.unlikely)
+
+		*(.data)
+		*(.data.*)
+		*(.rodata)
+		*(.rodata.*)
+	} = 0
+
+	. = ABSOLUTE(0x20000);
 	___initial_stack_limit = .;
-	. = ABSOLUTE(0xFFF0);
+	. = ABSOLUTE(0x30000);
 	___initial_stack = .;
 	. += 16;
 	___heap_st = .;

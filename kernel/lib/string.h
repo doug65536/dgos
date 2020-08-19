@@ -3,6 +3,7 @@
 #include "types.h"
 #include "cpu/nontemporal.h"
 #include "type_traits.h"
+#include "utf.h"
 
 __BEGIN_DECLS
 
@@ -37,17 +38,6 @@ size_t strcspn(char const *src, char const *chars);
 
 char *strncpy(char * restrict dest, char const * restrict src, size_t n);
 char *strncat(char * restrict dest, char const * restrict src, size_t n);
-
-int ucs4_to_utf8(char *out, char32_t in);
-int ucs4_to_utf16(char16_t *out, char32_t in);
-char32_t utf8_to_ucs4(char const *in, char const **ret_end);
-char32_t utf8_to_ucs4_upd(char const *&in);
-
-char32_t utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
-char32_t utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
-
-size_t utf8_count(char const *in);
-size_t utf16_count(uint16_t const *in);
 
 void *aligned16_memset(void *dest, int c, size_t n);
 
