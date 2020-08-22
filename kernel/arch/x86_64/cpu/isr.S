@@ -1661,7 +1661,7 @@ __module_dynlink_plt_thunk:
 cs_leave_asm:
     .cfi_startproc
     xorl %eax,%eax
-    decl %gs:CPU_INFO_LOCKS_HELD_OFS
+    addl $ -1,%gs:CPU_INFO_LOCKS_HELD_OFS
     js .Lpanic
     jnz .Lreturn
 
@@ -1837,7 +1837,7 @@ nofault_strncpy:
     movb %cl,(%rdi,%rax)
     test %cl,%cl
     jz .Lnofault_strncpy_done
-    inc %rax
+    add $ 1,%rax
     cmp %rdx,%rax
     jb .Lnofault_strncpy_loop
 
@@ -1928,7 +1928,7 @@ nofault_strnlen:
     jz .Lnofault_strnlen_done
 
     // Rather use simplest addressing mode above and increment two registers
-    inc %rax
+    add $ 1,%rax
 
     // Continue looping if the offset has not reached the maximum yet
     cmp %rsi,%rax

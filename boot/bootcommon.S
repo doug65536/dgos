@@ -320,7 +320,7 @@ idt_init:
     movw $ 0,4(%edx,%ecx,8)
     movw $ 0x8e,5(%edx,%ecx,8)
     movw $ 0,6(%edx,%ecx,8)
-    incl %ecx
+    addl $ 1,%ecx
     cmpl $ 32,%ecx
     jb 0b
 
@@ -351,15 +351,15 @@ cpu_a20_check:
     movw %ax,%es
 
     // Zero ax
-    incl %eax
+    addl $ 1,%eax
 
     // cpu_a20_chk = wraparound(cpu_a20_chk) + 1
     movb %es:cpu_a20_chk + 0x10,%al
-    incb %al
+    addb $ 1,%al
     movb %al,cpu_a20_chk
 
     // If wraparound(cpu_a20_chk) has not changed, a20 is on
-    decb %al
+    addb $ -1,%al
     cmpb %al,%es:cpu_a20_chk + 0x10
     sete %al
 
@@ -375,7 +375,7 @@ cpu_a20_wait:
 
     // cpu_a20_chk = wraparound(cpu_a20_chk) + 1
 0:  movb cpu_a20_chk + 0x100000,%al
-    incb %al
+    addb $ 1,%al
     movb %al,cpu_a20_chk
 
     // If wraparound(cpu_a20_chk) has not changed, a20 is on

@@ -184,7 +184,7 @@ isr_handler:
 	mov 8(%r10,%r13,8),%rsi
 	call hex16_out
 
-	inc %r13d
+	add $ 1,%r13d
 	cmp $ 14,%r13d
 	jb 1b
 
@@ -199,7 +199,7 @@ isr_handler:
 #      %al=0
 text_out:
 	movb (%rsi),%al
-	incq %rsi
+	add $ 1,%rsi
 	test %al,%al
 	jz 0f
 	movw %ax,(%rdi)

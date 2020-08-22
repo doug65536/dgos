@@ -114,7 +114,7 @@ boot_gpt:
     jmp boot_partition
 
 .Lpart_no_good:
-    incb dap_lba(%si)
+    addb $ 1,dap_lba(%si)
     cmpb $ 34,dap_lba(%si)
     jb .Lanother_gpt
 

@@ -5,9 +5,9 @@ template<ptrdiff_t ofs = 0>
 static _always_inline void cpu_gs_inc()
 {
     __asm__ __volatile__ (
-        "incl %%gs:%c[ofs]\n\t"
+        "addl $ 1,%%gs:(%[ofs])\n\t"
         :
-        : [ofs] "i" (ofs)
+        : [ofs] "r" (ofs)
         : "cc"
     );
 }
