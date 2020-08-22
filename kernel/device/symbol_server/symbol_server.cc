@@ -6,6 +6,64 @@
 #include "elf64.h"
 #include "cpu/perf.h"
 
+struct perf_ctr_t {
+    char const *text;
+    uint32_t event;
+
+} zen2_events[] = {
+
+/*
+{"Execution-Time Branch Misprediction Ratio (Non-Speculative)", Event[0x4300C3] / Event[0x4300C2]}
+{"All L2 Cache Accesses" Event[0x43F960] + Event[0x431F70] + Event[0x431F71] + Event[0x431F72]}
+{ "L2 Cache Access from L2 HWPF", Event[0x431F70] + Event[0x431F71] +
+                Event[0x431F72] },
+{ "All L2 Cache Misses", Event[0x430964] + Event[0x431F71] + Event[0x431F72]
+{ "L2 Cache Miss from L2 HWPF", Event[0x431F71] + Event[0x431F72]
+{ "All L2 Cache Hits", Event[0x43F664] + Event[0x431F70]
+*/
+    { "All DC Accesses", 0x430729 },
+    { "L2 Cache Access from IC Miss (including prefetch)", 0x431060 },
+    { "L2 Cache Access from DC Miss (including Prefetch)", 0x43C860 },
+    { "L2 Cache Miss from IC Miss", 0x430164 },
+    { "L2 Cache Miss from DC Miss", 0x430864 },
+    { "L2 Cache Hit from IC Miss", 0x430664 },
+    { "L2 Cache Hit from DC Miss", 0x437064 },
+    { "L2 Cache Hit from L2 HWPF", 0x431F70 },
+    { "L2 ITLB Misses & Instruction page walk", 0x430785 },
+    { "L1 DTLB Misses", 0x43FF45 },
+    { "L2 DTLB Misses & Data page walk", 0x43F045 },
+    { "All TLBs Flushed", 0x43DF78 },
+    { "Micro-ops Dispatched", 0x4303AA },
+    { "Mixed SSE/AVX Stall", 0x430E0E },
+    { "Micro-ops Retired", 0x4300C1 },
+    { "Retired CLFLUSH Instruction", 0x430026 },
+    { "SMI Received", 0x43002B },
+    { "Interrupts Taken", 0x43002C },
+    { "TSC Reads", 0x43002D },
+    { "STLF", 0x430035 },
+    { "Misaligned Loads", 0x430047 },
+    { "Cycles Not Halted", 0x430076 },
+    { "TLB Flush", 0x430078 },
+    { "Instruction refill from L2", 0x430082 },
+    { "Instruction refill from System", 0x430083 },
+    { "L1ITLB miss, L2ITLB hit", 0x430084 },
+    { "L1ITLB miss, L2ITLB miss", 0x430085 },
+    { "L1BP override", 0x43008A },
+    { "L2BP override", 0x43008B },
+    { "Dynamic indirect prediction", 0x43008E },
+    { "Retired Branch", 0x4300C2 },
+    { "Retired Branch Mispredicted", 0x4300C3 },
+    { "Retired Taken Branch", 0x4300C4 },
+    { "Retired Far Control Transfer", 0x4300C4 },
+    { "Retired Return Mispredicted", 0x4300C9 },
+    { "Retired Indirect Branch Mispredicted", 0x4300CA },
+    { "Retired SSE Instruction", 0x4304CB },
+    { "Retired MMX Instruction", 0x4302CB },
+    { "Retired x87 Instruction", 0x4301CB },
+    { "Div Busy", 0x4300D3 },
+    { "Div Op", 0x4300D4 },
+};
+
 class symbol_server_t {
     uart_dev_t *port = nullptr;
     thread_t tid = -1;
@@ -177,6 +235,26 @@ class symbol_server_t {
         return ext::string(length - digits.length(), '0');
     }
 
+    static int lookup_event_index(uint32_t full)
+    {
+        for (size_t i = 0, e = countof(zen2_events); i != e; ++i) {
+            if (zen2_events[i].event == full)
+                return i;
+        }
+
+        return -1;
+    }
+
+    static char const *lookup_event_description(uint32_t full)
+    {
+        int i = lookup_event_index(full);
+
+        if (i >= 0)
+            return zen2_events[i].text;
+
+        return "Unknown";
+    }
+
 #define YELLOW_STR(str) "\x1b" "[33m" str "\x1b" "[0m"
 
     void modal_top(uint64_t total_samples, char command)
@@ -256,6 +334,12 @@ class symbol_server_t {
 
             port->wrstr("\r\n");
 
+            port->wrstr("  (" YELLOW_STR("np") ") event description: ");
+            port->write(lookup_event_description(perf_get_all()));
+            clear_to_eol();
+
+            port->wrstr("\r\n");
+
             size_t cpu_count;
             cpu_count = thread_get_cpu_count();
             unsigned usage_x1M_total = 0;
@@ -293,19 +377,19 @@ class symbol_server_t {
                     now + std::chrono::seconds(1);
 
             if (auto_divisor) {
-                if (delta_samples <= 1000)
+                if (delta_samples <= 125)
                     perf_set_divisor(std::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 4));
-                else if (delta_samples <= 2000)
+                else if (delta_samples <= 150)
                     perf_set_divisor(std::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 2));
-                else if (delta_samples >= 32000)
+                else if (delta_samples >= 2400)
                     perf_set_divisor(std::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 8));
-                else if (delta_samples >= 16000)
+                else if (delta_samples >= 1200)
                     perf_set_divisor(std::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 4));
-                else if (delta_samples >= 8000)
+                else if (delta_samples >= 600)
                     perf_set_divisor(std::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 2));
             }
@@ -361,13 +445,27 @@ class symbol_server_t {
                     prompt_change_event(input);
                     break;
 
-
                 case 'z':
                     enable_zeroing();
                     break;
 
                 case 'Z':
                     disable_zeroing();
+                    break;
+
+                case 'n':
+                    int event_index;
+                    event_index = lookup_event_index(perf_get_all());
+                    if (++event_index >= (int)countof(zen2_events))
+                        event_index = 0;
+                    perf_set_all(zen2_events[event_index].event);
+                    break;
+
+                case 'p':
+                    event_index = lookup_event_index(perf_get_all());
+                    if (event_index-- == 0)
+                        event_index = countof(zen2_events) - 1;
+                    perf_set_all(zen2_events[event_index].event);
                     break;
 
                 case '\x1b':
