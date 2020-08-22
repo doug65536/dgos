@@ -78,21 +78,21 @@ EXPORT bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
 
     for (int spin = 0; result; pause(), ++spin) {
         // Spin outside lock until spin limit
-        if (spin < mutex->spin_count && mutex->owner >= 0)
+        if (unlikely(spin < mutex->spin_count && mutex->owner >= 0))
             continue;
 
         // Lock the mutex to acquire it or manipulate wait chain
-        if (!spinlock_try_lock_until(&mutex->lock, timeout_time))
+        if (unlikely(!spinlock_try_lock_until(&mutex->lock, timeout_time)))
             return false;
 
         // Check again inside lock
-        if (spin < mutex->spin_count && mutex->owner >= 0) {
+        if (unlikely(spin < mutex->spin_count && mutex->owner >= 0)) {
             // Racing thread beat us, go back to spinning outside lock
             spinlock_unlock(&mutex->lock);
             continue;
         }
 
-        if (mutex->owner < 0) {
+        if (likely(mutex->owner < 0)) {
             // Take ownership
             mutex->owner = thread_get_id();
 
@@ -100,8 +100,8 @@ EXPORT bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
                          (void*)mutex, mutex->owner);
 
             // Increase spin count
-            if (mutex->spin_count < SPINCOUNT_MAX)
-                mutex->spin_count -= spincount_mask;
+            mutex->spin_count -= -(mutex->spin_count < SPINCOUNT_MAX) &
+                    spincount_mask;
 
             break;
         }
@@ -110,8 +110,8 @@ EXPORT bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
         thread_wait_t wait;
 
         // Decrease spin count
-        if (mutex->spin_count > SPINCOUNT_MIN)
-            mutex->spin_count += spincount_mask;
+        mutex->spin_count += -(mutex->spin_count > SPINCOUNT_MIN) &
+                spincount_mask;
 
         MUTEX_DTRACE("Adding to waitchain of %p\n", (void*)mutex);
 
@@ -124,7 +124,7 @@ EXPORT bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
         // note: returns with mutex->lock unlocked!
         result = thread_sleep_release(&mutex->lock, &wait.thread, timeout_time);
 
-        if (result) {
+        if (likely(result)) {
             assert(wait.link.next == nullptr);
             assert(wait.link.prev == nullptr);
             assert(mutex->owner == wait.thread);
@@ -147,20 +147,20 @@ EXPORT bool mutex_lock(mutex_t *mutex)
 
     for (int spin = 0; result; pause(), ++spin) {
         // Spin outside lock until spin limit
-        if (spin < mutex->spin_count && mutex->owner >= 0)
+        if (unlikely(spin < mutex->spin_count && mutex->owner >= 0))
             continue;
 
         // Lock the mutex to acquire it or manipulate wait chain
         spinlock_lock(&mutex->lock);
 
         // Check again inside lock
-        if (spin < mutex->spin_count && mutex->owner >= 0) {
+        if (unlikely(spin < mutex->spin_count && mutex->owner >= 0)) {
             // Racing thread beat us, go back to spinning outside lock
             spinlock_unlock(&mutex->lock);
             continue;
         }
 
-        if (mutex->owner < 0) {
+        if (likely(mutex->owner < 0)) {
             // Take ownership
             mutex->owner = thread_get_id();
 
@@ -168,8 +168,8 @@ EXPORT bool mutex_lock(mutex_t *mutex)
                          (void*)mutex, mutex->owner);
 
             // Increase spin count
-            if (mutex->spin_count < SPINCOUNT_MAX)
-                mutex->spin_count -= spincount_mask;
+            mutex->spin_count -= -(mutex->spin_count < SPINCOUNT_MAX) &
+                spincount_mask;
 
             break;
         }
@@ -178,8 +178,8 @@ EXPORT bool mutex_lock(mutex_t *mutex)
         thread_wait_t wait;
 
         // Decrease spin count
-        if (mutex->spin_count > SPINCOUNT_MIN)
-            mutex->spin_count += spincount_mask;
+        mutex->spin_count += -(mutex->spin_count < SPINCOUNT_MAX) &
+            spincount_mask;
 
         MUTEX_DTRACE("Adding to waitchain of %p\n", (void*)mutex);
 
@@ -192,7 +192,7 @@ EXPORT bool mutex_lock(mutex_t *mutex)
         // note: returns with mutex->lock unlocked!
         result = thread_sleep_release(&mutex->lock, &wait.thread, UINT64_MAX);
 
-        if (result) {
+        if (likely(result)) {
             assert(wait.link.next == nullptr);
             assert(wait.link.prev == nullptr);
             assert(mutex->owner == wait.thread);
@@ -214,8 +214,14 @@ EXPORT void mutex_unlock(mutex_t *mutex)
     atomic_barrier();
     assert(mutex->owner == thread_get_id());
 
-    // See if any threads are waiting
-    if (mutex->link.next != &mutex->link) {
+    // Expect no threads waiting
+    if (likely(mutex->link.next == &mutex->link)) {
+        // No waiters
+        MUTEX_DTRACE("Mutex unlock waking waiter, old_tid=%d, new_tid=none\n",
+                     mutex->owner);
+        mutex->owner = -1;
+        spinlock_unlock(&mutex->lock);
+    } else {
         // Wake up the first waiter
         thread_wait_t *waiter = (thread_wait_t*)mutex->link.next;
         thread_wait_del(&waiter->link);
@@ -225,12 +231,6 @@ EXPORT void mutex_unlock(mutex_t *mutex)
         mutex->owner = waked_thread;
         spinlock_unlock(&mutex->lock);
         thread_resume(waked_thread, 1);
-    } else {
-        // No waiters
-        MUTEX_DTRACE("Mutex unlock waking waiter, old_tid=%d, new_tid=none\n",
-                     mutex->owner);
-        mutex->owner = -1;
-        spinlock_unlock(&mutex->lock);
     }
 }
 
@@ -279,8 +279,8 @@ EXPORT bool rwlock_ex_try_lock(rwlock_t *rwlock)
 
     bool result = false;
 
-    if (rwlock->reader_count == 0 &&
-            rwlock->ex_link.next == &rwlock->ex_link) {
+    if (likely(rwlock->reader_count == 0 &&
+            rwlock->ex_link.next == &rwlock->ex_link)) {
         // Acquire exclusive lock
         rwlock->reader_count = -tid;
 
@@ -301,21 +301,21 @@ EXPORT bool rwlock_ex_lock(rwlock_t *rwlock, uint64_t timeout_time)
     for (bool done = false; result && !done; pause(), ++spin) {
         // Spin only if someone has exclusive lock
         // and there are no waiting writers
-        if (spin < rwlock->spin_count &&
+        if (unlikely(spin < rwlock->spin_count &&
                 rwlock->reader_count < 0 &&
-                rwlock->ex_link.next == &rwlock->ex_link)
+                rwlock->ex_link.next == &rwlock->ex_link))
             continue;
 
         spinlock_lock(&rwlock->lock);
 
         // If there is no owner and there is no next writer
-        if (rwlock->reader_count == 0 &&
-                rwlock->ex_link.next == &rwlock->ex_link) {
+        if (likely(rwlock->reader_count == 0 &&
+                rwlock->ex_link.next == &rwlock->ex_link)) {
             // Acquire exclusive lock
             rwlock->reader_count = -tid;
 
             done = true;
-        } else if (spin >= rwlock->spin_count) {
+        } else if (unlikely(spin >= rwlock->spin_count)) {
             thread_wait_t wait;
 
             // Spinning did not help, so try to reduce spin count by one
@@ -354,7 +354,7 @@ EXPORT bool rwlock_upgrade(rwlock_t *rwlock, uint64_t timeout_time)
 
     assert(rwlock->reader_count > 0);
 
-    if (rwlock->reader_count == 1) {
+    if (likely(rwlock->reader_count == 1)) {
         // I am the only reader, direct upgrade
         rwlock->reader_count = -tid;
     } else {
@@ -367,7 +367,7 @@ EXPORT bool rwlock_upgrade(rwlock_t *rwlock, uint64_t timeout_time)
         result = thread_sleep_release(&rwlock->lock, &wait.thread,
                                       timeout_time);
 
-        if (result) {
+        if (likely(result)) {
             assert(wait.thread == tid);
             assert(wait.link.next == nullptr);
             assert(wait.link.prev == nullptr);
@@ -425,8 +425,8 @@ EXPORT bool rwlock_sh_try_lock(rwlock_t *rwlock)
 
     bool result = false;
 
-    if (rwlock->reader_count >= 0 &&
-            rwlock->ex_link.next == &rwlock->ex_link) {
+    if (likely(rwlock->reader_count >= 0 &&
+            rwlock->ex_link.next == &rwlock->ex_link)) {
         ++rwlock->reader_count;
         result = true;
     }
@@ -444,16 +444,16 @@ EXPORT bool rwlock_sh_lock(rwlock_t *rwlock, uint64_t timeout_time)
         // Spin outside lock until spin limit
         //  while the exclusive lock is held, and,
         //  there is a next writer
-        if (spin < rwlock->spin_count &&
+        if (unlikely(spin < rwlock->spin_count &&
                 rwlock->reader_count < 0 &&
-                rwlock->ex_link.next == &rwlock->ex_link)
+                rwlock->ex_link.next == &rwlock->ex_link))
             continue;
 
         spinlock_lock(&rwlock->lock);
 
         // If there is no exclusive owner and there is no next writer
-        if (rwlock->reader_count >= 0 &&
-                rwlock->ex_link.next == &rwlock->ex_link) {
+        if (likely(rwlock->reader_count >= 0 &&
+                rwlock->ex_link.next == &rwlock->ex_link)) {
             // Acquire exclusive lock
             ++rwlock->reader_count;
 
@@ -473,7 +473,7 @@ EXPORT bool rwlock_sh_lock(rwlock_t *rwlock, uint64_t timeout_time)
             result = thread_sleep_release(&rwlock->lock, &wait.thread,
                                           timeout_time);
 
-            if (result) {
+            if (likely(result)) {
                 // We were awakened
                 assert(wait.link.next == nullptr);
                 assert(wait.link.prev == nullptr);
@@ -498,7 +498,8 @@ EXPORT void rwlock_sh_unlock(rwlock_t *rwlock)
     assert(rwlock->reader_count > 0);
     --rwlock->reader_count;
 
-    if (!rwlock->reader_count && rwlock->ex_link.next != &rwlock->ex_link) {
+    if (unlikely(!rwlock->reader_count &&
+                 rwlock->ex_link.next != &rwlock->ex_link)) {
         // Wake first exclusive waiter
         thread_wait_t *waiter = (thread_wait_t*)rwlock->ex_link.next;
         thread_wait_del(&waiter->link);
@@ -536,7 +537,7 @@ EXPORT void condvar_destroy(condition_var_t *var)
     // Unlink every waiter from the condition variable
     // Might as well go in reverse order, most likely to be cached
     for (thread_wait_link_t *prev, *node = var->link.prev;
-         node != &var->link; node = prev) {
+         unlikely(node != &var->link); node = prev) {
         // Stash pointer for next iteration before clearing node
         prev = node->prev;
         node->next = nullptr;
