@@ -137,11 +137,14 @@ nvme_cmd_t nvme_cmd_t::create_trim(uint64_t lba, uint32_t count,
                 uint8_t(nvme_cmd_opcode_t::dataset_mgmt));
     cmd.hdr.nsid = ns;
 
+    // This makes no sense!!!
     nvme_dataset_range_t range;
     range.attr = 0;
     range.lba_count = count;
     range.starting_lba = lba;
 
+    // FIXME: Taking address of data on the stack that is going out of
+    // scope in the next two nanoseconds!!!
     cmd.hdr.dptr.prpp[0].addr = mphysaddr(&range);
     assert(cmd.hdr.dptr.prpp[0].addr);
 
@@ -1127,8 +1130,13 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
             break;
 
         case nvme_op_t::trim:
-            cmd = nvme_cmd_t::create_trim(
-                    request.lba, lba_count, ns);
+            // Hack!
+            request.iocp->set_result({errno_t::ENOTSUP, 0});
+            request.iocp->invoke();
+            return 1;
+
+//            cmd = nvme_cmd_t::create_trim(
+//                    request.lba, lba_count, ns);
             break;
 
         case nvme_op_t::flush:
