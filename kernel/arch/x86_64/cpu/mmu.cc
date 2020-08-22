@@ -2121,8 +2121,8 @@ EXPORT int munmap(void *addr, size_t size)
         size_t distance = 0;
         pte_t pte = 0;
 
-        if ((present_mask & 0x07) == 0x07) {
-            if ((*ptes[2] & PTE_PAGESIZE) == 0) {
+        if (likely((present_mask & 0x07) == 0x07)) {
+            if (likely((*ptes[2] & PTE_PAGESIZE) == 0)) {
                 // PT page level is present, 4KB mapping
                 pte = atomic_xchg(ptes[3], 0);
 
@@ -2149,14 +2149,13 @@ EXPORT int munmap(void *addr, size_t size)
                         free_batch.free(physaddr + i);
                 }
 
-                if (pte & PTE_PRESENT)
-                    freed += 512;
+                freed += ((pte & PTE_PRESENT) != 0) * 512;
 
                 distance = (1 << 21);
             }
         } else if ((present_mask & 0x03) == 0x03) {
             if ((*ptes[1] & PTE_PAGESIZE) == 0) {
-
+                // Do nothing
             } else {
                 // 1GB mapping
                 pte = atomic_xchg(ptes[1], 0);
@@ -2175,12 +2174,11 @@ EXPORT int munmap(void *addr, size_t size)
             distance = PAGE_SIZE;
         }
 
-        if (pte & PTE_PRESENT) {
-            if (pte & PTE_ACCESSED)
+        if (likely(pte & PTE_PRESENT)) {
+            if (likely(pte & PTE_ACCESSED))
                 cpu_page_invalidate(a);
             else
                 printdbg("Skipped an invlpg!\n");
-
         }
 
         assert(distance != 0);
