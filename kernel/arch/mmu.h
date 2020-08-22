@@ -304,7 +304,7 @@ static inline constexpr size_t round_up(size_t n)
 
 static inline constexpr size_t round_down(size_t n)
 {
-    return n & ~PAGE_MASK;
+    return n & -PAGE_SIZE;
 }
 
 static _always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)
