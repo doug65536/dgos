@@ -199,6 +199,9 @@ void *malloc_aligned(size_t bytes, size_t alignment)
                 blk->set_size(bytes);
                 blk->sig = blk_hdr_t::USED;
 
+                // Fill freshly allocated memory with a pattern
+                memset(blk + 1, 0xA0, blk->size - sizeof(*blk));
+
                 MALLOC_CHECK();
 
                 return blk + 1;
@@ -253,6 +256,8 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
         if (next->sig == blk_hdr_t::FREE && blk->size + next->size >= bytes) {
             // Expand in place
 
+            char *old_end = (char*)blk + blk->size;
+
             blk_hdr_t *new_blk = (blk_hdr_t*)(uintptr_t(blk) + bytes);
 
             new_blk->set_size(uintptr_t(next) - uintptr_t(new_blk));
@@ -261,12 +266,19 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
 
             blk->set_size(uintptr_t(new_blk) - uintptr_t(blk));
 
+            char *new_end = (char*)blk + blk->size;
+
             next->make_invalid();
+
+            // Fill newly exposed area with a pattern
+            memset(old_end, 0xA0, new_end - old_end);
 
             return blk + 1;
         }
 
         // Unable to expand in place
+
+        // Allocate new block (already canary filled)
         void *other_blk = malloc_aligned(bytes, alignment);
         if (unlikely(!other_blk))
             return nullptr;
