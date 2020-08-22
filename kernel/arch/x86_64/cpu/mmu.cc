@@ -743,7 +743,7 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-static void mmu_send_tlb_shootdown(bool synchronous = false)
+static void mmu_send_tlb_shootdown(bool synchronous = true)
 {
     uint32_t cpu_count = thread_cpu_count();
 
