@@ -753,21 +753,22 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
 
     cpu_scoped_irq_disable irq_was_enabled;
     uint32_t cur_cpu_nr = thread_cpu_number();
+
+    if (unlikely(thread_get_id() < thread_get_cpu_count()))
+        synchronous = false;
+
     thread_cpu_mask_t all_cpu_mask(-1);
     thread_cpu_mask_t cur_cpu_mask(cur_cpu_nr);
     thread_cpu_mask_t other_cpu_mask = all_cpu_mask - cur_cpu_mask;
     thread_cpu_mask_t new_pending = shootdown_pending.atom_or(other_cpu_mask);
     thread_cpu_mask_t need_ipi_mask = new_pending & other_cpu_mask;
 
-    std::vector<uint64_t> shootdown_counts;
+    uint64_t shootdown_counts[MAX_CPUS];
     if (synchronous) {
-        shootdown_counts.reserve(thread_cpu_count());
         for (uint32_t i = 0; i < cpu_count; ++i) {
-            if (unlikely(!shootdown_counts.push_back(
-                             (i != cur_cpu_nr)
-                             ? thread_shootdown_count(i)
-                             : -1)))
-                panic_oom();
+            shootdown_counts[i] = (i != cur_cpu_nr)
+                    ? thread_shootdown_count(i)
+                    : -1;
         }
     }
 
