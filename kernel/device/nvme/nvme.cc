@@ -47,6 +47,7 @@ nvme_cmd_t nvme_cmd_t::create_identify(
                 uint8_t(nvme_admin_cmd_opcode_t::identify));
     cmd.hdr.nsid = nsid;
     cmd.hdr.dptr.prpp[0].addr = mphysaddr(addr);
+    assert(cmd.hdr.dptr.prpp[0].addr);
     cmd.cmd_dword_10[0] =
             NVME_CMD_IDENT_CDW10_CNTID_n(0) |
             NVME_CMD_IDENT_CDW10_CNS_n(cns);
@@ -62,6 +63,7 @@ nvme_cmd_t nvme_cmd_t::create_sub_queue(
     cmd.hdr.cdw0 = NVME_CMD_SDW0_OPC_n(
                 uint8_t(nvme_admin_cmd_opcode_t::create_sq));
     cmd.hdr.dptr.prpp[0].addr = mphysaddr(addr);
+    assert(cmd.hdr.dptr.prpp[0].addr);
     cmd.cmd_dword_10[0] =
             NVME_CMD_CSQ_CDW10_QSIZE_n(size - 1) |
             NVME_CMD_CSQ_CDW10_QID_n(sqid);
@@ -81,6 +83,7 @@ nvme_cmd_t nvme_cmd_t::create_cmp_queue(
     cmd.hdr.cdw0 = NVME_CMD_SDW0_OPC_n(
                 uint8_t(nvme_admin_cmd_opcode_t::create_cq));
     cmd.hdr.dptr.prpp[0].addr = mphysaddr(addr);
+    assert(cmd.hdr.dptr.prpp[0].addr);
     cmd.cmd_dword_10[0] =
             NVME_CMD_CCQ_CDW10_QSIZE_n(size - 1) |
             NVME_CMD_CCQ_CDW10_QID_n(cqid);
@@ -140,6 +143,7 @@ nvme_cmd_t nvme_cmd_t::create_trim(uint64_t lba, uint32_t count,
     range.starting_lba = lba;
 
     cmd.hdr.dptr.prpp[0].addr = mphysaddr(&range);
+    assert(cmd.hdr.dptr.prpp[0].addr);
 
     cmd.cmd_dword_10[0] = NVME_CMD_DSMGMT_CDW10_NR_n(1);
     cmd.cmd_dword_10[1] = NVME_CMD_DSMGMT_CDW11_AD_n(1);
@@ -1320,19 +1324,23 @@ void nvme_queue_state_t::submit_cmd(
     NVME_CMD_SDW0_CID_SET(cmd.hdr.cdw0, index);
 
     if (range_count > 2) {
+        // Long list has first entry for data in first page
         cmd.hdr.dptr.prpp[0].addr = ranges[0].physaddr;
 
         uint64_t volatile *prp_list = prp_lists + index * 16;
 
+        // Fill in spill PRP slots
         for (size_t i = 1; i < range_count; ++i)
             prp_list[i-1] = ranges[i].physaddr;
 
+        // Then a pointer to the PRP list in the second entry
         cmd.hdr.dptr.prpp[1].addr = mphysaddr(prp_list);
     } else if (range_count > 1) {
         cmd.hdr.dptr.prpp[0].addr = ranges[0].physaddr;
         cmd.hdr.dptr.prpp[1].addr = ranges[1].physaddr;
     } else if (range_count > 0) {
         cmd.hdr.dptr.prpp[0].addr = ranges[0].physaddr;
+        cmd.hdr.dptr.prpp[1].addr = 0;
     }
 
     assert(index < cmp_handlers.size());
