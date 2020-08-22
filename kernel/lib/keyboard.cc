@@ -191,16 +191,17 @@ int keybd_event(keyboard_event_t event)
 {
     keyboard_buffer_t::scoped_lock buffer_lock(keybd_buffer.lock);
 
-    size_t next_head = keybd_queue_next(keybd_buffer.head);
-    if (next_head == keybd_buffer.tail) {
-        // Buffer is full
-        return 0;
-    }
-
     KEYBD_TRACE("event codepoint=%c (%d), vk=%s (%d)\n",
                 event.codepoint >= ' ' && event.codepoint < 126
                 ? event.codepoint : '.', event.codepoint,
                 keybd_special_text(event.vk), event.vk);
+
+    size_t next_head = keybd_queue_next(keybd_buffer.head);
+    if (next_head == keybd_buffer.tail) {
+        // Buffer is full
+        KEYBD_TRACE("Event dropped, keyboard input queue full\n");
+        return 0;
+    }
 
     // Insert into circular buffer
     keybd_buffer.buffer[keybd_buffer.head] = event;
