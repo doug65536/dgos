@@ -385,7 +385,7 @@ class lapic_x_t : public lapic_t {
         write32(APIC_REG_ICR_HI, APIC_DEST_n(dest));
         write32(APIC_REG_ICR_LO, cmd);
         intr_enabled.restore();
-        while (read32(APIC_REG_ICR_LO) & APIC_CMD_PENDING)
+        while (unlikely(read32(APIC_REG_ICR_LO) & APIC_CMD_PENDING))
             pause();
     }
 
@@ -396,7 +396,7 @@ class lapic_x_t : public lapic_t {
         write32_noinst(APIC_REG_ICR_HI, APIC_DEST_n(dest));
         write32_noinst(APIC_REG_ICR_LO, cmd);
         cpu_irq_toggle_noinst(irq_en);
-        while (read32_noinst(APIC_REG_ICR_LO) & APIC_CMD_PENDING)
+        while (unlikely(read32_noinst(APIC_REG_ICR_LO) & APIC_CMD_PENDING))
             __builtin_ia32_pause();
     }
 
