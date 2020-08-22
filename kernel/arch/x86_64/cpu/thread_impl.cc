@@ -484,14 +484,18 @@ static void thread_cleanup()
 
     cpu_irq_disable();
 
+    thread_info_t::scoped_lock lock(thread->lock);
+
     assert(thread->state == THREAD_IS_RUNNING);
 
-    atomic_barrier();
     thread->priority = 0;
+
     if (likely(thread->state == THREAD_IS_RUNNING))
         thread->state = THREAD_IS_EXITING_BUSY;
     else
         assert(!"Unexpected state!");
+
+    lock.unlock();
 
     thread_yield();
 }
