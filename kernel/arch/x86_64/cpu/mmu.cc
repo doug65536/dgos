@@ -2674,7 +2674,8 @@ static _always_inline int mphysranges_callback(
     mphysranges_state_t *state = (mphysranges_state_t *)context;
 
     int contiguous = state->count > 0 &&
-            (state->range->physaddr + state->range->size == range.physaddr);
+            (state->range->physaddr + state->range->size == range.physaddr) &&
+            (state->range->size + range.size < state->max_size);
 
     if (state->count == 0) {
         // Initial range
@@ -2734,7 +2735,7 @@ EXPORT bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
     size_t boundary = size_t(1) << log2_boundary;
 
     for (size_t i = ranges_count; i > 0 && ranges_count < count_limit; --i) {
-        mmphysrange_t *range = ranges + i - 1;
+        mmphysrange_t *range = ranges + (i - 1);
 
         uintptr_t end = range->physaddr + range->size;
 
@@ -2752,6 +2753,8 @@ EXPORT bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
             range[0].size = new_end - range[0].physaddr;
             range[1].physaddr = range[0].physaddr + range[0].size;
             range[1].size = end - range[1].physaddr;
+            ++i;
+            continue;
         }
     }
 
