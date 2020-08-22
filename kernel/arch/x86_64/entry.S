@@ -103,9 +103,6 @@ ap_init:
     shrq $ 1,%rbx
     leaq (%rdx,%rbx),%rsp
 
-    xorl %ebp,%ebp
-    pushq %rbp
-
     // MP processor entry
     call mp_main
 
