@@ -72,7 +72,7 @@ struct perf_ctr_def_t {
 };
 
 static uint32_t volatile perf_event = 0x76;
-static uint32_t volatile perf_unit_mask = 0xFF;
+static uint32_t volatile perf_unit_mask = 0x00;
 static uint32_t volatile perf_count_mask = 0;
 static uint64_t volatile perf_event_divisor = 1048576;
 static bool perf_event_invert = false;
