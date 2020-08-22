@@ -5,6 +5,291 @@
 #include <new>
 #include "../../user/include/utf.h"
 
+// The screen is decomposed into a series of boxes that
+// correspond to offscreen surface areas
+// Adding a box to the screen completely removes the areas that are
+// completely obscured by the new box, and clips off partially overlapping
+// postions of existing boxes
+
+///   clip left       span entire     clip right       within
+/// +--------------+--------------+--------------+--------------+
+/// |              |              |              |              |
+/// | +-----+      | +----------+ |      +-----+ |    +----+    |
+/// | |a   b|      | |a        b| |      |a   b| |    |a  b|    |
+/// | |   + |---+  | |  +    +  | |  +---| +   | | +--|    |--+ |
+/// | |c   d|m n|  | |c        d| |  |i j|c   d| | |ij|    |mn| | clip top
+/// | +-----+o p|  | +----------+ |  |k l+-----+ | |  |    |  | |
+/// |     |q   r|  |    |q  r|    |  |q   r|     | |  |c  d|  | |
+/// |     |     |  |    |    |    |  |     |     | |kl+----+op| |
+/// |     |s   t|  |    |s  t|    |  |s   t|     | |q        r| |
+/// |     +-----+  |    +----+    |  +-----+     | |s        t| |
+/// |             3|             2|             3| +----------+4|
+/// +--------------+--------------+--------------+--------------+
+/// |              |              |              |              |
+/// | +-----+      | +----------+ |      +-----+ |    +----+    |
+/// | |a   b|      | |a        b| |      |a   b| |    |a  b|    |
+/// | |   + |---+  | |  +    +  | |  +---|  +  | | +--|    |--+ |
+/// | |     |m n|  | |          | |  |i j|     | | |ij|    |mn| |
+/// | |     |   |  | |          | |  |   |     | | |  |    |  | | span entire
+/// | |     |o p|  | |          | |  |k l|     | | |  |    |  | |
+/// | |   + |---+  | |  +    +  | |  +---|  +  | | |  |    |  | |
+/// | |c   d|      | |c        d| |      |c   d| | |kl|    |op| |
+/// | +-----+      | +----------+ |      +-----+ | +--|c  d|--+ |
+/// |             2|             1|             2|    +----+   3|
+/// +--------------+--------------+--------------+--------------+
+/// |              |              |              |              |
+/// |    +------+  |    +----+    | +-------+    | +----------+ |
+/// |    |e    f|  |    |e  f|    | |e     f|    | |e        f| |
+/// |    |      |  |    |    |    | |       |    | |          | |
+/// |    |g    h|  |    |g  h|    | |g     h|    | |g        h| |
+/// | +-----+m n|  | +----------+ | |i   j+----+ | |ij+----+mn| | clip bottom
+/// | |a   b|   |  | |a        b| | |k   l|a  b| | |kl|a  b|op| |
+/// | |     |o p|  | |  +    +  | | +-----| +  | | +--|    |--+ |
+/// | |c + d|---+  | |c        d| |       |c  d| |    |c  d|    |
+/// | +-----+      | +----------+ |       +----+ |    +----+    |
+/// |             3|             2|             3|             4|
+/// +--------------+--------------+--------------+--------------+
+/// |    +------+  |   +------+   |    +-----+   | +----------+ |
+/// |    |e    f|  |   |e    f|   |    |e   f|   | |e        f| |
+/// |    |g    h|  |   |g    h|   |    |g   h|   | |g        h| |
+/// | +-----+m n|  | +----------+ |    |i j+---+ | |ij+----+mn| |
+/// | |a   b|   |  | |a        b| |    |   |a b| | |  |a  b|  | |
+/// | |     |   |  | |          | |    |   |   | | |  |    |  | | within
+/// | |c   d|   |  | |c        d| |    |   |c d| | |  |c  d|  | |
+/// | +-----+o p|  | +----------+ |    |k l+---+ | |kl+----+op| |
+/// |    |q    r|  |   |q    r|   |    |q   r|   | |q        r| |
+/// |    |s    t|  |   |s    t|   |    |s   t|   | |s        t| |
+/// |    +------+ 4|   +------+  3|    +-----+  4| +----------+5|
+/// +--------------+--------------+--------------+--------------+
+///                                                     ^
+///                                             most general case
+/// I is the incoming rectangle abcd
+/// E is the existing rectangle
+///   (efgh (top), ijkl (left), mnop (right), qrst (bottom))
+/// ijmn y are the max of the two top edges
+/// klop y are the min of the two bottom edges
+/// egikqs are always horizontally aligned with left edge of E
+/// fhnprt are always horizontally aligned with right edge of E
+/// ef are always vertically aligned with the top of E
+/// st are always vertically aligned with the bottom of E
+/// e, g, q, s are always aligned
+
+// Record that represents a single box of area on the screen
+struct comp_area_t {
+    // This screen area...
+    int32_t sy;
+    int32_t sx;
+    int32_t ey;
+    int32_t ex;
+
+    // ...contains this area of this surface
+    surface_t *surface;
+    int32_t x;
+    int32_t y;
+};
+
+comp_area_t *comp_areas;
+size_t comp_areas_capacity;
+size_t comp_areas_size;
+
+bool grow_areas()
+{
+    size_t new_capacity;
+
+    if (comp_areas_capacity)
+        new_capacity = comp_areas_capacity * 2;
+    else
+        new_capacity = 16;
+
+    comp_area_t *new_comp_areas = (comp_area_t*)realloc(
+                comp_areas, sizeof(*comp_areas) * new_capacity);
+
+    if (unlikely(!new_comp_areas))
+        return false;
+
+    comp_areas = new_comp_areas;
+    comp_areas_capacity = new_capacity;
+
+    return true;
+}
+
+bool area_insert_at(comp_area_t *area, size_t index)
+{
+    if (unlikely(comp_areas_capacity == comp_areas_size)) {
+        if (unlikely(!grow_areas()))
+            return false;
+    }
+
+    if (unlikely(index < comp_areas_size)) {
+        memmove(comp_areas + index + 1, comp_areas + index,
+                sizeof(*comp_areas) * (comp_areas_size - index));
+    }
+
+    ++comp_areas_size;
+
+    comp_areas[index] = *area;
+
+    return true;
+}
+
+void area_delete_at(size_t index)
+{
+    assert(index < comp_areas_size);
+
+    --comp_areas_size;
+
+    if (index < comp_areas_size) {
+        memmove(comp_areas + index, comp_areas + (index + 1),
+                sizeof(*comp_areas) * (comp_areas_size - index));
+    }
+}
+
+static inline bool area_is_valid(comp_area_t *area)
+{
+    return area->ey > area->sy && area->ex > area->sx;
+}
+
+static bool surface_is_visible(surface_t *surface)
+{
+    for (size_t i = 0; i < comp_areas_size; ++i)
+        if (comp_areas[i].surface == surface)
+            return true;
+
+    return false;
+}
+
+static inline int min(int a, int b)
+{
+    return a <= b ? a : b;
+}
+
+static inline int max(int a, int b)
+{
+    return a >= b ? a : b;
+}
+
+// Returns true if you should delete existing
+bool area_clip_pair(comp_area_t const *incoming, comp_area_t const *existing)
+{
+    // Handle completely non-overlapping cases asap
+
+    // Existing is below
+    if (incoming->ey <= existing->sy)
+        return false;
+
+    // Existing is above
+    if (incoming->sy >= existing->ey)
+        return false;
+
+    // Existing is to the left
+    if (incoming->sx >= existing->ex)
+        return false;
+
+    // Existing is to the right
+    if (incoming->ex <= existing->sx)
+        return false;
+
+    // top left incoming y
+    int ay = incoming->sy;
+
+    // top left incoming x
+    int ax = incoming->sx;
+
+    // bottom left incoming y
+    int cy = incoming->ey;
+
+    // top right incoming x
+    int bx = incoming->ex;
+
+    // top left existing y
+    int ey = existing->sy;
+
+    // top left existing x
+    int ex = existing->sx;
+
+    // bottom left existing y
+    int sy = existing->ey;
+
+    // top right existing x
+    int fx = existing->ex;
+
+    // top of middle portion
+    int iy = max(ay, ey);
+
+    // bottom of middle portion
+    int ky = min(cy, sy);
+
+    // width of left portion
+    int l_w = ax - ex;
+
+    // height of top portion
+    int t_h = iy - ey;
+
+    // width of center portion
+    int c_w = bx - ax;
+
+    // height of middle portion
+    int m_h = ky - iy;
+
+    // Calculate the offsets (u, v used for x, y image coord)
+    int eu = existing->x;
+    int ev = existing->y;
+
+    // Middle starts after width of left portion
+    int ju = eu + l_w;
+
+    // Top starts after height of top portion
+    int iv = ev + t_h;
+
+    // Right starts center width after end of left portion
+    int mu = ju + c_w;
+
+    // bottom portion starts middle height after end of top portion
+    int kv = iv + m_h;
+
+    // area formed from top region
+    comp_area_t efgh{ ey, ex, iy, fx, existing->surface, eu, ev };
+
+    // area formed from left side of center region
+    comp_area_t ijkl{ iy, ex, ky, ax, existing->surface, eu, iv };
+
+    // area formed from right side of center region
+    comp_area_t mnop{ iy, bx, ky, fx, existing->surface, mu, iv };
+
+    // area formed by bottom region
+    comp_area_t qrst{ ky, ex, sy, fx, existing->surface, eu, kv };
+
+    if (area_is_valid(&efgh))
+        area_insert_at(&efgh, comp_areas_size);
+
+    if (area_is_valid(&ijkl))
+        area_insert_at(&ijkl, comp_areas_size);
+
+    if (area_is_valid(&mnop))
+        area_insert_at(&mnop, comp_areas_size);
+
+    if (area_is_valid(&qrst))
+        area_insert_at(&qrst, comp_areas_size);
+
+    return true;
+}
+
+bool area_insert(comp_area_t *area)
+{
+    // Work backward from end, so inserted regions get ignored
+    // Inserted regions couldn't possibly interfere with new area
+    for (size_t i = comp_areas_size; i > 0; --i) {
+        comp_area_t *victim = comp_areas + (i - 1);
+
+        // If any clippings went in, delete the original
+        if (area_clip_pair(area, victim))
+            area_delete_at(i);
+    }
+
+    // Insert the new area
+    return area_insert_at(area, comp_areas_size);
+}
+
 // Linked in font
 extern bitmap_glyph_t const _binary_u_vga16_raw_start[];
 extern bitmap_glyph_t const _binary_u_vga16_raw_end[];
@@ -86,9 +371,36 @@ void vga_console_ring_t::clear_row(uint32_t row, uint32_t color)
     fill(sx, sy, ex, ey, color);
 }
 
+#ifdef __x86_64__
+#include <xmmintrin.h>
+#endif
+
 void vga_console_ring_t::bit8_to_pixels(uint32_t *out, uint8_t bitmap,
                                         uint32_t bg, uint32_t fg)
 {
+#ifdef __x86_64__
+    __m128i map = _mm_set1_epi32(bitmap);
+
+    __m128i lomask = _mm_set_epi32(0x8, 0x4, 0x2, 0x1);
+    __m128i himask = _mm_slli_epi32(lomask, 4);
+
+    lomask = _mm_and_si128(lomask, map);
+    himask = _mm_and_si128(himask, map);
+
+    lomask = _mm_cmpeq_epi32(lomask, _mm_setzero_si128());
+    himask = _mm_cmpeq_epi32(himask, _mm_setzero_si128());
+
+    __m128i fgs = _mm_set1_epi32(fg);
+    __m128i bgs = _mm_set1_epi32(bg);
+
+    lomask = _mm_or_si128(_mm_and_si128(bgs, lomask),
+                          _mm_andnot_si128(fgs, lomask));
+    himask = _mm_or_si128(_mm_and_si128(bgs, himask),
+                          _mm_andnot_si128(fgs, himask));
+
+    _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out), lomask);
+    _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out + 4), himask);
+#else
     out[0] = bitmap & 0x80 ? fg : bg;
     out[1] = bitmap & 0x40 ? fg : bg;
     out[2] = bitmap & 0x20 ? fg : bg;
@@ -97,6 +409,7 @@ void vga_console_ring_t::bit8_to_pixels(uint32_t *out, uint8_t bitmap,
     out[5] = bitmap & 0x04 ? fg : bg;
     out[6] = bitmap & 0x02 ? fg : bg;
     out[7] = bitmap & 0x01 ? fg : bg;
+#endif
 }
 
 void vga_console_ring_t::write(const char *data, size_t size,
@@ -123,7 +436,6 @@ void vga_console_ring_t::write(const char *data, size_t size,
 
         // Draw glyph into surface
 
-        // 16 scanlines per row
         uint32_t *row = pixels + width * font_h * out_y + font_w * out_x;
 
         // Doing loop interchange to write whole cache line of output across
