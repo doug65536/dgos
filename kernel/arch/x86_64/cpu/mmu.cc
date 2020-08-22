@@ -31,6 +31,7 @@
 #include "cxxstring.h"
 #include "nofault.h"
 #include "phys_alloc.h"
+#include "engunit.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
@@ -801,8 +802,8 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
         uint64_t wait_en = nano_time();
 
         printdbg("TLB shootdown waited for "
-                 "%" PRIu64 "u loops, %" PRIu64 " cycles\n", loops,
-                 wait_en - wait_st);
+                 "%" PRIu64 " loops, %ss\n", loops,
+                 engineering_t(wait_en - wait_st, -3).ptr());
     }
 }
 
