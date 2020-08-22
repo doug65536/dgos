@@ -96,6 +96,13 @@ constexpr bool operator!=(pair<_T1,_T2> const& __lhs,
     return !(__lhs.first == __rhs.first) || !(__lhs.second == __rhs.second);
 }
 
+constexpr bool operator<(pair<unsigned long,unsigned long> __lhs,
+                         pair<unsigned long,unsigned long> __rhs)
+{
+    return (__lhs.second | ((uint128_t)__lhs.first << 64)) <
+            (__rhs.second | ((uint128_t)__rhs.first << 64));
+}
+
 template<typename _T1, typename _T2>
 constexpr bool operator<(pair<_T1,_T2> const& __lhs,
                          pair<_T1,_T2> const& __rhs )
