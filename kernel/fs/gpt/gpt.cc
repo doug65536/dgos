@@ -110,6 +110,8 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 
     size_t part_tbl_size = hdr.part_ent_sz * hdr.part_ent_count;
 
+    size_t part_tbl_sector_count = part_tbl_size >> log2_sector_size;
+
     gpt_part_tbl_ent_t ptent;
 
     buffer.reset();
@@ -117,8 +119,6 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 
     if (unlikely(!buffer))
         panic_oom();
-
-    size_t part_tbl_sector_count = part_tbl_size >> log2_sector_size;
 
     GPT_TRACE("Reading %zu %zd byte blocks at LBA %" PRIu64 " from %s\n",
               part_tbl_sector_count, sector_size,
