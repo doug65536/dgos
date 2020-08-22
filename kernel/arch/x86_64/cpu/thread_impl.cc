@@ -351,31 +351,6 @@ struct alignas(256) cpu_info_t {
 
     // --- ^ 2 cache lines ---
 
-    static inline constexpr uint32_t resume_next(uint32_t curr)
-    {
-        return curr + 1 < 4 ? curr + 1 : 0;
-    }
-
-    bool enqueue_resume(thread_t tid, uintptr_t value)
-    {
-        size_t head = resume_head;
-
-        if (resume_next(head) == resume_tail) {
-            printdbg("Resume ring was full!");
-            return false;
-        }
-
-        resume_ring[head].tid = tid;
-        resume_ring[head].ret_lo = uint32_t(value & 0xFFFFFFFFU);
-        resume_ring[head].ret_hi = uint32_t((value >> 32) & 0xFFFFFFFFU);
-
-        resume_head = resume_next(resume_head);
-
-        return true;
-    }
-
-    // --- cache line ---
-
     using lock_type = ext::irq_spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
@@ -397,6 +372,30 @@ struct alignas(256) cpu_info_t {
     ready_set_t sleep_list;
 
     uint64_t volatile tlb_shootdown_count = 0;
+
+
+    static inline constexpr uint32_t resume_next(uint32_t curr)
+    {
+        return curr + 1 < 4 ? curr + 1 : 0;
+    }
+
+    bool enqueue_resume(thread_t tid, uintptr_t value)
+    {
+        size_t head = resume_head;
+
+        if (unlikely(resume_next(head) == resume_tail)) {
+            printdbg("Resume ring was full!");
+            return false;
+        }
+
+        resume_ring[head].tid = tid;
+        resume_ring[head].ret_lo = uint32_t(value & 0xFFFFFFFFU);
+        resume_ring[head].ret_hi = uint32_t((value >> 32) & 0xFFFFFFFFU);
+
+        resume_head = resume_next(resume_head);
+
+        return true;
+    }
 };
 
 // Make sure pointer arithmetic would never do a divide
