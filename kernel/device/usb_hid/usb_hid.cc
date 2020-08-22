@@ -286,10 +286,11 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
         if (!pressed) {
             // Generate keyup event
-            USBHID_TRACE("keydown, scancode=%#x\n", scancode);
 
             int vk = (scancode < usb_hid_keybd_lookup_count)
                     ? usb_hid_keybd_lookup[scancode] : 0;
+
+            USBHID_TRACE("keyup, scancode=%#x, vk=%#x\n", scancode, vk);
 
             fsa.deliver_vk(-vk);
         }
@@ -306,11 +307,11 @@ void usb_hid_keybd_t::detect_keybd_changes()
         if (memchr(last_keybd_state + 2, scancode, 6))
             continue;
 
-        USBHID_TRACE("keydown, scancode=%#x\n", scancode);
-
         // Generate keydown event
         int vk = (scancode < usb_hid_keybd_lookup_count)
                 ? usb_hid_keybd_lookup[scancode] : 0;
+
+        USBHID_TRACE("keydown, scancode=%#x, vk=%#x\n", scancode, vk);
 
         fsa.deliver_vk(vk);
     }
