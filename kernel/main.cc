@@ -857,7 +857,7 @@ static int init_thread(void *)
     printk("Running mmap stress with %d threads\n",
              ENABLE_MMAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
-        thread_create(stress_mmap_thread, (void*)uintptr_t(i),
+        thread_create(nullptr, stress_mmap_thread, (void*)uintptr_t(i),
                       "mmap_stress",
                       0, false, false);
     }
