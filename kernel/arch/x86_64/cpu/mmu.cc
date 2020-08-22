@@ -3132,11 +3132,7 @@ void clear_phys_state_t::reserve_addr()
 {
     bool ok;
     size_t size = size_t(1) << log2_window_sz;
-//    linear_allocator.dump("before reserve_addr"
-//                          " take_linear(addr=%#zx, size=%#zx\n",
-//                          addr, size);
     ok = linear_allocator.take_linear(addr, size, true);
-//    linear_allocator.dump("after reserve_addr take_linear\n");
     assert(ok);
 }
 
