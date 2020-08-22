@@ -33,7 +33,8 @@ void init_eh_frames(void*)
     register_eh_frame();
 }
 
-REGISTER_CALLOUT(init_eh_frames, nullptr, callout_type_t::heap_ready, "000");
+REGISTER_CALLOUT(init_eh_frames, nullptr,
+                 callout_type_t::heap_ready, "000");
 
 void abort()
 {

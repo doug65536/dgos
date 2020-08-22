@@ -94,8 +94,8 @@ static void vga_init_devs(void*)
     devfs_register(new (vga_conerr_reg_storage.data) vga_conerr_reg_t);
 }
 
-REGISTER_CALLOUT(vga_init_devs, nullptr, callout_type_t::
-                 devfs_ready, "000");
+REGISTER_CALLOUT(vga_init_devs, nullptr,
+                 callout_type_t::devfs_ready, "000");
 
 class text_display_t : public text_dev_base_t {
 protected:

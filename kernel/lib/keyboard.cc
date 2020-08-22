@@ -441,5 +441,5 @@ EXPORT void keybd_register(void*)
     devfs_register(keybd_file_reg_t::get_registration());
 }
 
-REGISTER_CALLOUT(keybd_register, nullptr, callout_type_t::
-                 devfs_ready, "000");
+REGISTER_CALLOUT(keybd_register, nullptr,
+                 callout_type_t::devfs_ready, "000");

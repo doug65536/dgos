@@ -55,7 +55,6 @@ static void malloc_statup_smp(void*)
     {
         new_default_heaps[i] = heap_create();
 
-
         if (unlikely(!new_default_heaps[i]))
             panic_oom();
 
@@ -69,7 +68,8 @@ static void malloc_statup_smp(void*)
     delete[] old_default_heaps;
 }
 
-REGISTER_CALLOUT(malloc_statup_smp, nullptr, callout_type_t::smp_online, "000");
+REGISTER_CALLOUT(malloc_startup_smp, nullptr,
+                 callout_type_t::smp_online, "000");
 
 static heap_t *this_cpu_heap()
 {

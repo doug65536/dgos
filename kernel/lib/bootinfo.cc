@@ -28,7 +28,8 @@ static void bootinfo_remap(void*)
     kernel_params->vbe_selected_mode = (vbe_selected_mode_t*)
             mmap((void*)mode, sizeof(*mode), PROT_READ, MAP_PHYSICAL);
 }
-REGISTER_CALLOUT(bootinfo_remap, nullptr, callout_type_t::vmm_ready, "000");
+REGISTER_CALLOUT(bootinfo_remap, nullptr,
+                 callout_type_t::vmm_ready, "000");
 
 EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
 {

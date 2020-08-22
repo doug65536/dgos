@@ -167,7 +167,8 @@ bool file_ref_filetab(int id)
     return false;
 }
 
-REGISTER_CALLOUT(file_init, nullptr, callout_type_t::heap_ready, "000");
+REGISTER_CALLOUT(file_init, nullptr,
+                 callout_type_t::heap_ready, "000");
 
 EXPORT int file_creatat(int dirid, char const *path, mode_t mode)
 {

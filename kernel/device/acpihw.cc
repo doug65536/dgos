@@ -15,7 +15,8 @@ private:
 
 acpi_hw_t *acpi_hw_t::instance;
 
-REGISTER_CALLOUT(&acpi_hw_t::init, nullptr, callout_type_t::acpi_ready, "000");
+REGISTER_CALLOUT(&acpi_hw_t::init, nullptr,
+                 callout_type_t::acpi_ready, "000");
 
 void acpi_hw_t::init(void *)
 {
