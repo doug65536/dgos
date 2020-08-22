@@ -637,7 +637,7 @@ static thread_t thread_create_with_state(
 
     if (i) {
         stack = thread_allocate_stack(i, stack_size,
-                                      "create_with_state", 0xF0);
+                                      "create_with_state", 0xA0);
     } else {
         stack = kernel_stack + kernel_stack_size;
         stack_size = kernel_stack_size;

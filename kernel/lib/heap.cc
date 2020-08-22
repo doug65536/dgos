@@ -625,7 +625,7 @@ void *pageheap_calloc(heap_t *heap, size_t num, size_t size)
 // +--------------+ <-- 16 byte aligned
 // |  heap_hdr_t  |
 // +--------------+ <-- 16 byte aligned, return value
-// |     data     | <-- 0xF0 filled
+// |     data     | <-- 0xA0 filled
 // +--------------+
 // |//// 0xFA ////| <-- 0 to 15 bytes ("fill after")
 // +--------------+ <-- 4KB aligned
