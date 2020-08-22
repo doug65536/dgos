@@ -107,11 +107,26 @@ template<typename _T1, typename _T2>
 constexpr bool operator<(pair<_T1,_T2> const& __lhs,
                          pair<_T1,_T2> const& __rhs )
 {
-    return (__lhs.first < __rhs.first)
-            ? true
-            : ((__rhs.first < __lhs.first)
-              ? false
-              : (__lhs.second < __rhs.second));
+    return (__lhs.first < __rhs.first) | (__lhs.second < __rhs.second) &
+            ((__lhs.second < __rhs.second) ^ 1);
+
+//    bool __lhs_is_less = (__lhs.first < __rhs.first);
+//    bool __rhs_is_less = (__rhs.first < __lhs.first);
+//    bool __second_less = (__lhs.second < __rhs.second);
+
+//    return (__lhs_is_less | __second_less) & (__rhs_is_less ^ 1);
+
+//    return __lhs_is_less
+//            ? true
+//            : __rhs_is_less
+//              ? false
+//              : __second_less;
+
+//    return (__lhs.first < __rhs.first)
+//            ? true
+//            : ((__rhs.first < __lhs.first)
+//              ? false
+//              : (__lhs.second < __rhs.second));
 }
 
 template<typename _T1, typename _T2>
