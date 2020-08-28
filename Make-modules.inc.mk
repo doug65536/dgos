@@ -547,6 +547,7 @@ EXTRA_user_shell_DEPENDENCIES = \
 
 bin_PROGRAMS += init
 generate_symbols_list += init
+generate_kallsym_list += init
 
 init_SOURCES = \
 	user/init/init.cc \
