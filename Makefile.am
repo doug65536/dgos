@@ -2847,7 +2847,7 @@ disks: hybdisk.img gptdisk.img mbrdisk.img isodisk.iso
 
 .PHONY: disks
 
-debug: debug-up-efi-hd-hyb-ahci-vga-tcg
+debug: debug-up-efi-hd-mbr-ahci-vga-tcg
 
 .PHONY: debug
 
