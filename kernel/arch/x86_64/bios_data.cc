@@ -10,6 +10,7 @@ static void biosdata_remap(void *arg)
     zero_page = (char*)mmap(
             nullptr, 64 << 10, PROT_READ | PROT_WRITE,
             MAP_PHYSICAL);
+    assert(zero_page != MAP_FAILED);
 }
 
 REGISTER_CALLOUT(biosdata_remap, nullptr,
