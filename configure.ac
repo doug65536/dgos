@@ -137,6 +137,16 @@ AS_IF([test x"$GREP" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find grep])])
 AC_SUBST([GREP])
 
+AC_CHECK_PROGS([TAIL], [tail], [NOT_FOUND])
+AS_IF([test x"$TAIL" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find tail])])
+AC_SUBST([TAIL])
+
+AC_CHECK_PROGS([HEAD], [head], [NOT_FOUND])
+AS_IF([test x"$HEAD" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find head])])
+AC_SUBST([HEAD])
+
 AC_CHECK_PROGS([SORT], [sort], [NOT_FOUND])
 AS_IF([test x"$SORT" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find sort])])

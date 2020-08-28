@@ -2764,13 +2764,19 @@ check-module-imports: all-kernel
 
 define genkallsym =
 
-sym/$(1)-kallsyms: $(1)
-	$$(NM) --demangle --defined-only -n "$$<" > "$$@"
+sym/$(1)-kallsyms: $(1) $$(top_srcdir)/Makefile.am
+	$$(NM) --demangle --defined-only -n "$$<" \
+		| $$(SORT) -u > "$$@"
 
-sym/$(1)-klinesyms: $(1)
-	$$(OBJDUMP) --dwarf=decodedline "$$<" | \
-		$$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+)\s*x?/\1 \2 \3/g' | \
-		$$(GREP) -P '.*\s+\d+\s+0x[0-9a-f]+' > "$$@"
+sym/$(1)-klinesyms: $(1) $$(top_srcdir)/Makefile.am
+	$$(OBJDUMP) --dwarf=decodedline "$$<" \
+		| $$(GREP) -v ':\s*file format' \
+		| $$(GREP) -P '^(\S+:)|(\S+\s+\d+\s+0x[0-9a-f]+)' \
+		| $$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+).*/* \2 \3/g' \
+		| $$(SED) -E 's/^CU: (.*)/\1/g' \
+		> "$$@"
+
+#$$(TAIL) -n +1
 
 endef
 
