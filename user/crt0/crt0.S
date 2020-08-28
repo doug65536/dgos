@@ -31,15 +31,16 @@ _start:
 	// r14 = envp = argv + (argc + 1)
     lea 8(%r13,%r12,8),%r14
 
-	// r15 = auxv
-    movq %r14,%r15
 
     // Scan through the envp array until the nullptr is encountered
     // Finish the loop pointing to the item after the nullptr
+    movq %r14,%r15
 .Lcheck_envp:
     cmpq $ 0,(%r15)
     leaq 8(%r15),%r15
     jnz .Lcheck_envp
+
+    // r15 = auxv
 
     // Resolve .rela.iplt
     leaq __rela_iplt_start(%rip),%rbx
@@ -78,14 +79,24 @@ _start:
     jmp .Lnext_init
 .Ldone_init:
 
+    // Save stack pointer and absolutely guarantee alignment
 	mov %rsp,%rbx
 	and $ -16,%rsp
+
+    // Pass argc, argv, envp, auxv to main
+    mov %r12,%rdi
+    mov %r13,%rsi
+    mov %r14,%rdx
+    mov %r15,%rcx
     call main
+
+    // Restore stack pointer
+    mov %rbx,%rsp
+
+    // Save program exit code
 	mov %rax,%r12
-	mov %rbx,%rsp
-    mov %rax,%rdi
 .Lexit_returned:
-	mov %r12,%rax
+	mov %r12,%rdi
     call exit
 	jmp .Lexit_returned
 
