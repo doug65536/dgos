@@ -18,6 +18,7 @@
 .global entry
 entry:
     mov %dl,boot_drive
+    mov %si,part_tbl_ptr
 
     mov $ .Linit_ret,%bx
     jmp early_init
@@ -26,6 +27,7 @@ entry:
     // If we make it here, the cpu is at least 32 bit with FPU
 
     // Load partition start LBA into edx:eax
+    mov part_tbl_ptr,%si
     movl ptbl_ent_stsec(%si),%eax
     xor %edx,%edx
 
@@ -38,3 +40,7 @@ entry:
 .global boot_drive
 boot_drive:
     .byte 0
+
+.global part_tbl_ptr
+part_tbl_ptr:
+    .hword 0
