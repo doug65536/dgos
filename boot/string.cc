@@ -179,7 +179,7 @@ void *memmove(void *dest, void const *src, size_t n)
     if (d < s || s + n <= d)
         return memcpy(d, s, n);
 
-    if (d > s) {
+    if (d != s) {
         for (size_t i = n; i; --i)
             d[i-1] = s[i-1];
     }

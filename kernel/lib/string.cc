@@ -466,7 +466,7 @@ EXPORT void *memmove(void *dest, void const *src, size_t n)
     if (d < s || s + n <= d)
         return memcpy(d, s, n);
 
-    if (d > s)
+    if (d != s)
         memcpy_reverse(d + n - 1, s + n - 1, n);
 
     return dest;
