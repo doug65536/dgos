@@ -91,7 +91,7 @@ struct gdb_cpu_t {
     uint32_t apic_id;
     isr_context_t *ctx;
     gdb_cpu_state_t volatile state;
-    std::function<void()> sync_bp;
+    ext::function<void()> sync_bp;
 
     // Ignore steps within this range and immediately single step again
     uintptr_t range_step_st;
@@ -183,7 +183,7 @@ private:
         }
     };
 
-    using bp_list = std::vector<breakpoint_t>;
+    using bp_list = ext::vector<breakpoint_t>;
 
     bp_list::iterator breakpoint_find(bp_list &list, uintptr_t addr,
                                       uintptr_t page_dir, uint8_t kind);
@@ -215,7 +215,7 @@ private:
 
     static gdb_cpu_ctrl_t instance;
 
-    std::vector<gdb_cpu_t> cpus;
+    ext::vector<gdb_cpu_t> cpus;
     thread_t stub_tid;
     int gdb_cpu;
     bool volatile stub_running;
@@ -286,7 +286,7 @@ private:
 
     static size_t constexpr MAX_BUFFER_SIZE = 8192 - _MALLOC_OVERHEAD;
 
-    using sender_fn_t = std::function<ssize_t(char const *, size_t)>;
+    using sender_fn_t = ext::function<ssize_t(char const *, size_t)>;
 
     // 'g' reply packet is a list of 32-bit values, enumeration is array index
     enum struct reg_t {
@@ -488,7 +488,7 @@ private:
     rx_state_t handle_packet();
     rx_state_t handle_memop_read(char const *input);
     rx_state_t handle_memop_write(char const *&input);
-    bool get_target_desc(std::unique_ptr<char[]> &result, size_t &result_sz,
+    bool get_target_desc(ext::unique_ptr<char[]> &result, size_t &result_sz,
                                 char const *annex, size_t annex_sz);
     rx_state_t handle_query_features(char const *input);
 
@@ -1107,7 +1107,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
 }
 
 bool gdbstub_t::get_target_desc(
-        std::unique_ptr<char[]>& result, size_t& result_sz,
+        ext::unique_ptr<char[]>& result, size_t& result_sz,
         char const *annex, size_t annex_sz)
 {
     // The following XML target descriptions were copied from the GDB
@@ -1462,7 +1462,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_query_features(char const *input)
     if (!annex_en)
         return reply("E03");
 
-    std::unique_ptr<char[]> desc;
+    ext::unique_ptr<char[]> desc;
     size_t desc_sz = 0;
     bool exists = get_target_desc(desc, desc_sz, annex_st, annex_en - annex_st);
 
@@ -1668,7 +1668,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
             // Initialize an array with one entry per CPU
             // Values are set once, only entries with 0 value are modified
 
-            std::vector<step_action_t> step_actions(
+            ext::vector<step_action_t> step_actions(
                         gdb_cpu_ctrl_t::get_gdb_cpu());
 
             step_cpu_nr = 0;
@@ -2542,7 +2542,7 @@ void gdb_cpu_ctrl_t::gdb_thread()
     // Set GDB stub to time critical priority
     thread_set_priority(stub_tid, 32767);
 
-    std::unique_ptr<gdbstub_t> stub(new (ext::nothrow) gdbstub_t);
+    ext::unique_ptr<gdbstub_t> stub(new (ext::nothrow) gdbstub_t);
 
     freeze_all(1);
 

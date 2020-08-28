@@ -25,15 +25,15 @@ using path_table_t = hashtbl_t<fs_mount_t, fs_factory_t*, &fs_mount_t::reg>;
 static path_table_t path_table;
 
 using lock_type = ext::noirq_lock<ext::spinlock>;
-using scoped_lock = std::unique_lock<lock_type>;
+using scoped_lock = ext::unique_lock<lock_type>;
 static lock_type storage_lock;
 
-static std::vector<storage_if_factory_t*> storage_if_factories;
-static std::vector<storage_if_base_t*> storage_ifs;
-static std::vector<storage_dev_base_t*> storage_devs;
-static std::vector<part_factory_t*> part_factories;
-static std::vector<fs_factory_t*> fs_regs;
-static std::vector<fs_mount_t> fs_mounts;
+static ext::vector<storage_if_factory_t*> storage_if_factories;
+static ext::vector<storage_if_base_t*> storage_ifs;
+static ext::vector<storage_dev_base_t*> storage_devs;
+static ext::vector<part_factory_t*> part_factories;
+static ext::vector<fs_factory_t*> fs_regs;
+static ext::vector<fs_mount_t> fs_mounts;
 
 size_t storage_dev_count()
 {
@@ -77,7 +77,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
     STORAGE_TRACE("Probing for %s interfaces...\n", factory->name);
 
     // Get a list of storage devices of this type
-    std::vector<storage_if_base_t *> list = factory->detect();
+    ext::vector<storage_if_base_t *> list = factory->detect();
 
     STORAGE_TRACE("Found %zu %s interfaces\n", list.size(), factory->name);
 
@@ -92,7 +92,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
         STORAGE_TRACE("Probing %s[%zu] for drives...\n", factory->name, i);
 
         // Get a list of storage devices on this interface
-        std::vector<storage_dev_base_t*> dev_list = if_->detect_devices();
+        ext::vector<storage_dev_base_t*> dev_list = if_->detect_devices();
 
         STORAGE_TRACE("Found %zu %s[%zu] drives\n", dev_list.size(),
                       factory->name, i);
@@ -146,7 +146,7 @@ EXPORT void fs_add(fs_factory_t *fs_reg, fs_base_t *fs)
                      ? fs_mounts.begin()
                      : fs_mounts.end(),
                      fs_mount_t{ fs_reg, fs }) ==
-                 std::vector<fs_mount_t>::iterator()))
+                 ext::vector<fs_mount_t>::iterator()))
         panic_oom();
 }
 
@@ -167,9 +167,9 @@ EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     if (mfs && mfs->is_boot()) {
         scoped_lock lock(storage_lock);
-        if (unlikely(fs_mounts.insert(fs_mounts.begin(),
+        if (unlikely(fs_mounts.insert(fs_mounts.cbegin(),
                                       fs_mount_t{ fs_reg, mfs }) ==
-                     std::vector<fs_mount_t>::iterator()))
+                     ext::vector<fs_mount_t>::iterator()))
             panic_oom();
     } else if (mfs) {
         scoped_lock lock(storage_lock);
@@ -194,7 +194,7 @@ static void probe_part_factory_on_drive(
                       (char const *)drive->info(STORAGE_INFO_NAME),
                       factory->name);
 
-        std::vector<part_dev_t*> part_list = factory->detect(drive);
+        ext::vector<part_dev_t*> part_list = factory->detect(drive);
 
         // Mount partitions
         for (size_t i = 0; i < part_list.size(); ++i) {
@@ -561,7 +561,7 @@ EXPORT storage_if_base_t::~storage_if_base_t()
 {
 }
 
-//std::unique_ptr<storage_if_base_t> dummy;
+//ext::unique_ptr<storage_if_base_t> dummy;
 
 storage_if_factory_t::~storage_if_factory_t()
 {

@@ -62,8 +62,8 @@ public:
     uint32_t const major;
     uint32_t const minor;
 
-    using minor_map_t = std::map<uint32_t, dev_base_t*>;
-    using major_map_t = std::map<uint32_t, minor_map_t>;
+    using minor_map_t = ext::map<uint32_t, dev_base_t*>;
+    using major_map_t = ext::map<uint32_t, minor_map_t>;
     static major_map_t dev_lookup;
 
     dev_base_t()
@@ -201,7 +201,7 @@ struct EXPORT storage_if_factory_t {
 
     void register_factory();
 
-    virtual std::vector<storage_if_base_t *> detect(void) = 0;
+    virtual ext::vector<storage_if_base_t *> detect(void) = 0;
     char const * const name;
 };
 
@@ -209,13 +209,13 @@ struct EXPORT storage_if_factory_t {
 struct EXPORT storage_if_base_t {
     virtual ~storage_if_base_t() = 0;
     virtual void cleanup_if() = 0;
-    virtual std::vector<storage_dev_base_t*> detect_devices() = 0;
+    virtual ext::vector<storage_dev_base_t*> detect_devices() = 0;
 };
 #pragma GCC visibility pop
 
 #define STORAGE_IF_IMPL                         \
     void cleanup_if() override final;           \
-    std::vector<storage_dev_base_t*> detect_devices() override final;
+    ext::vector<storage_dev_base_t*> detect_devices() override final;
 
 #define STORAGE_REGISTER_FACTORY(name) \
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
@@ -231,11 +231,11 @@ storage_dev_base_t *storage_dev_open(dev_t dev);
 void storage_dev_close(storage_dev_base_t *dev);
 
 template<typename T>
-bool unregister_factory(std::vector<T*> &factories,
+bool unregister_factory(ext::vector<T*> &factories,
                         T *factory)
 {
-    typename std::vector<T*>::iterator pos =
-            std::find(factories.begin(),
+    typename ext::vector<T*>::iterator pos =
+            ext::find(factories.begin(),
                       factories.end(), factory);
 
     if (unlikely(pos == factories.end()))
@@ -270,7 +270,7 @@ public:
     virtual ino_t get_inode() const = 0;
 };
 
-using fs_file_pair_t = std::pair<fs_base_t *, fs_file_info_t *>;
+using fs_file_pair_t = ext::pair<fs_base_t *, fs_file_info_t *>;
 
 struct fs_statvfs_t;
 
@@ -651,7 +651,7 @@ struct part_factory_t {
 
     virtual ~part_factory_t();
 
-    virtual std::vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
+    virtual ext::vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
     static void register_factory(void *p);
     char const * const name;
 };
@@ -670,8 +670,8 @@ __END_DECLS
 
 class intern_str_t {
 public:
-    std::shared_mutex intern_lock;
-    std::vector<char *> intern_lookup;
+    ext::shared_mutex intern_lock;
+    ext::vector<char *> intern_lookup;
 
     // Intern if necessary, and hold a ref to the string
     intern_str_t(char const *s)

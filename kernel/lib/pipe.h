@@ -30,7 +30,7 @@ struct pipe_t {
 
 private:
     using lock_type = ext::irq_mutex;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     void cleanup_buffer(scoped_lock &lock);
 
@@ -59,6 +59,6 @@ private:
     size_t page_capacity = 0;
 
     lock_type pipe_lock;
-    std::condition_variable pipe_not_empty;
-    std::condition_variable pipe_not_full;
+    ext::condition_variable pipe_not_empty;
+    ext::condition_variable pipe_not_full;
 };

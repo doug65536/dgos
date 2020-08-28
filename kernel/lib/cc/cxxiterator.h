@@ -2,7 +2,7 @@
 #include "types.h"
 #include "type_traits.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 struct input_iterator_tag { };
 struct output_iterator_tag { };
@@ -44,7 +44,7 @@ _D detect_difference_type(int);
 
 
 template<typename _T, typename _U>
-typename remove_reference<decltype(*declval<_T>())>::type
+typename ext::remove_reference<decltype(*ext::declval<_T>())>::type
 detect_value_type(_U);
 
 template<typename _T, typename _D = typename _T::value_type>
@@ -52,7 +52,7 @@ _D detect_value_type(int);
 
 
 template<typename _T, typename _U>
-typename remove_reference<decltype(&*declval<_T>())>::type
+typename ext::remove_reference<decltype(&*ext::declval<_T>())>::type
 detect_pointer_type(_U);
 
 template<typename _T, typename _D = typename _T::pointer>
@@ -60,7 +60,7 @@ _D detect_pointer_type(int);
 
 
 template<typename _T, typename _U>
-decltype(*declval<_T>())
+decltype(*ext::declval<_T>())
 detect_reference_type(_U);
 
 template<typename _T, typename _D = typename _T::reference>
@@ -98,4 +98,4 @@ public:
     using iterator_category = random_access_iterator_tag;
 };
 
-__END_NAMESPACE_STD
+__END_NAMESPACE_EXT

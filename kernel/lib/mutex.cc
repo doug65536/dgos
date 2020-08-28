@@ -4,124 +4,124 @@
 #include "cpu/control_regs.h"
 
 #pragma GCC visibility push(default)
-template class std::unique_lock<std::mutex>;
-template class std::unique_lock<std::shared_mutex>;
+template class ext::unique_lock<ext::mutex>;
+template class ext::unique_lock<ext::shared_mutex>;
 
-template class std::unique_lock<ext::shared_spinlock>;
-template class std::unique_lock<ext::ticketlock>;
-template class std::unique_lock<ext::spinlock>;
-template class std::unique_lock<ext::irqlock>;
-template class std::unique_lock<ext::mcslock>;
+template class ext::unique_lock<ext::shared_spinlock>;
+template class ext::unique_lock<ext::ticketlock>;
+template class ext::unique_lock<ext::spinlock>;
+template class ext::unique_lock<ext::irqlock>;
+template class ext::unique_lock<ext::mcslock>;
 
-template class std::unique_lock<ext::noirq_lock<std::mutex>>;
-template class std::unique_lock<ext::noirq_lock<std::shared_mutex>>;
+template class ext::unique_lock<ext::noirq_lock<ext::mutex>>;
+template class ext::unique_lock<ext::noirq_lock<ext::shared_mutex>>;
 
-template class std::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
-template class std::unique_lock<ext::noirq_lock<ext::ticketlock>>;
-template class std::unique_lock<ext::noirq_lock<ext::spinlock>>;
-template class std::unique_lock<ext::noirq_lock<ext::irqlock>>;
-//template class std::unique_lock<ext::noirq_lock<ext::mcslock>>;
+template class ext::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
+template class ext::unique_lock<ext::noirq_lock<ext::ticketlock>>;
+template class ext::unique_lock<ext::noirq_lock<ext::spinlock>>;
+template class ext::unique_lock<ext::noirq_lock<ext::irqlock>>;
+//template class ext::unique_lock<ext::noirq_lock<ext::mcslock>>;
 #pragma GCC visibility pop
 
-EXPORT std::mutex::mutex()
+EXPORT ext::mutex::mutex()
 {
     mutex_init(&m);
 }
 
-EXPORT std::mutex::~mutex()
+EXPORT ext::mutex::~mutex()
 {
     mutex_destroy(&m);
 }
 
-EXPORT void std::mutex::lock()
+EXPORT void ext::mutex::lock()
 {
     mutex_lock(&m);
 }
 
-EXPORT bool std::mutex::try_lock()
+EXPORT bool ext::mutex::try_lock()
 {
     return mutex_try_lock(&m);
 }
 
-EXPORT void std::mutex::unlock()
+EXPORT void ext::mutex::unlock()
 {
     mutex_unlock(&m);
 }
 
-EXPORT std::shared_mutex::shared_mutex()
+EXPORT ext::shared_mutex::shared_mutex()
 {
     rwlock_init(&m);
 }
 
-EXPORT std::shared_mutex::~shared_mutex()
+EXPORT ext::shared_mutex::~shared_mutex()
 {
     rwlock_destroy(&m);
 }
 
-EXPORT void std::shared_mutex::lock()
+EXPORT void ext::shared_mutex::lock()
 {
     rwlock_ex_lock(&m);
 }
 
-EXPORT bool std::shared_mutex::try_lock()
+EXPORT bool ext::shared_mutex::try_lock()
 {
     return rwlock_ex_try_lock(&m);
 }
 
-EXPORT void std::shared_mutex::unlock()
+EXPORT void ext::shared_mutex::unlock()
 {
     rwlock_ex_unlock(&m);
 }
 
-EXPORT void std::shared_mutex::lock_shared()
+EXPORT void ext::shared_mutex::lock_shared()
 {
     rwlock_sh_lock(&m);
 }
 
-EXPORT void std::shared_mutex::try_lock_shared()
+EXPORT void ext::shared_mutex::try_lock_shared()
 {
     rwlock_sh_try_lock(&m);
 }
 
-EXPORT void std::shared_mutex::unlock_shared()
+EXPORT void ext::shared_mutex::unlock_shared()
 {
     rwlock_sh_unlock(&m);
 }
 
-EXPORT void std::shared_mutex::upgrade_lock()
+EXPORT void ext::shared_mutex::upgrade_lock()
 {
     rwlock_upgrade(&m);
 }
 
 // ---
 
-EXPORT std::unique_lock<ext::mcslock>::unique_lock(ext::mcslock &attached_lock)
+EXPORT ext::unique_lock<ext::mcslock>::unique_lock(ext::mcslock &attached_lock)
     : m(&attached_lock)
     , locked(false)
 {
     lock();
 }
 
-EXPORT std::unique_lock<ext::mcslock>::unique_lock(
-        ext::mcslock &lock, std::defer_lock_t) noexcept
+EXPORT ext::unique_lock<ext::mcslock>::unique_lock(
+        ext::mcslock &lock, ext::defer_lock_t) noexcept
     : m(&lock)
     , locked(false)
 {
 }
 
-EXPORT std::unique_lock<ext::mcslock>::~unique_lock() noexcept
+EXPORT ext::unique_lock<ext::mcslock>::~unique_lock() noexcept
 {
     unlock();
 }
 
-EXPORT void std::unique_lock<ext::mcslock>::lock() noexcept
+EXPORT void ext::unique_lock<ext::mcslock>::lock() noexcept
 {
     assert(!locked);
     m->lock(&node);
     locked = true;
 }
 
-EXPORT void std::unique_lock<ext::mcslock>::unlock() noexcept
+EXPORT void ext::unique_lock<ext::mcslock>::unlock() noexcept
 {
     if (locked) {
         locked = false;
@@ -129,43 +129,43 @@ EXPORT void std::unique_lock<ext::mcslock>::unlock() noexcept
     }
 }
 
-EXPORT void std::unique_lock<ext::mcslock>::release() noexcept
+EXPORT void ext::unique_lock<ext::mcslock>::release() noexcept
 {
     locked = false;
     m = nullptr;
 }
 
-EXPORT void std::unique_lock<ext::mcslock>::swap(
+EXPORT void ext::unique_lock<ext::mcslock>::swap(
         unique_lock<ext::mcslock> &rhs) noexcept
 {
-    std::swap(rhs.m, m);
-    std::swap(rhs.locked, locked);
+    ext::swap(rhs.m, m);
+    ext::swap(rhs.locked, locked);
 }
 
 
 // ---
 
-EXPORT std::condition_variable::condition_variable()
+EXPORT ext::condition_variable::condition_variable()
 {
     condvar_init(&m);
 }
 
-EXPORT std::condition_variable::~condition_variable()
+EXPORT ext::condition_variable::~condition_variable()
 {
     condvar_destroy(&m);
 }
 
-EXPORT void std::condition_variable::notify_one()
+EXPORT void ext::condition_variable::notify_one()
 {
     condvar_wake_one(&m);
 }
 
-EXPORT void std::condition_variable::notify_all()
+EXPORT void ext::condition_variable::notify_all()
 {
     condvar_wake_all(&m);
 }
 
-EXPORT void std::condition_variable::notify_n(size_t n)
+EXPORT void ext::condition_variable::notify_n(size_t n)
 {
     condvar_wake_n(&m, n);
 }

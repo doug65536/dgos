@@ -399,7 +399,7 @@ __END_DECLS
 
 #include "cxxexception.h"
 
-class inval_user_pf : public std::exception {
+class inval_user_pf : public ext::exception {
     inval_user_pf(uintptr_t address, bool insn, bool write);
 
     inval_user_pf(inval_user_pf const&) = default;

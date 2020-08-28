@@ -23,7 +23,7 @@
 #define _VECTOR_COMPLAIN(...)
 #endif
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename _T, typename _Allocator = allocator<_T>>
 class vector
@@ -66,22 +66,22 @@ public:
     _always_inline constexpr vector(vector&& __other );
     inline constexpr vector(vector&& __other, _Allocator const& __alloc_);
 
-    vector(initializer_list<_T> __init,
+    vector(std::initializer_list<_T> __init,
             _Allocator const& __alloc_ = _Allocator());
 
     ~vector();
 
     vector& operator=(vector const& __other);
     inline vector& operator=(vector&& __other);
-    vector& operator=(initializer_list<_T> __ilist);
+    vector& operator=(std::initializer_list<_T> __ilist);
 
     bool assign(size_type __count, _T const& __value);
 
     template<typename _InputIt,
-             typename _InputVal = decltype(*declval<_InputIt>())>
+             typename _InputVal = decltype(*ext::declval<_InputIt>())>
     bool assign(_InputIt __first, _InputIt __last);
 
-    bool assign(initializer_list<_T> __ilist);
+    bool assign(std::initializer_list<_T> __ilist);
 
     allocator_type get_allocator() const;
 
@@ -146,7 +146,7 @@ public:
 
     _VECTOR_COMPLAIN(_use_result)
     iterator insert(const_iterator __pos,
-                    initializer_list<_T> __ilist);
+                    std::initializer_list<_T> __ilist);
 
     template<typename... _Args >
     _VECTOR_COMPLAIN(_use_result)
@@ -434,7 +434,7 @@ constexpr vector<_T,_Allocator>::vector(vector&& __other,
 }
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector(initializer_list<_T> __init,
+vector<_T,_Allocator>::vector(std::initializer_list<_T> __init,
         _Allocator const& __alloc_)
     : __m(nullptr)
     , __sz(0)
@@ -487,7 +487,7 @@ vector<_T,_Allocator>::operator=(vector&& __other)
 
 template<typename _T, typename _Allocator>
 vector<_T,_Allocator>&
-vector<_T,_Allocator>::operator=(initializer_list<_T> __ilist)
+vector<_T,_Allocator>::operator=(std::initializer_list<_T> __ilist)
 {
     assign(move(__ilist));
     return *this;
@@ -517,7 +517,7 @@ bool vector<_T,_Allocator>::assign(_InputIt __first, _InputIt __last)
 }
 
 template<typename _T, typename _Allocator>
-bool vector<_T,_Allocator>::assign(initializer_list<_T> __ilist)
+bool vector<_T,_Allocator>::assign(std::initializer_list<_T> __ilist)
 {
     if (!reserve(__ilist.size()))
         return false;
@@ -753,7 +753,7 @@ void vector<_T,_Allocator>::shrink_to_fit()
 template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::clear()
 {
-    if (std::has_trivial_destructor<_T>::value) {
+    if (has_trivial_destructor<_T>::value) {
         __sz = 0;
     } else {
         while (__sz > 0)
@@ -852,7 +852,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos,
 template<typename _T, typename _Allocator>
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
-                              initializer_list<_T> __ilist)
+                              std::initializer_list<_T> __ilist)
 {
     return insert(__pos, __ilist.begin(), __ilist.end());
 }
@@ -863,7 +863,7 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::emplace(const_iterator __pos, _Args&&... __args)
 {
     pointer place = __make_space(__pos, 1);
-    new (place) value_type(forward<_Args>(__args)...);
+    new (place) value_type(ext::forward<_Args>(__args)...);
     return iterator(place);
 }
 
@@ -959,7 +959,7 @@ bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args) noexcept
             return false;
     }
 
-    new (__m + __sz) value_type(forward<_Args>(__args)...);
+    new (__m + __sz) value_type(ext::forward<_Args>(__args)...);
 
     ++__sz;
 
@@ -999,10 +999,10 @@ bool vector<_T,_Allocator>::resize(size_type __count,
 template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::swap(vector &__other)
 {
-    std::swap(__m, __other.__m);
-    std::swap(__sz, __other.__sz);
-    std::swap(__capacity, __other.__capacity);
-    std::swap(__alloc, __other.__alloc);
+    ext::swap(__m, __other.__m);
+    ext::swap(__sz, __other.__sz);
+    ext::swap(__capacity, __other.__capacity);
+    ext::swap(__alloc, __other.__alloc);
 }
 
 //
@@ -1292,9 +1292,9 @@ cend(vector<_T, _Alloc> const& __rhs)
     return __rhs.end();
 }
 
-__END_NAMESPACE_STD
+__END_NAMESPACE_EXT
 
-extern template class std::vector<char, std::allocator<char>>;
-extern template class std::vector<uint8_t, std::allocator<uint8_t>>;
-extern template class std::vector<char16_t, std::allocator<char16_t>>;
-extern template class std::vector<wchar_t, std::allocator<wchar_t>>;
+extern template class ext::vector<char, ext::allocator<char>>;
+extern template class ext::vector<uint8_t, ext::allocator<uint8_t>>;
+extern template class ext::vector<char16_t, ext::allocator<char16_t>>;
+extern template class ext::vector<wchar_t, ext::allocator<wchar_t>>;

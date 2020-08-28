@@ -21,7 +21,7 @@ EXPORT void mmu_phys_allocator_t::init(
     highest_usable = highest_usable_;
     next_free = entry_t(-1);
 
-    std::fill_n(entries, highest_usable_, next_free);
+    ext::fill_n(entries, highest_usable_, next_free);
 }
 
 EXPORT void mmu_phys_allocator_t::add_free_space(
@@ -58,10 +58,8 @@ EXPORT physaddr_t mmu_phys_allocator_t::alloc_one()
 
     size_t index = next_free;
 
-    if (unlikely(index == entry_t(-1))) {
-        printdbg("Out of memory! Continuing...\n");
+    if (unlikely(index == entry_t(-1)))
         return 0;
-    }
 
     assert(index < highest_usable);
 

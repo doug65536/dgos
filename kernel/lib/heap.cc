@@ -92,8 +92,8 @@ static constexpr const size_t HEAP_MAX_ARENAS =
 C_ASSERT(sizeof(heap_ext_arena_t) == PAGESIZE);
 
 struct heap_t {
-    using lock_type = std::mutex;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using lock_type = ext::mutex;
+    using scoped_lock = ext::unique_lock<lock_type>;
 public:
     static heap_t *create();
     static void destroy(heap_t *heap);
@@ -636,6 +636,8 @@ void *pageheap_calloc(heap_t *heap, size_t num, size_t size)
 _assume_aligned(16)
 void *pageheap_alloc(heap_t *heap, size_t size)
 {
+    size_t exact_size = size;
+
     // Round size up to a multiple of 16 bytes, include header in size
     size = ((size + 15) & -16) + sizeof(heap_hdr_t);
 
@@ -652,28 +654,34 @@ void *pageheap_alloc(heap_t *heap, size_t size)
     char *blk = (char*)mmap(nullptr, alloc,
                             PROT_READ | PROT_WRITE, MAP_NOCOMMIT);
 
+    mprotect(blk, PAGESIZE, PROT_NONE);
+    mprotect(blk + end_guard, PAGESIZE, PROT_NONE);
+
     // Calculate pointer to header as near end of accessible area as posssible
     heap_hdr_t *hdr = (heap_hdr_t*)(blk + (end_guard - size));
 
-    // Fill the region after start guard but before the block
+
+    // Fill region before the block
+
+    madvise(blk + PAGESIZE,
+            (char*)hdr - ((char*)blk + PAGESIZE), MADV_WILLNEED);
+
     memset(blk + PAGESIZE, 0xFB, intptr_t(hdr) - intptr_t(blk + PAGESIZE));
+
+    // Fill region after exact block
+    memset((char*)(hdr + 1) + exact_size, 0xFA,
+           (char*)hdr + size - ((char*)(hdr + 1) + exact_size));
+
+    // Ideally fill heap allocation with garbage that will crash
+    // if uninitialized contents are used as a pointer
+    memset(hdr + 1, 0xF0, exact_size);
+
+    // We promised the compiler it is aligned like this, make sure
+    assert((uintptr_t(hdr + 1) & ~-16) == 0);
 
     hdr->size_next = size;
     hdr->sig1 = HEAP_BLK_TYPE_USED;
     hdr->heap_id = heap->id;
-
-    mprotect(blk, PAGESIZE, PROT_NONE);
-    mprotect(blk + end_guard, PAGESIZE, PROT_NONE);
-
-    // Fill region after the block but before the end guard
-    memset(blk + PAGESIZE, 0xFA, (char*)hdr - (blk + PAGESIZE));
-
-    // Ideally fill heap allocation with garbage that will crash
-    // if uninitialized contents are used as a pointer
-    memset(hdr + 1, 0xF0, size - sizeof(heap_hdr_t));
-
-    // We promised the compiler it is aligned like this, make sure
-    assert((uintptr_t(hdr + 1) & ~-16) == 0);
 
     return hdr + 1;
 }

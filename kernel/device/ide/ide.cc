@@ -49,14 +49,14 @@ struct ide_if_factory_t final
 {
     ide_if_factory_t();
 
-    virtual std::vector<storage_if_base_t *> detect(void) override;
+    virtual ext::vector<storage_if_base_t *> detect(void) override;
 };
 
 struct ide_if_t final : public storage_if_base_t, public zero_init_t {
     STORAGE_IF_IMPL
 
     using lock_type = ext::irq_mutex;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     struct bmdma_prd_t {
         uint32_t physaddr;
@@ -118,8 +118,8 @@ struct ide_if_t final : public storage_if_base_t, public zero_init_t {
         int io_done;
         int io_status;
         lock_type lock;
-        std::condition_variable not_busy_cond;
-        std::condition_variable done_cond;
+        ext::condition_variable not_busy_cond;
+        ext::condition_variable done_cond;
 
         void *io_window;
         void *dma_bounce;
@@ -135,7 +135,7 @@ struct ide_if_t final : public storage_if_base_t, public zero_init_t {
         int acquire_access();
         void release_access(int intr_was_enabled);
 
-        void detect_devices(std::vector<storage_dev_base_t *> &list);
+        void detect_devices(ext::vector<storage_dev_base_t *> &list);
 
         // Automatically use the correct port based on the enumeration type
         _always_inline uint8_t inb(ata_reg_cmd reg);
@@ -202,7 +202,7 @@ struct ide_if_t final : public storage_if_base_t, public zero_init_t {
     bool simplex_dma;
     bool dma_inuse;
     lock_type dma_lock;
-    std::condition_variable dma_available;
+    ext::condition_variable dma_available;
 };
 
 struct ide_dev_t : public storage_dev_base_t {
@@ -213,8 +213,8 @@ struct ide_dev_t : public storage_dev_base_t {
     int is_atapi;
 };
 
-static std::vector<ide_if_t*> ide_ifs;
-static std::vector<ide_dev_t*> ide_devs;
+static ext::vector<ide_if_t*> ide_ifs;
+static ext::vector<ide_dev_t*> ide_devs;
 
 // BMDMA
 //
@@ -244,9 +244,9 @@ ide_if_factory_t::ide_if_factory_t()
     storage_if_register_factory(this);
 }
 
-std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
+ext::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
 {
-    std::vector<storage_if_base_t*> list;
+    ext::vector<storage_if_base_t*> list;
 
     pci_dev_iterator_t pci_iter;
 
@@ -268,7 +268,7 @@ std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
     size_t std_idx = 0;
 
     do {
-        std::unique_ptr<ide_if_t> if_(new (ext::nothrow) ide_if_t{});
+        ext::unique_ptr<ide_if_t> if_(new (ext::nothrow) ide_if_t{});
 
         if_->chan[0].ports.cmd = pci_iter.config.is_bar_portio(0) &&
                 pci_iter.config.get_bar(0)
@@ -547,7 +547,7 @@ void ide_if_t::ide_chan_t::release_access(int intr_was_enabled)
 }
 
 void ide_if_t::ide_chan_t::detect_devices(
-        std::vector<storage_dev_base_t*>& list)
+        ext::vector<storage_dev_base_t*>& list)
 {
     IDE_TRACE("Detecting IDE devices\n");
 
@@ -638,7 +638,7 @@ void ide_if_t::ide_chan_t::detect_devices(
             continue;
         }
 
-        std::unique_ptr<ide_dev_t> dev(new (ext::nothrow) ide_dev_t{});
+        ext::unique_ptr<ide_dev_t> dev(new (ext::nothrow) ide_dev_t{});
         dev->chan = this;
         dev->slave = slave;
         dev->is_atapi = is_atapi;
@@ -648,7 +648,7 @@ void ide_if_t::ide_chan_t::detect_devices(
             panic_oom();
         dev.release();
 
-        std::unique_ptr<ata_identify_t> ident =
+        ext::unique_ptr<ata_identify_t> ident =
                 new (ext::nothrow) ata_identify_t;
 
         IDE_TRACE("if=%d, slave=%d, receiving IDENTIFY\n", secondary, slave);
@@ -1217,9 +1217,9 @@ errno_t ide_if_t::ide_chan_t::flush(int slave, int is_atapi, iocp_t *iocp)
     return errno_t::OK;
 }
 
-std::vector<storage_dev_base_t*> ide_if_t::detect_devices()
+ext::vector<storage_dev_base_t*> ide_if_t::detect_devices()
 {
-    std::vector<storage_dev_base_t*> list;
+    ext::vector<storage_dev_base_t*> list;
 
     if (bmdma_base) {
         simplex_dma = (bmdma_inb(ATA_BMDMA_REG_STATUS_n(0)) & 0x80) != 0;

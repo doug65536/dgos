@@ -37,7 +37,7 @@ public:
 private:
     uint32_t hash_of_item(const P &item) const;
 
-    std::vector<P> items;
+    ext::vector<P> items;
     uint32_t used;
     uint32_t holes;
     uint8_t log2_capacity;
@@ -70,7 +70,7 @@ template<typename T, typename K, typename P,
 bool basic_hashtbl_t<T, K, P, key_member, key_sz>::rehash(uint8_t new_log2)
 {
     size_t new_capacity = 1 << new_log2;
-    std::vector<P> new_tbl;
+    ext::vector<P> new_tbl;
     if (!new_tbl.resize(new_capacity, nullptr))
         return false;
 
@@ -80,7 +80,7 @@ bool basic_hashtbl_t<T, K, P, key_member, key_sz>::rehash(uint8_t new_log2)
         uint32_t new_mask = ~(uint32_t(-1) << new_log2);
 
         for (uint32_t src = 0, e = 1 << log2_capacity; src < e; ++src) {
-            P item(std::move(items[src]));
+            P item(ext::move(items[src]));
 
             // Skip nulls and holes
             if ((T*)item <= (void*)1)
@@ -95,7 +95,7 @@ bool basic_hashtbl_t<T, K, P, key_member, key_sz>::rehash(uint8_t new_log2)
                  k < e; ++k, hash = (hash + 1) & new_mask) {
                 T *candidate = (T*)new_tbl[hash];
                 if (candidate == nullptr) {
-                    new_tbl[hash] = std::move(item);
+                    new_tbl[hash] = ext::move(item);
                     ++new_used;
                     break;
                 }

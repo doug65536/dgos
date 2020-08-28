@@ -21,14 +21,18 @@ struct perf_ctr_t {
 { "L2 Cache Miss from L2 HWPF", Event[0x431F71] + Event[0x431F72]
 { "All L2 Cache Hits", Event[0x43F664] + Event[0x431F70]
 */
+    // Most widely useful ones first
+    { "Cycles Not Halted", 0x430076 },
+    { "Retired Branch Mispredicted", 0x4300C3 },
+
+    // More focused ones later
     { "All DC Accesses", 0x430729 },
     { "L2 Cache Access from IC Miss (including prefetch)", 0x431060 },
     { "L2 Cache Access from DC Miss (including Prefetch)", 0x43C860 },
-    { "L2 Cache Miss from IC Miss", 0x430164 },
     { "L2 Cache Miss from DC Miss", 0x430864 },
     { "L2 Cache Hit from IC Miss", 0x430664 },
     { "L2 Cache Hit from DC Miss", 0x437064 },
-    { "L2 Cache Hit from L2 HWPF", 0x431F70 },
+    { "L2 Cache Hit from L2 hardware prefetcher", 0x431F70 },
     { "L2 ITLB Misses & Instruction page walk", 0x430785 },
     { "L1 DTLB Misses", 0x43FF45 },
     { "L2 DTLB Misses & Data page walk", 0x43F045 },
@@ -42,7 +46,6 @@ struct perf_ctr_t {
     { "TSC Reads", 0x43002D },
     { "STLF", 0x430035 },
     { "Misaligned Loads", 0x430047 },
-    { "Cycles Not Halted", 0x430076 },
     { "TLB Flush", 0x430078 },
     { "Instruction refill from L2", 0x430082 },
     { "Instruction refill from System", 0x430083 },
@@ -52,14 +55,33 @@ struct perf_ctr_t {
     { "L2BP override", 0x43008B },
     { "Dynamic indirect prediction", 0x43008E },
     { "Retired Branch", 0x4300C2 },
-    { "Retired Branch Mispredicted", 0x4300C3 },
     { "Retired Taken Branch", 0x4300C4 },
-    { "Retired Far Control Transfer", 0x4300C4 },
-    { "Retired Return Mispredicted", 0x4300C9 },
+    { "Retired Taken Branch Mispredicted", 0x4300C5 },
+    { "Retired Far Control Transfer", 0x4300C6 },
+    { "Retired Near Returns", 0x4300C8 },
+    { "Retired Near Return Mispredicted", 0x4300C9 },
     { "Retired Indirect Branch Mispredicted", 0x4300CA },
     { "Retired SSE Instruction", 0x4304CB },
     { "Retired MMX Instruction", 0x4302CB },
     { "Retired x87 Instruction", 0x4301CB },
+
+    { "L2 Request - data cache read", 0x434061 },
+    { "L2 Request - data UC read", 0x432061 },
+    { "L2 Request - insn cache read", 0x431061 },
+    { "L2 Request - insn UC read", 0x430861 },
+    { "L2 Request - self modifying code invalidate", 0x430461 },
+    { "L2 Request - bus lock", 0x430261 },
+    { "L2 Request - bus lock response", 0x430161 },
+
+    { "L2 Request Outcome - data cache shared read hit", 0x438064 },
+    { "L2 Request Outcome - data cache read hit", 0x434064 },
+    { "L2 Request Outcome - data cache read hit on shared line", 0x432064 },
+    { "L2 Request Outcome - data cache store or state change hit", 0x431064 },
+    { "L2 Request Outcome - data cache req miss", 0x430864 },
+    { "L2 Request Outcome - insn cache hit modifiable line", 0x430464 },
+    { "L2 Request Outcome - insn cache hit clean line", 0x430264 },
+    { "L2 Request Outcome - insn cache req miss", 0x430164 },
+
     { "Div Busy", 0x4300D3 },
     { "Div Op", 0x4300D4 },
 };
@@ -88,7 +110,7 @@ class symbol_server_t {
         if ((end - slash) > 9 && !strcmp(end - 9, "-kallsyms"))
             end -= 9;
 
-        std::vector<char> name(slash, end);
+        ext::vector<char> name(slash, end);
 
         for (char& ch: name) {
             if (likely((ch >= 'a' && ch <= 'z') ||
@@ -114,7 +136,7 @@ class symbol_server_t {
         if (sz < 0)
             return false;
 
-        std::unique_ptr<char[]> buf(new (ext::nothrow) char[sz]);
+        ext::unique_ptr<char[]> buf(new (ext::nothrow) char[sz]);
         if (!buf)
             return false;
 
@@ -169,6 +191,8 @@ class symbol_server_t {
                 port->write(']');
             }
 
+            clear_to_eol();
+
             port->write("\r\n", 2);
         }
 
@@ -176,17 +200,19 @@ class symbol_server_t {
     }
 
     static void perf_sample_callback(void *arg, int percent, int millipercent,
+                                     char const *file, int line,
                                      char const *name)
     {
         symbol_server_t *self = (symbol_server_t*)arg;
         char buf[1024];
-        int sz = snprintf(buf, sizeof(buf), "%3d.%02d%% %s\n",
-                          percent, millipercent / 10, name);
+        int sz = snprintf(buf, sizeof(buf), "%3d.%02d%% %s(%d): %s\n",
+                          percent, millipercent / 10, file, line, name);
         if (sz > 0)
             self->port->write(buf, size_t(sz));
     }
 
     static void perf_top_callback(void *arg, int percent, int micropercent,
+                                  char const *filename, int line,
                                   char const *name)
     {
         symbol_server_t *self = (symbol_server_t*)arg;
@@ -195,11 +221,19 @@ class symbol_server_t {
             return;
 
         char edited_name[128];
+        size_t filename_len = strlen(filename);
         size_t name_len = strlen(name);
-        if (name_len < 96) {
+
+        char const *last_slash =
+                (char const *)memrchr(filename, '/', filename_len);
+
+        last_slash = last_slash ? last_slash : filename;
+
+        if (name_len < 96 - filename_len - 8) {
             // Do nothing
         } else {
-            ssize_t offset = std::min(ssize_t(name_len - 96),
+
+            ssize_t offset = ext::min(ssize_t(name_len - 96 - filename_len - 8),
                                       ssize_t(scroll_left));
 
             name = strncpy(edited_name,
@@ -217,9 +251,9 @@ class symbol_server_t {
         int sz = snprintf(buf, sizeof(buf),
                           "\x1b" "[%zu;1H"
                           "\x1b" "[0K"
-                          "%3d.%06d%% %.96s\n",
+                          "%3d.%06d%% %s(%d) %.96s\n",
                           top_rows,
-                          percent, micropercent, name);
+                          percent, micropercent, last_slash, line, name);
         if (sz > 0)
             self->port->write(buf, size_t(sz));
     }
@@ -295,6 +329,7 @@ class symbol_server_t {
             port->write(ext::to_string(delta_samples));
             port->wrstr(")");
 
+            clear_to_eol();
             port->wrstr("\r\n");
 
             port->wrstr("  (" YELLOW_STR(",.-+/*") ") divisor: ");
@@ -317,7 +352,6 @@ class symbol_server_t {
             port->write(ext::to_hex(perf_get_event()));
 
             clear_to_eol();
-
             port->wrstr("\r\n");
 
             port->wrstr("  (" YELLOW_STR("m") ") unit_mask: ");
@@ -326,18 +360,19 @@ class symbol_server_t {
             port->wrstr("  (" YELLOW_STR("c") ") count_mask: ");
             port->write(ext::to_hex(perf_get_count_mask()));
 
-            port->wrstr("  (" YELLOW_STR("i") ") invert: ");
+            port->wrstr("  (" YELLOW_STR("iI") ") invert: ");
             port->write(ext::to_hex(perf_get_invert()));
 
-            port->wrstr("  (" YELLOW_STR("e") ") edge: ");
+            port->wrstr("  (" YELLOW_STR("gG") ") edge: ");
             port->write(ext::to_hex(perf_get_edge()));
 
+            clear_to_eol();
             port->wrstr("\r\n");
 
             port->wrstr("  (" YELLOW_STR("np") ") event description: ");
             port->write(lookup_event_description(perf_get_all()));
-            clear_to_eol();
 
+            clear_to_eol();
             port->wrstr("\r\n");
 
             size_t cpu_count;
@@ -359,10 +394,10 @@ class symbol_server_t {
 
             ext::string fixed = ext::to_string(usage_fixed);
             ext::string frac = ext::to_string(usage_frac);
-            port->write(std::move(fixed));
+            port->write(ext::move(fixed));
             port->wrstr(".");
             port->write(leading_zeros(frac, 6));
-            port->write(std::move(frac));
+            port->write(ext::move(frac));
             port->wrstr("% (");
             port->write(ext::to_string(cpus_active));
             port->wrstr(" CPUs active)\r\n");
@@ -374,23 +409,23 @@ class symbol_server_t {
             uart_dev_t::clock::time_point now =
                     uart_dev_t::clock::now();
             uart_dev_t::clock::time_point timeout =
-                    now + std::chrono::seconds(1);
+                    now + ext::chrono::seconds(1);
 
             if (auto_divisor) {
                 if (delta_samples <= 125)
-                    perf_set_divisor(std::max(UINT64_C(1),
+                    perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 4));
                 else if (delta_samples <= 150)
-                    perf_set_divisor(std::max(UINT64_C(1),
+                    perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 2));
                 else if (delta_samples >= 2400)
-                    perf_set_divisor(std::max(UINT64_C(1),
+                    perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 8));
                 else if (delta_samples >= 1200)
-                    perf_set_divisor(std::max(UINT64_C(1),
+                    perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 4));
                 else if (delta_samples >= 600)
-                    perf_set_divisor(std::max(UINT64_C(1),
+                    perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 2));
             }
 
@@ -453,6 +488,16 @@ class symbol_server_t {
                     disable_zeroing();
                     break;
 
+                case 'i':
+                case 'I':
+                    perf_set_invert(input == 'i');
+                    break;
+
+                case 'g':
+                case 'G':
+                    perf_set_edge(input == 'g');
+                    break;
+
                 case 'n':
                     int event_index;
                     event_index = lookup_event_index(perf_get_all());
@@ -463,7 +508,7 @@ class symbol_server_t {
 
                 case 'p':
                     event_index = lookup_event_index(perf_get_all());
-                    if (event_index-- == 0)
+                    if (event_index-- <= 0)
                         event_index = countof(zen2_events) - 1;
                     perf_set_all(zen2_events[event_index].event);
                     break;
@@ -650,7 +695,7 @@ class symbol_server_t {
                     module_t *m = modload_get_index(i);
 
                     ext::string name = modload_get_name(m);
-                    ptrdiff_t base = modload_get_base(m);
+                    ptrdiff_t base = modload_get_base_adj(m);
                     size_t size = modload_get_size(m);
 
                     port->wrstr("\r\n");
@@ -710,6 +755,8 @@ class symbol_server_t {
 public:
     symbol_server_t()
     {
+        perf_init();
+
         port = uart_dev_t::open(uart_dev_t::com[3], 5,
                 115200, 8, 'N', 1, false);
 

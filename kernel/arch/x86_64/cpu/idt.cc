@@ -33,7 +33,7 @@ irq_dispatcher_handler_t isr_lookup[256];
 
 idt_entry_64_t idt[256];
 
-std::pair<void *, void *> ist_stacks[MAX_CPUS][IDT_IST_SLOT_COUNT];
+ext::pair<void *, void *> ist_stacks[MAX_CPUS][IDT_IST_SLOT_COUNT];
 
 static idt_unhandled_exception_handler_t unhandled_exception_handler_vec;
 
@@ -714,7 +714,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     if (closest_module) {
         printdbg("Closest module is %s, at +%#zx\n",
                  modload_get_name(closest_module).c_str(),
-                 rip - modload_get_base(closest_module));
+                 rip - modload_get_base_adj(closest_module));
     }
 
     perf_stacktrace_decoded();
@@ -880,7 +880,7 @@ void idt_set_ist_stack(size_t cpu_nr, size_t ist_slot, void *st, void *en)
     ist_stacks[cpu_nr][ist_slot] = { st, en };
 }
 
-std::pair<void *, void *> idt_get_ist_stack(size_t cpu_nr, size_t ist_slot)
+ext::pair<void *, void *> idt_get_ist_stack(size_t cpu_nr, size_t ist_slot)
 {
     assert(cpu_nr < MAX_CPUS);
     assert(ist_slot < IDT_IST_SLOT_COUNT);

@@ -12,7 +12,9 @@ void perf_stacktrace_xlat(void * const *ips, size_t count);
 void perf_init();
 
 uint64_t perf_gather_samples(
-        void (*callback)(void *, int, int, char const *), void *arg);
+        void (*callback)(void *arg, int percent, int micropercent,
+                         char const *file, int line, char const *function),
+        void *arg);
 
 uint32_t perf_set_event(uint32_t event);
 bool perf_set_invert(bool invert);

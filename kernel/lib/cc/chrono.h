@@ -7,7 +7,7 @@
 #include "numeric_limits.h"
 #include "export.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 __BEGIN_NAMESPACE(chrono)
 
 template<typename _Rep, typename _Period = ratio<1> >
@@ -17,22 +17,22 @@ __END_NAMESPACE //chrono
 
 template<typename _Rep, typename _Period>
 class common_type<
-        std::chrono::duration<_Rep, _Period>,
-        std::chrono::duration<_Rep, _Period>>
+        ext::chrono::duration<_Rep, _Period>,
+        ext::chrono::duration<_Rep, _Period>>
 {
 public:
-    using type = std::chrono::duration<_Rep, _Period>;
+    using type = ext::chrono::duration<_Rep, _Period>;
 };
 
 template<typename _Rep1, typename _Period1, typename _Rep2, typename _Period2>
 class common_type<
-        std::chrono::duration<_Rep1, _Period1>,
-        std::chrono::duration<_Rep2, _Period2>>
+        ext::chrono::duration<_Rep1, _Period1>,
+        ext::chrono::duration<_Rep2, _Period2>>
 {
 public:
-    using type = std::chrono::duration<
+    using type = ext::chrono::duration<
         typename common_type<_Rep1, _Rep2>::type,
-        typename std::ratio<
+        typename ext::ratio<
             gcd(_Period1::num, _Period2::num),
             lcm(_Period1::den, _Period2::den)
         >::type
@@ -178,7 +178,7 @@ constexpr operator+(duration<_Rep1,_Period1> const& lhs,
 
 template<typename _Rep1, typename _Period1,
          typename _Rep2, typename _Period2>
-typename std::common_type<duration<_Rep1,_Period1>,
+typename common_type<duration<_Rep1,_Period1>,
     duration<_Rep2,_Period2>>::type
 constexpr operator-(duration<_Rep1,_Period1> const& lhs,
                     duration<_Rep2,_Period2> const& rhs)
@@ -192,7 +192,7 @@ constexpr operator-(duration<_Rep1,_Period1> const& lhs,
 
 template<typename _Rep1, typename _Period1,
          typename _Rep2>
-duration<typename std::common_type<_Rep1,_Rep2>::type, _Period1>
+duration<typename common_type<_Rep1,_Rep2>::type, _Period1>
 constexpr operator*(duration<_Rep1,_Period1> const& lhs, _Rep2 const& rhs)
 {
     using T = typename common_type<
@@ -204,7 +204,7 @@ constexpr operator*(duration<_Rep1,_Period1> const& lhs, _Rep2 const& rhs)
 
 template<typename _Rep1, typename _Rep2,
          typename _Period1>
-duration<typename std::common_type<_Rep1,_Rep2>::type, _Period1>
+duration<typename common_type<_Rep1,_Rep2>::type, _Period1>
 constexpr operator*(_Rep1 const& lhs, duration<_Rep2,_Period1> const& rhs)
 {
     using T = typename common_type<
@@ -216,7 +216,7 @@ constexpr operator*(_Rep1 const& lhs, duration<_Rep2,_Period1> const& rhs)
 
 template<typename _Rep1, typename _Period1,
          typename _Rep2>
-duration<typename std::common_type<_Rep1,_Rep2>::type, _Period1>
+duration<typename common_type<_Rep1,_Rep2>::type, _Period1>
 constexpr operator/(duration<_Rep1,_Period1> const& lhs, _Rep2 const& rhs)
 {
     using T = typename common_type<
@@ -228,7 +228,7 @@ constexpr operator/(duration<_Rep1,_Period1> const& lhs, _Rep2 const& rhs)
 
 template<typename _Rep1, typename _Period1,
          typename _Rep2, typename _Period2>
-typename std::common_type<_Rep1,_Rep2>::type
+typename common_type<_Rep1,_Rep2>::type
 constexpr operator/(duration<_Rep1,_Period1> const& lhs,
                     duration<_Rep2,_Period2> const& rhs)
 {
@@ -240,7 +240,7 @@ constexpr operator/(duration<_Rep1,_Period1> const& lhs,
 }
 
 template<typename _Rep1, typename _Period1, typename _Rep2>
-duration<typename std::common_type<_Rep1,_Rep2>::type, _Period1>
+duration<typename common_type<_Rep1,_Rep2>::type, _Period1>
 constexpr operator%(duration<_Rep1, _Period1> const& d, _Rep2 const& s)
 {
 
@@ -248,7 +248,7 @@ constexpr operator%(duration<_Rep1, _Period1> const& d, _Rep2 const& s)
 
 template<typename _Rep1, typename _Period1,
          typename _Rep2, typename _Period2>
-typename std::common_type<duration<_Rep1,_Period1>,
+typename common_type<duration<_Rep1,_Period1>,
     duration<_Rep2,_Period2>>::type
 constexpr operator%(duration<_Rep1,_Period1> const& lhs,
                     duration<_Rep2,_Period2> const& rhs)
@@ -264,7 +264,7 @@ constexpr operator%(duration<_Rep1,_Period1> const& lhs,
 template<typename _ToDuration, typename _Rep, typename _Period>
 constexpr _ToDuration duration_cast(duration<_Rep,_Period> const& rhs)
 {
-    using __conv = typename std::ratio_divide<
+    using __conv = typename ext::ratio_divide<
         _Period, typename _ToDuration::period>;
 
     // To see in debugger
@@ -383,7 +383,7 @@ public:
     using duration = nanoseconds;
     using period = duration::period;
     using rep = duration::rep;
-    using time_point = std::chrono::time_point<system_clock>;
+    using time_point = ext::chrono::time_point<system_clock>;
 
     static constexpr bool is_steady()
     {
@@ -403,7 +403,7 @@ public:
     using duration = nanoseconds;
     using period = duration::period;
     using rep = duration::rep;
-    using time_point = std::chrono::time_point<steady_clock>;
+    using time_point = ext::chrono::time_point<steady_clock>;
 
     static constexpr bool is_steady()
     {
@@ -432,15 +432,15 @@ template<typename _Clock, typename _Duration>
 inline constexpr time_point<_Clock, _Duration>
 time_point<_Clock, _Duration>::max()
 {
-    return time_point(std::numeric_limits<std::chrono::
+    return time_point(numeric_limits<ext::chrono::
                       high_resolution_clock::duration::rep>::max());
 }
 
 
 __END_NAMESPACE // chrono
-__END_NAMESPACE_STD
+__END_NAMESPACE_EXT
 
 // Both clock implementations use int64_t nanosecond period
-extern template class std::chrono::duration<int64_t, std::nano>;
-extern template class std::chrono::time_point<std::chrono::system_clock>;
-extern template class std::chrono::time_point<std::chrono::steady_clock>;
+extern template class ext::chrono::duration<int64_t, ext::nano>;
+extern template class ext::chrono::time_point<ext::chrono::system_clock>;
+extern template class ext::chrono::time_point<ext::chrono::steady_clock>;

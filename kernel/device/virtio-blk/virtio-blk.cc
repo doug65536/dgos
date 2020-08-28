@@ -61,13 +61,13 @@ protected:
     void found_device(virtio_base_t *device) override final;
 };
 
-std::vector<virtio_blk_if_t *> virtio_blk_ifs;
+ext::vector<virtio_blk_if_t *> virtio_blk_ifs;
 
 class virtio_blk_if_factory_t : public storage_if_factory_t {
 public:
     virtio_blk_if_factory_t();
 private:
-    virtual std::vector<storage_if_base_t *> detect(void) override final;
+    virtual ext::vector<storage_if_base_t *> detect(void) override final;
 };
 
 enum struct virtio_blk_op_t : uint8_t {
@@ -127,7 +127,7 @@ private:
 
 private:
     using lock_type = ext::spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     struct blk_config_t {
         uint64_t capacity;
@@ -166,8 +166,8 @@ private:
 
         virtio_blk_if_t *owner;
         lock_type per_queue_lock;
-        std::vector<virtio_virtqueue_t::desc_t*> desc_chain;
-        std::vector<mmphysrange_t> phys_ranges;
+        ext::vector<virtio_virtqueue_t::desc_t*> desc_chain;
+        ext::vector<mmphysrange_t> phys_ranges;
         virtio_virtqueue_t *req_queue;
     };
 
@@ -198,9 +198,9 @@ virtio_blk_if_factory_t::virtio_blk_if_factory_t()
     storage_if_register_factory(this);
 }
 
-std::vector<storage_dev_base_t *> virtio_blk_if_t::detect_devices()
+ext::vector<storage_dev_base_t *> virtio_blk_if_t::detect_devices()
 {
-    return std::vector<storage_dev_base_t *>(
+    return ext::vector<storage_dev_base_t *>(
                 virtio_blk_ifs.begin(), virtio_blk_ifs.end());
 }
 
@@ -471,10 +471,10 @@ long virtio_blk_if_t::info(storage_dev_info_t key)
 static virtio_blk_factory_t virtio_blk_factory;
 static virtio_blk_if_factory_t virtio_blk_if_factory;
 
-std::vector<storage_if_base_t *> virtio_blk_if_factory_t::detect()
+ext::vector<storage_if_base_t *> virtio_blk_if_factory_t::detect()
 {
     virtio_blk_factory.detect();
 
-    return std::vector<storage_if_base_t *>(
+    return ext::vector<storage_if_base_t *>(
                 virtio_blk_ifs.begin(), virtio_blk_ifs.end());
 }

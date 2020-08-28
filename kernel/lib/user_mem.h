@@ -30,7 +30,7 @@ size_t mm_max_user_len(void const *buf);
 
 __END_DECLS
 
-using mm_copy_string_result_t = std::pair<ext::string, bool>;
+using mm_copy_string_result_t = ext::pair<ext::string, bool>;
 
 mm_copy_string_result_t mm_copy_user_string(
         char const *user_src, size_t max_size);
@@ -89,5 +89,5 @@ struct user_str_t {
     // Doubles as length storage when >= 0
     // otherwise holds negated errno value
     intptr_t lenof_str;
-    typename std::aligned_storage<max_sz, sizeof(char const*)>::type data;
+    typename ext::aligned_storage<max_sz, sizeof(char const*)>::type data;
 };

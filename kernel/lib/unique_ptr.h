@@ -173,7 +173,7 @@ private:
 };
 
 template<typename _T>
-using unique_ptr_free = std::unique_ptr<_T, free_deleter<_T>>;
+using unique_ptr_free = ext::unique_ptr<_T, free_deleter<_T>>;
 
 #endif
 

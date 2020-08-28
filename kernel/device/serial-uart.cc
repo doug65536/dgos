@@ -309,7 +309,7 @@ public:
     virtual ~uart_t() override;
 
 protected:
-    using timeout_t = std::chrono::steady_clock::time_point;
+    using timeout_t = ext::chrono::steady_clock::time_point;
 
     bool init(port_cfg_t const& cfg, bool use_irq) override;
 
@@ -423,7 +423,7 @@ protected:
     bool have_hw_flow = false;
 };
 
-static std::vector<std::unique_ptr<uart_t>> uarts;
+static ext::vector<ext::unique_ptr<uart_t>> uarts;
 
 bool uart_t::init(port_cfg_t const& cfg, bool use_irq)
 {
@@ -636,7 +636,7 @@ public:
 
 private:
     using lock_type = ext::irq_spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     void port_irq_handler() override final;
@@ -667,14 +667,14 @@ private:
     _noinline
     bool send_fifo_burst();
 
-    std::condition_variable tx_not_full;
-    std::condition_variable rx_not_empty;
-    std::condition_variable status_change;
+    ext::condition_variable tx_not_full;
+    ext::condition_variable rx_not_empty;
+    ext::condition_variable status_change;
 
     // Use 16 bit values to allow buffering of error information
     // as values >= 256
-    std::unique_ptr<uint16_t> rx_buffer;
-    std::unique_ptr<uint16_t> tx_buffer;
+    ext::unique_ptr<uint16_t> rx_buffer;
+    ext::unique_ptr<uint16_t> tx_buffer;
 
     lock_type lock;
 
@@ -784,7 +784,7 @@ bool uart_async_t::wait_dsr_until(timeout_t timeout)
     scoped_lock lock_(lock);
 
     while (!reg_msr.dsr) {
-        if (status_change.wait_until(lock_, timeout) == std::cv_status::timeout)
+        if (status_change.wait_until(lock_, timeout) == ext::cv_status::timeout)
             return false;
     }
 
@@ -987,7 +987,7 @@ bool uart_async_t::wait_tx_not_full_until(
 {
     UART_TRACE("Blocking on tx\n");
     bool result = tx_not_full.wait_until(lock_, timeout) ==
-            std::cv_status::no_timeout;
+            ext::cv_status::no_timeout;
     if (result)
         UART_TRACE("Unblocked tx\n");
     return result;
@@ -1000,7 +1000,7 @@ bool uart_async_t::wait_rx_not_empty_until(
     do {
         UART_TRACE("Blocking rx\n");
         result = rx_not_empty.wait_until(lock_, timeout) ==
-                std::cv_status::no_timeout;
+                ext::cv_status::no_timeout;
         if (result)
             UART_TRACE("Unblocked rx\n");
     } while (result && is_rx_empty());
@@ -1027,7 +1027,7 @@ public:
 
 private:
     using lock_type = ext::irq_spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     lock_type port_lock;
 
@@ -1130,7 +1130,7 @@ ssize_t uart_poll_t::write(void const *buf, size_t size, size_t min_write,
         }
 
         // Fill the FIFO or send the remainder
-        size_t block_size = std::min(size_t(bytes_until_next_poll),
+        size_t block_size = ext::min(size_t(bytes_until_next_poll),
                                      size - i);
 
         send_block((char*)buf + i, block_size);

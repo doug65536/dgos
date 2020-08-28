@@ -7,7 +7,7 @@
 
 class uart_dev_t {
 public:
-    using timeout_t = std::chrono::steady_clock::time_point;
+    using timeout_t = ext::chrono::steady_clock::time_point;
 
     static uint16_t const com[];
 
@@ -31,7 +31,7 @@ public:
               uint8_t data_bits, char parity_type,
               uint8_t stop_bits, bool use_irq);
 
-    using clock = std::chrono::steady_clock;
+    using clock = ext::chrono::steady_clock;
 
     // Transfer up to size bytes, blocking until at least min is transferred
     // Return number of bytes transferred or negative value for error

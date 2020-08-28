@@ -127,7 +127,7 @@ struct win_listener_t : refcounted<win_listener_t> {
 
 struct win_t : refcounted<win_t> {
     win_t *parent;
-    std::vector<refptr<win_t>> children;
+    ext::vector<refptr<win_t>> children;
 
     // The current scroll position
     vec2_t scroll_pos;

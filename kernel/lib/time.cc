@@ -73,6 +73,11 @@ EXPORT uint64_t time_unix(time_of_day_t const& time)
             ((y + 299) / 400) * UINT64_C(86400);
 }
 
+EXPORT uint64_t time_unix_ms(time_of_day_t const& time)
+{
+    return time_unix(time) * 1000 + time.centisec * 10;
+}
+
 bool time_ns_set_handler(uint64_t (*vec)(), void (*stop)(), bool override)
 {
     if (time_ns_vec != time_ns_dummy && !override)

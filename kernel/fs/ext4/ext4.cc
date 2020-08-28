@@ -261,7 +261,7 @@ class ext4_factory_t
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
-static std::vector<ext4_fs_t*> ext4_mounts;
+static ext::vector<ext4_fs_t*> ext4_mounts;
 
 // ---------------------------------------------------------------------------
 // Internal implementation
@@ -308,7 +308,7 @@ ext4_factory_t::ext4_factory_t()
 
 fs_base_t *ext4_factory_t::mount(fs_init_info_t *conn)
 {
-    std::unique_ptr<ext4_fs_t> self(new (ext::nothrow) ext4_fs_t);
+    ext::unique_ptr<ext4_fs_t> self(new (ext::nothrow) ext4_fs_t);
     if (self->mount(conn)) {
         if (unlikely(!ext4_mounts.push_back(self))) {
             panic_oom();

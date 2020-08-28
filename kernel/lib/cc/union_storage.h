@@ -9,14 +9,14 @@ union union_storage
 template<typename _T>
 union union_storage<_T>
 {
-    typename std::aligned_storage<sizeof(_T), alignof(_T)>::type current;
+    typename ext::aligned_storage<sizeof(_T), alignof(_T)>::type current;
 };
 
 template<typename _T, typename... _Types>
 union union_storage<_T, _Types...>
 {
     union_storage<_Types...> other;
-    typename std::aligned_storage<sizeof(_T), alignof(_T)>::type current;
+    typename ext::aligned_storage<sizeof(_T), alignof(_T)>::type current;
 };
 
 template<typename _Base, typename... _Types>
@@ -40,7 +40,7 @@ public:
     template<typename U, typename... Args>
     void construct(Args&&... args) {
         assert(!__constructed);
-        new (&__storage) U(std::forward<Args>(args)...);
+        new (&__storage) U(ext::forward<Args>(args)...);
         __constructed = true;
     }
 

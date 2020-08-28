@@ -3,7 +3,7 @@
 #include "initializer_list.h"
 #include "string.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename _T>
 _always_inline
@@ -175,25 +175,25 @@ constexpr _T max(_T const& __lhs, _T const& __rhs, _Compare __cmp)
 }
 
 template<typename _T, typename _Compare>
-constexpr _T min(initializer_list<_T> __list)
+constexpr _T min(std::initializer_list<_T> __list)
 {
     return *min_element(__list.begin(), __list.end());
 }
 
 template<typename _T, typename _Compare>
-constexpr _T max(initializer_list<_T> __list)
+constexpr _T max(std::initializer_list<_T> __list)
 {
     return *max_element(__list.begin(), __list.end());
 }
 
 template<typename _T, typename _Compare>
-constexpr _T min(initializer_list<_T> __list, _Compare __cmp)
+constexpr _T min(std::initializer_list<_T> __list, _Compare __cmp)
 {
     return *min_element(__list.begin(), __list.end(), __cmp);
 }
 
 template<typename _T, typename _Compare>
-constexpr _T max(initializer_list<_T> __list, _Compare __cmp)
+constexpr _T max(std::initializer_list<_T> __list, _Compare __cmp)
 {
     return *max_element(__list.begin(), __list.end(), __cmp);
 }

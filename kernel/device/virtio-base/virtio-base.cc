@@ -13,7 +13,7 @@
 #define VIRTIO_TRACE(...) ((void)0)
 #endif
 
-std::vector<virtio_base_t*> virtio_base_t::virtio_devs;
+ext::vector<virtio_base_t*> virtio_base_t::virtio_devs;
 
 char const *virtio_base_t::cap_names[] = {
     "<invalid>",
@@ -182,8 +182,8 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 // Route first vector to CPU 0, route rest of vectors
                 // round robin across all CPUs, starting at CPU 0
 
-                std::vector<int> target_cpus(queue_count + 1, 0);
-                std::vector<int> vector_offsets(queue_count + 1, 1);
+                ext::vector<int> target_cpus(queue_count + 1, 0);
+                ext::vector<int> vector_offsets(queue_count + 1, 1);
 
                 // Route config IRQs to CPU 0
                 vector_offsets[0] = 0;
@@ -550,7 +550,7 @@ void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
     if (sent_data && sent_size) {
         range_count = mphysranges(ranges, countof(ranges),
                                   sent_data, sent_size,
-                                  std::numeric_limits<uint32_t>::max());
+                                  ext::numeric_limits<uint32_t>::max());
 
         for (size_t i = 0; i < range_count; ++i, ++out) {
             desc[out] = alloc_desc(false);
@@ -567,7 +567,7 @@ void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
     if (rcvd_data && rcvd_size) {
         range_count = mphysranges(ranges, countof(ranges),
                                   rcvd_data, rcvd_size,
-                                  std::numeric_limits<uint32_t>::max());
+                                  ext::numeric_limits<uint32_t>::max());
 
         for (size_t i = 0; i < range_count; ++i, ++out) {
             desc[out] = alloc_desc(true);
@@ -664,7 +664,7 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
         VIRTIO_TRACE("Found %s device at %u:%u:%u\n", name,
                      pci_iter.bus, pci_iter.slot, pci_iter.func);
 
-        std::unique_ptr<virtio_base_t> self = create();
+        ext::unique_ptr<virtio_base_t> self = create();
 
         if (unlikely(!virtio_base_t::virtio_devs.push_back(self)))
             panic_oom();

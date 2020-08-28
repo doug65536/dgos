@@ -217,7 +217,7 @@ int keybd_event(keyboard_event_t event);
 
 // Called to read the keyboard queue
 keyboard_event_t keybd_waitevent(
-        std::chrono::steady_clock::time_point const& timeout_time);
+        ext::chrono::steady_clock::time_point const& timeout_time);
 keyboard_event_t keybd_waitevent();
 
 class keybd_dev_t {

@@ -75,13 +75,13 @@ struct pci_ecam_t {
     uint8_t en_bus;
 };
 
-static std::vector<pci_ecam_t> pci_ecam_list;
+static ext::vector<pci_ecam_t> pci_ecam_list;
 
 static pci_config_pio pci_pio_accessor;
 static pci_config_mmio pci_mmio_accessor;
 
 using pci_lock_type = ext::noirq_lock<ext::spinlock>;
-using pci_scoped_lock = std::unique_lock<pci_lock_type>;
+using pci_scoped_lock = ext::unique_lock<pci_lock_type>;
 static pci_lock_type pci_lock;
 static pci_config_rw *pci_accessor = &pci_pio_accessor;
 
@@ -143,7 +143,7 @@ struct pci_msix_mappings {
     uint32_t pba_sz;
 };
 
-static std::vector<std::pair<pci_addr_t, pci_msix_mappings>> pcix_tables;
+static ext::vector<ext::pair<pci_addr_t, pci_msix_mappings>> pcix_tables;
 
 #define offset_of(type, member) \
     ((uintptr_t)&(((type*)0x10U)->member) - 0x10U)
@@ -287,7 +287,7 @@ bool pci_config_pio::copy(pci_addr_t addr, void *dest,
 
     size_t block_sz;
     for (size_t i = 0; i < size; i += block_sz) {
-        block_sz = std::min(sizeof(uint32_t), size - i);
+        block_sz = ext::min(sizeof(uint32_t), size - i);
         value = pci_config_read(addr, offset + i, block_sz);
 
         memcpy(out + i, &value, block_sz);
@@ -999,9 +999,9 @@ static int pci_find_msi_msix(pci_addr_t addr,
 // Infer the number of vectors needed from the highest vector offset
 EXPORT int pci_vector_count_from_offsets(int const *vector_offsets, int count)
 {
-    return std::accumulate(vector_offsets, vector_offsets + count, 0,
+    return ext::accumulate(vector_offsets, vector_offsets + count, 0,
                       [&](int highest, int const& item) {
-        return std::max(highest, item);
+        return ext::max(highest, item);
     }) + 1;
 }
 
@@ -1098,9 +1098,9 @@ EXPORT bool pci_set_msi_irq(pci_dev_iterator_t const& pci_dev,
                                                tbl, pba, tbl_sz, pba_sz })))
             panic_oom();
 
-        size_t tbl_cnt = std::min(req_count, table_count);
+        size_t tbl_cnt = ext::min(req_count, table_count);
 
-        std::vector<msi_irq_mem_t> msi_writes(tbl_cnt);
+        ext::vector<msi_irq_mem_t> msi_writes(tbl_cnt);
 
         if (vector_offsets) {
             irq_range->count = pci_vector_count_from_offsets(
@@ -1465,7 +1465,7 @@ EXPORT int pci_enumerate_begin(
 
 EXPORT int pci_enumerate_next(pci_dev_iterator_t *iter)
 {
-    auto at = std::find(pci_cache.iters.begin(),
+    auto at = ext::find(pci_cache.iters.begin(),
                         pci_cache.iters.end(), *iter);
 
     if (likely(at != pci_cache.iters.end()))

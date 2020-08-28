@@ -133,14 +133,14 @@ public:
 
 private:
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     lock_type queue_lock;
-    std::condition_variable queue_not_full;
+    ext::condition_variable queue_not_full;
 
-    std::unique_ptr<virtio_iocp_t*[]> completions;
-    std::vector<virtio_iocp_t*> pending_completions;
-    std::vector<virtio_iocp_t*> finished_completions;
+    ext::unique_ptr<virtio_iocp_t*[]> completions;
+    ext::vector<virtio_iocp_t*> pending_completions;
+    ext::vector<virtio_iocp_t*> finished_completions;
 
     desc_t *desc_tab = nullptr;
 
@@ -403,12 +403,12 @@ protected:
     using blocking_iocp_t = virtio_virtqueue_t::virtio_blocking_iocp_t;
     using async_iocp_t = virtio_virtqueue_t::virtio_iocp_t;
     using lock_type = ext::irq_spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     virtual void irq_handler(int offset) = 0;
 
-    static std::vector<virtio_base_t*> virtio_devs;
+    static ext::vector<virtio_base_t*> virtio_devs;
 
     bool use_msi = false;
 
@@ -416,7 +416,7 @@ protected:
 
     pci_irq_range_t irq_range;
 
-    std::unique_ptr<virtio_virtqueue_t[]> queues;
+    ext::unique_ptr<virtio_virtqueue_t[]> queues;
     size_t queue_count = 0;
 
     lock_type cfg_lock;

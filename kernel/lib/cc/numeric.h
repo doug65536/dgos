@@ -2,7 +2,7 @@
 #include "types.h"
 #include "type_traits.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename _InputIt, typename _T>
 _T accumulate(_InputIt __first, _InputIt __last, _T __init)

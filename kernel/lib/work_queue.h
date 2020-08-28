@@ -34,7 +34,7 @@ public:
     static constexpr const size_t capacity = 32 * 32;
     static constexpr const size_t item_sz = 128;
 
-    using value_type = std::aligned_storage<item_sz, 8>::type;
+    using value_type = ext::aligned_storage<item_sz, 8>::type;
 
     workq_alloc();
     workq_alloc(workq_alloc const&) = delete;
@@ -49,7 +49,7 @@ private:
 
     uint32_t top;
     uint32_t map[32];
-    std::aligned_storage<item_sz, sizeof(void*)>::type items[capacity];
+    ext::aligned_storage<item_sz, sizeof(void*)>::type items[capacity];
     static_assert(sizeof(map) <= 32*32/8, "Must be within allocator limits");
 };
 
@@ -94,7 +94,7 @@ private:
 
 template<typename T>
 workq::workq_wrapper<T>::workq_wrapper(T&& functor)
-    : functor(std::forward<T>(functor))
+    : functor(ext::forward<T>(functor))
 {
 }
 
@@ -120,7 +120,7 @@ public:
 private:
     friend class workq;
     using lock_type = ext::spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     struct work {
         typedef void (*callback_t)(uintptr_t arg);
@@ -143,7 +143,7 @@ private:
     void worker();
 
     lock_type queue_lock;
-    std::condition_variable not_empty;
+    ext::condition_variable not_empty;
     int tid;
 
     workq_alloc alloc;
@@ -157,7 +157,7 @@ void workq::enqueue_on_all_barrier(T &&functor)
 {
     size_t cpu_count = thread_get_cpu_count();
     workq_impl::lock_type wait_lock;
-    std::condition_variable wait_done;
+    ext::condition_variable wait_done;
     size_t done_count = 0;
 
     for (size_t i = 0; i != cpu_count; ++i) {
@@ -182,7 +182,7 @@ void workq::enqueue(T&& functor)
 {
     cpu_scoped_irq_disable irq_dis;
     uint32_t cpu_nr = thread_cpu_number();
-    enqueue_on_cpu(cpu_nr, std::forward<T>(functor));
+    enqueue_on_cpu(cpu_nr, ext::forward<T>(functor));
 }
 
 template<typename T>
@@ -193,6 +193,6 @@ void workq::enqueue_on_cpu(size_t cpu_nr, T&& functor)
     workq_impl::scoped_lock lock(queue->queue_lock);
     void *mem = queue->allocate(queue, sizeof(workq_wrapper<T>));
     workq_wrapper<T> *item = new (mem)
-            workq_wrapper<T>(std::forward<T>(functor));
+            workq_wrapper<T>(ext::forward<T>(functor));
     percpu[cpu_nr].enqueue_and_unlock(item, lock);
 }

@@ -22,7 +22,7 @@ UNITTEST(test_filesystem_opendir)
 DISABLED_UNITTEST(test_filesystem_create_unlink_churn)
 {
     rand_lfs113_t r;
-    std::vector<int> names(1024, -1);
+    ext::vector<int> names(1024, -1);
     for (ssize_t i = 0; i < 1048576 + 1024; ++i) {
         char name[16];
         ssize_t d;

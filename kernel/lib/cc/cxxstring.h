@@ -41,7 +41,7 @@ public:
     static char_type* copy(char_type* __dest,
                            char_type const* __src, size_t __count)
     {
-        return std::copy(__src, __src + __count, __dest);
+        return ext::copy(__src, __src + __count, __dest);
     }
 
     static int compare(_CharT const *__lhs, _CharT const *__rhs, size_t __rlen)
@@ -99,7 +99,7 @@ char_traits<_CharT>::move(
         char_type *__dest, char_type const *__src, size_t __count)
 {
     if (__dest < __src || __src + __count <= __dest) {
-        std::copy(__src, __src + __count, __dest);
+        ext::copy(__src, __src + __count, __dest);
     } else if (__dest > __src) {
         for (size_t __i = __count; __i > 0; --__i)
             __dest[__i] = __src[__i];
@@ -128,13 +128,13 @@ void throw_bad_alloc();
 
 template<typename _CharT,
 typename _Traits = char_traits<_CharT>,
-typename _Allocator = std::allocator<_CharT>>
+typename _Allocator = allocator<_CharT>>
 class basic_string
 {
 private:
-    using _Storage = std::vector<_CharT, _Allocator>;
+    using _Storage = ext::vector<_CharT, _Allocator>;
 public:
-    static_assert(std::has_trivial_destructor<_CharT>::value,
+    static_assert(has_trivial_destructor<_CharT>::value,
                   "Null termination technique requires"
                   " trivially destructible type");
 
@@ -170,7 +170,7 @@ public:
     basic_string(basic_string const& __rhs)
     {
         if (!__str.reserve(__rhs.size() + 1))
-            throw std::bad_alloc();
+            throw ext::bad_alloc();
         __str = __rhs.__str;
         __str[__rhs.size()] = 0;
     }
@@ -198,7 +198,7 @@ public:
     }
 
     template<typename _IterT,
-             typename _IterV = decltype(*std::declval<_IterT>())>
+             typename _IterV = decltype(*ext::declval<_IterT>())>
     basic_string(_IterT __st, _IterT __en)
     {
         size_type __sz = __en - __st;
@@ -232,12 +232,12 @@ public:
         if (likely(assign_noexcept(__sz, __ch)))
             return *this;
 
-        throw std::bad_alloc();
+        throw ext::bad_alloc();
     }
 
     template<typename _InputIt,
              typename = typename
-             std::iterator_traits<_InputIt>::iterator_category>
+             ext::iterator_traits<_InputIt>::iterator_category>
     bool assign_noexcept(_InputIt __st, _InputIt __en) noexcept
     {
         __str.clear();
@@ -464,7 +464,7 @@ public:
         if (__count > __max_count)
             __count = __max_count;
 
-        std::copy(__str.data() + __pos, __str.data() + __pos + __count, __dest);
+        ext::copy(__str.data() + __pos, __str.data() + __pos + __count, __dest);
 
         return __count;
     }
@@ -577,7 +577,7 @@ public:
 
     int compare(basic_string const& __rhs) const
     {
-        size_type __rlen = std::min(__str.size(), __rhs.size());
+        size_type __rlen = ext::min(__str.size(), __rhs.size());
 
         int __cmp = traits_type::compare(__str.data(), __rhs.data(), __rlen);
 
@@ -665,7 +665,7 @@ public:
         if (__count1 > __max_count1)
             __count1 = __max_count1;
 
-        size_type __rlen = std::min(__count1, __count2);
+        size_type __rlen = ext::min(__count1, __count2);
 
         int __cmp = traits_type::compare(__str.data() + __pos1, __rhs, __rlen);
 
@@ -720,7 +720,7 @@ public:
 
     size_type find(_CharT __ch, size_type __pos = 0) const
     {
-        const_iterator __it = std::find(__str.cbegin() + __pos,
+        const_iterator __it = ext::find(__str.cbegin() + __pos,
                                         __str.cend(), __ch);
         return __it != __str.cend() ? __it - __str.cbegin() : npos;
     }
@@ -795,7 +795,7 @@ public:
 
     size_type find_first_of(_CharT __ch, size_type __str_pos = 0) const
     {
-        auto result = std::find(__str.cbegin() + __str_pos, __str.cend(), __ch);
+        auto result = ext::find(__str.cbegin() + __str_pos, __str.cend(), __ch);
         return result != __str.end() ? result - __str.begin() : npos;
     }
 
@@ -880,8 +880,13 @@ private:
         return *this;
     }
 
-    std::vector<_CharT> __str;
+    ext::vector<_CharT> __str;
 };
+
+template<typename _CharT, typename _Traits, typename _Alloc>
+constexpr
+typename basic_string<_CharT, _Traits, _Alloc>::size_type
+basic_string<_CharT, _Traits, _Alloc>::npos;
 
 template<typename _CharT, typename _Traits, typename _Alloc>
 constexpr const _CharT basic_string<_CharT, _Traits, _Alloc>::__empty_str[1];
@@ -1045,13 +1050,13 @@ string to_string( long double value );
 ext::string to_hex(unsigned long long value, bool prefix = true);
 
 template<typename _T,
-         typename = typename std::enable_if<std::is_integral<_T>::value>::type>
+         typename = typename ext::enable_if<ext::is_integral<_T>::value>::type>
 ext::string to_hex(_T value, bool prefix)
 {
-    if (std::is_same<_T, long long>::value)
+    if (ext::is_same<_T, long long>::value)
         return to_hex((unsigned long long)value, prefix);
 
-    if (std::is_signed<_T>::value)
+    if (ext::is_signed<_T>::value)
         return to_hex((unsigned long long)value & ~-(1ULL << (8*sizeof(_T))),
                       prefix);
 

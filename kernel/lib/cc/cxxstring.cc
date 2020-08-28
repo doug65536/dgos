@@ -95,7 +95,7 @@ ext::string std::to_string(long double value)
 
 void ext::detail::throw_bad_alloc()
 {
-    throw std::bad_alloc();
+    throw ext::bad_alloc();
 }
 
 ext::string ext::to_hex(unsigned long long value, bool prefix)

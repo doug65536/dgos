@@ -123,7 +123,7 @@ static format_flag_info_t pte_flags[] = {
     { "XD",     1,                  nullptr, PTE_NX_BIT       },
     { "PK",     PTE_PK_MASK,        nullptr, PTE_PK_BIT       },
     { "62:52",  PTE_AVAIL2_MASK,    nullptr, PTE_AVAIL2_BIT   },
-    { "PADDR",  PTE_ADDR,           nullptr, 0                },
+    { "PAGNR",  PTE_ADDR,           nullptr, 0                },
     { "11:9",   PTE_AVAIL1_MASK,    nullptr, PTE_AVAIL1_BIT   },
     { "G",      1,                  nullptr, PTE_GLOBAL_BIT   },
     { "PS",     1,                  nullptr, PTE_PAGESIZE_BIT },
@@ -202,16 +202,16 @@ struct mmap_device_mapping_t {
     ext::unique_mmap<char> range;
     mm_dev_mapping_callback_t callback;
     void *context;
-    std::mutex lock;
-    std::condition_variable done_cond;
+    ext::mutex lock;
+    ext::condition_variable done_cond;
     int64_t active_read;
 };
 
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
-static std::vector<mmap_device_mapping_t*> mm_dev_mappings;
-using mm_dev_mapping_lock_type = ext::noirq_lock<ext::spinlock>;
-using mm_dev_mapping_scoped_lock = std::unique_lock<mm_dev_mapping_lock_type>;
+static ext::vector<mmap_device_mapping_t*> mm_dev_mappings;
+using mm_dev_mapping_lock_type = ext::irq_spinlock;
+using mm_dev_mapping_scoped_lock = ext::unique_lock<mm_dev_mapping_lock_type>;
 static mm_dev_mapping_lock_type mm_dev_mapping_lock;
 
 /// Physical page allocation map
@@ -245,6 +245,8 @@ extern char ___init_brk[];
 
 // Used as a simple bump allocator to get address space early on
 static linaddr_t linear_base = PT_MAX_ADDR;
+
+static ext::irq_spinlock shootdown_lock;
 
 static thread_cpu_mask_t volatile shootdown_pending;
 
@@ -280,6 +282,9 @@ static physaddr_t mmu_alloc_phys()
     physaddr_t page;
 
     page = phys_allocator.alloc_one();
+
+    if (unlikely(!page))
+        panic("Out of memory!\n");
 
     return page;
 }
@@ -577,7 +582,7 @@ static _always_inline constexpr T *init_phys(uint64_t addr)
 
 struct clear_phys_state_t {
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
     lock_type locks[64];
 
     pte_t *pte;
@@ -628,6 +633,7 @@ void mm_phys_clear_init()
     for (int i = 0; i < clear_phys_state.level; ) {
         assert(*ptes[i] == 0);
         physaddr_t page = init_take_page();
+        assert(page != 0);
         printdbg("Assigning phys_clear_init table"
                  " pte=%p page=%#.16" PRIx64 "\n",
                  (void*)ptes[i], page);
@@ -748,17 +754,20 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 
 static void mmu_send_tlb_shootdown(bool synchronous = true)
 {
+    ext::unique_lock<ext::irq_spinlock> lock(shootdown_lock);
+
     uint32_t cpu_count = thread_cpu_count();
 
     // Skip if too early or uniprocessor
     if (unlikely(cpu_count <= 1))
         return;
 
-    cpu_scoped_irq_disable irq_was_enabled;
-    uint32_t cur_cpu_nr = thread_cpu_number();
-
+    // Must be asynchronous before SMP is fully up and running
     if (unlikely(thread_get_id() < thread_get_cpu_count()))
         synchronous = false;
+
+    cpu_scoped_irq_disable irq_was_enabled;
+    uint32_t cur_cpu_nr = thread_cpu_number();
 
     thread_cpu_mask_t all_cpu_mask(-1);
     thread_cpu_mask_t cur_cpu_mask(cur_cpu_nr);
@@ -836,11 +845,16 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 
     pte_t *ptes[4];
 
+start_over:
+
     ptes_from_addr(ptes, fault_addr);
     int present_mask = ptes_present(ptes);
 
     uintptr_t const err_code = ISR_CTX_ERRCODE(ctx);
 
+#if DEBUG_PAGE_FAULT
+    printdbg("Page fault at %p\n", (void*)fault_addr);
+#endif
 
     // Examine the error code
     // Wait until here so person debugging can look at ptes
@@ -851,10 +865,6 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
         cpu_debug_break();
         return nullptr;
     }
-
-#if DEBUG_PAGE_FAULT
-    printdbg("Page fault at %p\n", (void*)fault_addr);
-#endif
 
     pte_t pte = (present_mask >= 0x07) ? *ptes[3] : 0;
 
@@ -996,7 +1006,6 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 
             linaddr_t rounded_addr = fault_addr & -(intptr_t)PAGE_SIZE;
 
-
             // Lookup the device mapping
             intptr_t device = mmu_device_from_addr(rounded_addr);
             if (unlikely(device < 0))
@@ -1017,7 +1026,7 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
             pte_t volatile *vpte = ptes[3];
 
             // Attempt to be the first CPU to start reading a block
-            std::unique_lock<std::mutex> lock(mapping->lock);
+            ext::unique_lock<ext::mutex> lock(mapping->lock);
             while (mapping->active_read >= 0 &&
                    !(*vpte & PTE_PRESENT))
                 mapping->done_cond.wait(lock);
@@ -1130,21 +1139,9 @@ no_landing_pad:
 //
 // Initialization
 
-static int mmu_have_pat(void)
-{
-    // 0 == unknown, 1 == supported, -1 == not supported
-    static int supported;
-    if (likely(supported != 0))
-        return supported > 0;
-
-    supported = (cpuid_edx_bit(16, 1, 0) << 1) - 1;
-
-    return supported > 0;
-}
-
 static void mmu_configure_pat(void)
 {
-    if (likely(mmu_have_pat()))
+    if (likely(cpuid_has_pat()))
         cpu_msr_set(CPU_MSR_IA32_PAT, PAT_CFG);
 }
 
@@ -1180,13 +1177,13 @@ void mmu_init()
     }
 
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
-           std::min(sizeof(phys_mem_map), sizeof(*phys_mem_map) *
+           ext::min(sizeof(phys_mem_map), sizeof(*phys_mem_map) *
                            kernel_params->phys_mem_table_size));
 
     if (unlikely(kernel_params->phys_mem_table_size > countof(phys_mem_map)))
         printdbg("Memory map exceeded static sized in-kernel buffer\n");
 
-    phys_mem_map_count = std::min(kernel_params->phys_mem_table_size,
+    phys_mem_map_count = ext::min(kernel_params->phys_mem_table_size,
                                   countof(phys_mem_map));
 
     usable_early_mem_ranges = mmu_fixup_mem_map(
@@ -1218,7 +1215,7 @@ void mmu_init()
             if (mem->type == PHYSMEM_TYPE_NORMAL) {
                 usable_pages += mem->size >> PAGE_SIZE_BIT;
 
-                highest_usable = std::max(highest_usable, end);
+                highest_usable = ext::max(highest_usable, end);
             }
         }
     }
@@ -1364,10 +1361,6 @@ void mmu_init()
 
     // Preallocate the second level kernel PTPD pages so we don't
     // need to worry about process-specific page directory synchronization
-//    bool success;
-//    success = phys_allocator.alloc_multiple(PAGE_SIZE * 256, mmu_init_pagedir);
-//    assert(success);
-
     for (size_t i = 256; i < 512; ++i) {
         if (PT0_PTR[i] == 0) {
             physaddr_t page = mmu_alloc_phys();
@@ -1740,7 +1733,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
         page_flags |= zero_if_false(flags & MAP_WRITETHRU, PTE_PWT);
     } else {
         // Weakly ordered memory, set write combining in PTE if capable
-        page_flags |= select_mask(mmu_have_pat(),
+        page_flags |= select_mask(cpuid_has_pat(),
                                   PTE_PTEPAT_n(PAT_IDX_WC),
                                   PTE_PCD | PTE_PWT);
     }
@@ -2672,7 +2665,7 @@ EXPORT int madvise(void *addr, size_t len, int advice)
             any_invalidate = true;
             cpu_page_invalidate((uintptr_t)addr);
         } else {
-            printdbg("Skipped an invlpg!\n");
+            //printdbg("Skipped an invlpg!\n");
         }
 
         addr = (char*)addr + PAGE_SIZE;
@@ -2682,8 +2675,8 @@ EXPORT int madvise(void *addr, size_t len, int advice)
 
     if (any_invalidate)
         mmu_send_tlb_shootdown();
-    else
-        printdbg("Skipped a TLB shootdown!\n");
+//    else
+//        printdbg("Skipped a TLB shootdown!\n");
 
     return 0;
 }
@@ -2708,7 +2701,7 @@ EXPORT int msync(void const *addr, size_t len, int flags)
 
     mmap_device_mapping_t *mapping = mm_dev_mappings[device];
 
-    std::unique_lock<std::mutex> lock(mapping->lock);
+    ext::unique_lock<ext::mutex> lock(mapping->lock);
 
     while (mapping->active_read >= 0)
         mapping->done_cond.wait(lock);
@@ -3097,7 +3090,7 @@ uintptr_t mm_new_process(process_t *process, bool use64)
                               PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     // Copy upper memory mappings into new page directory
-    std::copy(master_pagedir + 256, master_pagedir + 512, dir + 256);
+    ext::copy(master_pagedir + 256, master_pagedir + 512, dir + 256);
 
     // Get the physical address for the new process page directory
     physaddr_t dir_physaddr = mphysaddr(dir);
@@ -3125,7 +3118,7 @@ void mm_destroy_process()
     unsigned path[4];
     pte_t *ptes[4];
 
-    std::vector<physaddr_t> pending_frees;
+    ext::vector<physaddr_t> pending_frees;
     pending_frees.reserve(4);
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);

@@ -14,15 +14,15 @@ UNITTEST(test_sort)
 
     do {
         int tcase[4];
-        std::copy(&cases[0], &cases[4], tcase);
+        ext::copy(&cases[0], &cases[4], tcase);
 
-        std::sort(tcase, tcase + 4);
+        ext::sort(tcase, tcase + 4);
 
         eq(1, tcase[0]);
         eq(2, tcase[1]);
         eq(3, tcase[2]);
         eq(4, tcase[3]);
-    } while (std::next_permutation(cases, cases + countof(cases)));
+    } while (ext::next_permutation(cases, cases + countof(cases)));
 }
 
 UNITTEST(test_stress_sort)
@@ -35,7 +35,7 @@ UNITTEST(test_stress_sort)
     static int const item_count = 5113;
     static uint32_t const rand_cap =
             ((uint64_t(1) << 32) - (uint64_t(1) << 32) % shuffle_count) - 1;
-    std::unique_ptr<int[]> items(new (ext::nothrow) int[item_count]);
+    ext::unique_ptr<int[]> items(new (ext::nothrow) int[item_count]);
 
     for (int i = 0; i < item_count; ++i)
         items[i] = i;
@@ -50,19 +50,19 @@ UNITTEST(test_stress_sort)
                 continue;
             }
             value %= item_count;
-            std::swap(items[shuffle], items[value]);
+            ext::swap(items[shuffle], items[value]);
         }
 
-        auto st = std::chrono::high_resolution_clock::now();
-        std::sort(items.get(), items.get() + item_count);
-        auto en = std::chrono::high_resolution_clock::now();
-        auto ns = std::chrono::microseconds(en - st).count();
+        auto st = ext::chrono::high_resolution_clock::now();
+        ext::sort(items.get(), items.get() + item_count);
+        auto en = ext::chrono::high_resolution_clock::now();
+        auto ns = ext::chrono::microseconds(en - st).count();
 
         printdbg("Sort %" PRIu64 " swaps"
                                  ", %" PRIu64" comparisons"
                                  ", %" PRIu64" us\n",
-                 std::detail::quicksort_cmp_count,
-                 std::detail::quicksort_swp_count,
+                 ext::detail::quicksort_cmp_count,
+                 ext::detail::quicksort_swp_count,
                  ns);
 
         for (int i = 0; i < item_count; ++i)

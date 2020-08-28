@@ -851,7 +851,7 @@ protected:
 
 private:
     using lock_type = ext::irq_spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     errno_t cc_to_errno(usb_cc_t cc);
 
@@ -946,13 +946,13 @@ private:
 
     usbxhci_evtring_seg_t volatile *dev_evt_segs;
 
-    std::unique_ptr<usbxhci_interrupter_info_t[]> interrupters;
+    ext::unique_ptr<usbxhci_interrupter_info_t[]> interrupters;
 
     size_t busid;
 
     lock_type endpoints_lock;
-    using endpoint_collection_t = std::vector<
-        std::unique_ptr<usbxhci_endpoint_data_t>>;
+    using endpoint_collection_t = ext::vector<
+        ext::unique_ptr<usbxhci_endpoint_data_t>>;
     endpoint_collection_t endpoints;
 
     // Endpoint data keyed on usbxhci_endpoint_target_t
@@ -977,17 +977,17 @@ private:
     hashtbl_t<usbxhci_pending_cmd_t,
     uint64_t, &usbxhci_pending_cmd_t::cmd_physaddr> usbxhci_pending_ht;
 
-    std::vector<void*> scratch_buffers;
+    ext::vector<void*> scratch_buffers;
 
-    std::vector<usb_iocp_t*> completed_iocp;
+    ext::vector<usb_iocp_t*> completed_iocp;
 
-    std::vector<usbxhci_slot_data_t> slot_data;
+    ext::vector<usbxhci_slot_data_t> slot_data;
 
     // Command issue lock
     lock_type lock_cmd;
 };
 
-static std::vector<std::unique_ptr<usbxhci>> usbxhci_devices;
+static ext::vector<ext::unique_ptr<usbxhci>> usbxhci_devices;
 
 // Handle 32 or 64 byte device context size
 usbxhci_slotctx_t *usbxhci::dev_ctx_ent_slot(size_t slotid)
@@ -1128,7 +1128,7 @@ void usbxhci::cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp)
 
 usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 {
-    std::unique_ptr<usbxhci_endpoint_data_t> newepd(
+    ext::unique_ptr<usbxhci_endpoint_data_t> newepd(
             new (ext::nothrow) usbxhci_endpoint_data_t);
 
     if (!newepd)
@@ -1295,7 +1295,7 @@ bool usbxhci::add_device(int parent_slot, size_t port, int route)
     // their device descriptor shall support GetDescriptor (BOS Descriptor)
     // requests
     usb_desc_bos bos_hdr{};
-    std::unique_ptr<usb_desc_bos> bos;
+    ext::unique_ptr<usb_desc_bos> bos;
     do {
         if (dev_desc.usb_spec >= 0x210) {
             err = get_descriptor(slotid, 0, &bos_hdr, sizeof(bos_hdr),
@@ -1364,19 +1364,19 @@ void usbxhci::legacy_handoff(uint32_t const volatile *cap)
 
     mm_wr(*os_owned, mm_rd(*os_owned) | 1);
 
-    std::chrono::steady_clock::time_point now, st, timeout;
-    st = std::chrono::steady_clock::now();
-    timeout = now + std::chrono::seconds(5);
+    ext::chrono::steady_clock::time_point now, st, timeout;
+    st = ext::chrono::steady_clock::now();
+    timeout = now + ext::chrono::seconds(5);
     now = st;
 
     while ((atomic_ld_acq(bios_owned) & 1) &&
-           (now = std::chrono::steady_clock::now()) < timeout)
+           (now = ext::chrono::steady_clock::now()) < timeout)
         pause();
 
     if (now < timeout) {
         USBXHCI_TRACE("Legacy handoff completed in %" PRId64 "ms\n",
-                      std::chrono::duration_cast<
-                        std::chrono::milliseconds>(
+                      ext::chrono::duration_cast<
+                        ext::chrono::milliseconds>(
                           timeout - now).count());
     } else {
         USBXHCI_TRACE("Legacy handoff timed out!\n");
@@ -1456,13 +1456,13 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     USBXHCI_TRACE("Waiting for controller not ready == zero\n");
 
     // 5 seconds is the point where no working controller is that slow
-    auto now = std::chrono::steady_clock::now();
+    auto now = ext::chrono::steady_clock::now();
     auto time_st = now;
-    auto timeout = time_st + std::chrono::seconds(5);
+    auto timeout = time_st + ext::chrono::seconds(5);
 
     // Wait for CNR (controller not ready) to be zero
     while ((mm_rd(mmio_op->usbsts) & USBXHCI_USBSTS_CNR) &&
-           ((now = std::chrono::steady_clock::now()) < timeout))
+           ((now = ext::chrono::steady_clock::now()) < timeout))
         pause();
 
     if (unlikely(now >= timeout)) {
@@ -1483,9 +1483,9 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     USBXHCI_TRACE("Stopping controller\n");
 
     // 2 seconds is the point where no working controller is that slow
-    now = std::chrono::steady_clock::now();
+    now = ext::chrono::steady_clock::now();
     time_st = now;
-    timeout = time_st + std::chrono::seconds(2);
+    timeout = time_st + ext::chrono::seconds(2);
 
     // Stop the controller
     uint32_t usbcmd = mm_rd(mmio_op->usbcmd);
@@ -1494,7 +1494,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     // Wait for controller to stop
     while ((!(mm_rd(mmio_op->usbsts) & USBXHCI_USBSTS_HCH)) &&
-           ((now = std::chrono::steady_clock::now()) < timeout))
+           ((now = ext::chrono::steady_clock::now()) < timeout))
         pause();
 
     if (unlikely(now >= timeout)) {
@@ -1503,15 +1503,15 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     }
 
     USBXHCI_TRACE("Stop completed in %" PRIu64 "ms\n",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                  ext::chrono::duration_cast<ext::chrono::milliseconds>(
                       now - time_st).count());
 
     USBXHCI_TRACE("Resetting controller\n");
 
     // 5 seconds is the point where no working controller is that slow
-    now = std::chrono::steady_clock::now();
+    now = ext::chrono::steady_clock::now();
     time_st = now;
-    timeout = time_st + std::chrono::seconds(5);
+    timeout = time_st + ext::chrono::seconds(5);
 
     // Reset the controller
     usbcmd |= USBXHCI_USBCMD_HCRST;
@@ -1519,7 +1519,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     // Wait for reset to complete
     while (((usbcmd = mm_rd(mmio_op->usbcmd) & USBXHCI_USBCMD_HCRST)) &&
-           ((now = std::chrono::steady_clock::now()) < timeout))
+           ((now = ext::chrono::steady_clock::now()) < timeout))
         pause();
 
     if (unlikely(now >= timeout)) {
@@ -1528,7 +1528,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     }
 
     USBXHCI_TRACE("Reset completed in %" PRIu64 "ms\n",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                  ext::chrono::duration_cast<ext::chrono::milliseconds>(
                       now - time_st).count());
 
     uint32_t hcsparams1 = mm_rd(mmio_cap->hcsparams1);
@@ -1552,8 +1552,8 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     size_t cpu_count = thread_get_cpu_count();
 
     // Share the same vector on all CPUs if using multiple interrupters
-    std::vector<int> target_cpus;
-    std::vector<int> vector_offsets;
+    ext::vector<int> target_cpus;
+    ext::vector<int> vector_offsets;
 
     if (maxintr >= cpu_count) {
         USBXHCI_TRACE("Device supports per-CPU IRQs\n");
@@ -1766,8 +1766,8 @@ int usbxhci::enable_slot(int port)
     issue_cmd((usbxhci_cmd_trb_t*)&cmd, &block);
     block.set_expect(1);
 
-    if (unlikely(!block.wait_until(std::chrono::steady_clock::now() +
-                                   std::chrono::seconds(5)))) {
+    if (unlikely(!block.wait_until(ext::chrono::steady_clock::now() +
+                                   ext::chrono::seconds(5)))) {
         return -int(usb_cc_t::undefined_err);
     }
 
@@ -1863,8 +1863,8 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     issue_cmd((usbxhci_cmd_trb_t*)&setaddr, &block);
     block.set_expect(1);
 
-    if (unlikely(!block.wait_until(std::chrono::steady_clock::now() +
-                                   std::chrono::seconds(5)))) {
+    if (unlikely(!block.wait_until(ext::chrono::steady_clock::now() +
+                                   ext::chrono::seconds(5)))) {
         return -int(usb_cc_t::undefined_err);
     }
 
@@ -2465,7 +2465,7 @@ void usbxhci::detect()
         if (pci_iter.config.prog_if != PCI_PROGIF_SERIAL_USB_XHCI)
             continue;
 
-        std::unique_ptr<usbxhci> self(new (ext::nothrow) usbxhci);
+        ext::unique_ptr<usbxhci> self(new (ext::nothrow) usbxhci);
 
         if (unlikely(!usbxhci_devices.emplace_back(self.get()))) {
             USBXHCI_TRACE("Out of memory!");
@@ -2520,7 +2520,7 @@ int usbxhci::make_data_trbs(
         trb->data_physaddr = ranges[i].physaddr;
 
         // Hint to HC how many TRBs are remaining in this transfer
-        unsigned remaining = std::min(
+        unsigned remaining = ext::min(
                     size_t(USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_MASK),
                     range_count - i - 1);
 

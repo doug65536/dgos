@@ -422,7 +422,7 @@ private:
     union clear_type_t;
 
     struct cmd_list_t {
-        std::vector<uint32_t> data;
+        ext::vector<uint32_t> data;
 
         void add_clear(clear_type_t clear_type,
                        uint32_t r, uint32_t g, uint32_t b, uint32_t a,
@@ -575,7 +575,7 @@ private:
     unsigned config_latest = 0;
     uint32_t config_events = 0;
     lock_type config_lock;
-    std::condition_variable config_changed;
+    ext::condition_variable config_changed;
 
     _noreturn
     static int config_work_thread(void *arg);
@@ -659,8 +659,8 @@ bool virtio_gpu_dev_t::issue_get_display_info()
     cmd_queue->sendrecv(&get_display_info, sizeof(get_display_info),
                         &display_info_resp, sizeof(display_info_resp), &iocp);
 
-    if (!iocp.wait_until(std::chrono::steady_clock::now() +
-                         std::chrono::seconds(5))) {
+    if (!iocp.wait_until(ext::chrono::steady_clock::now() +
+                         ext::chrono::seconds(5))) {
         VIRTIO_GPU_TRACE("...timed out!\n");
         return false;
     }
@@ -784,20 +784,20 @@ bool virtio_gpu_dev_t::issue_attach_backing(
     size_t backbuf_ranges_cap = (backbuf_sz + PAGE_SIZE - 1) >> PAGE_SCALE;
 
     // Allocate worst case physical range list
-    std::unique_ptr<mmphysrange_t[]> backbuf_ranges(
+    ext::unique_ptr<mmphysrange_t[]> backbuf_ranges(
                 new (ext::nothrow) mmphysrange_t[backbuf_ranges_cap]);
 
     // Get physical ranges
     size_t backbuf_range_count = mphysranges(
                 backbuf_ranges, backbuf_ranges_cap, backbuf, backbuf_sz,
-                std::numeric_limits<uint32_t>::max());
+                ext::numeric_limits<uint32_t>::max());
 
     // Calculate size of attach backing command
     size_t backing_cmd_sz = sizeof(virtio_gpu_resource_attach_backing_t) +
             sizeof(virtio_gpu_mem_entry_t) * backbuf_range_count;
 
     // Allocate a buffer to hold virtio_gpu_resource_attach_backing_t command
-    std::unique_ptr<virtio_gpu_resource_attach_backing_t> backing_cmd(
+    ext::unique_ptr<virtio_gpu_resource_attach_backing_t> backing_cmd(
                 new (backbuf_range_count, ext::nothrow)
                 virtio_gpu_resource_attach_backing_t);
 

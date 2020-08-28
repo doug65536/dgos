@@ -53,7 +53,7 @@ protected:
     static constexpr unsigned phase_count = 4;
 
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
     lock_type change_lock;
     usb_iocp_t in_iocp[phase_count];
     unsigned phase;
@@ -101,7 +101,7 @@ private:
     uint8_t this_mouse_state[phase_count][8];
 };
 
-static std::vector<usb_hid_dev_t*> hid_devs;
+static ext::vector<usb_hid_dev_t*> hid_devs;
 
 class usb_hid_class_drv_t final : public usb_class_drv_t {
 protected:

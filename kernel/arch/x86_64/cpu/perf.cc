@@ -1,4 +1,4 @@
-#include "perf.h"
+﻿#include "perf.h"
 #include "callout.h"
 #include "cpu/control_regs.h"
 #include "perf_reg.bits.h"
@@ -16,28 +16,47 @@
 static stacktrace_xlat_fn_t stacktrace_xlat_fn;
 static void *stacktrace_xlat_fn_arg;
 
-using perf_token_table_t = std::vector<ext::string>;
+// Represents an array of strings, indexed by token
+using perf_token_table_t = ext::vector<ext::string>;
 
+// Key is address, value is symbol token
 using perf_symbol_table_t = ext::fast_map<uintptr_t, size_t>;
+
+// Key is address, value is index into line vector
+using perf_line_table_t = ext::fast_map<uintptr_t, size_t>;
+
+struct perf_line_detail_t {
+    intptr_t addr;
+    uint32_t filename_token;
+    uint32_t line_nr;
+};
+
+using perf_line_vector_t = ext::vector<perf_line_detail_t>;
 
 struct perf_module_t {
     size_t size = 0;
-    uintptr_t base = 0;
+    uintptr_t min_addr = 0;
     perf_symbol_table_t syms;
+    perf_line_table_t lines;
     size_t name_token;
 };
 
 using perf_module_lookup_t = ext::fast_map<uintptr_t, perf_module_t*>;
 
-using perf_module_table_t = ext::fast_map<ext::string, perf_module_t>;
+// key is token
+using perf_module_by_name_table_t = ext::fast_map<size_t, perf_module_t>;
 
 static perf_token_table_t perf_tokens;
-static perf_module_table_t perf_module_syms;
+static perf_module_by_name_table_t perf_modules_by_name;
 static perf_module_lookup_t perf_module_lookup;
+static perf_line_table_t perf_line_lookup;
+static perf_line_vector_t perf_line_detail;
 
 // When bit 0 is set, update is in progress
 // Incremented before and after updates
 
+// One dedicated for each CPU
+// Collect ring_cnt raw ips into a burst
 struct perf_trace_cpu_t {
     static constexpr const size_t ring_cnt = 1 << 8;
     size_t level = 0;
@@ -52,24 +71,15 @@ static uint64_t *perf_sample_buf;
 static bool perf_zeroing = false;
 
 struct perf_work_value_t {
-    size_t name_token;
+    size_t line_token;
     uint64_t value;
 };
 
 static perf_work_value_t *perf_work_buf;
 
-static std::vector<perf_trace_cpu_t> perf_data;
+static ext::vector<perf_trace_cpu_t> perf_data;
 
-static std::vector<padded_rand_lfs113_t> perf_rand;
-
-struct perf_ctr_def_t {
-    uint32_t event;
-    char const *name;
-    uint32_t mask_defined;
-} perf_counters[] = {
-    {  },
-    {  },
-};
+static ext::vector<padded_rand_lfs113_t> perf_rand;
 
 static uint32_t volatile perf_event = 0x76;
 static uint32_t volatile perf_unit_mask = 0x00;
@@ -78,9 +88,10 @@ static uint64_t volatile perf_event_divisor = 1048576;
 static bool perf_event_invert = false;
 static bool perf_event_edge = false;
 
-using token_map_t = std::map<ext::string, size_t>;
+using token_map_t = ext::map<ext::string, size_t>;
 static token_map_t token_map;
 
+// can 'force' it to be a new token, even if it exists
 static size_t perf_tokenize(char const *st, char const *en, bool force = true)
 {
     if (st && !en)
@@ -95,7 +106,7 @@ static size_t perf_tokenize(char const *st, char const *en, bool force = true)
     }
 
     size_t token = perf_tokens.size();
-    if (unlikely(!perf_tokens.push_back(std::move(text))))
+    if (unlikely(!perf_tokens.push_back(ext::move(text))))
         panic_oom();
 
     if (!force) {
@@ -108,64 +119,254 @@ static size_t perf_tokenize(char const *st, char const *en, bool force = true)
     return token;
 }
 
-static bool perf_add_symbols(char const *filename,
-                             size_t size, uintptr_t base = 0,
-                             intptr_t natural_load_addr = 0,
-                             bool has_type_field = true)
+static bool perf_load_file(ext::unique_ptr<char[]> &buf, off_t &sz,
+                           char const *filename)
 {
-    file_t syms_fid;
+    file_t fid;
 
-    syms_fid = file_openat(AT_FDCWD, filename, O_RDONLY);
-    if (unlikely(syms_fid < 0))
+    fid = file_openat(AT_FDCWD, filename, O_RDONLY);
+    if (unlikely(fid < 0))
         return false;
 
-    off_t sz = file_seek(syms_fid, 0, SEEK_END);
+    sz = file_seek(fid, 0, SEEK_END);
     if (unlikely(sz < 0))
         return false;
 
-    std::unique_ptr<char[]> buf(new (ext::nothrow) char[sz]);
+    buf.reset(new (ext::nothrow) char[sz]);
     if (unlikely(!buf))
         return false;
 
-    off_t zero_pos = file_seek(syms_fid, 0, SEEK_SET);
+    off_t zero_pos = file_seek(fid, 0, SEEK_SET);
     if (unlikely(zero_pos < 0))
         return false;
 
-    ssize_t did_read = file_read(syms_fid, buf.get(), sz);
+    ssize_t did_read = file_read(fid, buf.get(), sz);
     if (unlikely(did_read < 0))
         return false;
 
-    int close_result = syms_fid.close();
+    int close_result = fid.close();
     if (unlikely(close_result < 0))
         return false;
 
-    // Parse the lines
-    char *end = buf.get() + sz;
-    char *next;
+    return true;
+}
 
+static ext::string perf_basename(char const *filename)
+{
     char const *filename_end = filename + strlen(filename);
     char const *slash = (char const *)memrchr(
                 filename, '/', filename_end - filename);
     slash = slash ? slash + 1 : filename;
 
-    ext::string module_name(slash, filename_end);
+    return ext::string(slash, filename_end);
+}
 
-    // Cut off -kallsyms suffix
-    if (module_name.length() > 9 &&
-            !memcmp(module_name.data() + module_name.length() - 9,
-                    "-kallsyms", 9))
-        module_name.resize(module_name.length() - 9);
+static void perf_remove_suffix(ext::string &name, char const *suffix)
+{
+    size_t suffix_len = strlen(suffix);
 
-    perf_module_t &mod = perf_module_syms[module_name];
-    perf_module_lookup[base] = &mod;
+    if (likely(suffix_len < name.length() &&
+               !memcmp(name.data() + name.length() - suffix_len,
+                       suffix, suffix_len)))
+        name.resize(name.length() - suffix_len);
+}
 
+static perf_module_t &perf_module_by_name(ext::string const& module_name)
+{
     size_t module_name_token = perf_tokenize(module_name.data(),
                                              module_name.data() +
-                                             module_name.size());
+                                             module_name.size(),
+                                             false);
+
+    perf_module_t &mod = perf_modules_by_name[module_name_token];
+
+    return mod;
+}
+
+static perf_module_t &perf_module_by_symbol_filename(
+        char const *filename, char const *suffix)
+{
+    ext::string symbol_filename = perf_basename(filename);
+
+    perf_remove_suffix(symbol_filename, suffix);
+
+    perf_module_t &mod = perf_module_by_name(symbol_filename);
+
+    return mod;
+}
+
+static bool perf_load_line_symbols(char const *filename, uintptr_t min_addr,
+                                   ptrdiff_t size, uintptr_t base_adj,
+                                   intptr_t natural_min_addr = 0)
+{
+    ext::unique_ptr<char[]> buf;
+    off_t sz;
+
+    if (unlikely(!perf_load_file(buf, sz, filename)))
+        return false;
+
+    perf_module_t &mod = perf_module_by_symbol_filename(
+                filename, "-klinesyms");
+
+    char *line = buf;
+    char *end = buf + sz;
+
+    // Parse a sequence of lines with this format:
+    // filename linenum address...whitespace...possible garbage...newline
+
+    char *line_file_st;
+    char *line_file_en;
+
+    size_t previous_line_sym_count = perf_line_detail.size();
+
+    while (line < end) {
+        char *name_st = line;
+
+        while (line < end && (unsigned)*line > ' ')
+            ++line;
+
+        if (line > name_st && line[-1] == ':') {
+            line_file_st = name_st;
+            line_file_en = line - 1;
+
+            while (line < end && *line <= ' ')
+                ++line;
+
+            continue;
+        }
+
+        char *name_en = line;
+
+        while (line < end && *line <= ' ')
+            line++;
+
+        size_t line_nr = 0;
+        while (line < end && *line >= '0' && *line <= '9') {
+            line_nr *= 10;
+            line_nr += *line++ - '0';
+        }
+
+        while (line < end && *line <= ' ')
+            ++line;
+
+        intptr_t address = 0;
+        while (line < end &&
+               ((*line >= '0' && *line <= '9') ||
+                (*line >= 'a' && *line <= 'f') ||
+                (*line >= 'A' && *line <= 'F') ||
+                (address == 0 && *line == 'x'))) {
+            char c = *line++;
+
+            size_t addend;
+
+            if (c >= '0' && c <= '9')
+                addend = c - '0';
+            else if (c >= 'a' && c <= 'f')
+                addend = 10 + c - 'a';
+            else if (c >= 'A' && c <= 'F')
+                addend = 10 + c - 'A';
+            else
+                addend = 0;
+
+            address <<= 4;
+            address |= addend;
+        }
+
+        while (line < end && *line != '\n')
+            ++line;
+
+        while (line < end && *line == '\n')
+            ++line;
+
+        if (likely(name_st < name_en && name_st[0] == '*')) {
+            name_st = line_file_st;
+            name_en = line_file_en;
+        }
+
+//        if (address < 0x400000)
+//            address += last_valid_address;
+//        else
+//            last_valid_address = address;
+
+        // Drop weird addresses
+
+        if (address < min_addr || address >= min_addr + size) {
+            printdbg("Dropped out of range symbol: %" PRIx64
+                     " not in range %#" PRIx64
+                     " - "
+                     "%#" PRIx64 "\n",
+                     address, min_addr, min_addr + size - 1);
+            continue;
+        }
+
+        address -= natural_min_addr;
+
+        size_t filename_token = perf_tokenize(name_st, name_en, false);
+
+        perf_line_detail_t line_detail = {
+            address,
+            uint32_t(filename_token),
+            uint32_t(line_nr)
+        };
+
+        ext::pair<perf_line_table_t::iterator, bool> ins =
+                mod.lines.emplace(address, perf_line_detail.size());
+
+        if (unlikely(ins.first == perf_line_table_t::iterator()))
+            panic_oom();
+
+        // Exact duplicates are fine and expected
+        if (!ins.second) {
+            perf_line_detail_t &existing = perf_line_detail[ins.first->second];
+
+            if (existing.filename_token == line_detail.filename_token &&
+                    existing.line_nr == line_detail.line_nr) {
+                continue;
+            }
+        }
+
+        // Duplicate address on different line? Really?
+        if (unlikely(!ins.second))
+            continue;
+
+        assert(filename_token <= UINT32_MAX);
+        assert(line_nr <= UINT32_MAX);
+
+        if (unlikely(!perf_line_detail.push_back(line_detail)))
+            panic_oom();
+    }
+
+    size_t added_line_sym_count = perf_line_detail.size() -
+            previous_line_sym_count;
+
+    printdbg("Added %zu line symbols\n", added_line_sym_count);
+
+    return true;
+}
+
+static bool perf_load_symbols(char const *filename, uintptr_t min_addr,
+                              ptrdiff_t size, uintptr_t base_adj = 0,
+                              intptr_t natural_load_addr = 0,
+                              bool has_type_field = true)
+{
+    ext::unique_ptr<char[]> buf;
+    off_t sz;
+
+    if (unlikely(!perf_load_file(buf, sz, filename)))
+        return false;
+
+    perf_module_t &mod = perf_module_by_symbol_filename(filename, "-kallsyms");
+
+    mod.min_addr = natural_load_addr + base_adj;
+
+    // Add entry to module base lookup
+    perf_module_lookup[mod.min_addr] = &mod;
 
     mod.size = size;
-    mod.base = base;
-    mod.name_token = module_name_token;
+
+    // Parse the lines
+    char *end = buf.get() + sz;
+    char *next;
 
     for (char *line = buf; line < end; line = next) {
         char *eol = (char*)memchr(line, '\n', end - line);
@@ -199,19 +400,24 @@ static bool perf_add_symbols(char const *filename,
         }
 
         // Discard absolute symbols
-        if (is_absolute)
+        if (unlikely(is_absolute))
             continue;
 
-        addr -= natural_load_addr;
+        // A symbol right at the beginning can't be a function
+        if (unlikely(!addr))
+            continue;
 
-        while (*line_iter == ' ')
+        addr -= mod.min_addr;
+        //addr += base;
+
+        while (likely(*line_iter == ' '))
             ++line_iter;
 
         char const *name_end = (char const *)memchr(
                     line_iter, '[', eol - line_iter);
         name_end = name_end ? line_iter - 1 : eol;
 
-        size_t symbol_token = perf_tokenize(line_iter, eol);
+        size_t symbol_token = perf_tokenize(line_iter, eol, false);
         mod.syms[addr] = symbol_token;
     }
 
@@ -222,18 +428,13 @@ static bool perf_add_symbols(char const *filename,
     return true;
 }
 
-static int last_batch_time;
-static int rate_adj;
-
 static void setup_sample(size_t cpu_nr)
 {
-    if (perf_rand.empty()) {
+    if (unlikely(perf_rand.empty())) {
         printdbg("No performance counters, can't select event\n");
         return;
 
     }
-
-    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE+0, 0);
 
     // higher scale = higher rate
     // lower shift = higher rate
@@ -244,48 +445,88 @@ static void setup_sample(size_t cpu_nr)
 
     count = count < -1 ? count : -1;
 
-    cpu_msr_set(CPU_MSR_PERFCTR_BASE, count);
-
     uint32_t evt = perf_event;
-    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE+0,
-                CPU_MSR_PERFEVTSEL_EN |
-                CPU_MSR_PERFEVTSEL_IRQ |
-                CPU_MSR_PERFEVTSEL_USR |
-                CPU_MSR_PERFEVTSEL_OS |
-                CPU_MSR_PERFEVTSEL_INV_n(perf_event_invert) |
-                CPU_MSR_PERFEVTSEL_EDGE_n(perf_event_edge) |
-                CPU_MSR_PERFEVTSEL_UNIT_MASK_n(
-                    perf_unit_mask & CPU_MSR_PERFEVTSEL_UNIT_MASK_MASK) |
-                CPU_MSR_PERFEVTSEL_CNT_MASK_n(
-                    perf_count_mask & CPU_MSR_PERFEVTSEL_CNT_MASK) |
-                CPU_MSR_PERFEVTSEL_EVT_SEL_LO_8_n(evt & 0xFF) |
-                CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_n(
-                    (evt >> 8) & CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_MASK));
+
+    uint64_t event_sel = CPU_MSR_PERFEVTSEL_EN |
+            CPU_MSR_PERFEVTSEL_IRQ |
+            CPU_MSR_PERFEVTSEL_USR |
+            CPU_MSR_PERFEVTSEL_OS |
+            CPU_MSR_PERFEVTSEL_INV_n(perf_event_invert) |
+            CPU_MSR_PERFEVTSEL_EDGE_n(perf_event_edge) |
+            CPU_MSR_PERFEVTSEL_UNIT_MASK_n(
+                perf_unit_mask & CPU_MSR_PERFEVTSEL_UNIT_MASK_MASK) |
+            CPU_MSR_PERFEVTSEL_CNT_MASK_n(
+                perf_count_mask & CPU_MSR_PERFEVTSEL_CNT_MASK) |
+            CPU_MSR_PERFEVTSEL_EVT_SEL_LO_8_n(evt & 0xFF) |
+            CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_n(
+                (evt >> 8) & CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_MASK);
+
+    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE+0, 0);
+    cpu_msr_set(CPU_MSR_PERFCTR_BASE, count);
+    cpu_msr_set(CPU_MSR_PERFEVTSEL_BASE+0, event_sel);
 }
 
-static perf_symbol_table_t::const_iterator lookup_symbol(uintptr_t addr)
+static perf_module_lookup_t::iterator perf_module_from_addr(uintptr_t addr)
 {
-    perf_module_lookup_t::const_iterator
+    perf_module_lookup_t::iterator
             it = perf_module_lookup.lower_bound(addr);
 
     if (likely(it == perf_module_lookup.end() ||
-               it->first != addr))
+               it->first > addr))
         --it;
 
+    return it;
+}
+
+static perf_line_table_t::iterator lookup_line(uintptr_t addr)
+{
+    perf_module_lookup_t::iterator it = perf_module_from_addr(addr);
+
     if (unlikely(it == perf_module_lookup.end()))
-        return perf_symbol_table_t::const_iterator();
+        return perf_symbol_table_t::iterator();
 
     perf_module_t &mod = *it->second;
 
     // If it lies outside the module, drop it
-    if (unlikely(addr > mod.base + mod.size))
-        return perf_symbol_table_t::const_iterator();
+    if (unlikely(addr >= mod.min_addr + mod.size))
+        return perf_symbol_table_t::iterator();
 
     // Find offset relative to module base
-    uintptr_t ofs = addr - mod.base;
+    uintptr_t ofs = addr - mod.min_addr;
 
     // Lookup symbol at that place
-    perf_symbol_table_t::const_iterator
+    perf_symbol_table_t::iterator
+            line_it = mod.lines.lower_bound(ofs);
+
+    // If ahead of it, step back one
+    if (likely(line_it == mod.lines.end() ||
+               line_it->first > ofs))
+        --line_it;
+
+    if (unlikely(line_it == mod.lines.end()))
+        line_it = perf_symbol_table_t::iterator();
+
+    return line_it;
+}
+
+static perf_symbol_table_t::iterator lookup_symbol(uintptr_t addr)
+{
+    perf_module_lookup_t::iterator it = perf_module_from_addr(addr);
+
+    if (unlikely(it == perf_module_lookup.end()))
+        return perf_symbol_table_t::iterator();
+
+    perf_module_t &mod = *it->second;
+
+    // If it lies outside the module, drop it
+    if (unlikely(addr > mod.min_addr + mod.size))
+        return perf_symbol_table_t::iterator();
+
+    // Find offset relative to module base
+    uintptr_t ofs = addr - mod.min_addr;
+
+    // Lookup symbol at that place
+    perf_symbol_table_t::iterator
             sym_it = mod.syms.lower_bound(ofs);
 
     // If ahead of it, step back one
@@ -294,58 +535,58 @@ static perf_symbol_table_t::const_iterator lookup_symbol(uintptr_t addr)
         --sym_it;
 
     if (sym_it == mod.syms.end())
-        sym_it = perf_symbol_table_t::const_iterator();
+        sym_it = perf_symbol_table_t::iterator();
 
     return sym_it;
 }
 
+_hot
 static void perf_sample(int (*ip)(void*), size_t cpu_nr)
 {
     uintptr_t addr = uintptr_t((void*)ip);
 
+    // Lookup the batch ring for this CPU
     perf_trace_cpu_t &trace = perf_data[cpu_nr];
+
+    // Compute location within the ring
     size_t i = trace.level;
     size_t curr = i;
     size_t next = (i + 1);
     trace.level = next;
+
+    // Write the value to the ring
     trace.ips[curr] = addr;
+
+    // If we filled up the ring
     if (next == perf_trace_cpu_t::ring_cnt) {
         trace.level = 0;
 
-        // Make adjustment to sample rate if necessary
-        uint64_t now = time_ns();
+        // Process batch in reverse
+        // Starting at most likely to be in cache
+        while (next > 0) {
+            // Fetch the trace IP
+            addr = trace.ips[--next];
 
-        uint64_t elap_ns = now - last_batch_time;
+            // Lookup line number by address
+            perf_line_table_t::iterator line_it = lookup_line(addr);
 
-        if (last_batch_time) {
-            if (elap_ns > 1000000000)
-                ++rate_adj;
-            else if (elap_ns < 400000000)
-                --rate_adj;
-        }
+            // If we found the symbol
+            if (likely(line_it != perf_line_table_t::iterator())) {
+                // Increment the sample count for the symbol's token
+                size_t line_token = line_it->second;
 
-        last_batch_time = now;
-
-        // Process batch
-        for (i = 0; i < perf_trace_cpu_t::ring_cnt; ++i) {
-            addr = trace.ips[i];
-
-            // Lookup module by base address
-            perf_symbol_table_t::const_iterator sym_it = lookup_symbol(addr);
-
-            if (likely(sym_it != perf_symbol_table_t::const_iterator())) {
-                size_t symbol_token = sym_it->second;
                 // Don't need fancy atomic thing, this is per-cpu
-                ++trace.samples[symbol_token];
-            } else {
-                //printdbg("Lost in space perf sample at %" PRIx64 "\n", addr);
+                ++trace.samples[line_token];
             }
         }
     }
 }
 
 EXPORT uint64_t perf_gather_samples(
-        void (*callback)(void *, int, int, char const *), void *arg)
+        void (*callback)(void *arg, int percent, int frac,
+                         char const *filename, int line_nr,
+                         char const *),
+        void *arg)
 {
     if (unlikely(perf_data.empty()))
         return 0;
@@ -354,28 +595,44 @@ EXPORT uint64_t perf_gather_samples(
 
     bool zero = perf_zeroing;
 
+    size_t line_detail_size = perf_line_detail.size();
+
     uint64_t grand = 0;
-    for (size_t i = 0; i < perf_tokens.size(); ++i) {
+    for (size_t i = 0; i < line_detail_size; ++i) {
         uint64_t total = 0;
         for (size_t k = 0; k < cpu_count; ++k) {
-            //size_t usage = thread_cpu_usage_x1k(k);
-            //total += usage * perf_data[k].samples[i] / 100000;
             total += perf_data[k].samples[i];
 
             if (zero)
-                perf_data[k].samples[i] = 0;
+                perf_data[k].samples[i] >>= 1;
         }
-        perf_work_buf[i].name_token = i;
+        perf_work_buf[i].line_token = i;
         perf_work_buf[i].value = total;
         grand += total;
     }
 
-    std::sort(perf_work_buf, perf_work_buf + perf_tokens.size(),
+    // Move all the nonzero values to the top
+    size_t line_detail_used = 0;
+    for (size_t i = 0; likely(i < line_detail_size); ++i) {
+        // Don't touch zeros
+        if (unlikely(perf_work_buf[i].value)) {
+            // If it is not already in the right place...
+            if (likely(i != line_detail_used)) {
+                // swap it so the nonzero one is at top
+                ext::swap(perf_work_buf[i], perf_work_buf[line_detail_used]);
+            }
+
+            // Grow result whether swapped or not
+            ++line_detail_used;
+        }
+    }
+
+    ext::sort(perf_work_buf, perf_work_buf + line_detail_used,
               [&](perf_work_value_t const& lhs, perf_work_value_t const& rhs) {
         return rhs.value < lhs.value;
     });
 
-    for (size_t i = 0; i < 16 && i < perf_tokens.size(); ++i) {
+    for (size_t i = 0; i < 16 && i < line_detail_size; ++i) {
         perf_work_value_t &item = perf_work_buf[i];
 
         if (item.value == 0)
@@ -383,13 +640,22 @@ EXPORT uint64_t perf_gather_samples(
 
         uint64_t fixed = grand ? 100000000 * item.value / grand : 0;
 
+        perf_line_detail_t &detail = perf_line_detail[item.line_token];
+        perf_symbol_table_t::iterator sym_it = lookup_symbol(detail.addr);
+
+        char const *filename = perf_tokens[detail.filename_token].c_str();
+        char const *function = sym_it != perf_symbol_table_t::iterator()
+                ? perf_tokens[sym_it->second].c_str()
+                : "???";
+
         callback(arg, int(fixed / 1000000), int(fixed % 1000000),
-                 perf_tokens[item.name_token].c_str());
+                 filename, detail.line_nr, function);
     }
 
     return grand;
 }
 
+_hot
 static isr_context_t *perf_nmi_handler(int intr, isr_context_t *ctx)
 {
     uint32_t cpu_nr = thread_cpu_number();
@@ -402,10 +668,10 @@ static isr_context_t *perf_nmi_handler(int intr, isr_context_t *ctx)
 static void stacktrace_xlat(void *arg, void * const *ips, size_t count)
 {
     for (size_t i = 0; i < count; ++i) {
-        perf_symbol_table_t::const_iterator sym_it =
+        perf_symbol_table_t::iterator sym_it =
                 lookup_symbol(uintptr_t(ips[i]));
 
-        if (unlikely(sym_it == perf_symbol_table_t::const_iterator())) {
+        if (unlikely(sym_it == perf_symbol_table_t::iterator())) {
             printdbg("??? (%#" PRIx64 ")\n", uint64_t(ips[i]));
             continue;
         }
@@ -432,13 +698,27 @@ EXPORT void perf_init()
     size_t kernel_sz;
     kernel_sz = kernel_get_size();
 
-    perf_add_symbols("sym/kernel-generic-kallsyms",
-                     kernel_sz, uintptr_t(__image_start),
-                     0xffffffff80000000);
+    perf_load_symbols("sym/kernel-generic-kallsyms",
+                      uintptr_t(__image_start),
+                      kernel_sz,
+                      uintptr_t(__image_start) -
+                      0xffffffff80000000,
+                      0xffffffff80000000);
 
-    perf_add_symbols("sym/init.sym",
-                     4<<20, uintptr_t(0x401000),
-                     0x401000, false);
+    perf_load_line_symbols("sym/kernel-generic-klinesyms",
+                           uintptr_t(__image_start),
+                           kernel_sz,
+                           uintptr_t(__image_start) -
+                           0xffffffff80000000,
+                           0xffffffff80000000);
+
+    perf_load_symbols("sym/init-kallsyms",
+                      4<<20, uintptr_t(0x400000),
+                      0, uintptr_t(0x400000));
+
+    perf_load_line_symbols("sym/init-klinesyms",
+                           4<<20, uintptr_t(0x400000),
+                           0, uintptr_t(0x400000));
 
     size_t mod_count = modload_get_count();
 
@@ -446,16 +726,30 @@ EXPORT void perf_init()
         module_t *m = modload_get_index(i);
 
         ext::string name = modload_get_name(m);
-        uintptr_t base = modload_get_base(m);
+        uintptr_t min_addr = modload_get_vaddr_min(m);
+        uintptr_t base_adj = modload_get_base_adj(m);
         size_t size = modload_get_size(m);
+
+        printdbg("Loading %s symbols and line number information"
+                 ", base=%#zx, size=%#zx\n",
+                 name.c_str(), base_adj, size);
 
         ext::string symname;
         symname.append("sym/")
                 .append(name)
                 .append("-kallsyms");
 
-        perf_add_symbols(symname.c_str(), size, base);
+        perf_load_symbols(symname.c_str(), min_addr, size, base_adj);
+
+        symname.resize(symname.length() - 9);
+        symname.append("-klinesyms");
+
+        perf_load_line_symbols(symname.c_str(), min_addr, size, base_adj);
     }
+
+    printdbg("Loaded symbols for %zu modules"
+             ", %zu line symbols\n", modload_get_count(),
+             perf_line_detail.size());
 
     perf_set_stacktrace_xlat_fn(stacktrace_xlat, nullptr);
 
@@ -473,7 +767,7 @@ EXPORT void perf_init()
     perf_sample_buf = (uint64_t*)mmap(
                 nullptr, sizeof(*perf_sample_buf) *
                 (cpu_count + 2) *
-                perf_tokens.size(),
+                perf_line_detail.size(),
                 PROT_READ | PROT_WRITE, MAP_POPULATE);
 
     if (unlikely(perf_sample_buf == MAP_FAILED))
@@ -484,12 +778,12 @@ EXPORT void perf_init()
 
     for (size_t i = 0; i < cpu_count; ++i) {
         perf_data[i].ips = perf_trace_buf + (perf_trace_cpu_t::ring_cnt * i);
-        perf_data[i].samples = perf_sample_buf + (perf_tokens.size() * i);
+        perf_data[i].samples = perf_sample_buf + (perf_line_detail.size() * i);
     }
 
     // Place to store results
     perf_work_buf = (perf_work_value_t *)
-            (perf_sample_buf + (perf_tokens.size() * cpu_count));
+            (perf_sample_buf + (perf_line_detail.size() * cpu_count));
 
     if (!cpuid_has_perf_ctr()) {
         printdbg("No performance counters!\n");

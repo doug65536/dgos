@@ -9,7 +9,7 @@
 
 struct contiguous_allocator_t {
     using lock_type = ext::irq_spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 public:
     using linaddr_t = uintptr_t;
 
@@ -43,8 +43,8 @@ public:
         size_t size;
     };
 
-    using tree_item_t = std::pair<uintptr_t, uintptr_t>;
-    using tree_cmp_t = std::less<tree_item_t>;
+    using tree_item_t = ext::pair<uintptr_t, uintptr_t>;
+    using tree_cmp_t = ext::less<tree_item_t>;
     using tree_t = ext::fast_set<tree_item_t, tree_cmp_t>;
 
     template<typename F>
@@ -65,7 +65,7 @@ private:
 template<typename F>
 void contiguous_allocator_t::each_fw(F callback)
 {
-    static_assert(std::is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
+    static_assert(ext::is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
                   bool>::value,
                   "Callback must return boolean");
 
@@ -81,7 +81,7 @@ void contiguous_allocator_t::each_fw(F callback)
 template<typename F>
 void contiguous_allocator_t::each_rv(F callback)
 {
-    static_assert(std::is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
+    static_assert(ext::is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
                   bool>::value,
                   "Callback must return boolean");
 

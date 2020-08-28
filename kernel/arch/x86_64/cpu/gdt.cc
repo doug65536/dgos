@@ -130,11 +130,13 @@ void gdt_init_tss(size_t cpu_count)
     printdbg("Allocating %zuKB per-cpu stacks\n", stacks_sz >> 10);
 
     // Map space for all the stacks
-    char *stacks_base = (char*)mmap(
-                nullptr, stacks_sz, PROT_NONE,
-                MAP_NOCOMMIT);
+    char *stacks_base = (char*)mmap(nullptr, stacks_sz,
+                                    PROT_READ | PROT_WRITE,
+                                    MAP_NOCOMMIT);
+
     if (unlikely(stacks_base == MAP_FAILED))
         panic_oom();
+
     char *stacks_alloc = stacks_base;
 
     for (size_t cpu_nr = 0; cpu_nr < cpu_count; ++cpu_nr) {
@@ -149,8 +151,9 @@ void gdt_init_tss(size_t cpu_count)
             char *stack_st = stack + PAGE_SIZE;
             char *stack_en = stacks_alloc;
 
-            mprotect(stack_st, stack_en - stack_st, PROT_READ | PROT_WRITE);
-            madvise(stack_st, stack_en - stack_st, MADV_WILLNEED);
+            mprotect(stack, PAGE_SIZE, PROT_NONE);
+            madvise(stack_st + PAGE_SIZE,
+                    stack_en - (stack_st + PAGE_SIZE), MADV_WILLNEED);
 
             printdbg("Allocated IST cpu=%zu slot=%zu at %#zx\n",
                      cpu_nr, st, (uintptr_t)stack);
@@ -190,7 +193,7 @@ void gdt_init_tss_early()
 
 void gdt_load_tr(int cpu_number)
 {
-    std::unique_lock<ext::spinlock> lock(gdt_tss_lock);
+    ext::unique_lock<ext::spinlock> lock(gdt_tss_lock);
 
     gdt_set_tss_base(tss_list + cpu_number);
     assert(gdt[GDT_SEL_TSS >> 3].mem.get_type() == GDT_TYPE_TSS);

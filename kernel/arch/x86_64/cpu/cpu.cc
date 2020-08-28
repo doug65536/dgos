@@ -907,8 +907,8 @@ void cpu_patch_calls(void const *call_target,
         int32_t *point = (int32_t*)points[i];
         intptr_t dist = intptr_t(call_target) - intptr_t(point);
         if (call_target != nullptr) {
-            assert(dist >= std::numeric_limits<int32_t>::min() &&
-                   dist <= std::numeric_limits<int32_t>::max());
+            assert(dist >= ext::numeric_limits<int32_t>::min() &&
+                   dist <= ext::numeric_limits<int32_t>::max());
             cpu_patch_insn(point - 1, dist, sizeof(uint32_t));
         } else {
             // 0xE8 is call disp32 opcode
@@ -964,7 +964,7 @@ void cpu_patch_nop(void *addr, size_t size)
 
         // Place a number of 0x66 prefixes for sizes over 8 bytes
         if (insn_sz > 8) {
-            out = std::fill_n(out, insn_sz - 8, data16_prefix[0]);
+            out = ext::fill_n(out, insn_sz - 8, data16_prefix[0]);
             insn_sz = 8;
         }
 
@@ -984,8 +984,8 @@ bool cpu_patch_jmp(void *addr, size_t size, void const *jmp_target)
     uintptr_t next = code + 4;
     uintptr_t dest = uintptr_t(jmp_target);
     intptr_t dist = dest - next;
-    if (likely(dist >= std::numeric_limits<int32_t>::min() ||
-               dist <= std::numeric_limits<int32_t>::max())) {
+    if (likely(dist >= ext::numeric_limits<int32_t>::min() ||
+               dist <= ext::numeric_limits<int32_t>::max())) {
         uint8_t buf[sizeof(jmp_disp32_insn)];
         memcpy(buf, jmp_disp32_insn, sizeof(buf));
         int32_t disp32 = dist;

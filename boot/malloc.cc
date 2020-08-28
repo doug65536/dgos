@@ -399,18 +399,18 @@ bool malloc_validate()
 }
 
 // deleted, must use nothrow
-//void* operator new(size_t count, std::align_val_t alignment)
+//void* operator new(size_t count, ext::align_val_t alignment)
 //{
 //    return malloc_aligned(count, size_t(alignment));
 //}
 
 // deleted, must use nothrow
-//void* operator new[](size_t count, std::align_val_t alignment)
+//void* operator new[](size_t count, ext::align_val_t alignment)
 //{
 //    return malloc_aligned(count, size_t(alignment));
 //}
 
-void* operator new[](size_t count, std::align_val_t alignment,
+void* operator new[](size_t count, ext::align_val_t alignment,
     ext::nothrow_t const&) noexcept
 {
     return malloc_aligned(count, size_t(alignment));

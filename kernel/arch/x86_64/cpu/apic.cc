@@ -89,13 +89,13 @@ struct mp_ioapic_t {
     uint32_t addr;
     uint32_t volatile *ptr;
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
     lock_type lock;
 };
 
 static char const *mp_tables;
 
-static std::vector<uint8_t> mp_pci_bus_ids;
+static ext::vector<uint8_t> mp_pci_bus_ids;
 static uint16_t mp_isa_bus_id;
 
 static uint64_t apic_timer_freq;
@@ -109,7 +109,7 @@ static mp_ioapic_t ioapic_list[16];
 
 using ioapic_msi_alloc_lock_type = ext::noirq_lock<ext::spinlock>;
 using ioapic_msi_alloc_scoped_lock =
-    std::unique_lock<ioapic_msi_alloc_lock_type>;
+    ext::unique_lock<ioapic_msi_alloc_lock_type>;
 static ioapic_msi_alloc_lock_type ioapic_msi_alloc_lock;
 
 // Bit 0 of this corresponds to vector INTR_APIC_IRQ_BASE
@@ -138,7 +138,7 @@ static uint8_t ioapic_next_irq_base = 16;
 static uint8_t ioapic_msi_base_intr;
 static uint8_t ioapic_msi_base_irq;
 
-static std::vector<uint8_t> isa_irq_lookup;
+static ext::vector<uint8_t> isa_irq_lookup;
 
 static unsigned apic_id_count;
 static uint32_t apic_id_list[512];
@@ -190,19 +190,19 @@ struct acpi_mapping_t {
     }
 };
 
-static std::vector<acpi_mapping_t> acpi_mappings;
+static ext::vector<acpi_mapping_t> acpi_mappings;
 
-static std::vector<memory_affinity_t> acpi_mem_affinity;
+static ext::vector<memory_affinity_t> acpi_mem_affinity;
 
 struct apic_affinity_t {
     uint32_t domain;
     uint32_t apic_id;
 };
 
-static std::vector<apic_affinity_t> acpi_apic_affinity;
+static ext::vector<apic_affinity_t> acpi_apic_affinity;
 
 static uint64_t acpi_slit_localities;
-static std::vector<uint8_t> acpi_slit_table;
+static ext::vector<uint8_t> acpi_slit_table;
 
 // SRAT
 
@@ -286,6 +286,12 @@ static std::vector<uint8_t> acpi_slit_table;
 
 // Self Interprocessor Interrupt (x2APIC only, write only)
 #define APIC_REG_SELF_IPI           0x3F
+
+// (AMD) Interrupt enable (0x48-0x4F)
+#define APIC_REG_AMD_IE_n(n)        (0x48 + ((n) >> 5))
+
+// (AMD) Specific EOI
+#define APIC_REG_AMD_SEOI           0x42
 
 #define APIC_CMD_DEST_MODE_PHYSICAL APIC_CMD_DEST_MODE_n(0)
 #define APIC_CMD_DEST_MODE_LOGICAL  APIC_CMD_DEST_MODE_n(1)
@@ -594,7 +600,7 @@ private:
     void set_cpu_count(size_t cpu_count) noexcept override final;
     void per_cpu_init(size_t cpu_nr) noexcept override final;
 
-    std::unique_ptr<cacheline_t[]> cpus;
+    ext::unique_ptr<cacheline_t[]> cpus;
     uint32_t cpu_count;
 
     // lapic_t interface
@@ -663,11 +669,11 @@ static lapic_t *apic;
 //.....
 
 
-static std::vector<acpi_gas_t> acpi_hpet_list;
+static ext::vector<acpi_gas_t> acpi_hpet_list;
 static bool acpi_madt_flags;
 
 // Local interrupt NMI LINT MADT records
-static std::vector<acpi_madt_lnmi_t> lapic_lint_nmi;
+static ext::vector<acpi_madt_lnmi_t> lapic_lint_nmi;
 
 // Firmware control structure
 struct acpi_facs_t {
@@ -993,7 +999,7 @@ static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
                          size_t guess, size_t actual_len)
 {
     if (actual_len > guess) {
-        auto it = std::find(acpi_mappings.begin(), acpi_mappings.end(),
+        auto it = ext::find(acpi_mappings.begin(), acpi_mappings.end(),
                             acpi_mapping_t{uint64_t(ptr), uint64_t(guess)});
 
         assert(it != acpi_mappings.end());
@@ -1264,7 +1270,8 @@ static void acpi_parse_rsdt()
             }
         }
 
-        //munmap(hdr, std::max(size_t(64) << 10, size_t(hdr->len)));
+        munmap((void*)hdr, ext::max(size_t(64) << 10,
+                                    size_t(aligned_sdt_hdr.len)));
     }
 }
 
@@ -1294,9 +1301,9 @@ static void mp_parse_fps()
     // MP tables has per-package APIC IDs only
     apic_id_list_per_pkg = true;
 
-    std::fill_n(intr_to_irq, countof(intr_to_irq), -1);
-    std::fill_n(irq_to_intr, countof(irq_to_intr), -1);
-    std::fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
+    ext::fill_n(intr_to_irq, countof(intr_to_irq), -1);
+    ext::fill_n(irq_to_intr, countof(irq_to_intr), -1);
+    ext::fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
 
     for (uint16_t i = 0; i < cth->entry_count; ++i) {
         mp_cfg_cpu_t *entry_cpu;
@@ -1525,7 +1532,7 @@ static void mp_parse_fps()
         }
     }
 
-    //munmap(cth, std::max(0x10000, cth->base_tbl_len + cth->ext_tbl_len));
+    //munmap(cth, ext::max(0x10000, cth->base_tbl_len + cth->ext_tbl_len));
 }
 
 static int parse_mp_tables(void)
@@ -2321,7 +2328,7 @@ static void clk_to_ns_reduce()
 {
     uint8_t numer_ceil_log2 = bit_log2(clk_to_ns_numer);
     uint8_t denom_ceil_log2 = bit_log2(clk_to_ns_denom);
-    uint8_t max_ceil_log2 = std::max(numer_ceil_log2, denom_ceil_log2);
+    uint8_t max_ceil_log2 = ext::max(numer_ceil_log2, denom_ceil_log2);
 
     if (max_ceil_log2 > 16) {
         uint8_t shr = max_ceil_log2 - 16;
@@ -2436,7 +2443,7 @@ static void apic_calibrate()
     // clk_to_ns: let clks = 2500000000
     //  2500000000 * 2 / 5 = 1000000000ns
 
-    uint64_t clk_to_ns_gcd = std::gcd(uint64_t(1000000000), rdtsc_freq);
+    uint64_t clk_to_ns_gcd = ext::gcd(uint64_t(1000000000), rdtsc_freq);
 
     //APIC_TRACE("CPU MHz GCD: %" PRId64 "\n", clk_to_ns_gcd);
 
@@ -2501,13 +2508,13 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
 
     // If this is the first IOAPIC, initialize some lookup tables
     if (ioapic_count == 1) {
-        std::fill_n(intr_to_irq, countof(irq_to_intr), -1);
-        std::fill_n(irq_to_intr, countof(irq_to_intr), -1);
-        std::fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
+        ext::fill_n(intr_to_irq, countof(irq_to_intr), -1);
+        ext::fill_n(irq_to_intr, countof(irq_to_intr), -1);
+        ext::fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
     }
 
     // Fill entries in interrupt-to-ioapic lookup table
-    std::fill_n(intr_to_ioapic + ioapic->base_intr,
+    ext::fill_n(intr_to_ioapic + ioapic->base_intr,
            ioapic->vector_count, ioapic_nr);
 
     // Assume GSIs are sequentially assigned to IOAPIC inputs
@@ -2999,4 +3006,31 @@ void apic_hook_perf_local_irq(intr_handler_t handler, char const *name,
     apic->write32(APIC_REG_LVT_PMCR,
                   APIC_LVT_VECTOR_n(INTR_EX_NMI) |
                   APIC_LVT_DELIVERY_n(APIC_LVT_DELIVERY_NMI));
+}
+
+bool apic_request_pending(int intr)
+{
+    assert(intr >= 0x10);
+    assert(intr <= 0xFF);
+
+    // 32 bits per register
+    return (apic->read32(APIC_REG_IRR_n(intr)) & (1U << (intr & 31))) != 0;
+}
+
+bool apic_request_in_service(int intr)
+{
+    assert(intr >= 0x10);
+    assert(intr <= 0xFF);
+
+    // 32 bits per register
+    return (apic->read32(APIC_REG_ISR_n(intr)) & (1U << (intr & 31))) != 0;
+}
+
+bool apic_request_is_level(int intr)
+{
+    assert(intr >= 0x10);
+    assert(intr <= 0xFF);
+
+    // 32 bits per register
+    return (apic->read32(APIC_REG_TMR_n(intr)) & (1U << (intr & 31))) != 0;
 }

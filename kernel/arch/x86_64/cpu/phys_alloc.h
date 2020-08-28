@@ -10,7 +10,7 @@ using linaddr_t = uintptr_t;
 class mmu_phys_allocator_t {
     typedef uint32_t entry_t;
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 public:
     static size_t size_from_highest_page(physaddr_t page_index);
 
@@ -118,6 +118,7 @@ public:
 private:
     _always_inline size_t index_from_addr(physaddr_t addr) const noexcept
     {
+        assert(addr >= begin);
         return (addr - begin) >> log2_pagesz;
     }
 
@@ -209,8 +210,7 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
 
             break;
         } else {
-            //assert(!"Out of memory!");
-            printdbg("Out of memory! Continuing...\n");
+            // Out of memory
             return false;
         }
     }

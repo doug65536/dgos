@@ -257,8 +257,8 @@ private:
 void test_read_stress()
 {
     int dev_cnt = storage_dev_count();
-    std::vector<read_stress_thread_t*> *read_stress_threads =
-            new (ext::nothrow) std::vector<read_stress_thread_t*>();
+    ext::vector<read_stress_thread_t*> *read_stress_threads =
+            new (ext::nothrow) ext::vector<read_stress_thread_t*>();
     if (unlikely(!read_stress_threads->reserve(
                      dev_cnt * ENABLE_READ_STRESS_THREAD)))
         panic("Out of memory");
@@ -395,9 +395,9 @@ static int stress_mmap_thread(void *p)
     //uint64_t last_free = mm_memory_remaining();
 
     size_t block_count = 16;
-    std::unique_ptr<std::pair<uintptr_t, uintptr_t>[]> blocks(
+    ext::unique_ptr<ext::pair<uintptr_t, uintptr_t>[]> blocks(
                 new (ext::nothrow)
-                std::pair<uintptr_t, uintptr_t>[block_count]);
+                ext::pair<uintptr_t, uintptr_t>[block_count]);
     size_t current = 0;
 
     rand_lfs113_t rand;
@@ -413,8 +413,9 @@ static int stress_mmap_thread(void *p)
             sz = 42 + (sz >> (32 - 17));
             total_sz += sz;
 
-            std::pair<uintptr_t, uintptr_t> &
+            ext::pair<uintptr_t, uintptr_t> &
                     current_block = blocks[current];
+
             if (blocks[current].second)
                 munmap((void*)current_block.first, current_block.second);
 
@@ -606,7 +607,7 @@ static int draw_test(void *p)
     int frames = 0;
 
     // 1280x800
-    std::unique_ptr<png_image_t> img(png_load("background.png"));
+    ext::unique_ptr<png_image_t> img(png_load("background.png"));
     uint64_t st_tm = time_ns();
     for (int sx = 1280-1920; sx < 0; sx += 15) {
         int step, sy1, sy2;
@@ -770,7 +771,7 @@ static int init_thread(void *)
     if (bootinfo_parameter(bootparam_t::boot_debugger))
         cpu_breakpoint();
 
-    perf_init();
+    //perf_init();
 
 #if ENABLE_UNWIND
     printk("Testing exception unwind\n");
@@ -929,8 +930,8 @@ public:
 private:
     int x = 0;
 
-    using lock_type = std::mutex;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using lock_type = ext::mutex;
+    using scoped_lock = ext::unique_lock<lock_type>;
     lock_type some_lock;
 };
 
@@ -951,9 +952,9 @@ public:
     }
 };
 
-class test_exception : public std::exception {
+class test_exception : public ext::exception {
 public:
-    test_exception(int n) : std::exception() {}
+    test_exception(int n) : ext::exception() {}
 };
 
 _noreturn
@@ -999,19 +1000,19 @@ struct symbols_t {
         uint32_t line_nr;
     };
 
-    using linemap_t = std::map<uintptr_t, linenum_entry_t>;
-    using funcmap_t = std::map<uintptr_t, size_t>;
+    using linemap_t = ext::map<uintptr_t, linenum_entry_t>;
+    using funcmap_t = ext::map<uintptr_t, size_t>;
 
     linemap_t line_lookup;
     funcmap_t func_lookup;
-    std::vector<char> tokens;
+    ext::vector<char> tokens;
 
     char const *token(size_t n) const noexcept
     {
         return tokens.data() + n;
     }
 
-    using name_lookup_t = std::map<ext::string, size_t>;
+    using name_lookup_t = ext::map<ext::string, size_t>;
 
     static void symbol_xlat(void *arg, void * const *ips, size_t count)
     {
@@ -1062,7 +1063,7 @@ struct symbols_t {
         if (unlikely(len < 0))
             return;
 
-        std::unique_ptr<char[]> buf = new (ext::nothrow) char[len];
+        ext::unique_ptr<char[]> buf = new (ext::nothrow) char[len];
         if (unlikely(!buf))
             return;
 
@@ -1184,7 +1185,7 @@ struct symbols_t {
             name_lookup_t &name_lookup,
             ext::string const& entry)
     {
-        std::pair<name_lookup_t::iterator, bool> ins =
+        ext::pair<name_lookup_t::iterator, bool> ins =
                 name_lookup.insert({ entry, tokens.size() });
 
         if (ins.second) {

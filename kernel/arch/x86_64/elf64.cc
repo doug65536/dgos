@@ -32,11 +32,11 @@
 #define ELF64_TRACE(...) ((void)0)
 #endif
 
-using lock_type = std::shared_mutex;
-using ex_lock = std::unique_lock<lock_type>;
-using sh_lock = std::shared_lock<lock_type>;
+using lock_type = ext::shared_mutex;
+using ex_lock = ext::unique_lock<lock_type>;
+using sh_lock = ext::shared_lock<lock_type>;
 static lock_type loaded_modules_lock;
-using module_list_t = std::vector<std::unique_ptr<module_t>>;
+using module_list_t = ext::vector<ext::unique_ptr<module_t>>;
 static module_list_t loaded_modules;
 
 // Keep this in sync with __module_dynlink_thunk
@@ -154,23 +154,23 @@ public:
     bool load(char const *path);
     errno_t load_image(void const *module, size_t module_sz,
                        char const *module_name,
-                       std::vector<ext::string> parameters,
+                       ext::vector<ext::string> parameters,
                        char *ret_needed);
     int run();
 
     ~module_t();
 
     Elf64_Ehdr file_hdr{};
-    std::vector<Elf64_Phdr> phdrs;
+    ext::vector<Elf64_Phdr> phdrs;
     Elf64_Addr min_vaddr = ~Elf64_Addr(0);
     Elf64_Addr max_vaddr = 0;
     void *image = nullptr;
     Elf64_Sxword base_adj = 0;
     Elf64_Phdr *dyn_seg = nullptr;
     size_t dyn_entries = 0;
-    std::vector<Elf64_Dyn> dyn;
+    ext::vector<Elf64_Dyn> dyn;
 
-    std::vector<Elf64_Xword> dt_needed;
+    ext::vector<Elf64_Xword> dt_needed;
     Elf64_Addr dt_strtab = 0;
     Elf64_Xword dt_strsz = 0;
 
@@ -210,9 +210,10 @@ public:
 
     char const *strs = nullptr;
 
+    size_t module_name_hash = 0;
     ext::string module_name;
-    std::vector<ext::string> param;
-    std::vector<char const *> argv;
+    ext::vector<ext::string> param;
+    ext::vector<char const *> argv;
 
     void *dso_handle = nullptr;
 
@@ -246,7 +247,7 @@ private:
 // Shared module loader
 module_t *modload_load(char const *path, bool run)
 {
-    std::unique_ptr<module_t> module(new (ext::nothrow) module_t{});
+    ext::unique_ptr<module_t> module(new (ext::nothrow) module_t{});
     if (likely(module->load(path)))
         return module.release();
     return nullptr;
@@ -255,11 +256,11 @@ module_t *modload_load(char const *path, bool run)
 // Shared module loader
 module_t *modload_load_image(void const *image, size_t image_sz,
                              char const *module_name,
-                             std::vector<ext::string> parameters,
+                             ext::vector<ext::string> parameters,
                              char *ret_needed,
                              errno_t *ret_errno)
 {
-    std::unique_ptr<module_t> module(new (ext::nothrow) module_t());
+    ext::unique_ptr<module_t> module(new (ext::nothrow) module_t());
 
     if (unlikely(!module)) {
         if (ret_errno)
@@ -268,20 +269,20 @@ module_t *modload_load_image(void const *image, size_t image_sz,
     }
 
     if (unlikely(parameters.insert(parameters.begin(), module_name) ==
-                 std::vector<ext::string>::iterator())) {
+                 ext::vector<ext::string>::iterator())) {
         if (ret_errno)
             *ret_errno = errno_t::ENOMEM;
         return nullptr;
     }
 
     errno_t err = module->load_image(image, image_sz, module_name,
-                                     std::move(parameters), ret_needed);
-
-    if (likely(err == errno_t::OK))
-        return module.release();
+                                     ext::move(parameters), ret_needed);
 
     if (ret_errno)
         *ret_errno = err;
+
+    if (likely(err == errno_t::OK))
+        return module.release();
 
     return nullptr;
 }
@@ -353,7 +354,7 @@ bool use_bochs_autoloader = false;
 
 _noinline
 void modload_load_symbols(char const *path,
-                          uintptr_t text_addr, uintptr_t base_addr)
+                          uintptr_t text_addr, intptr_t base_adj)
 {
     if (unlikely(use_bochs_autoloader)) {
         uint32_t cpu_nr = thread_cpu_number();
@@ -365,11 +366,11 @@ void modload_load_symbols(char const *path,
                               "modload_symbols_autoloaded:\n"
                               :
                               : "a" (cpu_nr), "d" (0x8A02), "D" (path)
-                              , "S" (text_addr), "c" (base_addr)
+                              , "S" (text_addr), "c" (base_adj)
                               : "memory");
     }
 
-    printdbg("gdb: add-symbol-file %s %#zx\n", path, text_addr);
+    printdbg("gdb: add-symbol-file %s -o %#zx\n", path, base_adj);
 }
 
 static errno_t load_failed(errno_t err)
@@ -554,8 +555,8 @@ void module_t::infer_vaddr_range()
         if (phdr.p_type != PT_LOAD)
             continue;
 
-        min_vaddr = std::min(min_vaddr, phdr.p_vaddr);
-        max_vaddr = std::max(max_vaddr, phdr.p_vaddr + phdr.p_memsz);
+        min_vaddr = ext::min(min_vaddr, phdr.p_vaddr);
+        max_vaddr = ext::max(max_vaddr, phdr.p_vaddr + phdr.p_memsz);
     }
 }
 
@@ -652,6 +653,7 @@ ssize_t module_t::module_reader_t::operator()(
 void module_t::find_1st_exec()
 {
     first_exec = 0;
+
     for (Elf64_Phdr const& phdr : phdrs) {
         if (phdr.p_flags & PF_X) {
             if (!first_exec || first_exec > phdr.p_vaddr + base_adj)
@@ -801,6 +803,7 @@ errno_t module_t::apply_relocs()
                     printk("module link error in %s:"
                            " Symbol \"%s\" not found",
                            module_name.c_str(), name);
+
                     return load_failed(errno_t::ENOEXEC);
                 }
 
@@ -1007,7 +1010,7 @@ all_common:
 
 truncated_common:
                 printk("%s: %s relocation truncated to fit!\n",
-                         module_name.c_str(), type_txt);
+                       module_name.c_str(), type_txt);
                 return load_failed(errno_t::ENOEXEC);
             }
         }
@@ -1021,13 +1024,17 @@ truncated_common:
 
 errno_t module_t::load_image(void const *module, size_t module_sz,
                              char const *module_name,
-                             std::vector<ext::string> parameters,
+                             ext::vector<ext::string> parameters,
                              char *ret_needed)
 {
     char const *last_slash = strrchr(module_name, '/');
-    this->module_name = last_slash ? last_slash + 1 : module_name;
 
-    param = std::move(parameters);
+    char const *name_only = last_slash ? last_slash + 1 : module_name;
+
+    this->module_name = name_only;
+    module_name_hash = hash_32(name_only, strlen(name_only));
+
+    param = ext::move(parameters);
 
     module_reader_t pread(module, module_sz);
 
@@ -1105,8 +1112,10 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
     // Made it this far, we can put the module on the list
     ex_lock lock(loaded_modules_lock);
+
     if (unlikely(!loaded_modules.push_back(this)))
         return load_failed(errno_t::ENOMEM);
+
     lock.unlock();
 
     //
@@ -1116,25 +1125,33 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
         char const *name = strs + name_ofs;
         bool already_loaded = false;
 
+        size_t name_hash = hash_32(name, strlen(name));
+
         for (module_t const* other: loaded_modules) {
-            if (other->module_name == name) {
+            if (name_hash == other->module_name_hash &&
+                    other->module_name == name) {
                 already_loaded = true;
                 break;
             }
         }
+
         if (!already_loaded) {
-            module_list_t::reverse_iterator it = std::find(
+            module_list_t::reverse_iterator it = ext::find(
                         loaded_modules.rbegin(), loaded_modules.rend(), this);
             assert(it != loaded_modules.rend());
+
             if (likely(it != loaded_modules.rend())) {
                 // Prevent unique_ptr delete
                 it->release();
                 loaded_modules.erase(it.base() - 1);
             }
+
             size_t name_len = strlen(name);
-            name_len = std::min(name_len + 1, size_t(NAME_MAX));
+            name_len = ext::min(name_len + 1, size_t(NAME_MAX));
+
             if (unlikely(!mm_copy_user(ret_needed, name, name_len)))
                 return errno_t::EFAULT;
+
             return errno_t::ENOENT;
         }
     }
@@ -1263,7 +1280,7 @@ public:
         uint64_t initial_loc;
         uint64_t address;
     };
-    std::vector<ent_t> search_table;
+    ext::vector<ent_t> search_table;
 
     eh_frame_hdr_hdr_t(uint8_t const *&input)
     {
@@ -1292,14 +1309,14 @@ ext::spinlock __module_register_frame_lock;
 EXPORT void __module_register_frame(void const * const *__module_dso_handle,
                                     void *__frame, size_t __size)
 {
-    std::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
+    ext::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
     __register_frame(__frame, __size);
 }
 
 EXPORT void __module_unregister_frame(void const * const *__module_dso_handle,
                                       void *__frame)
 {
-    std::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
+    ext::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
     __deregister_frame(__frame);
 }
 
@@ -1310,9 +1327,9 @@ struct early_atexit_t {
 };
 
 // Lookup by dso_handle
-using fn_list_item_t = std::pair<void (*)(void*),void*>;
-using fn_list_t = std::vector<fn_list_item_t>;
-using atexit_map_t = std::map<void *, fn_list_t>;
+using fn_list_item_t = ext::pair<void (*)(void*),void*>;
+using fn_list_t = ext::vector<fn_list_item_t>;
+using atexit_map_t = ext::map<void *, fn_list_t>;
 atexit_map_t atexit_lookup;
 bool atexit_ready;
 
@@ -1322,21 +1339,21 @@ size_t early_atexit_count;
 
 _constructor(ctor_mmu_init) static void atexit_init()
 {
-    for (size_t i = 0; i < early_atexit_count; ++i) {
-        fn_list_t& list = atexit_lookup[early_atexit[i].dso_handle];
-        if (unlikely(!list.push_back({early_atexit[i].handler,
-                                     early_atexit[i].arg})))
-            panic_oom();
-    }
-    early_atexit_count = 0;
+//    for (size_t i = 0; i < early_atexit_count; ++i) {
+//        fn_list_t& list = atexit_lookup[early_atexit[i].dso_handle];
+//        if (unlikely(!list.push_back({early_atexit[i].handler,
+//                                     early_atexit[i].arg})))
+//            panic_oom();
+//    }
+//    early_atexit_count = 0;
 
     atexit_ready = true;
 }
 
 EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
 {
-//    std::find_if(loaded_modules.begin(), loaded_modules.end(),
-//                 [dso_handle](std::unique_ptr<module_t> const& mp) {
+//    ext::find_if(loaded_modules.begin(), loaded_modules.end(),
+//                 [dso_handle](ext::unique_ptr<module_t> const& mp) {
 //        return mp->dso_handle == dso_handle;
 //    });
 
@@ -1364,7 +1381,7 @@ EXPORT module_t *modload_closest(ptrdiff_t address)
 
     sh_lock lock(loaded_modules_lock);
 
-    for (std::unique_ptr<module_t>& module: loaded_modules) {
+    for (ext::unique_ptr<module_t>& module: loaded_modules) {
         if (address >= module->base_adj) {
             ptrdiff_t distance = address - module->base_adj;
             if (closest > distance) {
@@ -1382,7 +1399,12 @@ EXPORT ext::string const& modload_get_name(module_t *module)
     return module->module_name;
 }
 
-EXPORT uintptr_t modload_get_base(module_t *module)
+EXPORT uintptr_t modload_get_vaddr_min(module_t *module)
+{
+    return module->min_vaddr;
+}
+
+EXPORT uintptr_t modload_get_base_adj(module_t *module)
 {
     return module->base_adj;
 }

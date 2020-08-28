@@ -89,7 +89,7 @@
 #define PIT_FREQ_DENOM  3
 
 using pit8254_lock_type = ext::noirq_lock<ext::spinlock>;
-using pit8254_scoped_lock = std::unique_lock<pit8254_lock_type>;
+using pit8254_scoped_lock = ext::unique_lock<pit8254_lock_type>;
 static pit8254_lock_type pit8254_lock;
 
 // When the timer ticks, this value is loaded into the timer

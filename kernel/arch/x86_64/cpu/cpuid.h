@@ -49,6 +49,7 @@ struct cpuid_cache_t {
     bool has_de         :1;
     bool has_pge        :1;
     bool has_sysenter   :1;
+    bool has_pat        :1;
     bool has_sse3       :1;
     bool has_mwait      :1;
     bool has_ssse3      :1;
@@ -290,6 +291,12 @@ CPUID_CONST_INLINE bool cpuid_has_fsgsbase()
 CPUID_CONST_INLINE bool cpuid_has_sysenter()
 {
     return cpuid_cache.has_sysenter;
+}
+
+// Paging attribute table MSR and PTE bits
+CPUID_CONST_INLINE bool cpuid_has_pat()
+{
+    return cpuid_cache.has_pat;
 }
 
 // 2MB pages

@@ -46,7 +46,7 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
         // Page align
         aligned_base = (aligned_base + PAGE_SIZE - 1) & -PAGE_SIZE;
 
-        std::pair<tree_t::iterator, bool>
+        ext::pair<tree_t::iterator, bool>
                 ins_by_size = free_addr_by_size.insert({size, aligned_base});
 
         if (!shared) {
@@ -54,7 +54,7 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
             free_addr_by_addr.share_allocator(free_addr_by_size);
         }
 
-        std::pair<tree_t::iterator, bool>
+        ext::pair<tree_t::iterator, bool>
                 ins_by_addr = free_addr_by_addr.insert({aligned_base, size});
 
         if (likely(*linear_base_ptr == prev_base))
@@ -130,19 +130,19 @@ EXPORT uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
         assert(bool(node_by_size));
         assert(bool(node_by_addr));
 
-        std::pair<tree_t::iterator, bool> chk;
+        ext::pair<tree_t::iterator, bool> chk;
 
         if (by_size.first > size) {
             // Insert remainder by size
             node_by_size.value() = { by_size.first - size,
                     by_size.second + size };
-            chk = free_addr_by_size.insert(std::move(node_by_size));
+            chk = free_addr_by_size.insert(ext::move(node_by_size));
             assert(chk.second);
 
             // Insert remainder by address
             node_by_addr.value() = {by_size.second + size,
                     by_size.first - size};
-            chk = free_addr_by_addr.insert(std::move(node_by_addr));
+            chk = free_addr_by_addr.insert(ext::move(node_by_addr));
             assert(chk.second);
         }
 
@@ -251,7 +251,7 @@ EXPORT bool contiguous_allocator_t::take_linear(
     tree_t::value_type pred;
     tree_t::iterator pred_it;
 
-    std::pair<tree_t::iterator, bool> chk;
+    ext::pair<tree_t::iterator, bool> chk;
 
     if (lo_it != free_addr_by_addr.begin()) {
         pred_it = lo_it;
@@ -306,10 +306,10 @@ EXPORT bool contiguous_allocator_t::take_linear(
 
                 item_by_size.value() = {before.second, before.first};
 
-                chk = free_addr_by_addr.insert(std::move(item_by_addr));
+                chk = free_addr_by_addr.insert(ext::move(item_by_addr));
                 assert(chk.second);
 
-                chk = free_addr_by_size.insert(std::move(item_by_size));
+                chk = free_addr_by_size.insert(ext::move(item_by_size));
                 assert(chk.second);
             }
 
@@ -319,10 +319,10 @@ EXPORT bool contiguous_allocator_t::take_linear(
 
                     item_by_size.value() = {after.second, after.first};
 
-                    chk = free_addr_by_addr.insert(std::move(item_by_addr));
+                    chk = free_addr_by_addr.insert(ext::move(item_by_addr));
                     assert(chk.second);
 
-                    chk = free_addr_by_size.insert(std::move(item_by_size));
+                    chk = free_addr_by_size.insert(ext::move(item_by_size));
                     assert(chk.second);
                 } else {
                     chk = free_addr_by_addr.insert(after);
@@ -365,10 +365,10 @@ EXPORT bool contiguous_allocator_t::take_linear(
 
             item_by_size.value() = {before.second, before.first};
 
-            chk = free_addr_by_addr.insert(std::move(item_by_addr));
+            chk = free_addr_by_addr.insert(ext::move(item_by_addr));
             assert(chk.second);
 
-            chk = free_addr_by_size.insert(std::move(item_by_size));
+            chk = free_addr_by_size.insert(ext::move(item_by_size));
             assert(chk.second);
         }
 
@@ -378,10 +378,10 @@ EXPORT bool contiguous_allocator_t::take_linear(
 
                 item_by_size.value() = {after.second, after.first};
 
-                chk = free_addr_by_addr.insert(std::move(item_by_addr));
+                chk = free_addr_by_addr.insert(ext::move(item_by_addr));
                 assert(chk.second);
 
-                chk = free_addr_by_size.insert(std::move(item_by_size));
+                chk = free_addr_by_size.insert(ext::move(item_by_size));
                 assert(chk.second);
             } else {
                 chk = free_addr_by_addr.insert(after);
@@ -416,14 +416,14 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     tree_t::value_type range{addr, size};
     uintptr_t end = addr + size;
 
-    std::pair<tree_t::iterator, bool>
+    ext::pair<tree_t::iterator, bool>
             ins = free_addr_by_addr.insert(range);
 
     // Did we luckily free a range that already exactly exists?
     if (unlikely(!ins.second))
         return;
 
-    std::pair<tree_t::iterator, bool>
+    ext::pair<tree_t::iterator, bool>
             ins_size = free_addr_by_size.insert({range.second, range.first});
 
     // If by addr went in, by size surely will
@@ -436,7 +436,7 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     tree_t::iterator succ_it = ins.first;
     ++succ_it;
 
-    std::pair<tree_t::iterator, bool> chk;
+    ext::pair<tree_t::iterator, bool> chk;
 
     // If there is a predecessor
     if (ins.first != free_addr_by_addr.begin()) {
@@ -543,12 +543,12 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     if (ins_node) {
         assert(bool(ins_size_node));
 
-        chk = free_addr_by_addr.insert(std::move(ins_node));
+        chk = free_addr_by_addr.insert(ext::move(ins_node));
         assert(chk.second);
 
         //dump("after inserting extracted node");
 
-        chk = free_addr_by_size.insert(std::move(ins_size_node));
+        chk = free_addr_by_size.insert(ext::move(ins_size_node));
         assert(chk.second);
     }
 

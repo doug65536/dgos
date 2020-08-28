@@ -38,10 +38,10 @@ EXPORT void pipe_t::cleanup_buffer(scoped_lock& lock)
 EXPORT pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock,
                                                 int64_t timeout_time)
 {
-    std::cv_status wait_result = std::cv_status::no_timeout;
+    ext::cv_status wait_result = ext::cv_status::no_timeout;
 
     for (pipe_buffer_hdr_t *result = nullptr;
-         page_pool && wait_result == std::cv_status::no_timeout;
+         page_pool && wait_result == ext::cv_status::no_timeout;
          wait_result = pipe_not_full.wait_until(lock, timeout_time)) {
         if (free_buffer) {
             // Use most recently used one from freelist
@@ -153,7 +153,7 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
         uint8_t *dest = buf + write_buffer->size;
 
         // Compute how much we can transfer on this loop
-        size_t transferred = std::min(remain, size);
+        size_t transferred = ext::min(remain, size);
 
         memcpy(dest, data, transferred);
 
@@ -186,7 +186,7 @@ EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout_time)
 
             size_t remain = read_buffer->size - read_ofs;
 
-            size_t transferred = std::min(remain, size);
+            size_t transferred = ext::min(remain, size);
 
             // The beginning of the payload
             uint8_t *buf = (uint8_t*)(read_buffer + 1);
@@ -220,7 +220,7 @@ EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout_time)
         } else {
             // Wait
             if (pipe_not_empty.wait_until(lock, timeout_time) ==
-                    std::cv_status::timeout)
+                    ext::cv_status::timeout)
                 break;
         }
     }

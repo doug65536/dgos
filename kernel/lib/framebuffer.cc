@@ -312,19 +312,19 @@ void fb_copy_to(int scr_x, int scr_y,
 static void nullify_degenerate(fb_rect_t& rect)
 {
     // Clamp end against start
-    rect.en.x = std::max(rect.en.x, rect.st.x);
-    rect.en.y = std::max(rect.en.y, rect.st.y);
+    rect.en.x = ext::max(rect.en.x, rect.st.x);
+    rect.en.y = ext::max(rect.en.y, rect.st.y);
 }
 
 static void scissor_rect(fb_rect_t& rect, fb_rect_t const& scissor)
 {
     // Clamp start against left and top edge
-    rect.st.x = std::max(rect.st.x, scissor.st.x);
-    rect.st.y = std::max(rect.st.x, scissor.st.y);
+    rect.st.x = ext::max(rect.st.x, scissor.st.x);
+    rect.st.y = ext::max(rect.st.x, scissor.st.y);
 
     // Clamp end against right and bottom edge
-    rect.en.x = std::min(rect.en.x, scissor.en.x);
-    rect.en.y = std::min(rect.en.y, scissor.en.y);
+    rect.en.x = ext::min(rect.en.x, scissor.en.x);
+    rect.en.y = ext::min(rect.en.y, scissor.en.y);
 }
 
 void fb_fill_rect_clamped(int sx _unused, int sy _unused,
@@ -355,8 +355,8 @@ void fb_draw_line(int x0, int y0, int x1, int y1, uint32_t color, F setpixel)
 {
     int dx = x1 - x0;
     int dy = y1 - y0;
-    int adx = std::max(dx, -dx);
-    int ady = std::max(dy, -dy);
+    int adx = ext::max(dx, -dx);
+    int ady = ext::max(dy, -dy);
 
     if (adx >= ady) {
         // Shallow, x changes more than y
@@ -989,8 +989,8 @@ void framebuffer_console_t::get_dimensions(int *width, int *height)
 
 void framebuffer_console_t::goto_xy(int x _unused, int y _unused)
 {
-    cursor_x = std::min(std::max(x, 0), width - 1);
-    cursor_y = std::min(std::max(y, 0), height - 1);
+    cursor_x = ext::min(ext::max(x, 0), width - 1);
+    cursor_y = ext::min(ext::max(y, 0), height - 1);
 }
 
 int framebuffer_console_t::get_x()
@@ -1386,15 +1386,15 @@ surface_t surface_t::map_noclip(rect_t region)
 
 surface_t surface_t::map(rect_t region)
 {
-    region.st.x = std::max(region.st.x, 0);
-    region.st.y = std::max(region.st.y, 0);
-    region.en.x = std::max(region.en.x, 0);
-    region.en.y = std::max(region.en.y, 0);
+    region.st.x = ext::max(region.st.x, 0);
+    region.st.y = ext::max(region.st.y, 0);
+    region.en.x = ext::max(region.en.x, 0);
+    region.en.y = ext::max(region.en.y, 0);
 
-    region.st.x = std::min(region.st.x, w);
-    region.en.x = std::min(region.en.x, w);
-    region.st.y = std::min(region.st.y, h);
-    region.en.y = std::min(region.en.y, h);
+    region.st.x = ext::min(region.st.x, w);
+    region.en.x = ext::min(region.en.x, w);
+    region.st.y = ext::min(region.st.y, h);
+    region.en.y = ext::min(region.en.y, h);
 
     return map_noclip(region);
 }

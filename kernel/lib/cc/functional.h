@@ -4,7 +4,7 @@
 
 #include "types.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename>
 class function;
@@ -27,14 +27,14 @@ struct greater_equal;
 template<typename>
 class reference_wrapper;
 
-__END_NAMESPACE_STD
+__END_NAMESPACE_EXT
 
 #include "unique_ptr.h"
 #include "utility.h"
 #include "algorithm.h"
 #include "type_traits.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename R, typename... _Args>
 class function<R(_Args...)>
@@ -66,7 +66,7 @@ public:
     template<typename ..._A>
     R operator()(_A&& ...args) const
     {
-        return impl->invoke(forward<_A>(args)...);
+        return impl->invoke(ext::forward<_A>(args)...);
     }
 
     template<typename _C>
@@ -83,7 +83,7 @@ public:
 
     function& swap(function& rhs)
     {
-        std::swap(impl, rhs.impl);
+        ext::swap(impl, rhs.impl);
     }
 
 private:
@@ -109,13 +109,13 @@ private:
 
         R invoke(_Args&& ...args) const override final
         {
-            return storage(forward<_Args>(args)...);
+            return storage(ext::forward<_Args>(args)...);
         }
 
         T storage;
     };
 
-    std::unique_ptr<CallableBase> impl;
+    ext::unique_ptr<CallableBase> impl;
 };
 
 template<typename R, typename... _Args>
@@ -154,7 +154,7 @@ struct less
     using result_type = bool;
     using first_argument = _T;
     using second_argument = _T;
-    using is_transparent = false_type;
+    using is_transparent = ext::false_type;
 
     bool constexpr operator()(_T const& __lhs, _T const& __rhs) const
     {
@@ -165,7 +165,7 @@ struct less
 template<>
 struct less<void>
 {
-    using is_transparent = true_type;
+    using is_transparent = ext::true_type;
 
     template<typename _T1, typename _T2>
     auto constexpr operator()(_T1 const& __lhs, _T2 const& __rhs) const

@@ -743,7 +743,7 @@ static _always_inline void mm_copy_rd(
 
 struct pci_cache_t {
 public:
-    std::vector<pci_dev_iterator_t> iters;
+    ext::vector<pci_dev_iterator_t> iters;
     uint64_t updated_at;
 };
 

@@ -64,10 +64,10 @@ struct gpt_part_tbl_ent_t {
 
 struct gpt_part_factory_t : public part_factory_t {
     constexpr gpt_part_factory_t();
-    std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
+    ext::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
-static std::vector<part_dev_t*> partitions;
+static ext::vector<part_dev_t*> partitions;
 
 constexpr gpt_part_factory_t::gpt_part_factory_t()
     : part_factory_t("gpt")
@@ -75,9 +75,9 @@ constexpr gpt_part_factory_t::gpt_part_factory_t()
     part_register_factory(this);
 }
 
-std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
+ext::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 {
-    std::vector<part_dev_t *> list;
+    ext::vector<part_dev_t *> list;
 
     char const *drive_name = (char const *)drive->info(STORAGE_INFO_NAME);
 
@@ -90,7 +90,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     size_t sector_size = 1UL << log2_sector_size;
 
     // Create sector-sized buffer to look at partition header
-    std::unique_ptr<uint8_t[]> buffer(new (ext::nothrow) uint8_t[sector_size]);
+    ext::unique_ptr<uint8_t[]> buffer(new (ext::nothrow) uint8_t[sector_size]);
 
     if (unlikely(!buffer))
         panic_oom();
@@ -129,7 +129,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
         return list;
 
     for (uint32_t i = 0; i < hdr.part_ent_count; ++i) {
-        std::unique_ptr<part_dev_t> part;
+        ext::unique_ptr<part_dev_t> part;
 
         // Copy into aligned object
         memcpy(&ptent, &buffer.get()[i * hdr.part_ent_sz], sizeof(ptent));

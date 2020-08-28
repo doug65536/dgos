@@ -30,7 +30,7 @@ struct thread_run_data_t
 // Thread function
 static int thread_run_start(void *p)
 {
-    std::unique_ptr<thread_run_data_t> data =
+    ext::unique_ptr<thread_run_data_t> data =
             reinterpret_cast<thread_run_data_t*>(p);
 
     data->invoke();
@@ -96,7 +96,7 @@ thread_run_data_t::thread_run_data_t(int (*f)(void *), void *a)
 
 thread_t thread_run_data_t::spawn_thread(thread_run_data_t *p) const
 {
-    std::unique_ptr<thread_run_data_t> data(p);
+    ext::unique_ptr<thread_run_data_t> data(p);
     thread_t tid = thread_create(nullptr,
                                  thread_run_start, data,
                                  "spawn_thread", 0, false, false);

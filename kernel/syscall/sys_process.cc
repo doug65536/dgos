@@ -12,15 +12,15 @@
 struct futex_tab_ent_t {
     uintptr_t addr = 0;
     size_t waiter_count = 0;
-    std::condition_variable wake;
+    ext::condition_variable wake;
 };
 
 using futex_tab_t = hashtbl_t<
     futex_tab_ent_t,
     uintptr_t, &futex_tab_ent_t::addr>;
 
-using lock_type = std::mutex;
-using scoped_lock = std::unique_lock<lock_type>;
+using lock_type = ext::mutex;
+using scoped_lock = ext::unique_lock<lock_type>;
 static lock_type futex_lock;
 static futex_tab_t futex_tab;
 
@@ -67,7 +67,7 @@ static long futex_wait(int *uptr, int expect, uint64_t timeout_time)
 
     futex_tab_ent_t *fent = futex_tab.lookup(&uphysaddr);
 
-    std::unique_ptr<futex_tab_ent_t> new_ent;
+    ext::unique_ptr<futex_tab_ent_t> new_ent;
 
     long status = 0;
 
@@ -91,10 +91,10 @@ static long futex_wait(int *uptr, int expect, uint64_t timeout_time)
         if (timeout_time == 0) {
             fent->wake.wait(lock);
         } else {
-            std::chrono::steady_clock::time_point const
-                    timeout{std::chrono::nanoseconds(timeout_time)};
+            ext::chrono::steady_clock::time_point const
+                    timeout{ext::chrono::nanoseconds(timeout_time)};
             if (unlikely(fent->wake.wait_until(lock, timeout) ==
-                         std::cv_status::timeout))
+                         ext::cv_status::timeout))
                 status = -int(errno_t::ETIMEDOUT);
         }
 
@@ -118,7 +118,7 @@ static long futex_wake(int *uaddr, int max_awakened)
     // Lookup waiter record
     futex_tab_ent_t *fent = futex_tab.lookup(&addr);
 
-    if (fent) {
+    if (unlikely(fent)) {
         // Found waiter(s)
 
         if (max_awakened == INT_MAX)
@@ -312,11 +312,11 @@ static long futex_wait_op(int *lock, int op_param,
             }
 
             if (condent) {
-                std::chrono::steady_clock::time_point timeout_timepoint{
-                    std::chrono::nanoseconds(timeout_time)};
+                ext::chrono::steady_clock::time_point timeout_timepoint{
+                    ext::chrono::nanoseconds(timeout_time)};
                 if (unlikely(condent->wake.wait_until(
                                  lock_, timeout_timepoint) ==
-                             std::cv_status::timeout))
+                             ext::cv_status::timeout))
                     return -int(errno_t::ETIMEDOUT);
             }
 
@@ -331,7 +331,7 @@ static long futex_wait_op(int *lock, int op_param,
     }
 }
 
-static std::pair<uint64_t, bool>
+static ext::pair<uint64_t, bool>
 timeout_from_user_timespec(timespec const *t)
 {
     timespec ts{};
@@ -345,7 +345,7 @@ timeout_from_user_timespec(timespec const *t)
 long sys_futex(int *uaddr, int futex_op, int val,
                struct timespec const *timeout, int *uaddr2, int val3)
 {
-    std::pair<uint64_t, bool> timeout_ns;
+    ext::pair<uint64_t, bool> timeout_ns;
 
     timeout_ns = { UINT64_MAX, true };
 
@@ -388,9 +388,9 @@ long sys_posix_spawn(pid_t *restrict pid,
     if (!path_string.second)
         return -int(errno_t::EFAULT);
 
-    std::vector<ext::string> argv_items;
-    std::vector<ext::string> envp_items;
-    std::vector<ext::string> *curr_items = &argv_items;
+    ext::vector<ext::string> argv_items;
+    ext::vector<ext::string> envp_items;
+    ext::vector<ext::string> *curr_items = &argv_items;
     char const ** restrict cur_src = argv;
 
     for (size_t pass = 0; pass < 2; ++pass) {
@@ -415,7 +415,7 @@ long sys_posix_spawn(pid_t *restrict pid,
             if (unlikely(!str.second))
                 return -int(errno_t::EINVAL);
 
-            if (unlikely(!curr_items->emplace_back(std::move(str.first))))
+            if (unlikely(!curr_items->emplace_back(ext::move(str.first))))
                 return -int(errno_t::ENOMEM);
         } while (str_entry);
 
@@ -425,9 +425,9 @@ long sys_posix_spawn(pid_t *restrict pid,
 
     pid_t pid_result = 0;
     long result = process_t::spawn(&pid_result,
-                                   std::move(path_string.first),
-                                   std::move(argv_items),
-                                   std::move(envp_items));
+                                   ext::move(path_string.first),
+                                   ext::move(argv_items),
+                                   ext::move(envp_items));
 
     if (unlikely(!mm_copy_user(pid, &pid_result, sizeof(*pid))))
         return -int(errno_t::EFAULT);

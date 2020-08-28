@@ -16,7 +16,7 @@ public:
 
 protected:
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     char *items;
     uint32_t item_size;
@@ -46,9 +46,11 @@ public:
     template<typename... Args>
     T *alloc(Args&& ...args)
     {
-        T *item = (T*)pool_base_t::alloc();
-        if (likely(item))
-            return new (item) T(std::forward<Args>(args)...);
+        void *mem = pool_base_t::alloc();
+
+        if (likely(mem))
+            return new (mem) T(ext::forward<Args>(args)...);
+
         return nullptr;
     }
 
@@ -56,7 +58,7 @@ public:
     T *calloc(Args&& ...args)
     {
         T *item = (T*)pool_base_t::calloc();
-        return new (item) T(std::forward<Args>(args)...);
+        return new (item) T(ext::forward<Args>(args)...);
     }
 
     T *operator[](uint32_t index)
@@ -64,12 +66,20 @@ public:
         return (T*)pool_base_t::item(index);
     }
 
-    template<typename U>
-    void free(U* item)
+    void free(T* item)
     {
-        size_t index = (T*)item - (T*)items;
+        size_t index = item - reinterpret_cast<T*>(items);
         assert(index < item_capacity);
-        item->~U();
+        item->~T();
         pool_base_t::free(index);
     }
+
+//    template<typename U>
+//    void free(U* item)
+//    {
+//        size_t index = static_cast<T*>(item) - static_cast<T*>(items);
+//        assert(index < item_capacity);
+//        item->~U();
+//        pool_base_t::free(index);
+//    }
 };

@@ -18,7 +18,7 @@ public:
     {
     }
 
-    unique_memlock(std::defer_lock_t)
+    unique_memlock(ext::defer_lock_t)
         : unique_memlock()
     {
     }
@@ -510,13 +510,13 @@ int sys_renameat(int olddirfd, char const *old_pathname,
 {
     process_t *p = fast_cur_process();
 
-    std::unique_ptr<user_str_t> old_path_storage(
+    ext::unique_ptr<user_str_t> old_path_storage(
                 new (ext::nothrow) user_str_t(old_pathname));
 
     if (unlikely(!old_path_storage))
         return old_path_storage->err_int();
 
-    std::unique_ptr<user_str_t> new_path_storage(
+    ext::unique_ptr<user_str_t> new_path_storage(
                 new (ext::nothrow) user_str_t(new_pathname));
 
     if (unlikely(!new_path_storage))

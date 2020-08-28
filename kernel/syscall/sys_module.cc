@@ -38,7 +38,7 @@ int sys_init_module(char const *module, ptrdiff_t module_sz,
     if (unlikely(module_params && !parameter_buffer.second))
         return -int(errno_t::EFAULT);
 
-    std::vector<ext::string> parameters;
+    ext::vector<ext::string> parameters;
 
     bool in_squote = false;
     bool in_dquote = false;
@@ -103,7 +103,7 @@ int sys_init_module(char const *module, ptrdiff_t module_sz,
     errno_t err = errno_t::OK;
 
     bool worked = modload_load_image(module, module_sz, kmname,
-                                     std::move(parameters),
+                                     ext::move(parameters),
                                      ret_needed, &err);
 
     return worked ? 0 : -int(err);

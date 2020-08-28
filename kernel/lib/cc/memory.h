@@ -22,7 +22,7 @@
 
 #include "heap.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename _T>
 struct allocator
@@ -89,11 +89,9 @@ struct allocator<void>
     {
     }
 };
-__END_NAMESPACE_STD
 
 #ifdef __DGOS_KERNEL__
 
-__BEGIN_NAMESPACE_EXT
 struct page_allocator_base
 {
 protected:
@@ -134,7 +132,7 @@ struct page_allocator<void>
     };
 };
 
-template<typename T, typename Alloc = std::allocator<char>,
+template<typename T, typename Alloc = allocator<char>,
          size_t chunk_size = PAGESIZE << 6>
 class bump_allocator_impl
     : public refcounted<bump_allocator_impl<T>>
@@ -154,7 +152,7 @@ private:
     union item_t
     {
         // Either a data item...
-        typename std::aligned_storage<sizeof(T), alignof(T)>::type storage;
+        typename ext::aligned_storage<sizeof(T), alignof(T)>::type storage;
 
         // Or a free chain pointer
         item_t *next_free;
@@ -251,25 +249,27 @@ public:
 //        printdbg("bump allocator item freed at %#zx\n",
 //                 uintptr_t(__p));
 
+        item_t *__item = reinterpret_cast<item_t*>(__p);
+
         // Either write next pointer into last block, or,
         // write that into first_free instead
         item_t **adj = last_free ? &last_free->next_free : &first_free;
-        *adj = reinterpret_cast<item_t*>(__p);
+        *adj = __item;
 
         // Newly deallocated block is reused last
         // after all previously freed blocks
         // This should reduce temporal locality but increase spacial locality
-        last_free = reinterpret_cast<item_t*>(__p);
+        last_free = __item;
 
         // Null out next pointer in free block chain
-        *reinterpret_cast<void**>(__p) = nullptr;
+        __item->next_free = nullptr;
     }
 
 private:
     item_t *current_page;
     size_t bump_index;
 
-    // Rebind incoming allocator to allocate item_t objects
+    // Rebound incoming allocator to allocate char objects
     Allocator alloc;
 
     item_t *first_free;
@@ -376,11 +376,9 @@ public:
 private:
     refptr<bump_allocator_impl<void, _Alloc>> impl;
 };
-__END_NAMESPACE_EXT
 
 #endif
 
-__BEGIN_NAMESPACE_STD
 template<typename T>
 struct default_delete
 {
@@ -627,7 +625,7 @@ class per_cpu_t
     {
         size_t cpu_count = thread_get_cpu_count();
         for (auto it = storage, en = storage + cpu_count; it != en; ++it)
-            new (it) T(std::forward<Args>(args)...);
+            new (it) T(ext::forward<Args>(args)...);
     }
 
     ~per_cpu_t()
@@ -636,7 +634,7 @@ class per_cpu_t
             ((T*)(it))->~T();
     }
 
-    typename std::aligned_storage<sizeof(T)>::type storage[MAX_CPUS];
+    typename ext::aligned_storage<sizeof(T)>::type storage[MAX_CPUS];
     size_t cpu_count = 0;
 };
 __END_NAMESPACE_EXT

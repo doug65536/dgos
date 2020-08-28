@@ -1,17 +1,17 @@
 #include "cxxexception.h"
 
-std::exception::~exception()
+ext::exception::~exception()
 {
 }
 
-char const *std::exception::what() const noexcept
+char const *ext::exception::what() const noexcept
 {
-    return "std::exception";
+    return "ext::exception";
 }
 
-char const *std::bad_alloc::what() const noexcept
+char const *ext::bad_alloc::what() const noexcept
 {
-    return "std::bad_alloc";
+    return "ext::bad_alloc";
 }
 
 #if 0
@@ -60,12 +60,12 @@ std::length_error::length_error(char const *__message)
 {
 }
 
-std::out_of_range::out_of_range(string const& __message)
+ext::out_of_range::out_of_range(string const& __message)
     : logic_error(__message)
 {
 }
 
-std::out_of_range::out_of_range(char const *__message)
+ext::out_of_range::out_of_range(char const *__message)
     : logic_error(__message)
 {
 }

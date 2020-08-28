@@ -4,11 +4,11 @@
 #include "permute.h"
 
 // Instantiate everything
-template class std::__basic_tree<int, void>;
-template class std::__basic_tree<int, void>::__basic_iterator<false, 1>;
-template class std::__basic_tree<int, void>::__basic_iterator<true, 1>;
-template class std::__basic_tree<int, void>::__basic_iterator<false, -1>;
-template class std::__basic_tree<int, void>::__basic_iterator<true, -1>;
+template class ext::__basic_tree<int, void>;
+template class ext::__basic_tree<int, void>::__basic_iterator<false, 1>;
+template class ext::__basic_tree<int, void>::__basic_iterator<true, 1>;
+template class ext::__basic_tree<int, void>::__basic_iterator<false, -1>;
+template class ext::__basic_tree<int, void>::__basic_iterator<true, -1>;
 
 #define HEAP_VALIDATE 0
 #if HEAP_VALIDATE
@@ -21,7 +21,7 @@ UNITTEST(test_set_int_default_construct)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
     eq(true, c.validate());
 
     eq(size_t(0), c.size());
@@ -45,9 +45,9 @@ UNITTEST(test_set_int_insert_1)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
 
-    std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(1);
+    ext::pair<ext::set<int>::iterator, bool> ins_pair = c.insert(1);
 
     ne(nullptr, &*ins_pair.first);
     eq(true, ins_pair.second);
@@ -87,9 +87,9 @@ UNITTEST(test_set_int_insert_dup)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
 
-    std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(1);
+    ext::pair<ext::set<int>::iterator, bool> ins_pair = c.insert(1);
 
     ne(nullptr, &*ins_pair.first);
     eq(true, ins_pair.second);
@@ -137,12 +137,12 @@ UNITTEST(test_set_int_excess_iter_incdec_at_ends)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
 
-    std::set<int>::iterator mit = c.begin();
-    std::set<int>::const_iterator cit = c.begin();
-    std::set<int>::reverse_iterator rit = c.begin();
-    std::set<int>::const_reverse_iterator crit = c.begin();
+    ext::set<int>::iterator mit = c.begin();
+    ext::set<int>::const_iterator cit = c.begin();
+    ext::set<int>::reverse_iterator rit = c.begin();
+    ext::set<int>::const_reverse_iterator crit = c.begin();
 
     // Beginning is also end in empty set
     eq(true, c.end() == mit);
@@ -187,9 +187,9 @@ UNITTEST(test_set_int_construct_insert_churn)
     heap_validate();
 
     for (int i = 0; i < 100; ++i) {
-        std::set<int> c;
+        ext::set<int> c;
         for (int k = 0; k < 100; ++k) {
-            std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(k);
+            ext::pair<ext::set<int>::iterator, bool> ins_pair = c.insert(k);
 
             ne(nullptr, &*ins_pair.first);
             eq(true, ins_pair.second);
@@ -204,7 +204,7 @@ UNITTEST(test_set_first_last)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
     for (int i = 0; i < 100; ++i)
         c.insert(i);
 
@@ -216,11 +216,11 @@ UNITTEST(test_set_first_last)
         eq(99 - i, *c.rbegin());
         eq(99 - i, *c.crbegin());
 
-        std::set<int>::iterator fit = c.erase(c.begin());
+        ext::set<int>::iterator fit = c.erase(c.begin());
 
         eq(true, fit == c.begin());
 
-        std::set<int>::iterator lit = c.erase(c.rbegin().current());
+        ext::set<int>::iterator lit = c.erase(c.rbegin().current());
 
         eq(true, lit == c.end());
 
@@ -243,11 +243,11 @@ UNITTEST(test_set_int_insert_1k)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
     int e = 1000;
 
     for (int i = 0; i < e; ++i) {
-        std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(i);
+        ext::pair<ext::set<int>::iterator, bool> ins_pair = c.insert(i);
 
         ne(nullptr, &*ins_pair.first);
         eq(true, ins_pair.second);
@@ -296,17 +296,17 @@ UNITTEST(test_set_int_insert_1k)
 
 UNITTEST(test_set_lower_bound)
 {
-    std::set<int> c;
+    ext::set<int> c;
 
     for (int i = 2; i < 10; i += 2) {
-        std::pair<std::set<int>::iterator, bool> ins = c.insert(i);
+        ext::pair<ext::set<int>::iterator, bool> ins = c.insert(i);
         eq(i, *ins.first);
         eq(true, ins.second);
     }
 
     for (int i = 1; i < 10; ++i) {
         int expect = (i & 1) ? (i + 1) : i;
-        std::set<int>::iterator it = c.lower_bound(i);
+        ext::set<int>::iterator it = c.lower_bound(i);
         eq(i > 8, it == c.end());
         eq(true, i > 8 || *it == expect);
     }
@@ -316,11 +316,11 @@ UNITTEST(test_set_int_insert_reverse)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
     int e = 1000;
 
     for (int i = 0; i < e; ++i) {
-        std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(e - i);
+        ext::pair<ext::set<int>::iterator, bool> ins_pair = c.insert(e - i);
 
         ne(nullptr, &*ins_pair.first);
         eq(true, ins_pair.second);
@@ -371,10 +371,10 @@ UNITTEST(test_set_int_simple_erase)
 {
     heap_validate();
 
-    std::set<int> c;
+    ext::set<int> c;
 
     for (int i = 0; i < 8; ++i) {
-        std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(i);
+        ext::pair<ext::set<int>::iterator, bool> ins_pair = c.insert(i);
 
         ne(nullptr, &*ins_pair.first);
         eq(true, ins_pair.second);
@@ -409,14 +409,14 @@ UNITTEST(test_set_int_simple_erase)
 
 UNITTEST(test_set_int_complex_erase)
 {
-    std::set<int> c;
+    ext::set<int> c;
 
     int inserted_st = 0;
     int inserted_en = 0;
 
     for (int i = 0; i < 64 + 1024 + 64; ++i) {
         if (i < 64 + 1024) {
-            std::pair<std::set<int>::iterator, bool>
+            ext::pair<ext::set<int>::iterator, bool>
                     ins_pair = c.insert(inserted_en++);
 
             ne(nullptr, &*ins_pair.first);
@@ -445,9 +445,9 @@ UNITTEST(test_set_int_complex_erase)
 
 DISABLED_UNITTEST(test_set_int_every_insert_permutation)
 {
-    std::set<int> c;
+    ext::set<int> c;
 
-    std::vector<int> order;
+    ext::vector<int> order;
     eq(true, order.reserve(8));
 
     order.clear();
@@ -460,7 +460,7 @@ DISABLED_UNITTEST(test_set_int_every_insert_permutation)
         for (int i = 0; i < 8; ++i) {
             int key = order[i];
 
-            std::pair<std::set<int>::iterator, bool>
+            ext::pair<ext::set<int>::iterator, bool>
                     ins_pair = c.insert(key);
 
             ne(nullptr, &*ins_pair.first);
@@ -476,22 +476,22 @@ DISABLED_UNITTEST(test_set_int_every_insert_permutation)
                 eq(key, *it);
             }
         }
-    } while (std::next_permutation(order.begin(), order.end()));
+    } while (ext::next_permutation(order.begin(), order.end()));
 
-    std::reverse(order.begin(), order.end());
+    ext::reverse(order.begin(), order.end());
 }
 
 DISABLED_UNITTEST(test_set_int_every_erase_permutation)
 {
-    std::vector<int> order;
-    std::set<int> c;
+    ext::vector<int> order;
+    ext::set<int> c;
 
     for (int i = 0; i < 8; ++i)
         order.push_back(i);
 
     do {
         for (int i = 0; i < 8; ++i) {
-            std::pair<std::set<int>::iterator, bool> ins_pair = c.insert(i);
+            ext::pair<ext::set<int>::iterator, bool> ins_pair = c.insert(i);
 
             ne(nullptr, &*ins_pair.first);
             eq(true, ins_pair.second);
@@ -518,13 +518,13 @@ DISABLED_UNITTEST(test_set_int_every_erase_permutation)
 
             eq(true, c.validate());
         }
-    } while (std::next_permutation(order.begin(), order.end()));
+    } while (ext::next_permutation(order.begin(), order.end()));
 }
 
 UNITTEST(test_map_insert)
 {
-    std::map<int, short> c;
-    std::pair<std::map<int, short>::iterator, bool>
+    ext::map<int, short> c;
+    ext::pair<ext::map<int, short>::iterator, bool>
             ins = c.insert({42, 6500});
     eq(true, c.end() != ins.first);
     eq(42, ins.first->first);
@@ -535,7 +535,7 @@ UNITTEST(test_map_insert)
 
 UNITTEST(test_map_index)
 {
-    std::map<int, short> c;
+    ext::map<int, short> c;
     c[42] = 6500;
     c[43] = 8900;
     eq(size_t(2), c.size());
@@ -610,7 +610,7 @@ UNITTEST(test_map_key_value_destruct)
     int val1_count = 0;
     int val2_count = 0;
 
-    std::map<destruct_watcher_t, destruct_watcher_t> c;
+    ext::map<destruct_watcher_t, destruct_watcher_t> c;
     c[destruct_watcher_t(42, &key1_count)] =
             destruct_watcher_t(6500, &val1_count);
     c[destruct_watcher_t(43, &key2_count)] =

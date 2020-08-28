@@ -5,7 +5,7 @@
 #include "chrono.h"
 #include "cpu/control_regs.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 class mutex;
 class shared_mutex;
 template<typename T> class unique_lock;
@@ -13,9 +13,7 @@ template<typename T> class shared_lock;
 
 struct defer_lock_t {
 };
-__END_NAMESPACE_STD
 
-__BEGIN_NAMESPACE_EXT
 class irqlock;
 class ticketlock;
 class spinlock;
@@ -263,17 +261,14 @@ private:
     bool irq_was_enabled = false;
 };
 
-using irq_mutex = noirq_lock<std::mutex>;
-using irq_shared_mutex = noirq_lock<std::shared_mutex>;
+using irq_mutex = noirq_lock<mutex>;
+using irq_shared_mutex = noirq_lock<shared_mutex>;
 using irq_mcslock = noirq_lock<mcslock>;
 using irq_spinlock = noirq_lock<spinlock>;
 using irq_ticketlock = noirq_lock<ticketlock>;
-__END_NAMESPACE_EXT
-
-__BEGIN_NAMESPACE_STD
 
 // Meets BasicLockable requirements
-class mutex : public ext::base_lock<mutex> {
+class mutex : public base_lock<mutex> {
 public:
     typedef mutex_t mutex_type;
 
@@ -405,8 +400,8 @@ public:
 
     void swap(unique_lock& rhs) noexcept
     {
-        std::swap(rhs.m, m);
-        std::swap(rhs.locked, locked);
+        ext::swap(rhs.m, m);
+        ext::swap(rhs.locked, locked);
     }
 
     _always_inline typename T::mutex_type& native_handle() noexcept
@@ -479,7 +474,7 @@ private:
 
 //template<typename _T>
 //EXPORT unique_lock<ext::noirq_lock<_T>>::unique_lock(
-//        ext::noirq_lock<_T> &lock, std::defer_lock_t) noexcept
+//        ext::noirq_lock<_T> &lock, ext::defer_lock_t) noexcept
 //    : m(&lock)
 //    , locked(false)
 //{
@@ -521,8 +516,8 @@ private:
 //EXPORT void unique_lock<ext::noirq_lock<_T>>::swap(
 //        unique_lock<ext::noirq_lock<_T>> &rhs) noexcept
 //{
-//    std::swap(rhs.m, m);
-//    std::swap(rhs.locked, locked);
+//    ext::swap(rhs.m, m);
+//    ext::swap(rhs.locked, locked);
 //}
 
 template<>
@@ -625,18 +620,14 @@ public:
 
     void swap(unique_lock<T>& rhs)
     {
-        std::swap(rhs.m, m);
-        std::swap(rhs.locked, locked);
+        ext::swap(rhs.m, m);
+        ext::swap(rhs.locked, locked);
     }
 
 private:
     T* m;
     bool locked;
 };
-
-__END_NAMESPACE_STD
-
-__BEGIN_NAMESPACE_STD
 
 enum class cv_status
 {
@@ -687,8 +678,8 @@ public:
         assert(lock.is_locked());
 
         return result
-                ? std::cv_status::no_timeout
-                : std::cv_status::timeout;
+                ? ext::cv_status::no_timeout
+                : ext::cv_status::timeout;
     }
 
     condition_var_t m;
@@ -696,10 +687,10 @@ public:
 __END_NAMESPACE_STD
 
 __BEGIN_NAMESPACE_EXT
-struct alignas(64) padded_mutex : public std::mutex {
+struct alignas(64) padded_mutex : public ext::mutex {
 };
 
-struct alignas(64) padded_condition_variable : public std::condition_variable {
+struct alignas(64) padded_condition_variable : public ext::condition_variable {
 };
 
 struct alignas(64) padded_ticketlock : public ticketlock {
@@ -708,27 +699,27 @@ struct alignas(64) padded_ticketlock : public ticketlock {
 struct alignas(64) padded_spinlock : public spinlock {
 };
 
-class alignas(64) padded_shared_mutex : public std::shared_mutex {
+class alignas(64) padded_shared_mutex : public ext::shared_mutex {
 };
 __END_NAMESPACE_EXT
 
 // Explicit instantiations
 
-extern template class std::unique_lock<std::mutex>;
-extern template class std::unique_lock<std::shared_mutex>;
+extern template class ext::unique_lock<ext::mutex>;
+extern template class ext::unique_lock<ext::shared_mutex>;
 
-extern template class std::unique_lock<ext::shared_spinlock>;
-extern template class std::unique_lock<ext::ticketlock>;
-extern template class std::unique_lock<ext::spinlock>;
-extern template class std::unique_lock<ext::irqlock>;
-extern template class std::unique_lock<ext::mcslock>;
+extern template class ext::unique_lock<ext::shared_spinlock>;
+extern template class ext::unique_lock<ext::ticketlock>;
+extern template class ext::unique_lock<ext::spinlock>;
+extern template class ext::unique_lock<ext::irqlock>;
+extern template class ext::unique_lock<ext::mcslock>;
 
-extern template class std::unique_lock<ext::noirq_lock<std::mutex>>;
-extern template class std::unique_lock<ext::noirq_lock<std::shared_mutex>>;
+extern template class ext::unique_lock<ext::noirq_lock<ext::mutex>>;
+extern template class ext::unique_lock<ext::noirq_lock<ext::shared_mutex>>;
 
-extern template class std::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
-extern template class std::unique_lock<ext::noirq_lock<ext::ticketlock>>;
-extern template class std::unique_lock<ext::noirq_lock<ext::spinlock>>;
-extern template class std::unique_lock<ext::noirq_lock<ext::irqlock>>;
-extern template class std::unique_lock<ext::noirq_lock<ext::mcslock>>;
+extern template class ext::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
+extern template class ext::unique_lock<ext::noirq_lock<ext::ticketlock>>;
+extern template class ext::unique_lock<ext::noirq_lock<ext::spinlock>>;
+extern template class ext::unique_lock<ext::noirq_lock<ext::irqlock>>;
+extern template class ext::unique_lock<ext::noirq_lock<ext::mcslock>>;
 

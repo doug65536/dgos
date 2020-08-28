@@ -35,7 +35,7 @@ public:
 
 private:
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     void invoke_once(scoped_lock &hold);
 
@@ -67,10 +67,10 @@ public:
     T wait();
 
     template<typename _Clock, typename _Duration>
-    bool wait_until(std::chrono::time_point<_Clock, _Duration>
+    bool wait_until(ext::chrono::time_point<_Clock, _Duration>
                     const& timeout_time)
     {
-        return wait_until(std::chrono::steady_clock::time_point(
+        return wait_until(ext::chrono::steady_clock::time_point(
                               timeout_time).time_since_epoch().count());
     }
 
@@ -81,14 +81,14 @@ public:
 
 private:
     using lock_type = ext::irq_spinlock;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     lock_type lock;
-    std::condition_variable done_cond;
+    ext::condition_variable done_cond;
     bool volatile done;
 };
 
-using err_sz_pair_t = std::pair<errno_t, size_t>;
+using err_sz_pair_t = ext::pair<errno_t, size_t>;
 
 template<typename T>
 class __basic_iocp_error_success_t
@@ -251,12 +251,12 @@ T basic_blocking_iocp_t<T, S>::wait()
 template<typename T, typename S>
 bool basic_blocking_iocp_t<T, S>::wait_until(uint64_t timeout_time)
 {
-    auto timeout = std::chrono::time_point<std::chrono::steady_clock>(
-                std::chrono::nanoseconds(timeout_time));
+    auto timeout = ext::chrono::time_point<ext::chrono::steady_clock>(
+                ext::chrono::nanoseconds(timeout_time));
 
     scoped_lock hold(lock);
     while (!done) {
-        if (done_cond.wait_until(hold, timeout) == std::cv_status::timeout)
+        if (done_cond.wait_until(hold, timeout) == ext::cv_status::timeout)
             return false;
     }
     return true;
@@ -287,17 +287,17 @@ using blocking_iocp_t = dgos::basic_blocking_iocp_t<
 
 // Explicit instantiations
 
-extern template struct std::pair<errno_t, size_t>;
+extern template struct ext::pair<errno_t, size_t>;
 
 extern template class dgos::__basic_iocp_error_success_t<
-        std::pair<errno_t, size_t>>;
+        ext::pair<errno_t, size_t>>;
 
 extern template class dgos::basic_iocp_t<
-        std::pair<errno_t, size_t>,
+        ext::pair<errno_t, size_t>,
         dgos::__basic_iocp_error_success_t<
-            std::pair<errno_t, size_t>>>;
+            ext::pair<errno_t, size_t>>>;
 
 extern template class dgos::basic_blocking_iocp_t<
-        std::pair<errno_t, size_t>,
+        ext::pair<errno_t, size_t>,
         dgos::__basic_iocp_error_success_t<
-            std::pair<errno_t, size_t>>>;
+            ext::pair<errno_t, size_t>>>;

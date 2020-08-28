@@ -15,7 +15,7 @@ public:
 
     noirq_lock()
         : inner_lock()
-        , inner_hold(inner_lock, std::defer_lock_t())
+        , inner_hold(inner_lock, ext::defer_lock_t())
     {
     }
 
@@ -61,6 +61,6 @@ public:
 
 private:
     _L inner_lock;
-    std::unique_lock<_L> inner_hold;
+    ext::unique_lock<_L> inner_hold;
     bool irq_was_enabled = false;
 };

@@ -14,7 +14,7 @@ int _FILE::add_ch(int ch)
 {
     unsigned char uc = ch;
     ssize_t sz = write(fd, &uc, 1);
-    if (sz < 0)
+    if (unlikely(sz < 0))
         return -1;
 
     return 0;

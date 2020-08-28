@@ -1,7 +1,7 @@
 #include "unittest.h"
 #include "vector.h"
 
-template class std::vector<int>;
+template class ext::vector<int>;
 
 struct MockStats {
     size_t nr_construct = 0;
@@ -72,14 +72,14 @@ private:
 
 UNITTEST(test_vector_construct_default)
 {
-    std::vector<int> v;
+    ext::vector<int> v;
     eq(size_t(0), v.size());
     eq(true, v.empty());
 }
 
 UNITTEST(test_vector_construct_size_defval)
 {
-    std::vector<int> v(42);
+    ext::vector<int> v(42);
 
     eq(42U, v.size());
     le(42U, v.capacity());
@@ -107,7 +107,7 @@ UNITTEST(test_vector_construct_size_defval)
 
 UNITTEST(test_vector_construct_size_23val)
 {
-    std::vector<int> v(42, 23);
+    ext::vector<int> v(42, 23);
 
     eq(size_t(42), v.size());
     le(size_t(42), v.capacity());
@@ -136,7 +136,7 @@ UNITTEST(test_vector_construct_size_23val)
 UNITTEST(test_vector_iterator)
 {
     int e = 42;
-    std::vector<int> v(e);
+    ext::vector<int> v(e);
 
     for (int i = 0; i < e; ++i)
         v[i] = i;
@@ -168,10 +168,10 @@ UNITTEST(test_vector_iterator)
     for (int i = 0; i < e; ++i)
         eq(i, v.crend()[-1 - i]);
 
-    using iter = std::vector<int>::iterator;
-    using citer = std::vector<int>::const_iterator;
-    using riter = std::vector<int>::reverse_iterator;
-    using criter = std::vector<int>::const_reverse_iterator;
+    using iter = ext::vector<int>::iterator;
+    using citer = ext::vector<int>::const_iterator;
+    using riter = ext::vector<int>::reverse_iterator;
+    using criter = ext::vector<int>::const_reverse_iterator;
 
     iter it = v.begin();
     citer cit = v.cbegin();
@@ -221,7 +221,7 @@ UNITTEST(test_vector_iterator)
 
 UNITTEST(test_vector_construct_size_fill)
 {
-    std::vector<int> v(42, 63);
+    ext::vector<int> v(42, 63);
     eq(42U, v.size());
     le(42U, v.capacity());
     eq(42, v.end() - v.begin());
@@ -242,7 +242,7 @@ UNITTEST(test_vector_construct_pointer_pair)
         42042042
     };
 
-    std::vector<int> v(input, input + 3);
+    ext::vector<int> v(input, input + 3);
     eq(3U, v.size());
     le(3U, v.capacity());
     eq(3, v.end() - v.begin());
@@ -309,7 +309,7 @@ static uint8_t const bitrev[] = {
 
 UNITTEST(test_vector_push)
 {
-    std::vector<int> v;
+    ext::vector<int> v;
 
     int count = 0;
 
@@ -346,7 +346,7 @@ UNITTEST(test_vector_push)
 
 UNITTEST(test_vector_pop)
 {
-    std::vector<int> v;
+    ext::vector<int> v;
 
     for (int i = 0; i < 1024; ++i)
         v.push_back(i);
@@ -366,7 +366,7 @@ UNITTEST(test_vector_pop)
 
 UNITTEST(test_vector_insert_begin)
 {
-    std::vector<int> v;
+    ext::vector<int> v;
 
     for (int i = 1024; i > 0; --i) {
         v.insert(v.begin(), i - 1);
@@ -379,7 +379,7 @@ UNITTEST(test_vector_insert_begin)
 
 UNITTEST(test_vector_erase)
 {
-    std::vector<int> v;
+    ext::vector<int> v;
 
     for (int i = 0; i < 1024; ++i)
         v.push_back(i);
@@ -391,7 +391,7 @@ UNITTEST(test_vector_erase)
 DISABLED_UNITTEST(test_vector_lifecycle)
 {
     MockStats stats;
-    std::vector<MockItem> v;
+    ext::vector<MockItem> v;
     bool ok = v.emplace_back(&stats);
     eq(true, ok);
     eq(size_t(1), stats.nr_construct);
@@ -404,7 +404,7 @@ DISABLED_UNITTEST(test_vector_lifecycle)
     eq(1U, stats.nr_movecon);
     eq(true, ok);
 
-    std::vector<MockItem> v2 = std::move(v);
+    ext::vector<MockItem> v2 = ext::move(v);
 
     eq(1U, stats.nr_construct);
 }
@@ -431,7 +431,7 @@ static uint8_t byte_from_sz(size_t sz)
 
 UNITTEST(test_vector_random_malloc)
 {
-    std::vector<std::pair<std::unique_ptr<uint8_t[]>, size_t>> ptrs(1234);
+    ext::vector<ext::pair<ext::unique_ptr<uint8_t[]>, size_t>> ptrs(1234);
     uint64_t seed = 42;
 
     size_t i = 0;

@@ -29,10 +29,10 @@ union process_ptr_t {
     }
 };
 
-static std::vector<process_ptr_t> processes;
+static ext::vector<process_ptr_t> processes;
 static size_t process_count;
 using processes_lock_type = process_t::lock_type;
-using processes_scoped_lock = std::unique_lock<processes_lock_type>;
+using processes_scoped_lock = ext::unique_lock<processes_lock_type>;
 static processes_lock_type processes_lock;
 static pid_t process_first_free;
 static pid_t process_last_free;
@@ -97,8 +97,8 @@ process_t *process_t::add()
 
 int process_t::spawn(pid_t * pid_result,
                      ext::string path,
-                     std::vector<ext::string> argv,
-                     std::vector<ext::string> env)
+                     ext::vector<ext::string> argv,
+                     ext::vector<ext::string> env)
 {
     *pid_result = -1;
 
@@ -106,9 +106,9 @@ int process_t::spawn(pid_t * pid_result,
 
     processes_scoped_lock lock(process->process_lock);
 
-    process->path = std::move(path);
-    process->argv = std::move(argv);
-    process->env = std::move(env);
+    process->path = ext::move(path);
+    process->argv = ext::move(argv);
+    process->env = ext::move(env);
 
     // Return the assigned PID
     *pid_result = process->pid;
@@ -206,7 +206,7 @@ int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
     scoped_lock lock(processes_lock);
 
     // Add a new jmpbuf for thread exit
-    std::unique_ptr<__exception_jmp_buf_t> new_jmpbuf(
+    ext::unique_ptr<__exception_jmp_buf_t> new_jmpbuf(
             new (ext::nothrow) __exception_jmp_buf_t());
 
     if (unlikely(!new_jmpbuf))
@@ -237,7 +237,7 @@ int process_t::kill(int pid, int sig)
     if (unlikely(pid < 0))
         return -int(errno_t::ESRCH);
 
-    if (pid >= processes.size())
+    if (pid >= (int)processes.size())
         return -int(errno_t::ESRCH);
 
     if (unlikely(sig < 0))
@@ -266,7 +266,7 @@ int process_t::send_signal_to_self(int sig)
 
 // Hack to reuse module loader symbol auto-load hook for processes too
 extern void modload_load_symbols(char const *path, uintptr_t text_addr,
-                                 uintptr_t base_addr);
+                                 intptr_t base_addr);
 
 template<typename P>
 intptr_t process_t::load_elf_with_policy(int fd)
@@ -285,7 +285,7 @@ intptr_t process_t::load_elf_with_policy(int fd)
     }
 
     // Allocate memory for program headers
-    std::vector<Phdr> program_hdrs;
+    ext::vector<Phdr> program_hdrs;
     if (unlikely(!program_hdrs.resize(hdr.e_phnum))) {
         printdbg("Failed to allocate memory for program headers\n");
         return -int(errno_t::ENOMEM);
@@ -685,7 +685,7 @@ int process_t::run()
     if (unlikely(!mm_copy_user(stack_ptr, &argc, sizeof(argc))))
         return -1;
 
-    std::vector<auxv_t> auxent;
+    ext::vector<auxv_t> auxent;
 
     if (unlikely(!auxent.push_back({ auxv_t::AT_ENTRY, (void*)hdr.e_entry })))
         panic_oom();
@@ -721,7 +721,7 @@ int process_t::run()
 
     __exception_jmp_buf_t *buf = ptr;
 
-    if (unlikely(!exit_jmpbufs.push_back(std::move(ptr))))
+    if (unlikely(!exit_jmpbufs.push_back(ext::move(ptr))))
         return -1;
 
     state = state_t::running;
@@ -776,10 +776,10 @@ void process_t::destroy()
     ext::string empty_path;
     empty_path.swap(path);
 
-    std::vector<ext::string> empty_argv;
+    ext::vector<ext::string> empty_argv;
     empty_argv.swap(argv);
 
-    std::vector<ext::string> empty_env;
+    ext::vector<ext::string> empty_env;
     empty_env.swap(env);
 
     delete (contiguous_allocator_t*)linear_allocator;
@@ -845,7 +845,7 @@ bool process_t::del_thread(thread_t tid)
 {
     scoped_lock lock(process_lock);
 
-    thread_list::iterator it = std::find(threads.begin(), threads.end(), tid);
+    thread_list::iterator it = ext::find(threads.begin(), threads.end(), tid);
 
     if (unlikely(it == threads.end()))
         return false;

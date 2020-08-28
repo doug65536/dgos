@@ -46,7 +46,7 @@ struct shift_out_of_bounds_data;
 struct unreachable_data;
 struct invalid_value_data;
 
-#define __ubsan_report(...) printdbg("ubsan: " __VA_ARGS__)
+#define __ubsan_report(...) panic("ubsan: " __VA_ARGS__)
 
 extern "C"
 EXPORT void __ubsan_handle_add_overflow(

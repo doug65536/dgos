@@ -11,7 +11,7 @@
 #include "cxxiterator.h"
 #include "functional.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 template<typename _InputIt, typename _T>
 constexpr _InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
@@ -139,7 +139,7 @@ constexpr bool equal(_InputIt1 __first1, _InputIt1 __last1,
 template<typename _OutputIt, typename _Size, typename _T>
 constexpr _OutputIt fill_n(_OutputIt __first, _Size __count, _T const& __value)
 {
-    static_assert(is_integral<_Size>::value, "Must pass integral count");
+    static_assert(ext::is_integral<_Size>::value, "Must pass integral count");
 
     while (__count >= 16) {
         *__first = __value;
@@ -206,7 +206,7 @@ template<typename _InputIt, typename _OutputIt>
 constexpr _OutputIt uninitialized_copy(_InputIt __first, _InputIt __last,
                              _OutputIt __out)
 {
-    using T = typename remove_reference<decltype(*__out)>::type;
+    using T = typename ext::remove_reference<decltype(*__out)>::type;
     while (__first != __last) {
         new (&*__out) T(*__first);
         ++__out;
@@ -221,28 +221,24 @@ constexpr _OutputIt uninitialized_fill(_OutputIt __first, _OutputIt __last,
 {
     using T = decltype(*__first);
     while (__first != __last) {
-        new (&*__first) typename remove_reference<T>::type(__value);
+        new (&*__first) typename ext::remove_reference<T>::type(__value);
         ++__first;
     }
     return __first;
 }
 
-__END_NAMESPACE_STD
-__BEGIN_NAMESPACE_EXT
 template<typename _T, typename _OutputIt, typename... _Args>
 constexpr _OutputIt uninitialized_emplace(
         _OutputIt __first, _OutputIt __last, _Args&& ...__args)
 {
     using T = decltype(*__first);
     while (__first != __last) {
-        new (&*__first) typename std::remove_reference<T>::type(
-                    std::forward<_Args>(__args)...);
+        new (&*__first) typename ext::remove_reference<T>::type(
+                    ext::forward<_Args>(__args)...);
         ++__first;
     }
     return __first;
 }
-__END_NAMESPACE_EXT
-__BEGIN_NAMESPACE_STD
 
 template<typename _InputIt, typename _OutputIt>
 constexpr _OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
@@ -418,7 +414,7 @@ constexpr size_t hoare_partition(_T* __a, size_t __lo, size_t __hi,
             return __hi;
 
         ++quicksort_swp_count;
-        std::swap(__a[__lo], __a[__hi]);
+        ext::swap(__a[__lo], __a[__hi]);
 
         // Pivot follows the swap if it was involved
         __pivot = __pivot == &__a[__hi]
@@ -437,16 +433,16 @@ constexpr void quicksort(_T* a, size_t lo, size_t hi, _Compare&& __is_less)
 {
     if (lo < hi) {
         size_t p = hoare_partition(
-                    a, lo, hi, std::forward<_Compare>(__is_less));
-        quicksort(a, lo, p, std::forward<_Compare>(__is_less));
-        quicksort(a, p + 1, hi, std::forward<_Compare>(__is_less));
+                    a, lo, hi, ext::forward<_Compare>(__is_less));
+        quicksort(a, lo, p, ext::forward<_Compare>(__is_less));
+        quicksort(a, p + 1, hi, ext::forward<_Compare>(__is_less));
     }
 }
 
 __END_NAMESPACE
 
 template<typename _RandomIt,
-typename _V = typename iterator_traits<_RandomIt>::value_type>
+typename _V = typename ext::iterator_traits<_RandomIt>::value_type>
 constexpr void sort(_RandomIt __first, _RandomIt __last)
 {
     detail::quicksort_cmp_count = 0;
@@ -530,4 +526,4 @@ bool prev_permutation(_BidirIt __first, _BidirIt __last)
     }
 }
 
-__END_NAMESPACE_STD
+__END_NAMESPACE_EXT

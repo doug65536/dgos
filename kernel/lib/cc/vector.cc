@@ -1,6 +1,6 @@
 #include "vector.h"
 
-template class std::vector<char, std::allocator<char>>;
-template class std::vector<uint8_t, std::allocator<uint8_t>>;
-template class std::vector<char16_t, std::allocator<char16_t>>;
-template class std::vector<wchar_t, std::allocator<wchar_t>>;
+template class ext::vector<char, ext::allocator<char>>;
+template class ext::vector<uint8_t, ext::allocator<uint8_t>>;
+template class ext::vector<char16_t, ext::allocator<char16_t>>;
+template class ext::vector<wchar_t, ext::allocator<wchar_t>>;

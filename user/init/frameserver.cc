@@ -13,6 +13,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <unistd.h>
+#include <limits.h>
 
 #define BLITTER_DEBUG 0
 #if BLITTER_DEBUG
@@ -472,8 +473,8 @@ static _always_inline __m256i translate_block_specific_avx2(
 }
 
 _avx2
-static _always_inline __m256i translate_block_noop_avx2(fb_info_t const * restrict,
-                                         __m256i pixels)
+static _always_inline __m256i translate_block_noop_avx2(
+        fb_info_t const * restrict, __m256i pixels)
 {
     return pixels;
 }
@@ -1770,5 +1771,5 @@ int start_framebuffer()
 
     //return stress(info);
     while (true)
-        sleep(4000);
+        sleep(UINT_MAX);
 }

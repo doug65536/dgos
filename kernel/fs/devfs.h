@@ -78,7 +78,7 @@ struct dev_fs_t final
         }
     };
 
-    std::set<device_t, device_less_t> devices;
+    ext::set<device_t, device_less_t> devices;
 
     struct file_handle_t : public fs_file_info_t {
         enum type_t {
@@ -114,5 +114,5 @@ struct dev_fs_t final
         return files.emplace_back(reg);
     }
 
-    std::vector<dev_fs_file_reg_t*> files;
+    ext::vector<dev_fs_file_reg_t*> files;
 };

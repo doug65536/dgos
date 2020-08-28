@@ -83,7 +83,7 @@ public:
 // Aligned storage to defer construction
 template<typename T>
 using vga_reg_storage_t =
-typename std::aligned_storage<sizeof(T), alignof(T)>::type;
+typename ext::aligned_storage<sizeof(T), alignof(T)>::type;
 
 static vga_reg_storage_t<vga_conout_reg_t> vga_conout_reg_storage;
 static vga_reg_storage_t<vga_conerr_reg_t> vga_conerr_reg_storage;

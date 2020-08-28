@@ -100,7 +100,7 @@ static constexpr _always_inline _flatten uint8_t bit_popcnt_32(int32_t n)
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_lsb_set_64(int64_t(n));
 }
@@ -108,7 +108,7 @@ static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_lsb_set_32(int32_t(n));
 }
@@ -116,7 +116,7 @@ static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int16_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
     return bit_lsb_set_32(int32_t(uint16_t(n)));
 }
@@ -124,7 +124,7 @@ static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_lsb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_lsb_set_32(int32_t(uint8_t(n)));
 }
@@ -133,14 +133,14 @@ template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_lsb_set(T const& n)
 {
-    return bit_lsb_set_n(n, typename std::integral_constant<
+    return bit_lsb_set_n(n, typename ext::integral_constant<
                        uint8_t, sizeof(T)>::type());
 }
 
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_msb_set_64(int64_t(n));
 }
@@ -148,7 +148,7 @@ static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_msb_set_32(int32_t(n));
 }
@@ -156,7 +156,7 @@ static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int16_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
     return bit_msb_set_32(int32_t(uint16_t(n)));
 }
@@ -164,7 +164,7 @@ static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_msb_set_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_msb_set_32(int32_t(uint8_t(n)));
 }
@@ -173,7 +173,7 @@ template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_msb_set(T const& n)
 {
-    return bit_msb_set_n(n, typename std::integral_constant<
+    return bit_msb_set_n(n, typename ext::integral_constant<
                          uint8_t, sizeof(n)>::type());
 }
 
@@ -199,7 +199,7 @@ static constexpr _always_inline _flatten uint8_t bit_log2_n_32(int32_t n)
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_log2_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_log2_n_64(int64_t(n));
 }
@@ -207,7 +207,7 @@ static constexpr _always_inline _flatten uint8_t bit_log2_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_log2_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_log2_n_32(int32_t(n));
 }
@@ -215,7 +215,7 @@ static constexpr _always_inline _flatten uint8_t bit_log2_n(
 template<typename T>
 _const
 static constexpr _always_inline uint8_t bit_log2_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int16_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
     return bit_log2_n_32(int32_t(uint16_t(n)));
 }
@@ -223,7 +223,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_log2_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_log2_n_32(int32_t(uint8_t(n)));
 }
@@ -233,14 +233,14 @@ _const
 static constexpr _always_inline _flatten uint8_t bit_log2(T const& n)
 {
     assert(n != 0);
-    return bit_log2_n(n, typename std::integral_constant<
+    return bit_log2_n(n, typename ext::integral_constant<
                       uint8_t, sizeof(T)>::type());
 }
 
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int64_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
     return bit_popcnt_64(int64_t(n));
 }
@@ -248,7 +248,7 @@ static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int32_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
     return bit_popcnt_32(int32_t(n));
 }
@@ -256,7 +256,7 @@ static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int16_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
     return bit_popcnt_32(int32_t(uint16_t(n)));
 }
@@ -264,7 +264,7 @@ static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
 template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_popcnt_n(
-        T const& n, std::integral_constant<uint8_t, sizeof(int8_t)>::type)
+        T const& n, ext::integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
     return bit_popcnt_32(int32_t(uint8_t(n)));
 }
@@ -273,7 +273,7 @@ template<typename T>
 _const
 static constexpr _always_inline _flatten uint8_t bit_popcnt(T const& n)
 {
-    return bit_popcnt_n(n, typename std::integral_constant<
+    return bit_popcnt_n(n, typename ext::integral_constant<
                         uint8_t, sizeof(n)>::type());
 }
 

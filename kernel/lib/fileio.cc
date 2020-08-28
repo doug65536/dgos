@@ -54,12 +54,12 @@ struct filetab_t {
 C_ASSERT_ISPO2(sizeof(filetab_t));
 
 using file_table_lock_type = ext::noirq_lock<ext::spinlock>;
-using file_table_scoped_lock = std::unique_lock<file_table_lock_type>;
+using file_table_scoped_lock = ext::unique_lock<file_table_lock_type>;
 
 static file_table_lock_type file_table_lock;
 
 // Array of files
-static std::vector<filetab_t> file_table;
+static ext::vector<filetab_t> file_table;
 
 // First free
 static filetab_t *file_table_ff;
@@ -671,7 +671,7 @@ size_t path_t::len_of(size_t index) const
     return 0;
 }
 
-std::pair<char const *, char const *> path_t::range_of(size_t index) const
+ext::pair<char const *, char const *> path_t::range_of(size_t index) const
 {
     if (likely(index < nr_components)) {
         path_frag_t const& frag = components[index];
@@ -729,7 +729,7 @@ ext::string path_t::to_string() const
     for (size_t i = 0; i < nr_components; ++i) {
         if (i > 0)
             s.push_back('/');
-        std::pair<char const *, char const *> range = range_of(i);
+        ext::pair<char const *, char const *> range = range_of(i);
         s.append(range.first, range.second);
     }
 
@@ -768,7 +768,7 @@ user_str_t::user_str_t(const char *user_str)
 
 user_str_t::user_str_t(const char *user_str, size_t truncate_len, truncate_t)
 {
-    truncate_len = std::min(max_sz, truncate_len);
+    truncate_len = ext::min(max_sz, truncate_len);
     lenof_str = 0;
     if (likely(mm_copy_user(data.data, user_str, truncate_len)))
         lenof_str = truncate_len;

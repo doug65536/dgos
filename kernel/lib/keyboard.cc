@@ -19,10 +19,10 @@ struct keyboard_buffer_t {
     size_t tail;
 
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     lock_type lock;
-    std::condition_variable not_empty;
+    ext::condition_variable not_empty;
 };
 
 static keyboard_buffer_t keybd_buffer;
@@ -215,7 +215,7 @@ int keybd_event(keyboard_event_t event)
 }
 
 keyboard_event_t keybd_waitevent(
-        std::chrono::steady_clock::time_point const& timeout_time)
+        ext::chrono::steady_clock::time_point const& timeout_time)
 {
     keyboard_event_t event{};
 
@@ -223,7 +223,7 @@ keyboard_event_t keybd_waitevent(
 
     while (keybd_buffer.head == keybd_buffer.tail) {
         if (keybd_buffer.not_empty.wait_until(buffer_lock, timeout_time) ==
-                std::cv_status::timeout)
+                ext::cv_status::timeout)
             return event;
     }
 
@@ -236,7 +236,7 @@ keyboard_event_t keybd_waitevent(
 
 keyboard_event_t keybd_waitevent()
 {
-    return keybd_waitevent(std::chrono::steady_clock::
+    return keybd_waitevent(ext::chrono::steady_clock::
                            time_point::max());
 }
 

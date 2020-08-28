@@ -16,7 +16,7 @@ static dev_fs_t dev_fs;
 
 char const *dev_fs_t::name() const noexcept
 {
-    return "tmpfs";
+    return "devfs";
 }
 
 void dev_fs_t::unmount()

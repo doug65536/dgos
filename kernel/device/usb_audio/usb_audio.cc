@@ -49,7 +49,7 @@ protected:
 
 usb_audio_class_drv_t usb_audio_class_drv_t::usb_audio;
 
-static std::vector<usb_audio_dev_t*> audio_devs;
+static ext::vector<usb_audio_dev_t*> audio_devs;
 
 struct usb_audio_cs_iface {
     usb_desc_hdr_t hdr;

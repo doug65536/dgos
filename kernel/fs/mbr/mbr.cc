@@ -32,10 +32,10 @@ struct partition_tbl_ent_t {
 
 struct mbr_part_factory_t : public part_factory_t {
     constexpr mbr_part_factory_t();
-    std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
+    ext::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
-static std::vector<part_dev_t*> partitions;
+static ext::vector<part_dev_t*> partitions;
 
 constexpr mbr_part_factory_t::mbr_part_factory_t()
     : part_factory_t("mbr")
@@ -43,14 +43,14 @@ constexpr mbr_part_factory_t::mbr_part_factory_t()
     part_register_factory(this);
 }
 
-std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
+ext::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
 {
-    std::vector<part_dev_t *> list;
+    ext::vector<part_dev_t *> list;
 
     long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
     if (sector_size >= 512) {
-        std::unique_ptr<uint8_t[]> sector(new (ext::nothrow)
+        ext::unique_ptr<uint8_t[]> sector(new (ext::nothrow)
                                           uint8_t[sector_size]);
         memset(sector, 0, sector_size);
 
@@ -60,11 +60,12 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                 memcpy(ptbl, sector + 446, sizeof(ptbl));
 
                 for (int i = 0; i < 4; ++i) {
-                    std::unique_ptr<part_dev_t> part;
+                    ext::unique_ptr<part_dev_t> part;
 
                     switch (ptbl[i].system_id) {
                     case 0x0B:// fall thru
                     case 0x0C:
+                    case 0xEF:
                         // FAT32 LBA filesystem
                         part.reset(new (ext::nothrow) part_dev_t{});
                         part->drive = drive;
@@ -81,7 +82,7 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
 
                     case 0x83:
                         // Linux filesystem
-                        std::unique_ptr<uint8_t> ext_superblock =
+                        ext::unique_ptr<uint8_t> ext_superblock =
                                 new (ext::nothrow) uint8_t[sector_size];
 
                         if (drive->read_blocks(ext_superblock, 1,

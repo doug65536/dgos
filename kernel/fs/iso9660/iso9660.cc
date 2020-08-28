@@ -34,25 +34,7 @@ struct iso9660_fs_t final : public fs_base_ro_t {
         }
     };
 
-    struct dir_handle_t : public file_handle_t {
-    };
-
-    union handle_t {
-        file_handle_t file;
-        dir_handle_t dir;
-
-        handle_t(std::true_type)
-            : file()
-        {
-        }
-
-        handle_t(std::false_type)
-            : dir()
-        {
-        }
-    };
-
-    static pool_t<handle_t> handles;
+    static pool_t<file_handle_t> handles;
 
     struct path_key_t {
         char const *name;
@@ -193,8 +175,8 @@ struct iso9660_fs_t final : public fs_base_ro_t {
     uint8_t block_shift;
 };
 
-pool_t<iso9660_fs_t::handle_t> iso9660_fs_t::handles;
-static std::vector<iso9660_fs_t*> iso9660_mounts;
+pool_t<iso9660_fs_t::file_handle_t> iso9660_fs_t::handles;
+static ext::vector<iso9660_fs_t*> iso9660_mounts;
 
 uint64_t iso9660_fs_t::dirent_size(iso9660_dir_ent_t const *de)
 {
@@ -625,7 +607,7 @@ fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
     if (iso9660_mounts.empty())
         iso9660_fs_t::handles.create(512);
 
-    std::unique_ptr<iso9660_fs_t> self(new (ext::nothrow) iso9660_fs_t);
+    ext::unique_ptr<iso9660_fs_t> self(new (ext::nothrow) iso9660_fs_t);
     if (self->mount(conn)) {
         if (unlikely(!iso9660_mounts.push_back(self)))
             return nullptr;
@@ -848,10 +830,12 @@ int iso9660_fs_t::opendirat(fs_file_info_t **fi,
     if (unlikely(!ptrec))
         return -int(errno_t::ENOENT);
 
-    dir_handle_t *dir = (dir_handle_t*)handles.alloc(std::false_type());
+    void *dir_memory = handles.alloc();
 
-    if (unlikely(!dir))
+    if (unlikely(!dir_memory))
         return -int(errno_t::EMFILE);
+
+    file_handle_t *dir = new (dir_memory) file_handle_t();
 
     dir->fs = this;
     dir->dirent = (iso9660_dir_ent_t *)lookup_sector(pt_rec_lba(ptrec));
@@ -871,7 +855,7 @@ ssize_t iso9660_fs_t::readdir(
         fs_file_info_t *fi,
         dirent_t *buf, off_t offset)
 {
-    dir_handle_t *dir = (dir_handle_t*)fi;
+    file_handle_t *dir = (file_handle_t*)fi;
 
     ssize_t dir_size = (ssize_t)dirent_size(dir->dirent);
 
@@ -901,7 +885,7 @@ ssize_t iso9660_fs_t::readdir(
 
 int iso9660_fs_t::releasedir(fs_file_info_t *fi)
 {
-    handles.free(&((handle_t*)fi)->dir);
+    handles.free(static_cast<file_handle_t*>(fi));
     return 0;
 }
 
@@ -915,26 +899,31 @@ int iso9660_fs_t::openat(fs_file_info_t **fi,
     if (unlikely((flags & O_CREAT) | ((flags & O_RDWR) == O_WRONLY)))
         return -int(errno_t::EROFS);
 
-    file_handle_t *file = (file_handle_t *)handles.alloc(std::true_type());
-    *fi = file;
+    void *handle_memory = handles.alloc();
 
-    file->fs = this;
+    if (unlikely(!handle_memory))
+        return -int(errno_t::ENOMEM);
 
-    file->dirent = lookup_dirent(path + (path[0] == '/'));
+    file_handle_t *handle = new (handle_memory) file_handle_t();
+    *fi = handle;
 
-    if (!file->dirent)
+    handle->fs = this;
+
+    handle->dirent = lookup_dirent(path + (path[0] == '/'));
+
+    if (unlikely(!handle->dirent))
         return -int(errno_t::ENOENT);
 
-    uint64_t lba = dirent_lba(file->dirent);
+    uint64_t lba = dirent_lba(handle->dirent);
 
-    file->content = (char*)lookup_sector(lba);
+    handle->content = (char*)lookup_sector(lba);
 
     return 0;
 }
 
 int iso9660_fs_t::release(fs_file_info_t *fi)
 {
-    handles.free(&((handle_t*)fi)->file);
+    handles.free(static_cast<file_handle_t*>(fi));
     return 0;
 }
 

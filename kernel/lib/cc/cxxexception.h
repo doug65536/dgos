@@ -1,7 +1,7 @@
 #pragma once
 #include "types.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 class exception;
 
@@ -61,11 +61,11 @@ public:
 };
 
 
-__END_NAMESPACE_STD
+__END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_EXT
 
-class cpu_exception : public std::exception {};
+class cpu_exception : public exception {};
 
 class gpf_exception : public cpu_exception {
 public:
@@ -86,7 +86,7 @@ __END_NAMESPACE_EXT
 // that pulls in too much stuff
 #if 0
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 class logic_error;
 class invalid_argument;

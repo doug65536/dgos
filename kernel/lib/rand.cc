@@ -100,7 +100,7 @@ void c4rand::write(void const *data, size_t len)
     // Keep going until we are both done and at index 0
     for (size_t ki = 0, i = 0; (i &= 0xFF) || !done; ++i) {
         b = (b + state[i] + key[ki]) & 0xFF;
-        std::swap(state[i], state[b]);
+        ext::swap(state[i], state[b]);
 
         // If we are at the end of the key, wrap around
         if (++ki >= len) {
@@ -119,7 +119,7 @@ void c4rand::read(void *data, size_t len)
     for (size_t i = 0; i < len; ++i) {
         a = (a + 1) & 0xFF;
         b = (b + state[a]) & 0xFF;
-        std::swap(state[a], state[b]);
+        ext::swap(state[a], state[b]);
         k[i] ^= state[(state[a] + state[b]) & 0xFF];
     }
 }

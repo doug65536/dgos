@@ -2,7 +2,7 @@
 #include "types.h"
 #include "type_traits.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 enum float_round_style {
     round_indeterminate       = -1,
@@ -65,7 +65,7 @@ class __basic_integral_numeric_limits
 {
 public:
     static constexpr bool is_specialized = true;
-    static constexpr bool is_signed = std::is_signed<T>::value;
+    static constexpr bool is_signed = ext::is_signed<T>::value;
     static constexpr bool is_integer = true;
     static constexpr bool is_exact = true;
     static constexpr bool has_infinity = false;
@@ -77,7 +77,7 @@ public:
     static constexpr bool is_iec559 = false;
     static constexpr bool is_bounded = true;
     static constexpr bool is_modulo = true;
-    static constexpr int digits = sizeof(T) * 8 - std::is_signed<T>::value;
+    static constexpr int digits = sizeof(T) * 8 - ext::is_signed<T>::value;
     static constexpr int digits10 = digits * __builtin_log10(2);
     static constexpr int max_digits10 = 0;
     static constexpr int radix = 2;

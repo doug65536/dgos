@@ -55,6 +55,10 @@ struct fat32_fs_t final : public fs_base_t {
         {
         }
 
+        virtual ~file_handle_t()
+        {
+        }
+
         // fs_file_info_t interface
         ino_t get_inode() const override
         {
@@ -170,9 +174,9 @@ struct fat32_fs_t final : public fs_base_t {
 
     static char *name_from_lfns(char *pathname, full_lfn_t const *full);
 
-    using lock_type = std::shared_mutex;
-    using read_lock = std::shared_lock<lock_type>;
-    using write_lock = std::unique_lock<lock_type>;
+    using lock_type = ext::shared_mutex;
+    using read_lock = ext::shared_lock<lock_type>;
+    using write_lock = ext::unique_lock<lock_type>;
 
     lock_type rwlock;
 
@@ -219,7 +223,7 @@ public:
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
-static std::vector<fat32_fs_t*> fat32_mounts;
+static ext::vector<fat32_fs_t*> fat32_mounts;
 
 static constexpr uint8_t dirent_size_shift =
         bit_log2(sizeof(fat32_dir_union_t));
@@ -758,7 +762,7 @@ off_t fat32_fs_t::walk_cluster_chain(
     cluster_t& c_clus = file->cached_cluster;
     off_t& c_ofs = file->cached_offset;
 
-    std::vector<cluster_t> sync_pending;
+    ext::vector<cluster_t> sync_pending;
 
     while (walked + block_size <= offset) {
         if (is_eof(fat[c_clus])) {
@@ -826,16 +830,17 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(
     cluster_t cluster = root_cluster;
     fat32_dir_union_t *de = nullptr;
 
-    if (dde)
+    if (dde) {
         *dde = &root_dirent;
+    }
 
     char const *name_st = pathname;
     char const *path_end = pathname + strlen(pathname);
 
+    name_st += ((name_st[0] == '/') ? 1 : 0);
+
     if (name_st == path_end)
         return &root_dirent;
-
-    name_st += ((name_st[0] == '/') ? 1 : 0);
 
     char const *name_en;
     for ( ; name_st < path_end; name_st = name_en + 1) {
@@ -1194,14 +1199,16 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
         }
     }
 
-    file_handle_t *file = handles.alloc();
+    void *file_memory = handles.alloc();
 
-    file->filename = path;
-
-    if (unlikely(!file)) {
+    if (unlikely(!file_memory)) {
         err = errno_t::EMFILE;
         return nullptr;
     }
+
+    file_handle_t *file = new (file_memory) file_handle_t();
+
+    file->filename = path;
 
     file->fs = this;
     file->dirent = &fde->short_entry;
@@ -1369,7 +1376,7 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    std::unique_ptr<char[]> sector_buffer =
+    ext::unique_ptr<char[]> sector_buffer =
             new (ext::nothrow) char[sector_size];
 
     if (!sector_buffer)
@@ -1443,12 +1450,12 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
             return nullptr;
     }
 
-    std::unique_ptr<fat32_fs_t> self(new (ext::nothrow) fat32_fs_t());
+    ext::unique_ptr<fat32_fs_t> self(new (ext::nothrow) fat32_fs_t());
 
     if (unlikely(!self))
         panic_oom();
 
-    if (self->mount(conn)) {
+    if (likely(self->mount(conn))) {
         if (unlikely(!fat32_mounts.push_back(self)))
             panic_oom();
         return self.release();
@@ -1591,7 +1598,7 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
 
 int fat32_fs_t::releasedir(fs_file_info_t *fi)
 {
-    handles.free((file_handle_t*)fi);
+    handles.free(static_cast<file_handle_t*>(fi));
     return 0;
 }
 
@@ -1766,7 +1773,7 @@ int fat32_fs_t::openat(fs_file_info_t **fi,
         file = create_handle(dirfi, path, flags, mode, err);
     }
 
-    if (!file)
+    if (unlikely(!file))
         return -int(err);
 
     *fi = file;

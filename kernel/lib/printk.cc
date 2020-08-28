@@ -281,7 +281,7 @@ static char *dtoa(char *txt, size_t txt_sz,
 static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
 using formatter_lock_type = ext::spinlock;
-using formatter_scoped_lock = std::unique_lock<formatter_lock_type>;
+using formatter_scoped_lock = ext::unique_lock<formatter_lock_type>;
 formatter_lock_type formatter_lock;
 
 /// emit_chars callback takes null pointer and a character,
@@ -841,12 +841,20 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
 {
     (void)unused;
 
+
     if (con_exists()) {
         if (s) {
-            if (c)
+            if (c) {
+                writedbg(s, c);
                 return con_write(s, c);
+            }
+
+            writedbg(s, strlen(s));
+
             return con_print(s);
         } else if (c) {
+            char ch = (char)c;
+            writedbg(&ch, 1);
             con_putc(c);
             return 1;
         }
@@ -858,7 +866,7 @@ static ext::noirq_lock<ext::spinlock> cprintf_lock;
 
 EXPORT int vcprintf(char const * restrict format, va_list ap)
 {
-    std::unique_lock<ext::noirq_lock<ext::spinlock>>
+    ext::unique_lock<ext::noirq_lock<ext::spinlock>>
             hold_cprintf_lock(cprintf_lock);
 
     int chars_written = 0;
@@ -878,9 +886,9 @@ EXPORT int vcprintf(char const * restrict format, va_list ap)
 EXPORT void printk(char const *format, ...)
 {
     va_list ap;
-    va_start(ap, format);
-    vprintdbg(format, ap);
-    va_end(ap);
+//    va_start(ap, format);
+//    vprintdbg(format, ap);
+//    va_end(ap);
     va_start(ap, format);
     vprintk(format, ap);
     va_end(ap);
@@ -911,7 +919,6 @@ EXPORT void vpanic(char const * restrict format, va_list ap)
 {
     printk("KERNEL PANIC! ");
     vprintk(format, ap);
-    printdbg(format, ap);
     cpu_debug_break();
     thread_panic_other_cpus();
     halt_forever();

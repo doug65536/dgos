@@ -14,7 +14,7 @@ public:
 private:
     intr_handler_t handler;
     ext::spinlock worker_lock;
-    std::condition_variable work;
+    ext::condition_variable work;
     ext::string name;
 };
 

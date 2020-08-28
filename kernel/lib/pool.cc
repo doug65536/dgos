@@ -25,7 +25,7 @@ EXPORT bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
     void *pool_mem = mmap(nullptr, size, PROT_READ | PROT_WRITE,
                           MAP_UNINITIALIZED);
 
-    if (!pool_mem || pool_mem == MAP_FAILED)
+    if (unlikely(!pool_mem || pool_mem == MAP_FAILED))
         return false;
 
     items = (char*)pool_mem;
@@ -65,14 +65,14 @@ EXPORT void *pool_base_t::item(uint32_t index)
 
 EXPORT void *pool_base_t::alloc()
 {
-    uint32_t *slot;
+    void *slot;
 
     scoped_lock lock(pool_lock);
 
     if (first_free != ~0U) {
         // Reuse freed item
         slot = (uint32_t*)item(first_free);
-        first_free = *slot;
+        memcpy(&first_free, slot, sizeof(first_free));
     } else if (item_count < item_capacity) {
         // Use a new slot
         slot = (uint32_t*)item(item_count++);
@@ -97,7 +97,8 @@ EXPORT void pool_base_t::free(uint32_t index)
     scoped_lock lock(pool_lock);
 
     void *item = items + (index * item_size);
-    *(uint32_t*)item = first_free;
+    // Patch next link index into block memory
+    memcpy(item, &first_free, sizeof(uint32_t));
     first_free = index;
 }
 

@@ -27,10 +27,12 @@ void malloc_startup(void*)
 
     // Allocate an array for per-cpu heap pointers using the BSP heap
     default_heaps = (heap_t**)heap_alloc(
-                default_heap, sizeof(*default_heaps) * 1);
+                default_heap, 1 * sizeof(*default_heaps));
 
     // Place the BSP heap pointer as the CPU0 heap
     default_heaps[0] = default_heap;
+
+    heap_count = 1;
 
     if (unlikely(!default_heaps))
         panic_oom();
@@ -65,7 +67,7 @@ static void malloc_startup_smp(void*)
     auto old_default_heaps = atomic_xchg(&default_heaps, new_default_heaps);
     atomic_st_rel(&heap_count, new_heap_count);
 
-    delete[] old_default_heaps;
+    heap_free(default_heaps[0], old_default_heaps);
 }
 
 REGISTER_CALLOUT(malloc_startup_smp, nullptr,
@@ -160,8 +162,8 @@ EXPORT void free(void *p)
 EXPORT char *strdup(char const *s)
 {
     size_t len = strlen(s);
-    char *b = new (ext::nothrow) char[len+1];
-    return (char*)memcpy(b, s, len+1);
+    char *b = (char*)malloc(len+1);
+    return b ? (char*)memcpy(b, s, len+1) : nullptr;
 }
 
 // banned throwing new, linker error please

@@ -62,8 +62,8 @@ public:
         }
     }
 
-    std::vector<ext::string> permit;
-    std::vector<ext::string> reject;
+    ext::vector<ext::string> permit;
+    ext::vector<ext::string> reject;
 };
 
 __END_NAMESPACE

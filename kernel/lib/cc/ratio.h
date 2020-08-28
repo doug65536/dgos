@@ -1,7 +1,7 @@
 #pragma once
 #include "types.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 namespace detail {
     static constexpr intmax_t gcd(intmax_t a, intmax_t b)

@@ -137,7 +137,7 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     unsigned tx_tail;
 
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
     lock_type lock;
 
     ethq_queue_t tx_queue;

@@ -33,7 +33,7 @@ public:
 private:
     friend class tmpfs_factory_t;
 
-    std::vector<char> names;
+    ext::vector<char> names;
 
     struct file_t {
         size_t name_ofs = 0;
@@ -127,7 +127,7 @@ private:
         char const *name = hdr->name();
         if (hdr->namesize == 11 &&
                 name[0] == 'T' &&
-                name[10] == '!' &&
+                name[8] == '!' &&
                 !memcmp(name, "TRAILER!!!", hdr->namesize))
             return nullptr;
 
@@ -145,7 +145,7 @@ private:
         return hdr->next(en);
     }
 
-    std::vector<file_t> files;
+    ext::vector<file_t> files;
     char const *st;
     char const *en;
 };
@@ -405,7 +405,7 @@ int tmpfs_fs_t::openat(fs_file_info_t **fi,
         if (file.name_hash == name_hash &&
                 file.name_sz == path_len + 1 &&
                 !memcmp(name, path, path_len)) {
-            std::unique_ptr<tmpfs_file_t> file(new (ext::nothrow)
+            ext::unique_ptr<tmpfs_file_t> file(new (ext::nothrow)
                                                tmpfs_file_t{});
             file->file_index = index;
             *fi = file.release();
@@ -637,7 +637,7 @@ bool tmpfs_startup(void *st, size_t sz)
     initrd_st = st;
     initrd_sz = sz;
 
-    std::unique_ptr<tmpfs_fs_t> fs(new (ext::nothrow) tmpfs_fs_t);
+    ext::unique_ptr<tmpfs_fs_t> fs(new (ext::nothrow) tmpfs_fs_t);
     fs_init_info_t info{};
     info.part_st = (uint64_t)st;
     info.part_len = sz;

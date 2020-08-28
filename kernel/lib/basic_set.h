@@ -17,7 +17,7 @@
 #define _BASIC_SET_TRACE(...) ((void)0)
 #endif
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 namespace detail {
 
@@ -113,11 +113,11 @@ public:
         assert(*__b_parent_ptr == __b);
 
         if (__a->__parent && __b->__parent) {
-            std::swap(*__a_parent_ptr, *__b_parent_ptr);
-            std::swap(__a->__parent, __b->__parent);
+            ext::swap(*__a_parent_ptr, *__b_parent_ptr);
+            ext::swap(__a->__parent, __b->__parent);
         }
-        std::swap(__a->__left, __b->__left);
-        std::swap(__a->__right, __b->__right);
+        ext::swap(__a->__left, __b->__left);
+        ext::swap(__a->__right, __b->__right);
     }
 
     static constexpr _T *__tree_max(_T *n)
@@ -770,7 +770,7 @@ public:
 template<typename _T, typename _U>
 struct __tree_value
 {
-    using type = std::pair<_T const, _U>;
+    using type = ext::pair<_T const, _U>;
     using key_type = _T const;
     using mapped_type = _U;
 
@@ -997,7 +997,7 @@ public:
     private:
         static_assert(_Dir == 1 || -_Dir == 1, "Unexpected direction");
         using owner_ptr_t = __basic_tree const *;
-        using node_ptr_t = typename std::conditional<_Is_const,
+        using node_ptr_t = typename ext::conditional<_Is_const,
             __node_t const *, __node_t *>::type;
 
         template<bool _is_const_inst>
@@ -1091,13 +1091,13 @@ public:
             return __curr->__item();
         }
 
-        typename std::conditional<_Is_const, const_reference, reference>::type
+        typename ext::conditional<_Is_const, const_reference, reference>::type
         operator*()
         {
             return __curr->__item();
         }
 
-        typename std::conditional<_Is_const, const_pointer, pointer>::type
+        typename ext::conditional<_Is_const, const_pointer, pointer>::type
         operator->() const
         {
             return __curr->__item_ptr();
@@ -1213,7 +1213,7 @@ public:
         , __first(__rhs.__first)
         , __last(__rhs.__last)
         , __current_size(__rhs.__current_size)
-        , __cmp(std::move(__rhs.__cmp))
+        , __cmp(ext::move(__rhs.__cmp))
     {
         __rhs.__root = nullptr;
         __rhs.__first = nullptr;
@@ -1243,7 +1243,7 @@ public:
         pair<iterator,bool> __ins = __insert_key(move(__key));
         if (likely(__ins.first != end()))
             return __tree_value_t::value(*__ins.first);
-        throw std::bad_alloc();
+        throw ext::bad_alloc();
     }
 
     template<typename _K>
@@ -1253,7 +1253,7 @@ public:
         pair<iterator,bool> __ins = __insert_key(__key);
         if (likely(__ins.first != end()))
             return __tree_value_t::value(*__ins.first);
-        throw std::bad_alloc();
+        throw ext::bad_alloc();
     }
 
     template<typename _K>
@@ -1262,7 +1262,7 @@ public:
         iterator __it = find(key);
         if (likely(__it != end()))
             return __tree_value_t::value(*__it);
-        throw std::out_of_range();
+        throw ext::out_of_range();
     }
 
     template<typename _K>
@@ -1271,7 +1271,7 @@ public:
         const_iterator __it = find(key);
         if (likely(__it != end()))
             return __tree_value_t::value(*__it);
-        throw std::out_of_range();
+        throw ext::out_of_range();
     }
 
     constexpr size_type size() const
@@ -1367,18 +1367,18 @@ public:
 
     constexpr size_type max_size()
     {
-        return std::numeric_limits<size_type>::max() /
+        return numeric_limits<size_type>::max() /
                 (sizeof(__node_t) + 32);
     }
 
     void swap(__basic_tree& __rhs)
     {
-        std::swap(__root, __rhs.__root);
-        std::swap(__first, __rhs.__first);
-        std::swap(__last, __rhs.__last);
-        std::swap(__current_size, __rhs.__current_size);
-        std::swap(__cmp, __rhs.__cmp);
-        std::swap(__alloc, __rhs.__alloc);
+        ext::swap(__root, __rhs.__root);
+        ext::swap(__first, __rhs.__first);
+        ext::swap(__last, __rhs.__last);
+        ext::swap(__current_size, __rhs.__current_size);
+        ext::swap(__cmp, __rhs.__cmp);
+        ext::swap(__alloc, __rhs.__alloc);
     }
 
     void clear();
@@ -1529,7 +1529,7 @@ private:
 
         // For debugger
         union __storage_t {
-            typename std::aligned_storage<
+            typename ext::aligned_storage<
                 sizeof(__item_type), alignof(__item_type)>::type __mem;
             __item_type __instance;
 
@@ -1965,8 +1965,8 @@ __basic_tree<_T, _V, _Compare, _Alloc>::operator=(__basic_tree &&__rhs)
     __current_size = __rhs.__current_size;
     __rhs.__current_size = 0;
 
-    __cmp = std::move(__rhs.__cmp);
-    __alloc = std::move(__rhs.__alloc);
+    __cmp = ext::move(__rhs.__cmp);
+    __alloc = ext::move(__rhs.__alloc);
 
     return *this;
 }
@@ -2384,7 +2384,7 @@ void __basic_tree<_T, _V, _Compare, _Alloc>::__swap_nodes(
     // Handle both cases with one implementation (__a is always parent)
     if (unlikely(__b == __a->__parent)) {
         assert(!"Unlikely eh?");
-        std::swap(__a, __b);
+        ext::swap(__a, __b);
     }
 
     // Find the pointer that points to A
@@ -2444,10 +2444,10 @@ void __basic_tree<_T, _V, _Compare, _Alloc>::__swap_nodes(
         // Neither is a direct descendent of the other
 
         // Trade children, parents, balances
-        std::swap(__a->__left, __b->__left);
-        std::swap(__a->__right, __b->__right);
-        std::swap(__a->__parent, __b->__parent);
-        std::swap(*__a_ptr, *__b_ptr);
+        ext::swap(__a->__left, __b->__left);
+        ext::swap(__a->__right, __b->__right);
+        ext::swap(__a->__parent, __b->__parent);
+        ext::swap(*__a_ptr, *__b_ptr);
 
         if (__a->__left)
             __a->__left->__parent = __a;
@@ -2459,7 +2459,7 @@ void __basic_tree<_T, _V, _Compare, _Alloc>::__swap_nodes(
             __b->__right->__parent = __b;
     }
 
-    std::swap(__a->__balance, __b->__balance);
+    ext::swap(__a->__balance, __b->__balance);
 }
 
 template<typename _T, typename _V, typename _Compare, typename _Alloc>
@@ -2708,16 +2708,12 @@ using map = __basic_tree<_K, _V, _C, _A>;
 
 //template<typename
 
-__END_NAMESPACE_STD
-
-__BEGIN_NAMESPACE_EXT
-
 using fast_tree_alloc_t = ext::bump_allocator<void, ext::page_allocator<char>>;
 
-template<typename _T, typename _C = std::less<_T>>
-using fast_set = std::set<_T, _C, fast_tree_alloc_t>;
+template<typename _T, typename _C = ext::less<_T>>
+using fast_set = set<_T, _C, fast_tree_alloc_t>;
 
-template<typename _K, typename _V, typename _C = std::less<_K>>
-using fast_map = std::map<_K, _V, _C, fast_tree_alloc_t>;
+template<typename _K, typename _V, typename _C = ext::less<_K>>
+using fast_map = map<_K, _V, _C, fast_tree_alloc_t>;
 
 __END_NAMESPACE_EXT

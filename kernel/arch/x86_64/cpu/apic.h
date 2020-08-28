@@ -27,6 +27,10 @@ uint64_t apic_timer_hw_oneshot(uint8_t &dcr_shadow, uint64_t icr);
 bool apic_enable(void);
 bool ioapic_irq_setcpu(int irq, int cpu);
 
+bool apic_request_pending(int intr);
+bool apic_request_in_service(int intr);
+bool apic_request_is_level(int intr);
+
 void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector);
 
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,

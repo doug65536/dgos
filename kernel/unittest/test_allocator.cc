@@ -77,8 +77,8 @@ public:
     void take(uintptr_t base, uintptr_t sz, block_data_t *block);
 
 private:
-    std::set<block_entry_t> blks;
-    std::set<free_entry_t> freeblks;
+    ext::set<block_entry_t> blks;
+    ext::set<free_entry_t> freeblks;
 };
 
 size_t block_data_t::size() const

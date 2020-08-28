@@ -251,7 +251,7 @@ public:
     uint32_t enqueue(T&& item)
     {
         size_t index = tail;
-        entries[tail] = std::move(item);
+        entries[tail] = ext::move(item);
         phase ^= set_tail(next(tail));
         return index;
     }
@@ -362,7 +362,7 @@ private:
 // asynchronous commands
 class nvme_detect_dev_ctx_t {
 public:
-    nvme_detect_dev_ctx_t(std::vector<storage_dev_base_t*>& list)
+    nvme_detect_dev_ctx_t(ext::vector<storage_dev_base_t*>& list)
         : identify_data(nullptr)
         , list(list)
         , cur_ns(0)
@@ -407,15 +407,15 @@ public:
     }
 
     void *identify_data;
-    std::vector<storage_dev_base_t*>& list;
+    ext::vector<storage_dev_base_t*>& list;
     uint8_t cur_ns;
 
 private:
     using lock_t = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_t>;
+    using scoped_lock = ext::unique_lock<lock_t>;
     uint64_t identify_data_physaddr;
     lock_t lock;
-    std::condition_variable done_cond;
+    ext::condition_variable done_cond;
     bool done;
 };
 
@@ -524,21 +524,21 @@ public:
 
 private:
     using lock_type = ext::noirq_lock<ext::spinlock>;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
 
     sub_queue_t sub_queue;
     cmp_queue_t cmp_queue;
 
     void wait_sub_queue_not_full(scoped_lock& lock_);
 
-    std::vector<nvme_cmp_t> cmp_buf;
+    ext::vector<nvme_cmp_t> cmp_buf;
 
-    std::vector<nvme_callback_t> cmp_handlers;
+    ext::vector<nvme_callback_t> cmp_handlers;
     uint64_t *prp_lists;
 
     lock_type lock;
-    std::condition_variable not_full;
-    std::condition_variable not_empty;
+    ext::condition_variable not_full;
+    ext::condition_variable not_empty;
     bool ready;
 };
 
@@ -549,7 +549,7 @@ class nvme_if_factory_t final : public storage_if_factory_t {
 public:
     nvme_if_factory_t();
 private:
-    virtual std::vector<storage_if_base_t*> detect(void) override final;
+    virtual ext::vector<storage_if_base_t*> detect(void) override final;
 };
 
 // NVMe interface instance
@@ -612,7 +612,7 @@ private:
     uint32_t host_buffer_size;
     uintptr_t host_buffer_physaddr;
 
-    std::vector<uint32_t> namespaces;
+    ext::vector<uint32_t> namespaces;
 
     using iocp_table_t = hashtbl_t<
         nvme_request_t,
@@ -622,7 +622,7 @@ private:
 
     iocp_table_t iocp_table;
 
-    std::unique_ptr<nvme_queue_state_t[]> queues;
+    ext::unique_ptr<nvme_queue_state_t[]> queues;
     bool use_msi;
 };
 
@@ -641,8 +641,8 @@ private:
     uint8_t log2_sectorsize;
 };
 
-static std::vector<nvme_if_t*> nvme_devices;
-static std::vector<nvme_dev_t*> nvme_drives;
+static ext::vector<nvme_if_t*> nvme_devices;
+static ext::vector<nvme_dev_t*> nvme_drives;
 
 nvme_if_factory_t::nvme_if_factory_t()
     : storage_if_factory_t("nvme")
@@ -650,9 +650,9 @@ nvme_if_factory_t::nvme_if_factory_t()
     storage_if_register_factory(this);
 }
 
-std::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
+ext::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 {
-    std::vector<storage_if_base_t *> list;
+    ext::vector<storage_if_base_t *> list;
 
     //return list;
 
@@ -676,7 +676,7 @@ std::vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 
         NVME_TRACE("found device!\n");
 
-        std::unique_ptr<nvme_if_t> self(new (ext::nothrow) nvme_if_t{});
+        ext::unique_ptr<nvme_if_t> self(new (ext::nothrow) nvme_if_t{});
 
         if (unlikely(!nvme_devices.push_back(self)))
             panic_oom();
@@ -722,13 +722,13 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     // and the I/O command queue for CPU 1 is queue[2], etc,
     // so provide a target CPU list that targets the MSI-X interrupts
     // appropriately, in case MSI-X is supported
-    std::vector<int> target_cpus(requested_vector_count);
+    ext::vector<int> target_cpus(requested_vector_count);
     target_cpus[0] = 0;
     for (size_t i = 1; i < requested_vector_count; ++i)
         target_cpus[i] = i - 1;
 
     // Prepare to use the same vector for all CPU-local queues
-    std::vector<int> vector_offsets(requested_vector_count, 1);
+    ext::vector<int> vector_offsets(requested_vector_count, 1);
     vector_offsets[0] = 0;
 
     // Try to use MSI(X) IRQ
@@ -859,7 +859,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     if (status != errno_t::OK)
         return error_occurred();
 
-    queue_count = std::min(requested_queue_count, max_queues);
+    queue_count = ext::min(requested_queue_count, max_queues);
 
     NVME_TRACE("Allocated queue count %zu\n", queue_count - 1);
 
@@ -954,7 +954,7 @@ void nvme_if_t::identify_ns_handler(
     uint32_t lba_format = ns_ident->lbaf[cur_format_index];
     uint8_t log2_sectorsize = NVME_NS_IDENT_LBAF_LBADS_GET(lba_format);
 
-    std::unique_ptr<nvme_dev_t> drive(new (ext::nothrow) nvme_dev_t{});
+    ext::unique_ptr<nvme_dev_t> drive(new (ext::nothrow) nvme_dev_t{});
 
     drive->init(this, namespaces[ctx->cur_ns], log2_sectorsize);
 
@@ -994,9 +994,9 @@ void nvme_if_t::cleanup_if()
 {
 }
 
-std::vector<storage_dev_base_t*> nvme_if_t::detect_devices()
+ext::vector<storage_dev_base_t*> nvme_if_t::detect_devices()
 {
-    std::vector<storage_dev_base_t*> list;
+    ext::vector<storage_dev_base_t*> list;
 
     NVME_TRACE("enumerating namespaces\n");
 
@@ -1099,7 +1099,7 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
         switch (request.op) {
         case nvme_op_t::read:
         case nvme_op_t::write:
-            chunk = std::min(bytes, size_t(0x10000));
+            chunk = ext::min(bytes, size_t(0x10000));
             range_count = mphysranges(ranges, countof(ranges),
                                       request.data, chunk, PAGE_SIZE);
 
@@ -1146,7 +1146,7 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
         }
 
         nvme_queue_state_t& queue = queues[queue_index];
-        queue.submit_cmd(std::move(cmd), &nvme_if_t::io_handler, request.iocp,
+        queue.submit_cmd(ext::move(cmd), &nvme_if_t::io_handler, request.iocp,
                          ranges, range_count);
     }
 
@@ -1208,7 +1208,7 @@ void nvme_if_t::setfeat_queues_handler(
     iocp_t* iocp = (iocp_t*)data;
     uint16_t max_sq = NVME_CMP_SETFEAT_NQ_DW0_NCQA_GET(packet.cmp_dword[0]);
     uint16_t max_cq = NVME_CMP_SETFEAT_NQ_DW0_NSQA_GET(packet.cmp_dword[0]);
-    max_queues = std::min(max_sq, max_cq) + 1;
+    max_queues = ext::min(max_sq, max_cq) + 1;
 
     errno_t err = status_to_errno(status_type, status);
 
@@ -1354,7 +1354,7 @@ void nvme_queue_state_t::submit_cmd(
     assert(index < cmp_handlers.size());
     cmp_handlers[index] = nvme_callback_t(callback, data);
 
-    sub_queue.enqueue(std::move(cmd));
+    sub_queue.enqueue(ext::move(cmd));
 }
 
 void nvme_queue_state_t::wait_sub_queue_not_full(scoped_lock& lock_)
@@ -1365,7 +1365,7 @@ void nvme_queue_state_t::wait_sub_queue_not_full(scoped_lock& lock_)
 
 void nvme_queue_state_t::advance_head(uint16_t new_head, bool need_lock)
 {
-    scoped_lock hold(lock, std::defer_lock_t());
+    scoped_lock hold(lock, ext::defer_lock_t());
 
     if (need_lock)
         hold.lock();

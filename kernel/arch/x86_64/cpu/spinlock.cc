@@ -24,7 +24,7 @@ EXPORT void spinlock_lock(spinlock_t *lock)
     cs_enter();
 
     // Try to immediately acquire lock, otherwise go into polling
-    while (atomic_cmpxchg(lock, 0, 1) != 0)
+    while (unlikely(atomic_cmpxchg(lock, 0, 1) != 0))
         cpu_wait_value(lock, 0);
 }
 

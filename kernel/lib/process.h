@@ -191,8 +191,8 @@ struct process_t
     };
 
     ext::string path;
-    std::vector<ext::string> argv;
-    std::vector<ext::string> env;
+    ext::vector<ext::string> argv;
+    ext::vector<ext::string> env;
     uintptr_t mmu_context = 0;
     void *linear_allocator = nullptr;
     uintptr_t tls_addr = 0;
@@ -201,16 +201,16 @@ struct process_t
     pid_t pid = 0;
     int uid = 0;
     int gid = 0;
-    using lock_type = std::mutex;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using lock_type = ext::mutex;
+    using scoped_lock = ext::unique_lock<lock_type>;
     lock_type process_lock;
-    std::condition_variable cond;
+    ext::condition_variable cond;
     int exitcode = -1;
     int cwd = -1;
     bool use64 = true;
 
-    using jmpbuf_ptr_t = std::unique_ptr<__exception_jmp_buf_t>;
-    using jmpbuf_list_t = std::vector<jmpbuf_ptr_t>;
+    using jmpbuf_ptr_t = ext::unique_ptr<__exception_jmp_buf_t>;
+    using jmpbuf_list_t = ext::vector<jmpbuf_ptr_t>;
     jmpbuf_list_t exit_jmpbufs;
 
     fd_table_t ids;
@@ -218,8 +218,8 @@ struct process_t
 
     static int spawn(pid_t * pid_result,
                      ext::string path,
-                     std::vector<ext::string> argv,
-                     std::vector<ext::string> env);
+                     ext::vector<ext::string> argv,
+                     ext::vector<ext::string> env);
     static process_t *init(uintptr_t mmu_context);
 
     void *get_allocator();
@@ -278,10 +278,10 @@ struct process_t
 private:
     friend __exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);
 
-    using thread_list = std::vector<thread_t>;
+    using thread_list = ext::vector<thread_t>;
     thread_list threads;
 
-    std::vector<file_mapping_t> file_maps;
+    ext::vector<file_mapping_t> file_maps;
 
     static process_t *lookup(pid_t pid);
 

@@ -85,9 +85,9 @@ class debug_out_t {
 public:
     // unsigned
     template<typename T>
-    _always_inline typename std::enable_if<
-        std::is_integral<T>::value && std::is_unsigned<T>::value &&
-        !std::is_same<T, bool>::value && !std::is_same<T, char>::value,
+    _always_inline typename ext::enable_if<
+        ext::is_integral<T>::value && ext::is_unsigned<T>::value &&
+        !ext::is_same<T, bool>::value && !ext::is_same<T, char>::value,
         debug_out_t&
     >::type
     operator<<(T const& rhs)
@@ -97,9 +97,9 @@ public:
 
     // signed
     template<typename T>
-    _always_inline typename std::enable_if<
-        std::is_integral<T>::value && std::is_signed<T>::value &&
-        !std::is_same<T, bool>::value && !std::is_same<T, char>::value,
+    _always_inline typename ext::enable_if<
+        ext::is_integral<T>::value && ext::is_signed<T>::value &&
+        !ext::is_same<T, bool>::value && !ext::is_same<T, char>::value,
         debug_out_t&
     >::type
     operator<<(T const& rhs)
@@ -117,7 +117,7 @@ public:
 
     // char const *
     template<typename T>
-    _always_inline typename std::enable_if<std::is_same<T,
+    _always_inline typename ext::enable_if<ext::is_same<T,
     char const *>::value, debug_out_t&>::type
     operator<<(T str)
     {
@@ -126,15 +126,15 @@ public:
 
     // pointer other than const char *
     template<typename T>
-    _always_inline typename std::enable_if<std::is_pointer<T>::value &&
-    !std::is_same<T, char const *>::value, debug_out_t&>::type
+    _always_inline typename ext::enable_if<ext::is_pointer<T>::value &&
+    !ext::is_same<T, char const *>::value, debug_out_t&>::type
     operator<<(T ptr)
     {
         return write_ptr(ptr);
     }
 
     template<typename _K, typename _V>
-    debug_out_t& operator<<(std::pair<_K, _V> const& __rhs)
+    debug_out_t& operator<<(ext::pair<_K, _V> const& __rhs)
     {
         return *this << '{' << __rhs.first << ',' << __rhs.second << '}';
     }

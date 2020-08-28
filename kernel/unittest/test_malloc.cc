@@ -25,7 +25,7 @@ UNITTEST(test_physalloc)
 
     uut.add_free_space(mem_base, mem_sz - mem_base);
 
-    std::vector<uintptr_t> pages;
+    ext::vector<uintptr_t> pages;
     eq(true, pages.reserve(uut.get_free_page_count()));
 
     for (size_t pass = 0; pass < 2; ++pass){
@@ -70,37 +70,37 @@ UNITTEST(test_contig_alloc_free)
 {
     contiguous_allocator_t uut;
 
-    //                                                                  +--+B
-    //                                                                  |  |
-    //                                                                 >+--+A
+    //                                                          +--+B
+    //                                                          |  |
+    //                                                         >+--+A
     //
-    //                                                          +--+9   +--+9
-    //                                                          |  |    |  |
-    //  +--+8   +--+8   +--+8   +--+8   +--+8   +--+8   +--+8  >|..|8   |  |
-    //  |  |    |  |    |  |    |  |    |  |    |  |    |  |    |  |    |  |
-    //  |  |    +--+7   +--+7   +--+7   +--+7   +--+7   +--+7   +--+7   +--+7
-    //  |  |    .  .
-    //  |  |    .  .                            +--+6   +--+6   +--+6   +--+6
-    //  |  |    .  .                            |  |    |  |    |  |    |  |
-    //  |  |    .  .            +--+5   +--+5  >|..|5   |  |    |  |    |  |
-    //  |  |    .  .            |  |    |  |    |  |    |  |    |  |    |  |
-    //  |  |    .  .           >+--+4   |..|4   |  |    |  |    |  |    |  |
-    //  |  |    .  .                    |  |    |  |    |  |    |  |    |  |
-    //  |  |    .  .                   >+--+3   +--+3   |..|    |  |    |  |
-    //  |  |    .  .                                    |  |    |  |    |  |
-    //  |  |    .  .    +--+2   +--+2   +--+2   +--+2  >|..|2   |  |    |  |
-    //  |  |    .  .    |  |    |  |    |  |    |  |    |  |    |  |    |  |
-    //  |  |    .  .   >+--+1   +--+1   +--+1   +--+1   +--+1   +--+1   +--+1
-    //  |  |    .  .
-    // >+--+0  <....
-    //  IA@0      A7    F1@1    F1@4    F1@3    F1@5    F1@1    F1@8    F1@8
-    //   a        b      c       d       e       f       g       h       i
-    //   |        |      |       |       |       |       |       |       |
-    //  Init    Alloc    | non-adjacent  | end-adjacent  |   adjacent    |
-    //                   |   in hole     |    in hole    |    at end     |
-    //                   |               |               |               |
-    //             non-adjacent    start-adjacent   close hole    non-adjacent
-    //               at start         in hole                         at end
+    //                                                   +--+9  +--+9
+    //                                                   |  |   |  |
+    //  +--+8  +--+8  +--+8  +--+8  +--+8  +--+8  +--+8 >|..|8  |  |
+    //  |  |   |  |   |  |   |  |   |  |   |  |   |  |   |  |   |  |
+    //  |  |   +--+7  +--+7  +--+7  +--+7  +--+7  +--+7  +--+7  +--+7
+    //  |  |   .  .
+    //  |  |   .  .                        +--+6  +--+6  +--+6  +--+6
+    //  |  |   .  .                        |  |   |  |   |  |   |  |
+    //  |  |   .  .          +--+5  +--+5 >|..|5  |  |   |  |   |  |
+    //  |  |   .  .          |  |   |  |   |  |   |  |   |  |   |  |
+    //  |  |   .  .         >+--+4  |..|4  |  |   |  |   |  |   |  |
+    //  |  |   .  .                 |  |   |  |   |  |   |  |   |  |
+    //  |  |   .  .                >+--+3  +--+3  |..|   |  |   |  |
+    //  |  |   .  .                               |  |   |  |   |  |
+    //  |  |   .  .   +--+2  +--+2  +--+2  +--+2 >|..|2  |  |   |  |
+    //  |  |   .  .   |  |   |  |   |  |   |  |   |  |   |  |   |  |
+    //  |  |   .  .  >+--+1  +--+1  +--+1  +--+1  +--+1  +--+1  +--+1
+    //  |  |   .  .
+    // >+--+0 <....
+    //  IA@0     A7   F1@1   F1@4   F1@3   F1@5   F1@1   F1@8   F1@8
+    //   a       b     c      d      e      f      g      h      i
+    //   |       |     |      |      |      |      |      |      |
+    //  Init   Alloc   | non-adjacent| end-adjacent|   adjacent  |
+    //                 |   in hole   |    in hole  |    at end   |
+    //                 |             |             |             |
+    //           non-adjacent  start-adjacent  close hole  non-adjacent
+    //             at start       in hole                     at end
     //
 
     // a) Space at 4MB line
@@ -431,7 +431,7 @@ DISABLED_UNITTEST(test_mmap_oom)
 
     constexpr size_t max_items = 256;
 
-    std::unique_ptr<item[]> items(new (ext::nothrow) item[max_items]());
+    ext::unique_ptr<item[]> items(new (ext::nothrow) item[max_items]());
     size_t item_count;
 
     for (size_t pass = 0; pass < 2; ++pass) {

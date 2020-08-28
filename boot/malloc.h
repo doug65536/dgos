@@ -50,7 +50,7 @@ void operator delete[](void *block) noexcept;
 void operator delete[](void *block, unsigned int);
 
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 
 struct nothrow_t {
     explicit nothrow_t() = default;
@@ -58,17 +58,10 @@ struct nothrow_t {
 enum class align_val_t : size_t {};
 extern nothrow_t const nothrow;
 
-__END_NAMESPACE_STD
-
-__BEGIN_NAMESPACE_EXT
-struct nothrow_t {
-    explicit nothrow_t() = default;
-};
-extern nothrow_t const nothrow;
 __END_NAMESPACE_EXT
 
-void* operator new[](size_t count, std::align_val_t alignment);
-void* operator new[](size_t count, std::align_val_t alignment,
+void* operator new[](size_t count, ext::align_val_t alignment);
+void* operator new[](size_t count, ext::align_val_t alignment,
     ext::nothrow_t const&) noexcept;
 void *operator new(size_t size, ext::nothrow_t const&) noexcept;
 void *operator new[](size_t size, ext::nothrow_t const&) noexcept;

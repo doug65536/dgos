@@ -830,17 +830,17 @@ struct hba_port_info_t {
     slot_request_t slot_requests[32] = {};
 
     // Wake every time a slot is released
-    std::condition_variable slotalloc_avail;
+    ext::condition_variable slotalloc_avail;
 
     // Wake when all slots are released
-    std::condition_variable idle_cond;
+    ext::condition_variable idle_cond;
 
     // Wake after a non-NCQ command finishes (when NCQ capable)
-    std::condition_variable non_ncq_done_cond;
+    ext::condition_variable non_ncq_done_cond;
 
     // Keep track of slot order
     using lock_type = ext::irq_mutex;
-    using scoped_lock = std::unique_lock<lock_type>;
+    using scoped_lock = ext::unique_lock<lock_type>;
     lock_type lock;
 
     // Set to true to block slot acquires to idle the controller for a
@@ -870,7 +870,7 @@ class ahci_if_factory_t final
 public:
     ahci_if_factory_t();
 private:
-    virtual std::vector<storage_if_base_t *> detect(void) override final;
+    virtual ext::vector<storage_if_base_t *> detect(void) override final;
 };
 
 int module_main(int argc, char const * const * argv)
@@ -961,7 +961,7 @@ private:
     bool use_64 = false;
     bool bypass_offline = false;
 
-    std::vector<acs_lba_range_t> queued_trim_ranges;
+    ext::vector<acs_lba_range_t> queued_trim_ranges;
 };
 
 // Drive
@@ -980,8 +980,8 @@ private:
     bool is_atapi;
 };
 
-static std::vector<ahci_if_t*> ahci_devices;
-static std::vector<ahci_dev_t*> ahci_drives;
+static ext::vector<ahci_if_t*> ahci_devices;
+static ext::vector<ahci_dev_t*> ahci_drives;
 
 bool ahci_if_t::supports_64bit()
 {
@@ -1122,8 +1122,8 @@ void ahci_if_t::handle_port_irq(unsigned port_num)
             // Take a snapshot of all pending commands
             slot_request_t pending[32];
             C_ASSERT(sizeof(pending) == sizeof(pi->slot_requests));
-            std::copy(std::begin(pi->slot_requests),
-                      std::end(pi->slot_requests), pending);
+            ext::copy(ext::begin(pi->slot_requests),
+                      ext::end(pi->slot_requests), pending);
 
             // Reissue each command in order
             for (uint8_t reissue = 0; reissue < num_cmd_slots; ++reissue) {
@@ -1767,7 +1767,7 @@ void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
     slot_request_t &request = pi->slot_requests[slot];
 
     if (likely(prdts != nullptr))
-        std::copy(prdts, prdts + countof(cmd_tbl_ent->prdts),
+        ext::copy(prdts, prdts + countof(cmd_tbl_ent->prdts),
                   cmd_tbl_ent->prdts);
     else
         memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
@@ -1997,9 +1997,9 @@ ahci_if_factory_t::ahci_if_factory_t()
     storage_if_register_factory(this);
 }
 
-std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
+ext::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 {
-    std::vector<storage_if_base_t *> list;
+    ext::vector<storage_if_base_t *> list;
 
     pci_dev_iterator_t pci_iter;
 
@@ -2044,7 +2044,7 @@ std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 
         //sleep(3000);
 
-        std::unique_ptr<ahci_if_t> self(new (ext::nothrow) ahci_if_t{});
+        ext::unique_ptr<ahci_if_t> self(new (ext::nothrow) ahci_if_t{});
 
         if (likely(self->init(pci_iter))) {
             if (likely(list.push_back(self.get()))) {
@@ -2070,9 +2070,9 @@ std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 //
 // device registration
 
-std::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
+ext::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 {
-    std::vector<storage_dev_base_t*> list;
+    ext::vector<storage_dev_base_t*> list;
 
     uint8_t port_num;
     for (unsigned ports_impl = ports_impl_mask; ports_impl;
@@ -2083,7 +2083,7 @@ std::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 
         if (port->sig == ahci_sig_t::SATA_SIG_ATA ||
                 port->sig == ahci_sig_t::SATA_SIG_ATAPI) {
-            std::unique_ptr<ahci_dev_t> drive(new (ext::nothrow) ahci_dev_t{});
+            ext::unique_ptr<ahci_dev_t> drive(new (ext::nothrow) ahci_dev_t{});
 
             if (drive->init(this, port_num,
                             port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
@@ -2115,7 +2115,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
     port = dev_port;
     is_atapi = dev_is_atapi;
 
-    std::unique_ptr<ata_identify_t> identify =
+    ext::unique_ptr<ata_identify_t> identify =
             new (ext::nothrow) ata_identify_t;
 
     blocking_iocp_t block;

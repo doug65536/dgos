@@ -11,7 +11,7 @@ public:
     bool take(std::initializer_list<int> fds);
 
 private:
-    using scoped_lock_t = std::unique_lock<ext::spinlock>;
+    using scoped_lock_t = ext::unique_lock<ext::spinlock>;
     ext::spinlock alloc_lock;
 
     bool take_locked(int fd, scoped_lock_t& lock);

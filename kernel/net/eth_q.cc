@@ -105,7 +105,7 @@ EXPORT int ethq_init(void)
 static ext::noirq_lock<ext::spinlock> ethq_lock;
 EXPORT ethq_pkt_t *ethq_pkt_acquire(void)
 {
-    std::unique_lock<ext::noirq_lock<ext::spinlock>> lock(ethq_lock);
+    ext::unique_lock<ext::noirq_lock<ext::spinlock>> lock(ethq_lock);
 
     ethq_pkt_t *pkt = ethq_first_free;
 
@@ -117,7 +117,7 @@ EXPORT ethq_pkt_t *ethq_pkt_acquire(void)
 
 EXPORT void ethq_pkt_release(ethq_pkt_t *pkt)
 {
-    std::unique_lock<ext::noirq_lock<ext::spinlock>> lock(ethq_lock);
+    ext::unique_lock<ext::noirq_lock<ext::spinlock>> lock(ethq_lock);
 
     pkt->next = ethq_first_free;
     ethq_first_free = pkt;

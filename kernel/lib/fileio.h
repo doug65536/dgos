@@ -219,7 +219,7 @@ public:
     }
 
 private:
-    std::vector<pmd_t> entries;
+    ext::vector<pmd_t> entries;
 };
 
 // 64-bit
@@ -257,7 +257,7 @@ struct path_t {
 
     size_t len_of(size_t index) const;
 
-    std::pair<char const *, char const *> range_of(size_t index) const;
+    ext::pair<char const *, char const *> range_of(size_t index) const;
 
     bool is_abs() const;
 
@@ -290,7 +290,7 @@ private:
     bool absolute = false;
     bool unc = false;
 
-    typename std::aligned_storage<path_buf_sz, sizeof(char const*)>::type data;
+    typename ext::aligned_storage<path_buf_sz, sizeof(char const*)>::type data;
 };
 
 int file_create_socket();

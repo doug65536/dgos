@@ -42,5 +42,6 @@ void time_ofday_set_handler(time_ofday_handler_t handler);
 time_of_day_t time_ofday(void);
 
 uint64_t time_unix(time_of_day_t const& time);
+uint64_t time_unix_ms(time_of_day_t const& time);
 
 __END_DECLS
