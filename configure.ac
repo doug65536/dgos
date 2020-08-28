@@ -228,6 +228,7 @@ for flag in \
 		Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
+		Werror=parentheses \
 		Warray-bounds Wformat-overflow \
 		Wno-address-of-packed-member \
 		Wsuggest-override Wsuggest-attribute=format \
