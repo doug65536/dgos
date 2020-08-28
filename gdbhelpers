@@ -48,8 +48,8 @@ define startupbreakpoints
 
 	hbreak modload_load_symbols
 	commands
-		printf "Loading %s at 0x%lx",$rdi,$rsi
-		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
+		printf "Loading %s with offset 0x%lx",$rdi,$rdx
+		eval "add-symbol-file %s -o 0x%lx",$rdi,$rdx
 	end
 
 	set may-call-functions off
@@ -270,16 +270,19 @@ except:
 	end
 end
 
+define initsyms
+	add-symbol-file init
+end
+
 define modulesyms
 	set $midx = 0
 	set $mcount = loaded_modules.__sz
 	while $midx < $mcount
 		set $module_ptr = loaded_modules.__m[$midx++].__ptr
-		set $mname = (char const *)$module_ptr->module_name.__str.__m
+		set $mname = (uintptr_t)$module_ptr->module_name.__str.__m
 		set $maddr = (uintptr_t)$module_ptr->first_exec
-		print $mname
-		printf "Loading %s at 0x%lx",$mname,$maddr
-		#eval "add-symbol-file %s 0x%lx",$mname,$maddr
+		printf "Loading %s at 0x%lx\n",$mname,$maddr
+		eval "add-symbol-file %s 0x%lx",$mname,$maddr
 	end
 end
 
@@ -288,7 +291,7 @@ define modulelist
 	set $mcount = loaded_modules.__sz
 	while $midx < $mcount
 		set $module_ptr = loaded_modules.__m[$midx++].__ptr
-		set $mname = (char const *)$module_ptr->module_name.__str.__m
+		set $mname = (uintptr_t)$module_ptr->module_name.__str.__m
 		set $maddr = (uintptr_t)$module_ptr->first_exec
 		printf "0x%lx %s",$maddr,$mname
 	end
