@@ -250,7 +250,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
         time_of_day_timestamp = time_ns();
 
         // Flush trace
-        if (eainst_flush_ready)
+        if (unlikely(eainst_flush_ready))
             apic_send_ipi_noinst(-2, INTR_IPI_FL_TRACE);
     }
 
@@ -272,11 +272,34 @@ EXPORT time_of_day_t cmos_gettimeofday()
     return result;
 }
 
+static int cmos_test_thread(void *)
+{
+    uint64_t st_ns = time_ns();
+    uint64_t st_ut = time_unix_ms(time_ofday());
+
+    for (;;) {
+        uint64_t ns = time_ns();
+        uint64_t ut = time_unix_ms(time_ofday());
+
+        int64_t d_ns = ns - st_ns;
+        int64_t d_ut = ut - st_ut;
+
+        st_ns = ns;
+        st_ut = ut;
+
+        printdbg("ns=%+" PRId64
+                 ", ut=%+" PRId64
+                 "\n", d_ns / 1000000, d_ut);
+
+        thread_sleep_for(1000);
+    }
+}
+
 void cmos_init(void)
 {
     cmos_scoped_lock lock(cmos_lock);
 
-    irq_hook(8, cmos_irq_handler, "cmosrtc");
+    irq_hook(8, cmos_irq_handler, "cmos_rtc");
 
     // Set IRQ rate to 2Hz, just in case
     uint8_t cmos_status_a = cmos_read(CMOS_REG_STATUS_A, lock);
@@ -322,6 +345,9 @@ void cmos_init(void)
 
     // EOI just in case
     cmos_read(CMOS_REG_STATUS_C, lock);
+
+    thread_create(nullptr, cmos_test_thread, nullptr,
+                  "cmos-test", 0, false, false);
 
     irq_setcpu(8, -1);
     irq_setmask(8, true);
