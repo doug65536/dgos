@@ -55,6 +55,8 @@ void load_module(char const *path, char const *parameters = nullptr)
     if (unlikely(sz != read(fd, mem, sz)))
         err("Cannot read %" PRIu64 " bytes\n", sz);
 
+    close(fd);
+
     int status;
     char *needed = (char*)malloc(NAME_MAX);
     do {
@@ -72,8 +74,6 @@ void load_module(char const *path, char const *parameters = nullptr)
 
     if (unlikely(status < 0))
         err("Module failed to initialize with %d %d\n", status, errno);
-
-    close(fd);
 }
 
 
@@ -146,7 +146,7 @@ void start_fs_stress()
 
 int main(int argc, char **argv, char **envp)
 {
-    printf("init startup complete\n");
+    printf("init started\n");
 
     load_module("boot/unittest.km");
 
