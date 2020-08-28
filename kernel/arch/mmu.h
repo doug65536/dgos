@@ -51,6 +51,7 @@ extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
 #define PTE_EX_DEVICE_BIT   (PTE_AVAIL1_BIT+2)
 #define PTE_EX_WAIT_BIT     (PTE_AVAIL2_BIT+0)
 #define PTE_EX_FILEMAP_BIT  (PTE_AVAIL2_BIT+1)
+#define PTE_EX_DEMAND_BIT   (PTE_AVAIL2_BIT+2)
 
 // Size of multi-bit fields
 #define PTE_PK_BITS         4
@@ -96,6 +97,7 @@ extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
 #define PTE_EX_DEVICE       (1UL << PTE_EX_DEVICE_BIT)
 #define PTE_EX_WAIT         (1UL << PTE_EX_WAIT_BIT)
 #define PTE_EX_FILEMAP      (1UL << PTE_EX_FILEMAP_BIT)
+#define PTE_EX_DEMAND       (1UL << PTE_EX_DEMAND_BIT)
 
 // PAT configuration
 #define PAT_IDX_WB  0
@@ -322,7 +324,8 @@ static _always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)
 
 static _always_inline bool pte_is_sysmem(pte_t pte)
 {
-    return (pte & (PTE_PRESENT | PTE_EX_PHYSICAL | PTE_EX_DEVICE)) ==
+    return (pte & (PTE_PRESENT | PTE_EX_PHYSICAL |
+                   PTE_EX_DEVICE | PTE_EX_DEMAND)) ==
             PTE_PRESENT;
 }
 
@@ -330,10 +333,14 @@ static _always_inline bool pte_is_sysmem(pte_t pte)
 _const
 static _always_inline bool pte_is_demand(pte_t pte)
 {
-    // Demand paged pages are represented by a not present page
-    // that has a physaddr field equal to the highest possible physaddr
-    // That's 0x000FFFFFFFFFF000
-    return (pte & (PTE_ADDR | PTE_PRESENT)) == PTE_ADDR;
+    return pte & PTE_EX_DEMAND;
+}
+
+// True if device cache page
+_const
+static _always_inline bool pte_is_device(pte_t pte)
+{
+    return pte & PTE_EX_DEVICE;
 }
 
 // True if page of address space is dedicated to faulting on every access
@@ -343,7 +350,8 @@ static _always_inline bool pte_is_guard(pte_t pte)
     // Guard pages are represented by a not present page
     // that has a physaddr field of all 1's except 0 in MSB.
     // That's 0x0007FFFFFFFFF000
-    return (pte & (PTE_ADDR | PTE_PRESENT)) == ((PTE_ADDR >> 1) & PTE_ADDR);
+    return (pte & (PTE_ADDR | PTE_PRESENT | PTE_EX_DEMAND)) ==
+            ((PTE_ADDR >> 1) & PTE_ADDR);
 }
 
 __END_DECLS

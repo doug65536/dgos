@@ -234,6 +234,9 @@ size_t phys_mem_map_count;
 static physmem_range_t early_mem_ranges[128];
 static size_t usable_early_mem_ranges;
 
+// Physical page full of zeros
+static physaddr_t zeros_page;
+
 physaddr_t root_physaddr;
 static pte_t const * master_pagedir;
 static pte_t *current_pagedir;
@@ -838,7 +841,9 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 
     uintptr_t const err_code = ISR_CTX_ERRCODE(ctx);
 
+
     // Examine the error code
+    // Wait until here so person debugging can look at ptes
     if (unlikely(err_code & CTX_ERRCODE_PF_R)) {
         // Reserved bit violation?!
         mmu_dump_pf(err_code);
@@ -853,6 +858,26 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 
     pte_t pte = (present_mask >= 0x07) ? *ptes[3] : 0;
 
+    // If pte wait bit is set, spin on it until wait clears and retry
+    if (unlikely(pte & PTE_EX_WAIT)) {
+        // It doesn't make sense for a locked PTE to be present
+        assert(!(pte & PTE_PRESENT));
+
+        printdbg("Waiting for PTE\n");
+
+        // Wait for the wait bit to clear, but watch for an IPI
+        while ((pte = atomic_ld_acq(ptes[3])) & PTE_EX_WAIT) {
+            if (apic_request_pending(INTR_IPI_TLB_SHTDN))
+                mmu_tlb_perform_shootdown();
+            else
+                pause();
+        }
+
+        printdbg("Wait completed for PTE, restarting instruction\n");
+
+        return ctx;
+    }
+
     // Check for SMAP violation
     // (kernel accessing user mode memory with EFLAGS.AC==0)
     if (unlikely(ISR_CTX_REG_CS(ctx) == GDT_SEL_KERNEL_CODE64 &&
@@ -866,7 +891,41 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
     }
 
     // Check for lazy TLB shootdown
+    // Also handle write to read-only zeros page with demand commit mapping
     if (present_mask == 0xF) {
+        // If it is a write, and the page is demand commit, and the pte says
+        // read only, then commit a page and continue
+        if ((err_code & CTX_ERRCODE_PF_W) &&
+                (pte & (PTE_WRITABLE | PTE_EX_DEMAND | PTE_EX_WAIT)) ==
+                PTE_EX_DEMAND) {
+
+            physaddr_t page = phys_allocator.alloc_one();
+
+            assert(page != 0);
+
+            for (;;) {
+                pte_t replacement = (pte & ~PTE_ADDR & ~PTE_EX_DEMAND) |
+                        page |
+                        PTE_WRITABLE;
+
+                assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                        (zeros_page | PTE_WRITABLE));
+
+                // Restart instruction if PTE update completes successfully
+                if (likely(atomic_cmpxchg_upd(ptes[3], &pte, replacement)))
+                    return ctx;
+
+                if (unlikely(!((pte &
+                        (PTE_WRITABLE | PTE_EX_DEMAND | PTE_EX_WAIT)) ==
+                        (PTE_EX_DEMAND)))) {
+                    // It changed too much
+                    goto start_over;
+                }
+
+                // else try again
+            }
+        }
+
         // It is a not a lazy shootdown, if
         //  - there was a reserved bit violation, or,
         //  - there was a protection key violation, or,
@@ -911,10 +970,14 @@ isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
                 page_flags = PTE_PRESENT | PTE_ACCESSED;
             }
 
+            pte_t replacement = (pte & ~PTE_ADDR) |
+                    (page & PTE_ADDR) | page_flags;
+
+            assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                    (zeros_page | PTE_WRITABLE));
+
             // Update PTE and restart instruction
-            if (unlikely(atomic_cmpxchg(
-                             ptes[3], pte, (pte & ~PTE_ADDR) |
-                             (page & PTE_ADDR) | page_flags) != pte)) {
+            if (unlikely(atomic_cmpxchg(ptes[3], pte, replacement) != pte)) {
                 // Another thread beat us to it
                 mmu_free_phys(page);
                 page = 0;
@@ -1281,6 +1344,10 @@ void mmu_init()
     // This isn't actually used. #PF is fast-pathed in ISR handling
     intr_hook(INTR_EX_PAGE, mmu_page_fault_handler, "sw_page", eoi_none);
 
+    zeros_page = mmu_alloc_phys();
+    assert(zeros_page != 0);
+    memset(init_phys<void>(zeros_page), 0, PAGE_SIZE);
+
     malloc_startup(nullptr);
 
     assert(malloc_validate(false));
@@ -1305,8 +1372,15 @@ void mmu_init()
         if (PT0_PTR[i] == 0) {
             physaddr_t page = mmu_alloc_phys();
             clear_phys(page);
+
+            pte_t replacement = page | PTE_WRITABLE | PTE_PRESENT;
+
+            assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                    (zeros_page | PTE_WRITABLE));
+
             // Global bit MBZ in PML4e on AMD
-            PT0_PTR[i] = page | PTE_WRITABLE | PTE_PRESENT;
+            pte_t old_pte = atomic_xchg(&PT0_PTR[i], replacement);
+            assert(old_pte == 0);
         }
     }
 
@@ -1572,9 +1646,12 @@ static pte_t *mm_create_pagetables_aligned(
 
                 clear_phys(page);
 
-                pte_t new_pte = (page | page_flags) & global_mask;
+                pte_t replacement = (page | page_flags) & global_mask;
 
-                pte_t previous = atomic_cmpxchg(base + i, old, new_pte);
+                assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                        (zeros_page | PTE_WRITABLE));
+
+                pte_t previous = atomic_cmpxchg(base + i, old, replacement);
                 if (previous != old) {
                     assert(pte_is_sysmem(previous));
                     free_batch.free(page);
@@ -1786,7 +1863,12 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                 if (likely(!(flags & MAP_UNINITIALIZED)))
                     clear_phys(paddr);
 
-                pte_t old = atomic_xchg(base_pte + idx, paddr | page_flags);
+                pte_t replacement = paddr | page_flags;
+
+                assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                        (zeros_page | PTE_WRITABLE));
+
+                pte_t old = atomic_xchg(base_pte + idx, replacement);
 
                 if (old && (old & (PTE_PRESENT | PTE_EX_PHYSICAL)) ==
                     PTE_PRESENT)
@@ -1795,8 +1877,10 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                 return true;
             });
 
-            if (unlikely(!success))
+            if (unlikely(!success)) {
+                panic("Out of memory!\n");
                 return MAP_FAILED;
+            }
         } else if (!(flags & MAP_PHYSICAL)) {
             // Demand paged
 
@@ -1820,17 +1904,24 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
             if (paddr)
                 pte = paddr | page_flags;
 
+            assert((pte & (PTE_ADDR | PTE_WRITABLE)) !=
+                    (zeros_page | PTE_WRITABLE));
+
             if ((prot & (PROT_READ | PROT_WRITE)) &&
                     !(flags & MAP_NOCOMMIT)) {
                 if (paddr && (paddr & PTE_ADDR) != PTE_ADDR)
                     pte |= PTE_PRESENT;
+
+                assert((pte & (PTE_ADDR | PTE_WRITABLE)) !=
+                        (zeros_page | PTE_WRITABLE));
 
                 if (paddr && !(flags & (MAP_STACK | MAP_NOCOMMIT))) {
                     // Commit first page
                     pte = atomic_xchg(base_pte, pte);
 
                     ++ofs;
-                } else if (paddr && !(flags & MAP_NOCOMMIT)) {
+                } else if (paddr && MAP_STACK ==
+                           (flags & (MAP_STACK | MAP_NOCOMMIT))) {
                     // Commit last page
 
                     pte = atomic_xchg(base_pte + --end, pte);
@@ -1840,10 +1931,19 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                     free_batch.free(pte & PTE_ADDR);
             }
 
-            pte_t demand_fill = page_flags |
-                    ((prot & (PROT_READ | PROT_WRITE))
-                    ? PTE_ADDR
-                    : ((PTE_ADDR >> 1) & PTE_ADDR));
+            pte_t demand_fill;
+
+            if (!(flags & MAP_DEVICE))
+                demand_fill = (page_flags & ~PTE_WRITABLE) |
+                        ((prot & (PROT_READ | PROT_WRITE))
+                        ? (zeros_page | PTE_PRESENT | PTE_EX_DEMAND)
+                        : ((PTE_ADDR >> 1) & PTE_ADDR));
+            else
+                demand_fill = page_flags | PTE_ADDR;
+
+            assert((demand_fill & (PTE_ADDR | PTE_WRITABLE)) !=
+                    (zeros_page | PTE_WRITABLE));
+
             // Demand page fill
             for ( ; ofs < end; ++ofs) {
                 pte = demand_fill;
@@ -2064,10 +2164,16 @@ EXPORT void *mremap(
         new_size -= old_size;
         new_base = mm_create_pagetables_aligned(
                     new_st, new_size, 3, free_batch);
-        pte_t new_pte = (low ? PTE_USER : PTE_GLOBAL) |
-                PTE_WRITABLE | PTE_ADDR;
+        pte_t replacement = (low ? PTE_USER : PTE_GLOBAL) |
+                PTE_EX_DEMAND |
+                zeros_page;
+
+        assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                (zeros_page | PTE_WRITABLE));
+
         for (size_t i = 0, e = new_size >> PAGE_SCALE; i < e; ++i) {
-            pte_t pte = atomic_xchg(new_base + i, new_pte);
+            pte_t pte = atomic_xchg(new_base + i, replacement);
+
             if (unlikely(pte_is_sysmem(pte)))
                 free_batch.free(pte & PTE_ADDR);
         }
@@ -2083,7 +2189,9 @@ EXPORT void *mremap(
     size_t i, e;
     for (i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
         pte_t pte = atomic_xchg(old_pte[3] + i, 0);
+
         pte = atomic_xchg(new_base + i, pte);
+
         if (unlikely(pte_is_sysmem(pte)))
             free_batch.free(pte & PTE_ADDR);
     }
@@ -2264,26 +2372,43 @@ EXPORT int mprotect(void *addr, size_t len, int prot)
                 (*pt[1] & PTE_PRESENT) &&
                 (*pt[2] & PTE_PRESENT));
 
-        pte_t replace;
+        pte_t replacement;
         for (pte_t expect = *pt[3]; ; pause()) {
-            bool demand_paged = ((expect & demand_no_read) == demand_no_read);
+            bool guard = pte_is_guard(expect);
+            bool demand = pte_is_demand(expect);
 
             if (expect == 0)
                 return -1;
-            else if (demand_paged && (prot & PROT_READ))
-                // We are enabling read on demand paged entry
-                replace = (expect & ~clr_bits) |
-                        (set_bits & ~PTE_PRESENT) | PTE_ADDR;
-            else if (demand_paged && !(prot & (PROT_READ | PROT_WRITE)))
-                // We are disabling read on a demand paged entry
-                replace = (expect & demand_no_read & ~clr_bits) |
-                        (set_bits & ~PTE_PRESENT);
-            else
+            else if (guard && (prot & PROT_READ))
+                // We are transitioning from guard page to page that is present
+                replacement = (expect & ~clr_bits &
+                               ~PTE_ADDR & ~PTE_WRITABLE) |
+                        ((set_bits | PTE_PRESENT) & ~PTE_WRITABLE) |
+                        ((prot & PROT_WRITE) ? PTE_EX_DEMAND : 0) |
+                        zeros_page;
+            else if (guard && !(prot & (PROT_READ | PROT_WRITE)))
+                // We are disabling read on a guard
+                replacement = (expect & ~clr_bits & ~PTE_ADDR) |
+                        set_bits |
+                        demand_no_read;
+            else if (demand) {
+                if (prot != PROT_NONE)
+                    replacement = (expect & ~clr_bits & ~PTE_ADDR) |
+                            (prot & PTE_WRITABLE ? PTE_EX_DEMAND : 0) |
+                            zeros_page;
+                else
+                    replacement = (expect & ~clr_bits & ~PTE_ADDR) |
+                            (prot & PTE_WRITABLE ? PTE_EX_DEMAND : 0) |
+                            ((PTE_ADDR >> 1) & PTE_ADDR);
+            } else
                 // Just change permission bits
-                replace = (expect & ~clr_bits) | set_bits;
+                replacement = (expect & ~clr_bits) | set_bits;
+
+            assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                    (zeros_page | PTE_WRITABLE));
 
             // Try to update PTE
-            if (likely(atomic_cmpxchg_upd(pt[3], &expect, replace)))
+            if (likely(atomic_cmpxchg_upd(pt[3], &expect, replacement)))
                 break;
         }
 
@@ -2417,7 +2542,7 @@ EXPORT int madvise(void *addr, size_t len, int advice)
     while (pt[3] < end && pte_list_present(pt)) {
         bool need_invalidate = false;
 
-        pte_t replace;
+        pte_t replacement;
         for (pte_t expect = *pt[3]; ; pause()) {
             if (order_bits == pte_t(-1)) {
                 // Discarding
@@ -2426,10 +2551,13 @@ EXPORT int madvise(void *addr, size_t len, int advice)
                     page = expect & PTE_ADDR;
 
                     // Replace with demand paged entry
-                    replace = (expect | PTE_ADDR) & ~PTE_PRESENT;
+                    replacement = (expect & ~PTE_ADDR & ~PTE_WRITABLE) |
+                            ((expect & PTE_WRITABLE) ? PTE_EX_DEMAND : 0) |
+                            PTE_PRESENT |
+                            zeros_page;
 
                     if (unlikely(!atomic_cmpxchg_upd(
-                                     pt[3], &expect, replace))) {
+                                     pt[3], &expect, replacement))) {
                         continue;
                     }
 
@@ -2445,7 +2573,7 @@ EXPORT int madvise(void *addr, size_t len, int advice)
                 // Scan for at least one not-present pte
                 size_t i, e;
                 for (i = 0, e = len >> PAGE_SCALE; i < e; ++i) {
-                    if (!(pt[3][i] & PTE_PRESENT))
+                    if (!(pt[3][i] & PTE_PRESENT) || pte_is_demand(pt[3][i]))
                         break;
                 }
                 if (unlikely(i == e))
@@ -2487,15 +2615,23 @@ EXPORT int madvise(void *addr, size_t len, int advice)
 
                 success = phys_allocator.alloc_multiple(
                             len, [&](size_t idx, uint8_t, physaddr_t paddr) {
+                    if (!uninitialized)
+                        clear_phys(paddr);
+
                     pte_t pte = pt[3][idx];
-                    while (pte_is_demand(pte) || pte_is_guard(pte)) {
-                        assert(!(pte & PTE_PRESENT));
 
-                        if (!uninitialized)
-                            clear_phys(paddr);
+                    bool is_demand;
+                    bool is_guard;
 
-                        pte_t replacement = (pte & ~PTE_ADDR) |
-                            paddr | PTE_PRESENT;
+                    while ((is_demand = pte_is_demand(pte)) ||
+                           (is_guard = pte_is_guard(pte))) {
+                        pte_t replacement = (pte & ~PTE_ADDR &
+                                             ~PTE_EX_DEMAND) |
+                                (is_demand ? PTE_WRITABLE : 0) |
+                                paddr | PTE_PRESENT;
+
+                        assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                                (zeros_page | PTE_WRITABLE));
 
                         // If updating PTE succeeded, we want the page
                         if (likely(atomic_cmpxchg_upd(&pt[3][idx],
@@ -2503,22 +2639,28 @@ EXPORT int madvise(void *addr, size_t len, int advice)
                             return true;
 
                         // Unlikely racing change, retry...
-                        continue;
                     }
 
                     // Do not want the page
                     return false;
                 });
+
                 pt[3] += len >> PAGE_SCALE;
-                if (!success)
+
+                if (!success) {
+                    panic("Out of memory!\n");
                     return -1;
+                }
                 break;
             } else {
                 // Weak/Strong order
-                replace = (expect & ~(PTE_PTEPAT | PTE_PCD | PTE_PWT)) |
+                replacement = (expect & ~(PTE_PTEPAT | PTE_PCD | PTE_PWT)) |
                         order_bits;
 
-                if (likely(atomic_cmpxchg_upd(pt[3], &expect, replace))) {
+                assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                        (zeros_page | PTE_WRITABLE));
+
+                if (likely(atomic_cmpxchg_upd(pt[3], &expect, replacement))) {
                     need_invalidate = (bool)(expect & PTE_ACCESSED);
 
                     break;
@@ -2601,16 +2743,20 @@ EXPORT uintptr_t mphysaddr(void volatile const *addr)
     physaddr_t page = pte & PTE_ADDR;
 
     // If page is being demand paged
-    if (pte_is_demand(pte)) {
+    if (pte_is_device(pte) && !(present_mask & 0x8)) {
         // Commit a page
         page = mmu_alloc_phys();
+        assert(page != 0);
 
         clear_phys(page);
 
-        pte_t new_pte = (pte & ~PTE_ADDR) | page;
+        pte_t replacement = (pte & ~PTE_ADDR) | page;
 
-        if (atomic_cmpxchg_upd(ptes[3], &pte, new_pte))
-            pte = new_pte;
+        assert((replacement & (PTE_ADDR | PTE_WRITABLE)) !=
+                (zeros_page | PTE_WRITABLE));
+
+        if (atomic_cmpxchg_upd(ptes[3], &pte, replacement))
+            pte = replacement;
         else
             mmu_free_phys(page);
     } else if (!(pte & PTE_PRESENT)) {
@@ -3081,6 +3227,7 @@ uintptr_t mm_fork_kernel_text()
 
     // Clone root page directory
     physaddr_t page = mmu_alloc_phys();
+    assert(page != 0);
     mmu_map_page(uintptr_t(window), page, flags);
     cpu_page_invalidate(uintptr_t(window));
     memcpy(window, master_pagedir, PAGE_SIZE);
