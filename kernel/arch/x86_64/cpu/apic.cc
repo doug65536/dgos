@@ -1881,10 +1881,10 @@ int apic_init(int ap)
     if (cpuid_has_x2apic()) {
         if (!ap) {
             if (cpuid_is_kvm()) {
-                APIC_TRACE("Using KVM paravirtualized x2APIC\n");
+                printk("Using KVM paravirtualized x2APIC\n");
                 apic = lapic_any_t::create_kvm(&apic_instance);
             } else {
-                APIC_TRACE("Using x2APIC\n");
+                printk("Using x2APIC\n");
                 apic = lapic_any_t::create_x2(&apic_instance);
             }
         }
