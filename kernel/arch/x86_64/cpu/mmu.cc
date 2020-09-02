@@ -115,7 +115,7 @@ static uint64_t min_kern_addr = UINT64_C(0xFFFFFF8000000000);
 // Page tables for entire address, worst case, consists of
 //  68719476736 4KB pages  (134217728 PT pages,   0x8000000000 bytes, 512GB)
 //    134217728 2MB pages  (   262144 PD pages,     0x40000000 bytes,   1GB)
-//       262144 1GB pages  (      512 PDPT pages,     0x200000 bytes,   4MB)
+//       262144 1GB pages  (      512 PDPT pages,     0x200000 bytes,   2MB)
 //                         (        1 PML4 page,        0x1000 bytes,   4KB)
 
 
