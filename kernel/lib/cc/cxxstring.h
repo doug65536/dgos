@@ -329,21 +329,25 @@ public:
         return __str.back();
     }
 
+    _always_inline
     _CharT *data()
     {
         return __str.data();
     }
 
+    _always_inline
     _CharT const *data() const
     {
         return __str.data();
     }
 
+    _always_inline
     _CharT& operator[](size_type __index)
     {
         return __str[__index];
     }
 
+    _always_inline
     _CharT const& operator[](size_type __index) const
     {
         return __str[__index];
@@ -364,11 +368,13 @@ public:
         return __str.empty();
     }
 
+    _always_inline
     size_type size() const
     {
         return __str.size();
     }
 
+    _always_inline
     size_type length() const
     {
         return __str.size();
