@@ -1466,7 +1466,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
         if (thread->state == THREAD_IS_RUNNING) {
             // Replenish timeslice and reinsert it into ready queue
             thread->state = THREAD_IS_READY_BUSY;
-            thread->preempt_time = thread->used_time + 16000000;
+            thread->preempt_time = thread->used_time + 10000000;
             thread->timeslice_timestamp = now;
             sched_node.value().first = now;
             thread->schedule_node = cpu->ready_list
@@ -1526,7 +1526,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     // Program rescheduling interrupt for remainder of timeslice
     uint64_t timeslice = thread->preempt_time > thread->used_time
             ? thread->preempt_time - thread->used_time
-            : 32000000;
+            : 10000000;
 
     // If only idle thread or only one thread in addition to idle thread
     // then grant infinite timeslice
@@ -1548,8 +1548,16 @@ isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
             timeslice = next_sleep_expiry - now;
     }
 
-    if (timeslice < UINT64_MAX)
-        thread_set_timer(cpu->apic_dcr, timeslice);
+    // Update CPU usage accounting at least once per second
+    if (timeslice > 1000000000)
+        timeslice = 1000000000;
+
+    // At least 200 microseconds
+    if (timeslice < 200000)
+        timeslice = 200000;
+
+    //if (timeslice < UINT64_MAX)
+    thread_set_timer(cpu->apic_dcr, timeslice);
 
     thread_csw_fpu(ctx, cpu, outgoing, thread);
 
@@ -2247,7 +2255,7 @@ void thread_pcid_free(int pcid)
 
 EXPORT unsigned thread_cpu_usage_x1M(size_t cpu)
 {
-    return 100000000 - cpus[cpu].busy_percent_x1M;
+    return cpus[cpu].busy_percent_x1M;
 }
 
 void thread_add_cpu_irq_time(uint64_t tsc_ticks)

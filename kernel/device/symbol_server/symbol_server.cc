@@ -380,7 +380,7 @@ class symbol_server_t {
             unsigned usage_x1M_total = 0;
             unsigned cpus_active = 0;
             for (size_t cpu_nr = 0; cpu_nr < cpu_count; ++cpu_nr) {
-                unsigned usage_1M = 100000000 - thread_cpu_usage_x1M(cpu_nr);
+                unsigned usage_1M = thread_cpu_usage_x1M(cpu_nr);
                 usage_x1M_total += usage_1M;
                 cpus_active += (usage_1M != 0);
             }
