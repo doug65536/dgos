@@ -20,13 +20,13 @@ static void *stacktrace_xlat_fn_arg;
 using perf_token_table_t = ext::vector<ext::string>;
 
 // Key is address, value is symbol token
-using perf_symbol_table_t = ext::fast_map<uintptr_t, size_t>;
+using perf_symbol_table_t = ext::fast_map<uintptr_t, uintptr_t>;
 
 // Key is address, value is index into line vector
-using perf_line_table_t = ext::fast_map<uintptr_t, size_t>;
+using perf_line_table_t = ext::fast_map<uintptr_t, uintptr_t>;
 
 struct perf_line_detail_t {
-    intptr_t addr;
+    uintptr_t addr;
     uint32_t filename_token;
     uint32_t line_nr;
 };
@@ -35,6 +35,7 @@ using perf_line_vector_t = ext::vector<perf_line_detail_t>;
 
 struct perf_module_t {
     size_t size = 0;
+    // The keys in the symbol and line table are relative to min_addr
     uintptr_t min_addr = 0;
     perf_symbol_table_t syms;
     perf_line_table_t lines;
@@ -48,9 +49,14 @@ using perf_module_by_name_table_t = ext::fast_map<size_t, perf_module_t>;
 
 static perf_token_table_t perf_tokens;
 static perf_module_by_name_table_t perf_modules_by_name;
+
+// Keyed by module min_addr
 static perf_module_lookup_t perf_module_lookup;
+
 static perf_line_table_t perf_line_lookup;
 static perf_line_vector_t perf_line_detail;
+static perf_module_t *first_module;
+
 
 // When bit 0 is set, update is in progress
 // Incremented before and after updates
@@ -195,8 +201,104 @@ static perf_module_t &perf_module_by_symbol_filename(
     return mod;
 }
 
-static bool perf_load_line_symbols(char const *filename, uintptr_t min_addr,
-                                   ptrdiff_t size, uintptr_t base_adj,
+static bool perf_load_symbols(char const *filename,
+                              ptrdiff_t size,
+                              uintptr_t min_addr,
+                              uintptr_t base_adj = 0,
+                              uintptr_t natural_load_addr = 0,
+                              bool has_type_field = true)
+{
+    ext::unique_ptr<char[]> buf;
+    off_t sz;
+
+    if (unlikely(!perf_load_file(buf, sz, filename)))
+        return false;
+
+    perf_module_t &mod = perf_module_by_symbol_filename(filename, "-kallsyms");
+
+    // If it was new
+    if (first_module && !mod.size) {
+        // Share allocators with first module
+        mod.lines.share_allocator(first_module->lines);
+        mod.syms.share_allocator(first_module->syms);
+    } else {
+        first_module = &mod;
+    }
+
+    mod.size = size;
+    mod.min_addr = natural_load_addr + base_adj;
+
+    // Add entry to module base lookup
+    perf_module_lookup[mod.min_addr] = &mod;
+
+    // Parse the lines
+    char *end = buf.get() + sz;
+    char *next;
+
+    for (char *line = buf; line < end; line = next) {
+        char *eol = (char*)memchr(line, '\n', end - line);
+        eol = eol ? eol : end;
+        next = eol + 1;
+
+        char *line_iter = line;
+
+        unsigned long addr = strtoul(line_iter, &line_iter, 16);
+
+        // Fail if strtoul parse failed
+        if (unlikely(!line_iter))
+            return false;
+
+        bool is_absolute = false;
+
+        if (has_type_field) {
+            while (*line_iter == ' ')
+                ++line_iter;
+
+            for ( ; line_iter < eol; ++line_iter) {
+                if (*line_iter == 'a' || *line_iter == 'A') {
+                    is_absolute = true;
+                    break;
+                } else if (*line_iter != ' ') {
+                    break;
+                }
+            }
+
+            ++line_iter;
+        }
+
+        // Discard absolute symbols
+        if (unlikely(is_absolute))
+            continue;
+
+        // A symbol right at the beginning can't be a function
+        if (unlikely(!addr || addr < natural_load_addr))
+            continue;
+
+        addr -= natural_load_addr;
+        //addr += base;
+
+        while (likely(*line_iter == ' '))
+            ++line_iter;
+
+        char const *name_end = (char const *)memchr(
+                    line_iter, '[', eol - line_iter);
+        name_end = name_end ? line_iter - 1 : eol;
+
+        size_t symbol_token = perf_tokenize(line_iter, eol, false);
+        mod.syms[addr] = symbol_token;
+    }
+
+//    printdbg("%s symbols:\n", module_name.c_str());
+//    for (perf_symbol_table_t::value_type const& entry: mod.syms)
+//        printdbg("0x%016zx %s\n", entry.first, entry.second.c_str());
+
+    return true;
+}
+
+static bool perf_load_line_symbols(char const *filename,
+                                   ptrdiff_t size,
+                                   uintptr_t min_addr,
+                                   uintptr_t base_adj,
                                    intptr_t natural_min_addr = 0)
 {
     ext::unique_ptr<char[]> buf;
@@ -249,7 +351,7 @@ static bool perf_load_line_symbols(char const *filename, uintptr_t min_addr,
         while (line < end && *line <= ' ')
             ++line;
 
-        intptr_t address = 0;
+        uintptr_t address = 0;
         while (line < end &&
                ((*line >= '0' && *line <= '9') ||
                 (*line >= 'a' && *line <= 'f') ||
@@ -283,19 +385,15 @@ static bool perf_load_line_symbols(char const *filename, uintptr_t min_addr,
             name_en = line_file_en;
         }
 
-//        if (address < 0x400000)
-//            address += last_valid_address;
-//        else
-//            last_valid_address = address;
-
         // Drop weird addresses
 
+
         if (address < min_addr || address >= min_addr + size) {
-            printdbg("Dropped out of range symbol: %" PRIx64
-                     " not in range %#" PRIx64
-                     " - "
-                     "%#" PRIx64 "\n",
-                     address, min_addr, min_addr + size - 1);
+//            printdbg("Dropped out of range symbol: %" PRIx64
+//                     " not in range %#" PRIx64
+//                     " - "
+//                     "%#" PRIx64 "\n",
+//                     address, min_addr, min_addr + size - 1);
             continue;
         }
 
@@ -303,8 +401,10 @@ static bool perf_load_line_symbols(char const *filename, uintptr_t min_addr,
 
         size_t filename_token = perf_tokenize(name_st, name_en, false);
 
+        uintptr_t absolute_addr = address + natural_min_addr + base_adj;
+
         perf_line_detail_t line_detail = {
-            address,
+            absolute_addr,
             uint32_t(filename_token),
             uint32_t(line_nr)
         };
@@ -344,106 +444,22 @@ static bool perf_load_line_symbols(char const *filename, uintptr_t min_addr,
     return true;
 }
 
-static bool perf_load_symbols(char const *filename, uintptr_t min_addr,
-                              ptrdiff_t size, uintptr_t base_adj = 0,
-                              intptr_t natural_load_addr = 0,
-                              bool has_type_field = true)
-{
-    ext::unique_ptr<char[]> buf;
-    off_t sz;
-
-    if (unlikely(!perf_load_file(buf, sz, filename)))
-        return false;
-
-    perf_module_t &mod = perf_module_by_symbol_filename(filename, "-kallsyms");
-
-    mod.min_addr = natural_load_addr + base_adj;
-
-    // Add entry to module base lookup
-    perf_module_lookup[mod.min_addr] = &mod;
-
-    mod.size = size;
-
-    // Parse the lines
-    char *end = buf.get() + sz;
-    char *next;
-
-    for (char *line = buf; line < end; line = next) {
-        char *eol = (char*)memchr(line, '\n', end - line);
-        eol = eol ? eol : end;
-        next = eol + 1;
-
-        char *line_iter = line;
-
-        unsigned long addr = strtoul(line_iter, &line_iter, 16);
-
-        // Fail if strtoul parse failed
-        if (unlikely(!line_iter))
-            return false;
-
-        bool is_absolute = false;
-
-        if (has_type_field) {
-            while (*line_iter == ' ')
-                ++line_iter;
-
-            for ( ; line_iter < eol; ++line_iter) {
-                if (*line_iter == 'a' || *line_iter == 'A') {
-                    is_absolute = true;
-                    break;
-                } else if (*line_iter != ' ') {
-                    break;
-                }
-            }
-
-            ++line_iter;
-        }
-
-        // Discard absolute symbols
-        if (unlikely(is_absolute))
-            continue;
-
-        // A symbol right at the beginning can't be a function
-        if (unlikely(!addr))
-            continue;
-
-        addr -= mod.min_addr;
-        //addr += base;
-
-        while (likely(*line_iter == ' '))
-            ++line_iter;
-
-        char const *name_end = (char const *)memchr(
-                    line_iter, '[', eol - line_iter);
-        name_end = name_end ? line_iter - 1 : eol;
-
-        size_t symbol_token = perf_tokenize(line_iter, eol, false);
-        mod.syms[addr] = symbol_token;
-    }
-
-//    printdbg("%s symbols:\n", module_name.c_str());
-//    for (perf_symbol_table_t::value_type const& entry: mod.syms)
-//        printdbg("0x%016zx %s\n", entry.first, entry.second.c_str());
-
-    return true;
-}
 
 static void setup_sample(size_t cpu_nr)
 {
     if (unlikely(perf_rand.empty())) {
         printdbg("No performance counters, can't select event\n");
         return;
-
     }
 
     // higher scale = higher rate
     // lower shift = higher rate
 
-    int32_t random_offset = (perf_rand[cpu_nr].lfsr113_rand() & 0x3F) - 0x20;
+    //int32_t random_offset = (perf_rand[cpu_nr].lfsr113_rand() & 0x3F) - 0x20;
 
-    int64_t count = - perf_event_divisor - random_offset;
+    int64_t count = - perf_event_divisor;// - random_offset;
 
-    count = count < -1 ? count : -1;
+    count = count <= -1 ? count : -1;
 
     uint32_t evt = perf_event;
 
@@ -540,6 +556,7 @@ static perf_symbol_table_t::iterator lookup_symbol(uintptr_t addr)
     return sym_it;
 }
 
+// Called in NMI handler, careful!
 _hot
 static void perf_sample(int (*ip)(void*), size_t cpu_nr)
 {
@@ -597,33 +614,40 @@ EXPORT uint64_t perf_gather_samples(
 
     size_t line_detail_size = perf_line_detail.size();
 
+    // 128 bytes at a time
+    uint64_t row_totals[16];
+
     uint64_t grand = 0;
-    for (size_t i = 0; i < line_detail_size; ++i) {
-        uint64_t total = 0;
-        for (size_t k = 0; k < cpu_count; ++k) {
-            total += perf_data[k].samples[i];
-
-            if (zero)
-                perf_data[k].samples[i] >>= 1;
-        }
-        perf_work_buf[i].line_token = i;
-        perf_work_buf[i].value = total;
-        grand += total;
-    }
-
-    // Move all the nonzero values to the top
     size_t line_detail_used = 0;
-    for (size_t i = 0; likely(i < line_detail_size); ++i) {
-        // Don't touch zeros
-        if (unlikely(perf_work_buf[i].value)) {
-            // If it is not already in the right place...
-            if (likely(i != line_detail_used)) {
-                // swap it so the nonzero one is at top
-                ext::swap(perf_work_buf[i], perf_work_buf[line_detail_used]);
-            }
+    for (size_t i = 0; i < line_detail_size; i += 16) {
+        size_t remain = ext::min(line_detail_size - i, size_t(16));
 
-            // Grow result whether swapped or not
-            ++line_detail_used;
+        // Clear whole cache line of totals
+        for (size_t c = 0; c < remain; ++c)
+            row_totals[c] = 0;
+
+        for (size_t k = 0; k < cpu_count; ++k) {
+            auto samples = (uint64_t*)__builtin_assume_aligned(
+                        &perf_data[k].samples[i], 2048);
+
+            // Add (and conditionally zero) whole cache line of inputs
+            for (size_t c = 0; c < remain; ++c)
+                row_totals[c] += samples[c];
+
+            if (zero) {
+                for (size_t c = 0; c < remain; ++c)
+                    samples[c] = 0;
+            }
+        }
+
+        // Process whole cache line worth of values
+        for (size_t c = 0; c < remain; ++c) {
+            if (row_totals[c]) {
+                grand += row_totals[c];
+                perf_work_buf[line_detail_used].line_token = i + c;
+                perf_work_buf[line_detail_used].value = row_totals[c];
+                ++line_detail_used;
+            }
         }
     }
 
@@ -632,11 +656,11 @@ EXPORT uint64_t perf_gather_samples(
         return rhs.value < lhs.value;
     });
 
-    for (size_t i = 0; i < 16 && i < line_detail_size; ++i) {
+    for (size_t i = 0; i < 16 && i < line_detail_used; ++i) {
         perf_work_value_t &item = perf_work_buf[i];
 
-        if (item.value == 0)
-            break;
+//        if (item.value == 0)
+//            break;
 
         uint64_t fixed = grand ? 100000000 * item.value / grand : 0;
 
@@ -686,7 +710,6 @@ static void stacktrace_xlat(void *arg, void * const *ips, size_t count)
 }
 
 static void perf_update_all_cpus()
-
 {
     workq::enqueue_on_all_barrier([](size_t cpu_nr) {
         setup_sample(cpu_nr);
@@ -696,29 +719,41 @@ static void perf_update_all_cpus()
 EXPORT void perf_init()
 {
     size_t kernel_sz;
+
     kernel_sz = kernel_get_size();
 
+    uintptr_t kernel_min_addr = uintptr_t(__image_start);
+    uintptr_t kernel_natural_addr = 0xffffffff80000000;
+    uintptr_t kernel_adj = kernel_min_addr - kernel_natural_addr;
+
     perf_load_symbols("sym/kernel-generic-kallsyms",
-                      uintptr_t(__image_start),
                       kernel_sz,
-                      uintptr_t(__image_start) -
-                      0xffffffff80000000,
-                      0xffffffff80000000);
+                      kernel_min_addr,
+                      kernel_adj,
+                      kernel_natural_addr);
 
     perf_load_line_symbols("sym/kernel-generic-klinesyms",
-                           uintptr_t(__image_start),
                            kernel_sz,
-                           uintptr_t(__image_start) -
-                           0xffffffff80000000,
-                           0xffffffff80000000);
+                           kernel_min_addr,
+                           kernel_adj,
+                           kernel_natural_addr);
+
+    uintptr_t init_sz = 4 << 20;
+    uintptr_t init_min_addr = 0x400000;
+    uintptr_t init_natural_addr = 0x400000;
+    uintptr_t init_adj = 0;
 
     perf_load_symbols("sym/init-kallsyms",
-                      4<<20, uintptr_t(0x400000),
-                      0, uintptr_t(0x400000));
+                      init_sz,
+                      init_min_addr,
+                      init_adj,
+                      init_natural_addr);
 
     perf_load_line_symbols("sym/init-klinesyms",
-                           4<<20, uintptr_t(0x400000),
-                           0, uintptr_t(0x400000));
+                           init_sz,
+                           init_min_addr,
+                           init_adj,
+                           init_natural_addr);
 
     size_t mod_count = modload_get_count();
 
@@ -744,7 +779,10 @@ EXPORT void perf_init()
         symname.resize(symname.length() - 9);
         symname.append("-klinesyms");
 
-        perf_load_line_symbols(symname.c_str(), min_addr, size, base_adj);
+        perf_load_line_symbols(symname.c_str(),
+                               size,
+                               min_addr,
+                               base_adj);
     }
 
     printdbg("Loaded symbols for %zu modules"
@@ -929,6 +967,7 @@ EXPORT uint64_t perf_get_all()
     return CPU_MSR_PERFEVTSEL_EN |
             CPU_MSR_PERFEVTSEL_OS |
             CPU_MSR_PERFEVTSEL_USR |
+            //no effect CPU_MSR_PERFEVTSEL_HG_ONLY_GUEST |
             CPU_MSR_PERFEVTSEL_EDGE_n(perf_event_edge) |
             CPU_MSR_PERFEVTSEL_INV_n(perf_event_invert) |
             CPU_MSR_PERFEVTSEL_CNT_MASK_n(perf_count_mask) |
