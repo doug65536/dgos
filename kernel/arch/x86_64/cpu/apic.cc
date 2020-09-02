@@ -884,23 +884,37 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr, char const *hdr)
         ACPI_TRACE("IOAPIC found\n");
         if (ioapic_count < countof(ioapic_list)) {
             mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
+
+            ACPI_TRACE("IOAPIC at %#" PRIx32 "\n", ent->ioapic.addr);
+
             ioapic->addr = ent->ioapic.addr;
+
             ioapic->irq_base = ent->ioapic.irq_base;
+
             ioapic->id = ent->ioapic.apic_id;
+
+            ACPI_TRACE("Mapping IOAPIC\n");
+
             ioapic->ptr = (uint32_t*)mmap(
                         (void*)(uintptr_t)ent->ioapic.addr, 12,
                         PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL | MAP_NOCACHE |
                         MAP_WRITETHRU);
+
             if (unlikely(ioapic->ptr == MAP_FAILED))
                 panic_oom();
 
             ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
+
             uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
+
             entries = IOAPIC_VER_ENTRIES_GET(entries) + 1;
 
             ioapic->vector_count = entries;
+
             ioapic->base_intr = ioapic_alloc_vectors(entries);
+
+            ACPI_TRACE("Setting up IOAPIC\n");
 
             ioapic_reset(ioapic);
 
@@ -1148,11 +1162,14 @@ static void acpi_parse_rsdt()
     assert(acpi_rsdt_len <= (1 << 20));
 
     size_t len = acpi_rsdt_len ? acpi_rsdt_len : sizeof(acpi_sdt_hdr_t);
+
     acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
                 (void*)acpi_rsdt_addr, len,
                 PROT_READ, MAP_PHYSICAL);
+
     if (unlikely(rsdt_hdr == MAP_FAILED))
         panic_oom();
+
     if (unlikely(!acpi_mappings.push_back({uint64_t(rsdt_hdr), len})))
         panic_oom();
 
@@ -2986,9 +3003,11 @@ _always_optimize _flatten
 void lapic_kvm_t::paravirt_eoi() noexcept
 {
     uint32_t cpu_nr = thread_cpu_number();
+
     // It was not set, cannot do paravirtualized EOI
     if (unlikely(!atomic_btr(&cpus[cpu_nr].values[0], 0))) {
         printdbg("Paravirtualized EOI took slow path!\n");
+
         lapic_x2_t::write32(APIC_REG_EOI, 0);
     } else {
         printdbg("Paravirtualized EOI!\n");
