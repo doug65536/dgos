@@ -144,6 +144,19 @@ void start_fs_stress()
 //        printf("Error creating mouse thread\n");
 //}
 
+void syscall_perf_test()
+{
+    for (size_t iter = 0; iter < 16; ++iter) {
+        uint64_t st = __builtin_ia32_rdtsc();
+        for (size_t i = 0; i < 1000000; ++i)
+            raise(42);
+        uint64_t en = __builtin_ia32_rdtsc();
+        uint64_t el = en - st;
+        printf("One million syscalls in %lu cycles (%lu/call)\n",
+               el, el/1000000);
+    }
+}
+
 int main(int argc, char **argv, char **envp)
 {
     printf("init started\n");
@@ -212,15 +225,8 @@ int main(int argc, char **argv, char **envp)
 
     load_module("boot/symsrv.km");
 
-    for (size_t iter = 0; iter < 16; ++iter) {
-        uint64_t st = __builtin_ia32_rdtsc();
-        for (size_t i = 0; i < 1000000; ++i)
-            raise(42);
-        uint64_t en = __builtin_ia32_rdtsc();
-        uint64_t el = en - st;
-        printf("One million syscalls in %lu cycles (%lu/call)\n",
-               el, el/1000000);
-    }
+
+    //syscall_perf_test();
 
     //start_fs_stress();
 
