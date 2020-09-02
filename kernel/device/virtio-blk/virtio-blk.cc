@@ -276,8 +276,10 @@ int virtio_blk_if_t::per_queue_t::io(request_t *request)
         phys_ranges.resize(phys_ranges.size() * 2);
     }
 
-    if (unlikely(desc_chain.size() < range_count + 2))
-        desc_chain.resize(range_count + 2);
+    if (unlikely(desc_chain.size() < range_count + 2)) {
+        if (unlikely(!desc_chain.resize(range_count + 2)))
+            panic_oom();
+    }
 
     req_queue->alloc_multiple(desc_chain.data(), range_count + 2);
 
@@ -400,6 +402,7 @@ errno_t virtio_blk_if_t::io(
 {
    virtio_blk_if_t::request_t *request =
            new (ext::nothrow) virtio_blk_if_t::request_t;
+
    request->data = data;
    request->count = count;
    request->header.lba = lba;
