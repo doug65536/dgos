@@ -40,6 +40,11 @@
 #define DEBUG_CREATE_PT         0
 #define DEBUG_PAGE_TABLES       0
 #define DEBUG_PAGE_FAULT        0
+#if DEBUG_INVALIDATION
+#define TRACE_INVALIDATE(...) printdbg("invl: " __VA_ARGS__)
+#else
+#define TRACE_INVALIDATE(...) ((void)0)
+#endif
 
 #define PROFILE_PHYS_ALLOC      0
 #if PROFILE_PHYS_ALLOC
@@ -2279,7 +2284,7 @@ EXPORT int munmap(void *addr, size_t size)
             if (likely(pte & PTE_ACCESSED))
                 cpu_page_invalidate(a);
             else
-                printdbg("Skipped an invlpg!\n");
+                TRACE_INVALIDATE("Skipped an invlpg!\n");
         }
 
         assert(distance != 0);
@@ -2297,7 +2302,7 @@ EXPORT int munmap(void *addr, size_t size)
         if (combined_pte & PTE_ACCESSED)
             mmu_send_tlb_shootdown();
         else
-            printdbg("Skipped a tlb shootdown!\n");
+            TRACE_INVALIDATE("Skipped a tlb shootdown!\n");
     }
 
     contiguous_allocator_t *allocator =
@@ -2665,7 +2670,7 @@ EXPORT int madvise(void *addr, size_t len, int advice)
             any_invalidate = true;
             cpu_page_invalidate((uintptr_t)addr);
         } else {
-            //printdbg("Skipped an invlpg!\n");
+            TRACE_INVALIDATE("Skipped an invlpg!\n");
         }
 
         addr = (char*)addr + PAGE_SIZE;
@@ -2675,8 +2680,8 @@ EXPORT int madvise(void *addr, size_t len, int advice)
 
     if (any_invalidate)
         mmu_send_tlb_shootdown();
-//    else
-//        printdbg("Skipped a TLB shootdown!\n");
+    else
+        TRACE_INVALIDATE("Skipped a TLB shootdown!\n");
 
     return 0;
 }
