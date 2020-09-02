@@ -40,6 +40,8 @@
 #define DEBUG_CREATE_PT         0
 #define DEBUG_PAGE_TABLES       0
 #define DEBUG_PAGE_FAULT        0
+#define DEBUG_INVALIDATION      0
+
 #if DEBUG_INVALIDATION
 #define TRACE_INVALIDATE(...) printdbg("invl: " __VA_ARGS__)
 #else
