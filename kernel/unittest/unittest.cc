@@ -243,7 +243,7 @@ void unittest::unit::eq_str(const char *expect,
 {
     if (unlikely(strcmp(expect, value))) {
         dbgout << name << " expected \"" << expect << '"' <<
-        " but got " << value << '\n';
+            " but got " << value << '\n';
         fail(file, line);
     }
 }
