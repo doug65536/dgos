@@ -5,10 +5,6 @@
 #include "cxxstring.h"
 #include "debug.h"
 
-__thread int test_tls;
-__thread int test_tls_2;
-__thread int test_tls_3;
-
 unittest::unit *unittest::unit::list_st;
 unittest::unit *unittest::unit::list_en;
 
