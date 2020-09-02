@@ -2976,7 +2976,7 @@ lapic_kvm_t::~lapic_kvm_t()
 void lapic_kvm_t::write32(uint32_t offset, uint32_t val) noexcept
 {
     // Redirect EOI write to paravirtualized EOI
-    if (cpu_count && offset == APIC_REG_EOI)
+    if (likely(cpu_count && offset == APIC_REG_EOI))
         return paravirt_eoi();
 
     return lapic_x2_t::write32(offset, val);
