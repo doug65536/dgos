@@ -597,7 +597,7 @@ struct clear_phys_state_t {
     size_t cls_tlb_ver;
 
     // 3TB before end of address space
-    static constexpr linaddr_t addr = 0xFFFFFD0000000000;
+    static constexpr linaddr_t addr = -(3ULL << 40);    // 0xFFFFFD0000000000
 
     void clear(physaddr_t addr);
     void reserve_addr();
@@ -768,7 +768,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = true)
         return;
 
     // Must be asynchronous before SMP is fully up and running
-    if (unlikely(thread_get_id() < thread_get_cpu_count()))
+    if (unlikely((unsigned)thread_get_id() < thread_get_cpu_count()))
         synchronous = false;
 
     cpu_scoped_irq_disable irq_was_enabled;

@@ -52,18 +52,6 @@ static _always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
     return result;
 }
 
-static _always_inline uint32_t cpu_msr_get_hi(uint32_t msr)
-{
-    uint64_t result;
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        : "=d" (result)
-        : "c" (msr)
-        : "rax"
-    );
-    return result;
-}
-
 static _always_inline void cpu_msr_set(uint32_t msr, uint64_t value)
 {
     __asm__ __volatile__ (
