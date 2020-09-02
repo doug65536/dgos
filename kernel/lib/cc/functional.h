@@ -163,6 +163,18 @@ struct less
 };
 
 template<>
+struct less<ext::pair<uint64_t, uint64_t>>
+{
+    _always_inline
+    auto constexpr operator()(ext::pair<uint64_t, uint64_t> __lhs,
+                              ext::pair<uint64_t, uint64_t> __rhs) const
+    {
+        return ((uint128_t(__lhs.first) << 64) | __lhs.second) <
+                ((uint128_t(__rhs.first) << 64) | __rhs.second);
+    }
+};
+
+template<>
 struct less<void>
 {
     using is_transparent = ext::true_type;
