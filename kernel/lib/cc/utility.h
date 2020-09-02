@@ -151,12 +151,14 @@ constexpr bool operator>=(pair<_T1,_T2> const& __lhs,
 }
 
 template<typename _T>
+_always_inline
 constexpr _T min(_T const& __lhs, _T const& __rhs)
 {
     return __lhs <= __rhs ? __lhs : __rhs;
 }
 
 template<typename _T>
+_always_inline
 constexpr _T max(_T const& __lhs, _T const& __rhs)
 {
     return __rhs <= __lhs ? __lhs : __rhs;
