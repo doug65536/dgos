@@ -859,8 +859,10 @@ static void translate_pixels_generic32_avx2(
         }
 
         // Flush fill buffers because we didn't fill start of this cache line
-        if (count)
-            _mm_sfence();
+        _mm_sfence();
+
+        if (unlikely(!count))
+            return;
     }
 
     // Copy blocks of 32 pixels
