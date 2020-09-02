@@ -13,6 +13,8 @@
 #include "cpu/interrupts.h"
 #include "device/eainstrument.h"
 
+#define CMOS_TEST 0
+
 #define CMOS_ADDR_PORT  0x70
 #define CMOS_DATA_PORT  0x71
 
@@ -272,6 +274,7 @@ EXPORT time_of_day_t cmos_gettimeofday()
     return result;
 }
 
+#if CMOS_TEST
 static int cmos_test_thread(void *)
 {
     uint64_t st_ns = time_ns();
@@ -294,6 +297,7 @@ static int cmos_test_thread(void *)
         thread_sleep_for(1000);
     }
 }
+#endif
 
 void cmos_init(void)
 {
@@ -346,8 +350,10 @@ void cmos_init(void)
     // EOI just in case
     cmos_read(CMOS_REG_STATUS_C, lock);
 
+#if CMOS_TEST
     thread_create(nullptr, cmos_test_thread, nullptr,
                   "cmos-test", 0, false, false);
+#endif
 
     irq_setcpu(8, -1);
     irq_setmask(8, true);
