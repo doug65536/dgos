@@ -92,7 +92,7 @@ comp_area_t *comp_areas;
 size_t comp_areas_capacity;
 size_t comp_areas_size;
 
-bool grow_areas()
+static bool grow_areas()
 {
     size_t new_capacity;
 
@@ -113,7 +113,7 @@ bool grow_areas()
     return true;
 }
 
-bool area_insert_at(comp_area_t *area, size_t index)
+static bool area_insert_at(comp_area_t *area, size_t index)
 {
     if (unlikely(comp_areas_capacity == comp_areas_size)) {
         if (unlikely(!grow_areas()))
@@ -132,7 +132,7 @@ bool area_insert_at(comp_area_t *area, size_t index)
     return true;
 }
 
-void area_delete_at(size_t index)
+static void area_delete_at(size_t index)
 {
     assert(index < comp_areas_size);
 
@@ -169,7 +169,8 @@ static inline int max(int a, int b)
 }
 
 // Returns true if you should delete existing
-bool area_clip_pair(comp_area_t const *incoming, comp_area_t const *existing)
+static bool area_clip_pair(comp_area_t const *incoming,
+                           comp_area_t const *existing)
 {
     // Handle completely non-overlapping cases asap
 
@@ -274,7 +275,7 @@ bool area_clip_pair(comp_area_t const *incoming, comp_area_t const *existing)
     return true;
 }
 
-bool area_insert(comp_area_t *area)
+static bool area_insert(comp_area_t *area)
 {
     // Work backward from end, so inserted regions get ignored
     // Inserted regions couldn't possibly interfere with new area
@@ -424,7 +425,7 @@ void vga_console_ring_t::write(const char *data, size_t size,
     while (size) {
         size_t cp = 0;
 
-        while (size && cp < 16 && cp < row_remain) {
+        while (size && cp < cp_max && cp < row_remain) {
             codepoints[cp++] = utf8_to_ucs4_upd(data);
             --size;
         }
@@ -442,7 +443,7 @@ void vga_console_ring_t::write(const char *data, size_t size,
         // Doing 0th scanline of each glyph, then 1st of each, then 2nd, etc
 
         for (size_t y = 0; y < 16; ++y, row += width) {
-            // Up to 16 characters across
+            // Scanline
 
             uint32_t *out = row;
 
@@ -454,21 +455,19 @@ void vga_console_ring_t::write(const char *data, size_t size,
 
         // If at end of row
         if (out_x == ring_w) {
-            // Move to start of
-            out_x = 0;
-
             // Next row
+            out_x = 0;
             ++out_y;
 
-            // If out of range
             if (out_y == ring_h) {
+                // Past bottom of whole ring
                 // Bump back into range
                 --out_y;
 
                 // Make a new row
                 new_line(0);
             } else if (out_y == row_count) {
-                // Make a new row
+                // New row that has not been used yet
                 new_line(0);
             }
         }
