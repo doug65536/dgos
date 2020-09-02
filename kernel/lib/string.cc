@@ -6,7 +6,9 @@
 #include "assert.h"
 #include "cpu/nontemporal.h"
 
-#define USE_REP_STRING 1
+#if defined(__x86_64__) || defined(__i386__)
+#define USE_REP_STRING
+#endif
 
 #ifdef USE_REP_STRING
 EXPORT void memcpy_movsq(void *dest, void *src, size_t u64_count)
@@ -244,7 +246,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
     return dest;
 }
 
-#if USE_REP_STRING
+#ifdef USE_REP_STRING
 void clear64(void *dest, size_t n)
 {
     memset_stosq(dest, 0, n);
@@ -299,6 +301,19 @@ static _always_inline void memcpy64(char *&d, char const *&s, size_t count)
     );
 }
 
+#ifdef USE_REP_STRING
+EXPORT void *memcpy(void *dest, void const *src, size_t n)
+{
+    void *ret = dest;
+    __asm__ __volatile__ (
+        "rep movsb\n\t"
+        : "+D" (dest), "+S" (src), "+c" (n)
+        :
+        : "memory"
+    );
+    return ret;
+}
+#else
 EXPORT void *memcpy(void *dest, void const *src, size_t n)
 {
 #ifdef USE_REP_STRING
@@ -374,6 +389,7 @@ EXPORT void *memcpy(void *dest, void const *src, size_t n)
 
     return dest;
 }
+#endif
 
 static _always_inline void memcpy_byte_reverse(
         char *d, char const *s, size_t &count)
@@ -409,7 +425,7 @@ static _always_inline void memcpy64_reverse(
 static _always_inline void memcpy_reverse(
         void *dest, void const *src, size_t n)
 {
-#if USE_REP_STRING
+#ifdef USE_REP_STRING
     char *d = (char *)dest;
     char const *s = (char const *)src;
 

@@ -4,6 +4,10 @@
 #include "malloc.h"
 #include "assert.h"
 
+#ifdef __x86_64__
+#define USE_REP_STRING
+#endif
+
 size_t strlen(char const *src)
 {
     size_t len = 0;
@@ -215,36 +219,30 @@ void *memset(void *dest, int c, size_t n)
     return dest;
 }
 
+#ifdef USE_REP_STRING
 void *memcpy(void *dest, void const *src, size_t n)
 {
-#if 1
-    char *d = (char*)dest;
-    if ((n & 3) == 0) {
-        n >>= 2;
-        __asm__ __volatile__ (
-            "cld\n\t"
-            "rep movsl\n\t"
-            : "+S" (src)
-            , "+D" (d)
-            , "+c" (n)
-        );
-    } else {
-        __asm__ __volatile__ (
-            "cld\n\t"
-            "rep movsb\n\t"
-            : "+S" (src)
-            , "+D" (d)
-            , "+c" (n)
-        );
-    }
+    void *ret = dest;
+    __asm__ __volatile__ (
+        "rep movsb\n\t"
+        : "+D" (dest), "+S" (src), "+c" (n)
+        :
+        : "memory"
+    );
+    return ret;
+}
 #else
+void *memcpy(void *dest, void const *src, size_t n)
+{
     char *d = (char*)dest;
     char const *s = (char const *)src;
+
     while (n--)
         *d++ = *s++;
-#endif
+
     return dest;
 }
+#endif
 
 char *utf8_from_tchar(char *block)
 {
