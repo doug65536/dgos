@@ -161,8 +161,6 @@ int main(int argc, char **argv, char **envp)
 {
     printf("init started\n");
 
-    load_module("boot/unittest.km");
-
     // fixme: check ACPI
     load_module("boot/keyb8042.km");
 
@@ -208,7 +206,6 @@ int main(int argc, char **argv, char **envp)
                       PCI_SUBCLASS_STORAGE_ATA, -1))
         load_module("boot/ide.km");
 
-
     load_module("boot/iso9660.km");
     load_module("boot/gpt.km");
     load_module("boot/mbr.km");
@@ -225,6 +222,7 @@ int main(int argc, char **argv, char **envp)
 
     load_module("boot/symsrv.km");
 
+    load_module("boot/unittest.km");
 
     //syscall_perf_test();
 
