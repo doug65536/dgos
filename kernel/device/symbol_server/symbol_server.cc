@@ -387,7 +387,7 @@ class symbol_server_t {
             //usage_1k_total /= cpu_count;
             // Erase to EOL
             clear_to_eol();
-            port->wrstr("CPU usage: ");
+            port->wrstr("Current CPU usage: ");
 
             unsigned usage_fixed = usage_x1M_total / 1000000;
             unsigned usage_frac = usage_x1M_total % 1000000;
