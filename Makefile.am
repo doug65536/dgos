@@ -2769,13 +2769,57 @@ sym/$(1)-kallsyms: $(1) $$(top_srcdir)/Makefile.am
 		| $$(SORT) -u > "$$@"
 
 sym/$(1)-klinesyms: $(1) $$(top_srcdir)/Makefile.am
-	$$(OBJDUMP) --dwarf=decodedline "$$<" \
-		| $$(GREP) -v ':\s*file format' \
-		| $$(GREP) -P '^(\S+:)|(\S+\s+\d+\s+0x[0-9a-f]+)' \
-		| $$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+).*/* \2 \3/g' \
+	awk_file_per_line=( \
+		'BEGIN { name="" }' $$$$'\n' \
+		'{' $$$$'\n' \
+		'  file = $$$$1' $$$$'\n' \
+		'  line = $$$$2' $$$$'\n' \
+		'  addr = $$$$3' $$$$'\n' \
+		'  if (line ~ /[0-9]+/) {' $$$$'\n' \
+		'    if (addr ~ /[0-9a-fA-Fx]+/) {' $$$$'\n' \
+		'      print name " " line " " addr' $$$$'\n' \
+		'    }' $$$$'\n' \
+		'  } else if (file && !line && !addr) {' $$$$'\n' \
+		'	 name = file' $$$$'\n' \
+		'    print "reject: " $$$$0' $$$$'\n' \
+		'  }' $$$$'\n' \
+		'}' $$$$'\n' \
+		) \
+	&& awk_dedup_filename=( \
+		'BEGIN { prevname="" }' $$$$'\n' \
+		'{' $$$$'\n' \
+		'  name = $$$$1' $$$$'\n' \
+		'  line = $$$$2' $$$$'\n' \
+		'  addr = $$$$3' $$$$'\n' \
+		'  if (name == prevname) {' $$$$'\n' \
+		'    print "* " line " " addr' $$$$'\n' \
+		'  } else {' $$$$'\n' \
+		'    prevname = name' $$$$'\n' \
+		'    print name "\n* " $$$$2 " " $$$$3' $$$$'\n' \
+		'  }' $$$$'\n' \
+		'}' $$$$'\n' \
+		) \
+	&& $$(OBJDUMP) --dwarf=decodedline --wide "$$<" \
 		| $$(SED) -E 's/^CU: (.*)/\1/g' \
+		| $$(TEE) "$$@-raw" \
+		| $$(AWK) "$$$${awk_file_per_line[*]}" \
+		| $$(SORT) --key=1,1 --key=3,3 -s \
+		| $$(AWK) "$$$${awk_dedup_filename[*]}" \
 		> "$$@"
 
+#'  if (file ~ /:$$$$/) {' $$$$'\n' \
+#'    name = file' $$$$'\n' \
+#'  } else if (line ~ /^\d+$$$$/ &&' $$$$'\n' \
+#'      addr ~ /^0x[0-9a-fA-F]+/) {' $$$$'\n' \
+#'    print name " " line " " addr' $$$$'\n' \
+#'  }' $$$$'\n'
+
+
+#| $$(AWK) "$$$${awk_dedup_filename[*]}"
+
+#| $$(SED) -E 's/^(\S+)\s+([0-9]+)\s+(0x[0-9a-f]+).*/* \2 \3/g' \
+#| $$(GREP) -v ':\s*file format' \
+#| $$(GREP) -P '^(\S+:)|(\S+\s+\d+\s+0x[0-9a-f]+)' \
 #$$(TAIL) -n +1
 
 endef
