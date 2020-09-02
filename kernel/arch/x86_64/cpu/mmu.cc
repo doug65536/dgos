@@ -1171,6 +1171,12 @@ static bool mmu_init_pagedir(size_t idx, uint8_t log2_pagesz, physaddr_t paddr)
 
 void mmu_init()
 {
+    // just a curiosity, crashes in qemu-kvm
+//    uint64_t topmem = cpu_msr_get(CPU_MSR_TOPMEM);
+//    uint64_t topmem2 = cpu_msr_get(CPU_MSR_TOPMEM2);
+//    printdbg(" topmem=%16" PRIx64 "\n", topmem);
+//    printdbg("topmem2=%16" PRIx64 "\n", topmem2);
+
     // Hook IPI for TLB shootdown
     TRACE_INIT("Hooking TLB shootdown\n");
     intr_hook(INTR_IPI_TLB_SHTDN, mmu_tlb_shootdown_handler,

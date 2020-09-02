@@ -142,6 +142,9 @@
 #define CPU_MSR_MPERF   0xE7
 #define CPU_MSR_APERF   0xE8
 
+#define CPU_MSR_TOPMEM  0xC001001A
+#define CPU_MSR_TOPMEM2 0xC001001D
+
 //
 // CR0
 
