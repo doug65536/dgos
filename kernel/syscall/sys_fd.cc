@@ -465,7 +465,7 @@ int sys_openat(int dirfd, char const* pathname, int flags, mode_t mode)
         return err(id);
     }
 
-    p->ids.ids[fd] = id;
+    p->ids.ids[fd].set(id, flags);
     return fd;
 }
 
