@@ -783,6 +783,7 @@ static thread_t thread_create_with_state(
     // Kick other cpu if not this cpu
     if (thread_cpu_number() != cpu_nr)
         apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
+    // Hand over the cpu if new thread should run sooner than running thread
     else if (thread->sched_timestamp > 0 &&
              parent->sched_timestamp >= thread->sched_timestamp)
         thread_yield();
@@ -1057,7 +1058,7 @@ static thread_info_t *thread_choose_next(
          sleeping = next) {
         thread_info_t *sleeping_thread = (thread_info_t*)sleeping->second;
 
-        printdbg("Sleep ended for tid=%d\n", sleeping_thread->thread_id);
+        THREAD_TRACE("Sleep ended for tid=%d\n", sleeping_thread->thread_id);
 
         thread_state_t expect_state = (outgoing != sleeping_thread)
                 ? THREAD_IS_SLEEPING
@@ -1207,8 +1208,10 @@ void accumulate_time(cpu_info_t *cpu, thread_info_t *thread, uint64_t elapsed)
 {
     thread->used_time += elapsed;
 
+    // If it is not an idle thread
     if (uint32_t(thread->thread_id) > cpu_count)
         cpu->busy_ratio += elapsed;
+
     cpu->time_ratio += elapsed;
 
     // Normalize ratio to < 32768
