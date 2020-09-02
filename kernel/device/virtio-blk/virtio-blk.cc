@@ -218,8 +218,9 @@ void virtio_blk_factory_t::found_device(virtio_base_t *device)
 
 int virtio_blk_if_t::io(request_t *request)
 {
-    uint32_t cpu_nr = thread_cpu_number();
-    unsigned queue_nr = cpu_nr % queue_count;
+    unsigned queue_nr = queue_count > 1
+            ? thread_cpu_number() % queue_count
+            : 0;
 
     return per_queue[queue_nr].io(request);
 }
