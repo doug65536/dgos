@@ -1712,6 +1712,10 @@ static void *mouse_test(void *arg)
     int pos_x = 0, pos_y = 0;
 
     if (mouse >= 0) {
+        surface_draw(pos_x, pos_y,
+                     img->width, img->height,
+                     0, 0, img, info);
+
         size_t offset = 0;
         int packet;
 
