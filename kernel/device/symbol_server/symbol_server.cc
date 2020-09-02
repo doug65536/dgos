@@ -220,6 +220,12 @@ class symbol_server_t {
         if (top_rows++ > 16)
             return;
 
+        // space
+        //
+        // | %%% fileline function         |
+        // <-- func_ofs ->
+        // <------------- 96 -------------->
+
         char edited_name[128];
         size_t filename_len = strlen(filename);
         size_t name_len = strlen(name);
@@ -227,33 +233,34 @@ class symbol_server_t {
         char const *last_slash =
                 (char const *)memrchr(filename, '/', filename_len);
 
-        last_slash = last_slash ? last_slash : filename;
+        last_slash = last_slash ? last_slash + 1 : filename;
 
-        if (name_len < 96 - filename_len - 8) {
-            // Do nothing
-        } else {
+        ssize_t offset = ext::min(ssize_t(96 - name_len - filename_len - 8),
+                                  ssize_t(scroll_left));
+        offset = ext::max(ssize_t(0), offset);
 
-            ssize_t offset = ext::min(ssize_t(name_len - 96 - filename_len - 8),
-                                      ssize_t(scroll_left));
+        name = strncpy(edited_name,
+               name + offset,
+               96);
 
-            name = strncpy(edited_name,
-                   name + offset,
-                   96);
+        if (offset > 0)
+            memcpy(edited_name, "...", 3);
 
-            if (offset > 0)
-                memcpy(edited_name, "...", 3);
+        if (offset == scroll_left)
+            memcpy(edited_name + 96 - 3, "...", 3);
 
-            if (offset == scroll_left)
-                memcpy(edited_name + 96 - 3, "...", 3);
-        }
+        char fileline[96];
+        int fileline_len = snprintf(fileline, sizeof(fileline), "%s(%d)",
+                                    last_slash, line);
 
         char buf[128];
         int sz = snprintf(buf, sizeof(buf),
                           "\x1b" "[%zu;1H"
                           "\x1b" "[0K"
-                          "%3d.%06d%% %s(%d) %.96s\n",
+                          "%3d.%06d%% %s %.*s\n",
                           top_rows,
-                          percent, micropercent, last_slash, line, name);
+                          percent, micropercent, fileline,
+                          ext::max(0, 96 - fileline_len - 1), name);
         if (sz > 0)
             self->port->write(buf, size_t(sz));
     }
@@ -412,19 +419,19 @@ class symbol_server_t {
                     now + ext::chrono::seconds(1);
 
             if (auto_divisor) {
-                if (delta_samples <= 125)
+                if (delta_samples <= 1250)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 4));
-                else if (delta_samples <= 150)
+                else if (delta_samples <= 1500)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 2));
-                else if (delta_samples >= 2400)
+                else if (delta_samples >= 24000)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 8));
-                else if (delta_samples >= 1200)
+                else if (delta_samples >= 12000)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 4));
-                else if (delta_samples >= 600)
+                else if (delta_samples >= 6000)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 2));
             }
