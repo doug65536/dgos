@@ -147,6 +147,11 @@ AS_IF([test x"$HEAD" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find head])])
 AC_SUBST([HEAD])
 
+AC_CHECK_PROGS([TEE], [tee], [NOT_FOUND])
+AS_IF([test x"$TEE" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find tee])])
+AC_SUBST([TEE])
+
 AC_CHECK_PROGS([SORT], [sort], [NOT_FOUND])
 AS_IF([test x"$SORT" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find sort])])
