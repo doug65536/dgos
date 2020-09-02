@@ -48,35 +48,35 @@ UNITTEST(test_printk_types)
     ext::fill_n(buffer.data(), buffer.size(), 0xEE);
 
     len = snprintf(buffer.data(), buffer.size(),
-                       "%" PRId32, int32_t(-2310987654));
-    eq(11, len);
-    eq_str("-2310987654", buffer.data());
+                       "%" PRId32, int32_t(-231098765));
+    eq(10, len);
+    eq_str("-231098765", buffer.data());
 
     ext::fill_n(buffer.data(), buffer.size(), 0xEE);
 
     len = snprintf(buffer.data(), buffer.size(),
-                       "%" PRId64, int64_t(-2211180611367787214));
-    eq(20, len);
-    eq_str("-2211180611367787214", buffer.data());
+                       "%" PRId64, int64_t(-221118061136778721));
+    eq(19, len);
+    eq_str("-221118061136778721", buffer.data());
 
     ext::fill_n(buffer.data(), buffer.size(), 0xEE);
 
     len = snprintf(buffer.data(), buffer.size(),
                        "%" PRIu8, uint8_t(135));
-    eq(2, len);
-    eq_str("42", buffer.data());
+    eq(3, len);
+    eq_str("135", buffer.data());
 
     ext::fill_n(buffer.data(), buffer.size(), 0xEE);
 
     len = snprintf(buffer.data(), buffer.size(),
-                       "%" PRIu16, uint8_t(17495));
+                       "%" PRIu16, uint16_t(17495));
     eq(5, len);
     eq_str("17495", buffer.data());
 
     ext::fill_n(buffer.data(), buffer.size(), 0xEE);
 
     len = snprintf(buffer.data(), buffer.size(),
-                       "%" PRIu32, uint8_t(2310987654));
+                       "%" PRIu32, uint32_t(2310987654));
     eq(10, len);
     eq_str("2310987654", buffer.data());
 
