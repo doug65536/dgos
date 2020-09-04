@@ -759,7 +759,7 @@ errno_t module_t::apply_relocs()
         Elf64_Rela const *rela_ptr = rela_ptrs[rel_idx];
         size_t ent_count = rela_cnts[rel_idx];
         for (size_t i = 0; i < ent_count; ++i) {
-            void const *operand = (void*)(rela_ptr[i].r_offset + base_adj);
+            void *operand = (void*)(rela_ptr[i].r_offset + base_adj);
             Elf64_Word sym_idx = ELF64_R_SYM(rela_ptr[i].r_info);
             Elf64_Word sym_type = ELF64_R_TYPE(rela_ptr[i].r_info);
             char const * const type_txt = get_relocation_type(sym_type);
@@ -963,44 +963,58 @@ errno_t module_t::apply_relocs()
                 break;
 
 int32_common:
-                *(int32_t*)operand = value;
+                int32_t valuei32;
+                valuei32 = int32_t(value);
+                memcpy(operand, &valuei32, sizeof(valuei32));
                 if (unlikely(int64_t(value) != int32_t(value)))
                     goto truncated_common;
                 goto all_common;
 
 uint32_common:
-                *(uint32_t*)operand = uint32_t(value);
+                uint32_t valueu32;
+                valueu32 = int32_t(value);
+                memcpy(operand, &valueu32, sizeof(valueu32));
                 if (unlikely(value != uint32_t(value)))
                     goto truncated_common;
                 goto all_common;
 
 int16_common:
-                *(int16_t*)operand = int16_t(value);
+                int16_t valuei16;
+                valuei16 = int16_t(value);
+                memcpy(operand, &valuei16, sizeof(valuei16));
                 if (unlikely(int64_t(value) != int16_t(value)))
                     goto truncated_common;
                 goto all_common;
 
 uint16_common:
-                *(uint16_t*)operand = uint16_t(value);
+                uint16_t valueu16;
+                valueu16 = int16_t(value);
+                memcpy(operand, &valueu16, sizeof(valueu16));
                 if (unlikely(value != uint16_t(value)))
                     goto truncated_common;
                 goto all_common;
 
 int8_common:
-                *(int8_t*)operand = int8_t(value);
+                int8_t valuei8;
+                valuei8 = int8_t(value);
+                memcpy(operand, &valuei8, sizeof(valuei8));
                 if (unlikely(int64_t(value) != int8_t(value)))
                     goto truncated_common;
                 goto all_common;
 
 uint8_common:
-                *(uint8_t*)operand = uint8_t(value);
+                uint8_t valueu8;
+                valueu8 = uint8_t(value);
+                memcpy(operand, &valueu8, sizeof(valueu8));
                 ELF64_TRACE("%s=%#" PRIx64 "\n", type_txt, value);
                 if (unlikely(value != uint8_t(value)))
                     goto truncated_common;
                 goto all_common;
 
 int64_common:
-                *(int64_t*)operand = int64_t(value);
+                int64_t valuei64;
+                valuei64 = int64_t(value);
+                memcpy(operand, &valuei64, sizeof(valuei64));
                 goto all_common;
 
 all_common:
