@@ -219,6 +219,12 @@ struct isr_context_t {
     isr_gpr_context_t gpr;
 };
 
+struct isr_syscall_context_t {
+    uintptr_t user_rip;
+    uintptr_t user_flags;
+    uintptr_t user_rsp;
+};
+
 // Vector register numbers
 //  0-15 ->  xmm0[127:  0]-xmm15[127:  0]  (128)
 // 16-31 ->  ymm0[255:128]-ymm15[255:128]  (128)

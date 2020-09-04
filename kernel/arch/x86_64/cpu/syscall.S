@@ -236,6 +236,10 @@ syscall_entry:
     push_cfi %rcx
     .cfi_offset rip,-3*8
 
+    // Save syscall context pointer in cpu-local storage
+    // Permits a syscall to modify the return ip and sp
+    mov %rsp,%gs:CPU_INFO_SYSCALL_CTX_OFS
+
     // call IBPB or patched with nop if not available
     insn_fixup
     call protection_barrier_from_user
@@ -260,6 +264,9 @@ syscall_entry:
     // - we have user gs and still in kernel mode
     // - stack is switched to user stack in kernel mode
     cli
+
+    // Clear syscall context pointer
+    movq %rdx,%gs:CPU_INFO_SYSCALL_CTX_OFS(%rdx)
 
     // Restore return address
     pop_cfi %rcx
