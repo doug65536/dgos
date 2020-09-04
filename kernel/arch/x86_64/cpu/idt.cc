@@ -21,6 +21,7 @@
 #include "elf64.h"
 #include "perf.h"
 #include "utility.h"
+#include "legacy_pic.h"
 
 // Enforce that we use the correct value in syscall.S
 C_ASSERT(SYSCALL_RFLAGS == (CPU_EFLAGS_IF | 2));
@@ -179,7 +180,6 @@ static void idtr_load(table_register_64_t *table_reg)
 #endif
 
 extern "C" isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx);
-extern "C" isr_context_t *pic8259_dispatcher(int intr, isr_context_t *ctx);
 extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx);
 
 _constructor(ctor_ctors_ran) static void isr_lookup_init()
