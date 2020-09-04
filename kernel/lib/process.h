@@ -156,6 +156,8 @@ void process_set_allocator(process_t *process, void *allocator);
 
 __END_DECLS
 
+#define CLONE_FLAGS_DETACHED    1
+
 struct process_t
 {
     static constexpr uintptr_t min_addr = 0x400000;
@@ -210,8 +212,24 @@ struct process_t
     bool use64 = true;
 
     using jmpbuf_ptr_t = ext::unique_ptr<__exception_jmp_buf_t>;
-    using jmpbuf_list_t = ext::vector<jmpbuf_ptr_t>;
-    jmpbuf_list_t exit_jmpbufs;
+
+    struct user_thread_info_t {
+        user_thread_info_t()
+            : jmpbuf(new (ext::nothrow) __exception_jmp_buf_t())
+        {
+        }
+
+        user_thread_info_t(user_thread_info_t const&) = delete;
+        user_thread_info_t(user_thread_info_t&&) = default;
+
+        // Data
+        jmpbuf_ptr_t jmpbuf;
+        intptr_t exitcode = INTPTR_MIN;
+        bool detached = false;
+    };
+
+    using user_thread_list_t = ext::vector<user_thread_info_t>;
+    user_thread_list_t user_threads;
 
     fd_table_t ids;
     state_t state = state_t::unused;
@@ -228,10 +246,10 @@ struct process_t
     void destroy();
 
     _noreturn
-    static void exit(pid_t pid, int exitcode);
+    static void exit(pid_t pid, intptr_t exitcode);
 
     _noreturn
-    void exit_thread(thread_t tid, int exitcode);
+    void exit_thread(thread_t tid, void *exitcode);
 
     bool add_thread(thread_t tid, scoped_lock& lock);
     bool del_thread(thread_t tid);
@@ -254,6 +272,10 @@ struct process_t
 
     void *create_tls();
 
+    int detach(int tid);
+
+    int is_joinable(int tid);
+
     struct clone_data_t {
         process_t *process;
         void *sp;
@@ -262,15 +284,14 @@ struct process_t
         void *arg;
     };
 
-    size_t thread_index(thread_t tid, scoped_lock& lock) const noexcept
+    intptr_t thread_index(thread_t tid, scoped_lock& lock) const noexcept
     {
-        size_t i, e = threads.size();
-        for (i = 0; i < e; ++i) {
-            if (threads[i] == tid)
-                break;
-        }
-
-        return i < e ? i : ~0;
+        assert(lock.is_locked());
+        intptr_t i, e;
+        thread_list::value_type const *d;
+        for (i = 0, e = threads.size(), d = threads.data();
+             i < e && d[i] != tid; ++i);
+        return i < e ? i : -1;
     }
 
     __exception_jmp_buf_t *exit_jmpbuf(int tid, scoped_lock &lock);
@@ -291,12 +312,12 @@ private:
     static process_t *add_locked(scoped_lock const&);
     void remove();
     static process_t *add();
-    static int run(void *process_arg);
+    static intptr_t run(void *process_arg);
 
-    static int start_clone_thunk(void *clone_data);
-    int start_clone(clone_data_t const& clone_data);
+    static intptr_t start_clone_thunk(void *clone_data);
+    intptr_t start_clone(clone_data_t const& clone_data);
 
-    int run();
+    intptr_t run();
 };
 
 __exception_jmp_buf_t *process_get_exit_jmpbuf(

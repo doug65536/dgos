@@ -197,7 +197,7 @@ private:
     void freeze_one(gdb_cpu_t &cpu);
 
     _noreturn
-    static int gdb_thread(void*);
+    static intptr_t gdb_thread(void*);
 
     _noreturn
     _always_inline void gdb_thread();
@@ -958,7 +958,7 @@ void gdbstub_t::run()
 
             if (ISR_CTX_INTR(ctx) == INTR_EX_BREAKPOINT) {
                 // GDB expects us to have nudged RIP back to the breakpoint
-                ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
+                ISR_CTX_REG_RIP(ctx) = (intptr_t(*)(void*))
                         ((uint8_t*)ISR_CTX_REG_RIP(ctx) - 1);
             }
 
@@ -2527,7 +2527,7 @@ void gdb_cpu_ctrl_t::freeze_one(gdb_cpu_t& cpu)
     }
 }
 
-int gdb_cpu_ctrl_t::gdb_thread(void *)
+intptr_t gdb_cpu_ctrl_t::gdb_thread(void *)
 {
     instance.gdb_thread();
 }
@@ -2642,7 +2642,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             // single-stepping stepping, and reenabling it (above)
 
             // Adjust RIP back to start of instruction
-            ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
+            ISR_CTX_REG_RIP(ctx) = (intptr_t(*)(void*))
                     ((char*)ISR_CTX_REG_RIP(ctx) - 1);
 
             bp_workaround_addr = uintptr_t(ISR_CTX_REG_RIP(ctx));

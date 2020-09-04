@@ -1079,7 +1079,7 @@ start_over:
             if (likely(landing_pad)) {
                 // Put CPU on landing pad with rax == -1
                 ISR_CTX_REG_RAX(ctx) = -1;
-                ISR_CTX_REG_RIP(ctx) = (int(*)(void*))landing_pad;
+                ISR_CTX_REG_RIP(ctx) = (intptr_t(*)(void*))landing_pad;
                 return ctx;
             }
 

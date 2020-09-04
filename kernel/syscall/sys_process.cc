@@ -441,7 +441,7 @@ void sys_exit(int exitcode)
     process_t::exit(-1, exitcode);
 }
 
-void sys_thread_exit(int tid, int exitcode)
+void sys_thread_exit(int tid, void *exitcode)
 {
     process_t *p = thread_current_process();
 
@@ -482,4 +482,31 @@ unsigned sys_sleep(unsigned ms)
     uint64_t en = time_ns();
 
     return (en - st) / 1000000;
+}
+
+long sys_join(int tid, void **exit_code)
+{
+    if (unlikely(!mm_is_user_range(exit_code, sizeof(*exit_code))))
+        return -int(errno_t::EFAULT);
+
+    intptr_t exit_value = thread_wait(tid);
+
+    if (unlikely(!mm_copy_user(exit_code, &exit_value, sizeof(*exit_code))))
+        return -int(errno_t::EFAULT);
+
+    return 0;
+}
+
+long sys_detach(int tid)
+{
+    process_t *process = fast_cur_process();
+
+    return process->detach(tid);
+}
+
+int sys_is_joinable(int tid)
+{
+    process_t *process = fast_cur_process();
+
+    return process->is_joinable(tid);
 }

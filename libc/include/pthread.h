@@ -422,6 +422,8 @@ int __futex(int *uaddr, int futex_op, int val,
     (((oparg) & 0xfff) << 12) | \
     ((cmparg) & 0xfff))
 
+#define __CLONE_FLAGS_DETACHED  1
+
 int __clone(void (*bootstrap)(int tid, void *(*fn)(void*), void *arg),
             void *child_stack, int flags,
             void *(*fn)(void *arg), void *arg);

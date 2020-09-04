@@ -15,11 +15,9 @@ struct isr_context_t;
 
 // Platform independent thread API
 
-typedef int  thread_t;
-
-typedef int16_t thread_priority_t;
-
-typedef int (*thread_fn_t)(void*);
+using thread_t = int;
+using thread_priority_t = int16_t;
+using thread_fn_t = intptr_t(*)(void*);
 
 void thread_check_stack(int intr);
 
@@ -228,7 +226,7 @@ void thread_resume(thread_t thread, intptr_t exit_code);
 thread_priority_t thread_get_priority(thread_t thread_id);
 void thread_set_priority(thread_t thread_id, thread_priority_t priority);
 
-int thread_wait(thread_t thread_id);
+intptr_t thread_wait(thread_t thread_id);
 
 void thread_idle_set_ready(void);
 

@@ -558,7 +558,7 @@ static perf_symbol_table_t::iterator lookup_symbol(uintptr_t addr)
 
 // Called in NMI handler, careful!
 _hot
-static void perf_sample(int (*ip)(void*), size_t cpu_nr)
+static void perf_sample(intptr_t (*ip)(void*), size_t cpu_nr)
 {
     uintptr_t addr = uintptr_t((void*)ip);
 

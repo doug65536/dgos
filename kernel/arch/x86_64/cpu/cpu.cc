@@ -613,9 +613,16 @@ extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
         if (likely(landing_pad)) {
             // Put CPU on landing pad with rax == -1
             ISR_CTX_REG_RAX(ctx) = -1;
-            ISR_CTX_REG_RIP(ctx) = (int(*)(void*))landing_pad;
+            ISR_CTX_REG_RIP(ctx) = (intptr_t(*)(void*))landing_pad;
             return ctx;
         }
+    } else if (GDT_SEL_RPL_IS_USER(ISR_CTX_REG_CS(ctx))) {
+        // Inject a signal
+        //
+        // Frame:
+        // <return rip>
+        // <return rsp>
+        //
     }
 
     return nullptr;

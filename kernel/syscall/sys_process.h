@@ -9,7 +9,7 @@ _noreturn
 void sys_exit(int exitcode);
 
 _noreturn
-void sys_thread_exit(int tid, int exitcode);
+void sys_thread_exit(int tid, void *exitcode);
 
 long sys_futex(int *uaddr, int futex_op, int val,
                struct timespec const *timeout,
@@ -28,3 +28,6 @@ long sys_clone(void (*bootstrap)(int tid, void *(*fn)(void *arg), void *arg),
 int sys_kill(int pid, int sig);
 
 unsigned sys_sleep(unsigned ms);
+long sys_join(int tid, void **exit_code);
+long sys_detach(int tid);
+int sys_is_joinable(int tid);

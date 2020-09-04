@@ -127,7 +127,7 @@ protected:
     static unit *list_en;
 
 private:
-    static int thread_fn(void *arg);
+    static intptr_t thread_fn(void *arg);
 
     char const * const name = nullptr;
     char const * const test_file = nullptr;

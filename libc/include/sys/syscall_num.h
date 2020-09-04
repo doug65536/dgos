@@ -334,3 +334,6 @@
 #define SYS_sigaction               323
 #define SYS_thread_exit             324
 #define SYS_sleep                   325
+#define SYS_join                    326
+#define SYS_detach                  327
+#define SYS_is_joinable             328

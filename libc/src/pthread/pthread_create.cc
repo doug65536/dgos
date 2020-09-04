@@ -24,6 +24,8 @@ int pthread_create(pthread_t *result, pthread_attr_t const *attr,
 {
     size_t guard_sz = attr ? attr->guard_sz : 0;
 
+    bool detach = attr ? attr->detach : false;
+
     // 8MB
     size_t stack_sz = 8 << 20;
 
@@ -43,7 +45,17 @@ int pthread_create(pthread_t *result, pthread_attr_t const *attr,
         mprotect(stack_keep_en, guard_sz, PROT_NONE);
     }
 
-    __clone(pthread_bootstrap, stack_keep_en, 0, fn, arg);
+    int flags = detach ? __CLONE_FLAGS_DETACHED : 0;
 
-    return ENOSYS;
+    int tid_negerr = __clone(pthread_bootstrap, stack_keep_en, flags, fn, arg);
+
+    if (unlikely(tid_negerr < 0))
+        return -tid_negerr;
+
+    *result = tid_negerr;
+
+    if (attr && attr->detach)
+        pthread_detach(*result);
+
+    return 0;
 }

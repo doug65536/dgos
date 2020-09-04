@@ -152,14 +152,62 @@ void syscall_perf_test()
             raise(42);
         uint64_t en = __builtin_ia32_rdtsc();
         uint64_t el = en - st;
-        printf("One million syscalls in %lu cycles (%lu/call)\n",
+        printf("One million syscalls in %lu rdtsc ticks (%lu/call)\n",
                el, el/1000000);
     }
+}
+
+void *do_nothing(void *arg)
+{
+    return (void*)(uintptr_t(arg) + 42);
+}
+
+void test_thread_create_join()
+{
+    int pterr;
+
+    uint64_t st = __builtin_ia32_rdtsc();
+
+    size_t it;
+
+    for (it = 0; it < 1024; ++it) {
+        pthread_t test_thread = 0;
+        pterr = pthread_create(&test_thread, nullptr, do_nothing, (void*)it);
+
+        if (pterr != 0)
+            printf("Thread creation failed with %d\n", pterr);
+
+        void *test_return = nullptr;
+
+        pterr = pthread_join(test_thread, &test_return);
+        test_thread = 0;
+
+        //pthread_detach(test_thread);
+
+        if (unlikely(test_return != (void*)(uintptr_t((void*)it) + 42))) {
+            printf("Thread exit code is wrong"
+                   ", expected %p but got %p on iter %zu\n",
+                   (void*)(uintptr_t((void*)it) + 42), test_return, it);
+        }
+
+        if (pterr != 0)
+            printf("Thread join failed with %d\n", pterr);
+    }
+
+    uint64_t en = __builtin_ia32_rdtsc();
+    uint64_t el = en - st;
+    printf("%" PRIu64 " threads ran and joined"
+                      " in %" PRIu64 "u rdtsc ticks"
+                      " (%" PRIu64 "/thread)\n",
+           it, el, el/it);
+
+    printf("Completed create/join stress loop\n");
 }
 
 int main(int argc, char **argv, char **envp)
 {
     printf("init started\n");
+
 
     // fixme: check ACPI
     load_module("boot/keyb8042.km");
@@ -222,13 +270,16 @@ int main(int argc, char **argv, char **envp)
 
     load_module("boot/symsrv.km");
 
-    load_module("boot/unittest.km");
 
     //syscall_perf_test();
 
     //start_fs_stress();
 
     //start_mouse_thread();
+
+    test_thread_create_join();
+
+    load_module("boot/unittest.km");
 
     return start_framebuffer();
 }

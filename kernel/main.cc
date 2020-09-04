@@ -124,12 +124,12 @@ public:
     }
 
 private:
-    static int worker(void *arg)
+    static intptr_t worker(void *arg)
     {
         return reinterpret_cast<read_stress_thread_t*>(arg)->worker();
     }
 
-    int worker()
+    intptr_t worker()
     {
         static uint8_t counts[256 << 6];
         static int volatile next_id;
@@ -766,7 +766,7 @@ void test_spawn()
 #endif
 }
 
-static int init_thread(void *)
+static intptr_t init_thread(void *)
 {
     if (bootinfo_parameter(bootparam_t::boot_debugger))
         cpu_breakpoint();
@@ -889,7 +889,7 @@ static int init_thread(void *)
     return 0;
 }
 
-int debugger_thread(void *)
+intptr_t debugger_thread(void *)
 {
     printk("Starting GDB stub\n");
     gdb_init();

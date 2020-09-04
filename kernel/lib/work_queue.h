@@ -133,7 +133,7 @@ private:
     void free(workq_work *work);
 
     _noreturn
-    static int worker(void *arg);
+    static intptr_t worker(void *arg);
 
     workq_work *dequeue_work_locked(scoped_lock& lock);
 

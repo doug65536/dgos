@@ -131,7 +131,7 @@ int process_t::spawn(pid_t * pid_result,
             : -int(errno_t::EFAULT);
 }
 
-int process_t::run(void *process_arg)
+intptr_t process_t::run(void *process_arg)
 {
     return ((process_t*)process_arg)->run();
 }
@@ -139,7 +139,7 @@ int process_t::run(void *process_arg)
 // This is the thread start function for the new kernel thread backing
 // this user thread
 // Runs in the context of a new thread
-int process_t::start_clone_thunk(void *clone_data)
+intptr_t process_t::start_clone_thunk(void *clone_data)
 {
     clone_data_t *cdp = (clone_data_t*)clone_data;
 
@@ -154,7 +154,7 @@ int process_t::start_clone_thunk(void *clone_data)
 }
 
 // Runs in the context of a new thread
-int process_t::start_clone(clone_data_t const& data)
+intptr_t process_t::start_clone(clone_data_t const& data)
 {
     uintptr_t tid = thread_get_id();
 
@@ -162,22 +162,61 @@ int process_t::start_clone(clone_data_t const& data)
 
     create_tls();
 
-    __exception_jmp_buf_t *buf = process_get_exit_jmpbuf(tid, lock);
+    intptr_t index = thread_index(tid, lock);
 
-    assert_msg(buf, "Can't find new thread's exit jmpbuf");
+    assert_msg(index >= 0, "Can't find new thread's exit jmpbuf");
+
+    __exception_jmp_buf_t *buf = user_threads[index].jmpbuf;
 
     if (!__setjmp(buf)) {
+        void *buf_rsp = buf->rsp;
         lock.unlock();
 
         arch_jump_to_user(uintptr_t((void*)data.bootstrap), uintptr_t(data.sp),
-                   uintptr_t(buf->rsp), use64,
+                   uintptr_t(buf_rsp), use64,
                    tid, uintptr_t(data.fn), uintptr_t(data.arg));
     }
 
-    // FIXME: thread exit code
+    lock.lock();
 
-    return 0;
+    // It might have moved since releasing the lock
+    index = thread_index(tid, lock);
+
+    intptr_t exitcode = user_threads[index].exitcode;
+
+    user_threads.erase(user_threads.begin() + index);
+    threads.erase(threads.begin() + index);
+
+    return exitcode;
 }
+
+void process_t::exit_thread(thread_t tid, void *exitcode)
+{
+    scoped_lock lock(process_lock);
+
+    intptr_t index = thread_index(tid, lock);
+
+    if (likely(index >= 0)) {
+        user_thread_info_t &info = user_threads[index];
+
+        info.exitcode = intptr_t(exitcode);
+
+        // Detach the thread if not detached already
+        if (!info.detached) {
+            info.detached = true;
+            thread_close(tid);
+        }
+
+        __exception_jmp_buf_t *jmpbuf = info.jmpbuf;
+
+        lock.unlock();
+
+        __longjmp(jmpbuf, 1);
+    }
+
+    panic("Thread %d not found in exit_thread!", tid);
+}
+
 
 int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
                      void *child_stack, int flags,
@@ -205,29 +244,23 @@ int process_t::clone(void (*bootstrap)(int tid, void *(*fn)(void *), void *arg),
 
     scoped_lock lock(processes_lock);
 
-    // Add a new jmpbuf for thread exit
-    ext::unique_ptr<__exception_jmp_buf_t> new_jmpbuf(
-            new (ext::nothrow) __exception_jmp_buf_t());
-
-    if (unlikely(!new_jmpbuf))
-        return -1;
-
-    if (unlikely(!exit_jmpbufs.push_back(new_jmpbuf.get())))
+    // Create the user_thread_info_t object
+    if (unlikely(!user_threads.emplace_back()))
         return -1;
 
     if (unlikely(!threads.push_back(-1))) {
-        exit_jmpbufs.pop_back();
         panic_oom();
+        user_threads.pop_back();
         return -1;
     }
-
-    // Safely stored, keep it
-    new_jmpbuf.release();
 
     if (thread_create(&threads.back(),
                       &process_t::start_clone_thunk, kernel_thread_arg,
                       "user_thread", 0, true, true) < 0)
         return -1;
+
+    if (flags & CLONE_FLAGS_DETACHED)
+        thread_close(threads.back());
 
     return threads.back();
 }
@@ -495,8 +528,39 @@ void *process_t::create_tls()
     return (void*)tls_ptr;
 }
 
+int process_t::detach(int tid)
+{
+    scoped_lock lock(process_lock);
+
+    intptr_t index = thread_index(tid, lock);
+
+    if (unlikely(index < 0))
+        return -int(errno_t::ESRCH);
+
+    if (unlikely(user_threads[index].detached))
+        return -int(errno_t::EINVAL);
+
+    thread_close(tid);
+
+    user_threads[index].detached = true;
+
+    return 0;
+}
+
+int process_t::is_joinable(int tid)
+{
+    scoped_lock lock(process_lock);
+
+    intptr_t index = thread_index(tid, lock);
+
+    if (unlikely(index < 0))
+        return -int(errno_t::ESRCH);
+
+    return !user_threads[index].detached;
+}
+
 // Returns when program exits
-int process_t::run()
+intptr_t process_t::run()
 {
     // Attach this kernel thread to this process
     thread_set_process(-1, this);
@@ -715,14 +779,10 @@ int process_t::run()
 
     // Add new jmpbuf to find kernel stack
 
-    jmpbuf_list_t::value_type ptr{new  (ext::nothrow) __exception_jmp_buf_t()};
-    if (unlikely(!ptr))
+    if (unlikely(!user_threads.emplace_back()))
         return -1;
 
-    __exception_jmp_buf_t *buf = ptr;
-
-    if (unlikely(!exit_jmpbufs.push_back(ext::move(ptr))))
-        return -1;
+    __exception_jmp_buf_t *buf = user_threads.back().jmpbuf;
 
     state = state_t::running;
     lock.unlock();
@@ -786,7 +846,7 @@ void process_t::destroy()
     linear_allocator = nullptr;
 }
 
-void process_t::exit(pid_t pid, int exitcode)
+void process_t::exit(pid_t pid, intptr_t exitcode)
 {
     scoped_lock lock(processes_lock);
 
@@ -806,33 +866,21 @@ void process_t::exit(pid_t pid, int exitcode)
     process_ptr->exitcode = exitcode;
     process_ptr->state = state_t::exited;
 
-    size_t index = process_ptr->thread_index(current_thread_id, lock);
+    intptr_t index = process_ptr->thread_index(current_thread_id, lock);
 
-    __exception_jmp_buf_t *exit_buf = process_ptr->exit_jmpbufs[index];
+    assert_msg(index >= 0, "Thread exit jmpbuf not found in process_t::exit");
+
+    __exception_jmp_buf_t *exit_buf = index >= 0
+            ? process_ptr->user_threads[index].jmpbuf.get()
+            : nullptr;
 
     lock.unlock();
     process_ptr->cond.notify_all();
 
-    if (likely(index != ~0U))
+    if (likely(exit_buf))
         __longjmp(exit_buf, 1);
 
     panic("Thread has no exit jmpbuf!");
-}
-
-void process_t::exit_thread(thread_t tid, int exitcode)
-{
-    scoped_lock lock(process_lock);
-
-    size_t i, e;
-    for (i = 0, e = threads.size(); i != e && threads[i] != tid; ++i);
-
-    if (likely(i < threads.size())) {
-        __exception_jmp_buf_t *jmpbuf = exit_jmpbufs[i];
-        lock.unlock();
-        __longjmp(jmpbuf, 1);
-    }
-
-    panic("Thread %d not found in exit_thread!", tid);
 }
 
 bool process_t::add_thread(thread_t tid, scoped_lock &lock)
@@ -893,19 +941,12 @@ process_t *process_t::init(uintptr_t mmu_context)
 
 __exception_jmp_buf_t *process_t::exit_jmpbuf(int tid, scoped_lock& lock)
 {
-    size_t i = 0;
+    intptr_t i = thread_index(tid, lock);
 
-    size_t e = threads.size();
-
-    for ( ; i != e; ++i) {
-        if (threads[i] == tid)
-            break;
-    }
-
-    if (unlikely(i == e))
+    if (unlikely(i < 0))
         return nullptr;
 
-    return exit_jmpbufs[i];
+    return user_threads[i].jmpbuf.get();
 }
 
 __exception_jmp_buf_t *process_get_exit_jmpbuf(

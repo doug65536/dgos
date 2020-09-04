@@ -227,7 +227,7 @@ void unittest::unit::run_all(unit_ctx *ctx)
     }
 }
 
-int unittest::unit::thread_fn(void *arg)
+intptr_t unittest::unit::thread_fn(void *arg)
 {
     unittest::unit *test = (unittest::unit *)arg;
     test->invoke();

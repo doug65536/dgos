@@ -30,7 +30,7 @@ UNITTEST(test_condition_variable_wait_timeout)
     //no limit ge(1800U, elap.count());
 }
 
-static int test_thread_worker(void *variation)
+static intptr_t test_thread_worker(void *variation)
 {
     test_thread_variation_t *var = (test_thread_variation_t*)variation;
 

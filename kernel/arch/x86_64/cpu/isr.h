@@ -97,7 +97,7 @@ struct isr_ret_frame_t {
 };
 
 struct isr_iret_frame_t {
-    int (*rip)(void*);
+    intptr_t (*rip)(void*);
     uintptr_t cs;
     uintptr_t rflags;
     uintptr_t rsp;
@@ -334,7 +334,7 @@ void protection_barrier_to_user_verw();
 
 void cpu_clear_fpu();
 
-void thread_entry(void *);
+intptr_t thread_entry(void *);
 
 __END_DECLS
 #endif

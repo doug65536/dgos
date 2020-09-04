@@ -92,7 +92,7 @@ class symbol_server_t {
 
     unsigned scroll_left = 0;
 
-    static int thread_entry(void *arg)
+    static intptr_t thread_entry(void *arg)
     {
         symbol_server_t *self = reinterpret_cast<symbol_server_t*>(arg);
         return self->worker();
@@ -640,7 +640,7 @@ class symbol_server_t {
         port->write("\r\nZeroing disabled\r\n");
     }
 
-    int worker()
+    intptr_t worker()
     {
         printdbg("symsrv: started\n");
 
@@ -757,6 +757,8 @@ class symbol_server_t {
 
             }
         }
+
+        return 0;
     }
 
 public:

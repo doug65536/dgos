@@ -56,7 +56,7 @@ void workq_impl::free(workq_work *work)
     alloc.free(work);
 }
 
-int workq_impl::worker(void *arg)
+intptr_t workq_impl::worker(void *arg)
 {
     ((workq_impl*)arg)->worker();
     // noreturn

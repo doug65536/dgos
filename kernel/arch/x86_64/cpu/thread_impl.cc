@@ -36,7 +36,7 @@
 #define THREAD_TRACE(...) ((void)0)
 #endif
 
-#define DEBUG_THREAD_STACK    1
+#define DEBUG_THREAD_STACK    0
 #if DEBUG_THREAD_STACK
 #define THREAD_STK_TRACE(...) printdbg("thread_stk: " __VA_ARGS__)
 #else
@@ -179,9 +179,7 @@ struct alignas(256) thread_info_t {
     uint32_t reserved4;
 
     // Process exit code
-    int exit_code;
-
-    uint32_t reserved2;
+    intptr_t exit_code;
 
     // 2 64-bit values
     __cxa_eh_globals cxx_exception_info;
@@ -294,7 +292,7 @@ struct alignas(256) cpu_info_t {
 
     thread_info_t *goto_thread = nullptr;
 
-    uint64_t pf_count = 0;
+    isr_syscall_context_t *syscall_ctx = nullptr;
 
     // Context switch is prevented when this is nonzero
     uint32_t locks_held = 0;
@@ -318,7 +316,7 @@ struct alignas(256) cpu_info_t {
 
     uint64_t irq_time = 0;
 
-    uint64_t reserved4 = 0;
+    uint64_t pf_count = 0;
 
     // Cleanup to be run after switching stacks on a context switch
     void (*after_csw_fn)(void*) = nullptr;
@@ -409,6 +407,7 @@ C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, syscall_flags) == CPU_INFO_SYSCALL_FLAGS_OFS);
 C_ASSERT(offsetof(cpu_info_t, in_irq) == CPU_INFO_IN_IRQ_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
+C_ASSERT(offsetof(cpu_info_t, syscall_ctx) == CPU_INFO_SYSCALL_CTX_OFS);
 C_ASSERT(offsetof(cpu_info_t, locks_held) == CPU_INFO_LOCKS_HELD_OFS);
 C_ASSERT(offsetof(cpu_info_t, csw_deferred) == CPU_INFO_CSW_DEFERRED_OFS);
 C_ASSERT(offsetof(cpu_info_t, after_csw_fn) == CPU_INFO_AFTER_CSW_FN_OFS);
@@ -443,7 +442,9 @@ uint32_t cpu_count;
 uint32_t total_cpus;
 
 void thread_destruct(thread_info_t *thread);
-static void thread_signal_completion(thread_info_t *thread);
+static void thread_signal_completion_locked(
+        thread_info_t *thread,
+        thread_info_t::scoped_lock &thread_lock);
 
 // Get executing APIC ID (the slow expensive way, for early initialization)
 static uint32_t get_apic_id_slow()
@@ -494,6 +495,8 @@ static void thread_cleanup()
         thread->state = THREAD_IS_EXITING_BUSY;
     else
         assert(!"Unexpected state!");
+
+    thread_signal_completion_locked(thread, lock);
 
     lock.unlock();
 
@@ -595,7 +598,7 @@ static thread_t thread_create_with_state(
 
         thread = threads + i;
 
-        if (thread->state != THREAD_IS_UNINITIALIZED)
+        if (likely(thread->state != THREAD_IS_UNINITIALIZED))
             continue;
 
         // Atomically grab the thread
@@ -769,7 +772,7 @@ static thread_t thread_create_with_state(
         // Idle, lowest possible priority
         now = UINT64_MAX;
 
-    printdbg("cpu %zu initially scheduling thread %u\n",
+    THREAD_TRACE("cpu %zu initially scheduling thread %u\n",
              cpu_nr, thread->thread_id);
 
     uint64_t timeslice_timestamp = now;
@@ -833,7 +836,7 @@ static void thread_monitor_mwait()
 }
 #endif
 
-static int smp_idle_thread(void *)
+static intptr_t smp_idle_thread(void *)
 {
     // Enable spinning
     spincount_mask = -1;
@@ -1004,7 +1007,7 @@ void thread_init(int ap)
 
         size_t cpu_nr = run_cpu[thread->thread_id];
 
-        printdbg("cpu %zu initially scheduling idle thread %u\n",
+        THREAD_TRACE("cpu %zu initially scheduling idle thread %u\n",
                  cpu_nr, thread->thread_id);
 
         schedule_thread_on_cpu(thread, UINT64_MAX, cpu_nr, UINT64_MAX);
@@ -1152,11 +1155,12 @@ static void thread_free_stacks(thread_info_t *thread)
     }
 }
 
-static void thread_signal_completion(thread_info_t *thread)
+static void thread_signal_completion_locked(
+        thread_info_t *thread,
+        thread_info_t::scoped_lock &thread_lock)
 {
     // Wake up any threads waiting for this thread to exit ASAP
-    thread_info_t::scoped_lock thread_lock(thread->lock);
-    thread->state = THREAD_IS_FINISHED;
+    assert(thread->state == THREAD_IS_EXITING_BUSY);
     thread_lock.unlock();
     thread->done_cond.notify_all();
 }
@@ -1754,7 +1758,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
             cpu_wait_value(&resumed_thread->state, THREAD_IS_SLEEPING);
             uint64_t wait_sleeping_en = time_ns();
             uint64_t wait_sleeping = wait_sleeping_en - wait_sleeping_st;
-            printdbg("Waited %" PRIu64 "ns to wake thread from sleep\n",
+            THREAD_TRACE("Waited %" PRIu64 "ns to wake thread from sleep\n",
                      wait_sleeping);
         }
 
@@ -1781,7 +1785,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
                 if (unlikely(wait_st)) {
                     uint64_t wait_en = time_ns();
 
-                    printdbg("Waited %ss for resume ring"
+                    THREAD_TRACE("Waited %ss for resume ring"
                              " of cpu %zu from cpu %u\n",
                              engineering_t<uint64_t>(
                                  wait_en - wait_st, -3).ptr(),
@@ -1836,7 +1840,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
     }
 }
 
-EXPORT int thread_wait(thread_t thread_id)
+EXPORT intptr_t thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
 

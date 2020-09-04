@@ -10,7 +10,7 @@ struct thread_callout_worker_t {
     thread_t tid;
 };
 
-static int thread_callout_worker(void *arg)
+static intptr_t thread_callout_worker(void *arg)
 {
     auto work = (thread_callout_worker_t*)arg;
     work->fn(work->arg);

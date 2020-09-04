@@ -578,10 +578,10 @@ private:
     ext::condition_variable config_changed;
 
     _noreturn
-    static int config_work_thread(void *arg);
+    static intptr_t config_work_thread(void *arg);
 
     _noreturn
-    int config_work_thread();
+    void config_work_thread();
 };
 
 int virtio_gpu_factory_t::detect()
@@ -1093,12 +1093,12 @@ void virtio_gpu_dev_t::irq_handler(int offset)
     }
 }
 
-int virtio_gpu_dev_t::config_work_thread(void *arg)
+intptr_t virtio_gpu_dev_t::config_work_thread(void *arg)
 {
     reinterpret_cast<virtio_gpu_dev_t*>(arg)->config_work_thread();
 }
 
-int virtio_gpu_dev_t::config_work_thread()
+void virtio_gpu_dev_t::config_work_thread()
 {
     // Must disable interrupts here to prevent an IRQ occurring and that
     // ISR also acquiring the config lock. It would deadlock. In practice IRQs

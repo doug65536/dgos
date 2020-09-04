@@ -28,7 +28,7 @@ struct thread_run_data_t
 };
 
 // Thread function
-static int thread_run_start(void *p)
+static intptr_t thread_run_start(void *p)
 {
     ext::unique_ptr<thread_run_data_t> data =
             reinterpret_cast<thread_run_data_t*>(p);
