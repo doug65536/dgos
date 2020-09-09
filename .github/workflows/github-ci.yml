@@ -12,6 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: banner
+      run: printf "Building with %d processors\n" "$(nproc)"
+    - name: build cpu
+      run: grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1
     - name: Cache
       uses: actions/cache@v2.1.1
       with:
@@ -29,4 +33,4 @@ jobs:
     - name: bootstrap
       run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && ../bootstrap
     - name: disks
-      run: cd cibuild && make disks
+      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc)
