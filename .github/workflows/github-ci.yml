@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: dgos CI
 
 on:
   push:
@@ -7,18 +7,11 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build:    
 
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: toolchain
-      run: bash -c 'mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -o toolchain_build -p toolchain_install'
-    - name: bootstrap
-      run: bash -c 'export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && ../bootstrap'
-    - name: disks
-      run: bash -c 'cd cibuild && make disks'
     - name: Cache
       uses: actions/cache@v2.1.1
       with:
@@ -28,3 +21,12 @@ jobs:
         key: toolchain
         # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
         #restore-keys: # optional
+    - uses: actions/checkout@v2
+    - name: dependencies
+      run: sudo apt install lemon
+    - name: toolchain
+      run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -o toolchain_build -p toolchain_install
+    - name: bootstrap
+      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && ../bootstrap
+    - name: disks
+      run: cd cibuild && make disks
