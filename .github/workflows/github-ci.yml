@@ -15,7 +15,7 @@ jobs:
     - name: banner
       run: printf "Building with %d processors\n" "$(nproc)"
     - name: build cpu
-      run: grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1
+      run: "grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1"
     - name: Cache
       uses: actions/cache@v2.1.1
       with:
