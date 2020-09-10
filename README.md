@@ -1,3 +1,5 @@
+![CI Status](https://github.com/doug65536/dgos/workflows/dgos%20CI/badge.svg)
+
 - x86-64 platform
 
 ## Bootloader
