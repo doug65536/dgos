@@ -12,13 +12,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      
     - name: banner
       run: printf "Building with %d processors\n" "$(nproc)"
       shell: bash
+      
     - name: build cpu
       run: "grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1"
       shell: bash
+      
     - uses: actions/checkout@v2
+      
     - name: Cache
       uses: actions/cache@v2.1.1
       id: cache
@@ -29,20 +33,36 @@ jobs:
         key: toolchain
         # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
         #restore-keys: # optional
+
     - name: dependencies
       run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86 cpu-checker
+      
     - name: toolchain
       run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -q -o toolchain_build -p toolchain_install
       if: steps.cache.outputs.cache-hit != 'true'
+      
     - name: bootstrap
       run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && ../bootstrap
+      
     - name: disks
       run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc)
+      
     - uses: actions/upload-artifact@v2
       with:
-        name: disks
-        path: |
-          cibuild/mbrdisk.img
-          cibuild/hybdisk.img
-          cibuild/gptdisk.img
-          cibuild/isodisk.iso
+        name: mbr-disk-image
+        path: cibuild/mbrdisk.img        
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: hybrid-disk-image
+        path: cibuild/hybdisk.img
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: gpt-disk-image
+        path: cibuild/gptdisk.img
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: iso-disk-image
+        path: cibuild/isodisk.iso
