@@ -14,8 +14,12 @@ jobs:
     steps:
     - name: banner
       run: printf "Building with %d processors\n" "$(nproc)"
+      shell: bash
     - name: build cpu
       run: "grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1"
+      shell: bash
+    - name: make dirs
+      run: mkdir -p cibuild/toolchain_install
     - name: Cache
       uses: actions/cache@v2.1.1
       id: cache
