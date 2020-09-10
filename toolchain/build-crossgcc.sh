@@ -128,7 +128,6 @@ function make_tool() {
 
 	if ! [[ -f "Makefile" ]]
 	then
-	set -x
 		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:6}" || exit
 	fi
 	log make "$parallel" "$target" || exit
