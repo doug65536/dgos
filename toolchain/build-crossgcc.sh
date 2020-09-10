@@ -48,7 +48,7 @@ function download_file() {
 		err 'Missing argument to download_file'
 	fi
 
-	wget -P "$dest" -N "$url" || exit
+	log wget -P "$dest" -N "$url" || exit
 }
 
 function require_value() {
