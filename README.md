@@ -1,5 +1,3 @@
-<!-- [![](https://api.travis-ci.org/doug65536/dgos.svg?branch=master)](https://travis-ci.org/doug65536/dgos) -->
-
 - x86-64 platform
 
 ## Bootloader
