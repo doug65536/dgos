@@ -19,8 +19,6 @@ jobs:
       run: "grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1"
       shell: bash
     - uses: actions/checkout@v2
-    - name: make dirs
-      run: mkdir -p cibuild/toolchain_install
     - name: Cache
       uses: actions/cache@v2.1.1
       id: cache
