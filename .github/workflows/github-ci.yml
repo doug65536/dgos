@@ -27,7 +27,7 @@ jobs:
         #restore-keys: # optional
     - uses: actions/checkout@v2
     - name: dependencies
-      run: sudo apt install lemon mtools
+      run: sudo apt install lemon mtools genisoimage
     - name: toolchain
       run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -o toolchain_build -p toolchain_install
     - name: bootstrap
