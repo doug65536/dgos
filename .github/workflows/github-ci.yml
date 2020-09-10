@@ -30,7 +30,7 @@ jobs:
         # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
         #restore-keys: # optional
     - name: dependencies
-      run: sudo apt install lemon mtools genisoimage
+      run: sudo apt install lemon mtools genisoimage qemu-system-x86
     - name: toolchain
       run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -q -o toolchain_build -p toolchain_install
       if: steps.cache.outputs.cache-hit != 'true'
