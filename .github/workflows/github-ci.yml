@@ -21,7 +21,7 @@ jobs:
       id: cache
       with:
         # A list of files, directories, and wildcard patterns to cache and restore
-        path: cibuild/toolchain/toolchain_install
+        path: cibuild/toolchain/toolchain_install/**/*
         # An explicit key for restoring and saving the cache
         key: toolchain
         # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
