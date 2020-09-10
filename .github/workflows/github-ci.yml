@@ -31,9 +31,6 @@ jobs:
         #restore-keys: # optional
     - name: dependencies
       run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86 cpu-checker
-    - name: kvm test
-      run: kvm-ok
-      shell: bash
     - name: toolchain
       run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -q -o toolchain_build -p toolchain_install
       if: steps.cache.outputs.cache-hit != 'true'
