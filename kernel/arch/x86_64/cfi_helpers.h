@@ -23,3 +23,8 @@
     lea (\ofs)(%rsp),%rsp
     .cfi_adjust_cfa_offset -(\ofs)
 .endm
+
+.macro add_rsp_cfi	ofs:vararg
+    add $ (\ofs),%rsp
+    .cfi_adjust_cfa_offset -(\ofs)
+.endm
