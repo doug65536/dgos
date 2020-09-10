@@ -18,9 +18,6 @@ jobs:
     - name: build cpu
       run: "grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1"
       shell: bash
-    - name: kvm test
-      run: kvm-ok
-      shell: bash
     - uses: actions/checkout@v2
     - name: Cache
       uses: actions/cache@v2.1.1
@@ -33,7 +30,10 @@ jobs:
         # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
         #restore-keys: # optional
     - name: dependencies
-      run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86
+      run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86 cpu-checker
+    - name: kvm test
+      run: kvm-ok
+      shell: bash
     - name: toolchain
       run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -q -o toolchain_build -p toolchain_install
       if: steps.cache.outputs.cache-hit != 'true'
