@@ -38,3 +38,11 @@ jobs:
       run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && ../bootstrap
     - name: disks
       run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc)
+    - uses: actions/upload-artifact@v2
+      with:
+        name: disks
+        path: |
+          cibuild/mbrdisk.img
+          cibuild/hybdisk.img
+          cibuild/gptdisk.img
+          cibuild/isodisk.iso
