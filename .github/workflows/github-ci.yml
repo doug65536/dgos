@@ -18,6 +18,7 @@ jobs:
       run: "grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1"
     - name: Cache
       uses: actions/cache@v2.1.1
+      id: cache
       with:
         # A list of files, directories, and wildcard patterns to cache and restore
         path: cibuild/toolchain/toolchain_install
@@ -30,6 +31,7 @@ jobs:
       run: sudo apt install lemon mtools genisoimage
     - name: toolchain
       run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -o toolchain_build -p toolchain_install
+      if: steps.cache.outputs.cache-hit != 'true'
     - name: bootstrap
       run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && ../bootstrap
     - name: disks
