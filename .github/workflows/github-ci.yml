@@ -18,6 +18,9 @@ jobs:
     - name: build cpu
       run: "grep -oP '(?<=model name\t: ).*' /proc/cpuinfo|head -n1"
       shell: bash
+    - name: kvm test
+      run: kvm-ok
+      shell: bash
     - uses: actions/checkout@v2
     - name: Cache
       uses: actions/cache@v2.1.1
