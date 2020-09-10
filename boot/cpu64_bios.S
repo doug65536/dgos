@@ -11,6 +11,7 @@ code64_run_kernel:
 	movw %ax,%es
 	movw %ax,%fs
 	movw %ax,%gs
+	xor %eax,%eax
 	movw %ax,%ss
 	nop
 	mov (%rdi),%rax

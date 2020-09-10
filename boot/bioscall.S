@@ -54,7 +54,7 @@ bioscall:
     // 16-bit protected mode
 
     // Load 16-bit data segments
-0:  movw $ GDT_SEL_PM_DATA16,%ax
+0:  movl $ GDT_SEL_PM_DATA16,%eax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs
@@ -76,7 +76,7 @@ bioscall:
     // If it got a perfect 64KB stack size, clear bit 16 (which would be 1)
     movzwl %sp,%esp
 
-    xorw %ax,%ax
+    xorl %eax,%eax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs

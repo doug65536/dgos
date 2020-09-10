@@ -155,11 +155,9 @@ void run_code64(void (*fn)(void *), void *arg)
 
         // Far call to selector that has L bit set (64 bit)
         "mov $ 6+idtr_64,%%eax\n\t"
-        "push $ 2f\n\t"
-        "push %[gdt_code64]\n\t"
-        "push $ 0f\n\t"
-        "lret\n\t"
-        "2:\n\t"
+        "pushl %[gdt_code64]\n\t"
+        "pushl $ 0f\n\t"
+        "lcalll *(%%esp)\n\t"
 
         // Returned from long mode, back to compatibility mode
 
@@ -181,7 +179,7 @@ void run_code64(void (*fn)(void *), void *arg)
         ".global long_mode_entry\n\t"
         "long_mode_entry:"
 
-        "lidtq (%%eax)\n\t"
+        "lidtq (%%rax)\n\t"
 
         // Load parameters
         "movl %c[fn_ofs](%[params]),%%eax\n\t"
@@ -193,7 +191,7 @@ void run_code64(void (*fn)(void *), void *arg)
         "mov %%r15,%%rsp\n\t"
 
         // Far return to 32 bit compatibility mode code segment
-        "lret\n\t"
+        "lret $ 8\n\t"
 
         "1:\n\t"
         ".code32\n\t"
