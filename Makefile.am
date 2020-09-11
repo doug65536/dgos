@@ -967,8 +967,9 @@ KERNEL_LDFLAGS_SHARED = \
 	-Wl,--gc-keep-exported \
 	-Wl,-pie \
 	-Wl,--whole-archive -Wl,libkei.a -Wl,--no-whole-archive \
-	-Wl,--no-strip-discarded \
 	$(NOSTDLIB_FLAGS)
+
+#-Wl,--no-strip-discarded
 
 #-Wl,-m,elf_x86_64
 #-Wl,--no-dynamic-linker
@@ -2483,8 +2484,9 @@ QEMU_USB = \
 	-device usb-kbd,id=hidkbd,bus=xhci.0 \
 	-device usb-tablet,id=hidtab,bus=xhci.0 \
 	-device usb-mouse,id=hidmse,bus=xhci.0 \
-	-device usb-audio,id=hidaud,bus=xhci.0 \
 	$(QEMU_USB_EXTRA)
+
+#-device usb-audio,id=hidaud,bus=xhci.0
 
 #-device usb-hub,id=hidhub,bus=xhci.0,ports=4,port=1
 #-device usb-kbd,bus=hidhub.0 \
