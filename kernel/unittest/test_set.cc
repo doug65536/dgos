@@ -443,7 +443,7 @@ UNITTEST(test_set_int_complex_erase)
     eq(true, c.validate());
 }
 
-DISABLED_UNITTEST(test_set_int_every_insert_permutation)
+UNITTEST(test_set_int_every_insert_permutation)
 {
     ext::set<int> c;
 
@@ -481,7 +481,7 @@ DISABLED_UNITTEST(test_set_int_every_insert_permutation)
     ext::reverse(order.begin(), order.end());
 }
 
-DISABLED_UNITTEST(test_set_int_every_erase_permutation)
+UNITTEST(test_set_int_every_erase_permutation)
 {
     ext::vector<int> order;
     ext::set<int> c;
