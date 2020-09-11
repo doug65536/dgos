@@ -2540,14 +2540,14 @@ QEMU_SERIAL = \
 QEMU_SOUND = -soundhw es1370
 
 QEMU_COMMON = \
-	$(QEMU_MONITOR) \
-	$(QEMU_SERIAL) \
-	$(QEMU_DEBUGCON) \
-	$(QEMU_NET) \
-	$(QEMU_SOUND) \
 	-no-shutdown -no-reboot -d unimp,guest_errors \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS) \
+	$(QEMU_SERIAL) \
+	$(QEMU_DEBUGCON) \
+	$(QEMU_MONITOR) \
+	$(QEMU_NET) \
+	$(QEMU_SOUND) \
 	$(QEMU_USB) \
 	$(QEMU_MEMFILL)
 
