@@ -233,7 +233,7 @@ for flag in \
 		Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
-		Werror=parentheses \
+		Werror=parentheses Werror=format-security \
 		Warray-bounds Wformat-overflow \
 		Wno-address-of-packed-member \
 		Wsuggest-override Wsuggest-attribute=format \
@@ -561,7 +561,7 @@ AC_SUBST([USERLIB64_LDFLAGS])
 ELF32_FLAGS=
 for flag in \
 	m32 \
-	mpreferred-stack-boundary=2 \
+	mpreferred-stack-boundary=4 \
 	Wl,-m,elf_i386 \
 	Wl,-N \
 	Wl,--no-dynamic-linker
@@ -575,7 +575,7 @@ AC_SUBST([ELF32_FLAGS])
 ELF64_FLAGS=
 for flag in \
 	m64 \
-	mpreferred-stack-boundary=3 \
+	mpreferred-stack-boundary=4 \
 	Wl,-m,elf_x86_64 \
 	Wl,-z,common-page-size=4096 \
 	Wl,-z,max-page-size=4096 \
