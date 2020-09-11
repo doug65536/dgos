@@ -725,6 +725,17 @@ long formatter(
         if (flags.negative || flags.leading_plus)
             flags.pending_padding -= (flags.pending_padding > 0);
 
+        // Make room for 0x or 0 prefix (for hash)
+        if (flags.hash) {
+            if (flags.base == 16) {
+                if ((flags.pending_padding -= 2) < 0) {
+                    flags.pending_padding = 0;
+                }
+            } else if (flags.base == 8) {
+                flags.pending_padding -= (flags.pending_padding > 0);
+            }
+        }
+
         if (flags.pending_padding != 0 &&
                 !flags.left_justify) {
             // Reduce padding by number of leading zeros
@@ -738,13 +749,14 @@ long formatter(
                 chars_written += emit_chars(nullptr, ' ', emit_context);
         }
 
-        if (flags.hash && flags.base == 16)
+        if (flags.hash && flags.base == 16) {
             chars_written += emit_chars(!flags.upper ? "0x" : "0X",  2,
                                         emit_context);
-        else if (flags.hash && flags.base == 8)
+            flags.hash = 0;
+        } else if (flags.hash && flags.base == 8) {
             chars_written += emit_chars(nullptr, '0', emit_context);
-
-        if (flags.negative) {
+            flags.hash = 0;
+        } else if (flags.negative) {
             flags.negative = 0;
             chars_written += emit_chars(nullptr, '-', emit_context);
         } else if (flags.leading_plus) {
