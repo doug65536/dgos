@@ -1,6 +1,9 @@
 define startupbreakpoints
 	set remotetimeout 86400
 
+	#set can-use-hw-watchpoints 0
+	#watch -l *(void**)0xfffffd00504bb000
+
 	#file
 	#add-symbol-file kernel-generic 0xffffff00000001a0
 
@@ -20,30 +23,33 @@ define startupbreakpoints
 
 	set range-stepping off
 
-	#set may-call-functions off
+	set may-call-functions off
 
 	#on is good for TCG, horrible for KVM or baremetal
-	set breakpoint always-inserted off
+	#set breakpoint always-inserted off
 
 	#exec-file kernel-generic
 	#symbol-file kernel-generic -o -0x000000ff80000000
 
+	hbreak cpu_debug_break
+
 	thbreak entry
 	commands
+		#cd ../lto
 		#allow everything
 		#maintenance packet qqemu.sstep=1
 		#allow irqs only
 		#maintenance packet qqemu.sstep=5
 		#b isr_entry_13
-		b cpu_debug_break
-		b unhandled_exception_handler
-		b apic_spurious_handler
-		#GP
-		b isr_entry_8
-		#UD
-		b isr_entry_6
-		b vpanic
-		b validate_failed
+		#b unhandled_exception_handler
+		#b apic_spurious_handler
+		##GP
+		#b isr_entry_8
+		##UD
+		#b isr_entry_6
+		#b vpanic
+		#b validate_failed
+
 	end
 
 	hbreak modload_load_symbols
