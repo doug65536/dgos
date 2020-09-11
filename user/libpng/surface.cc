@@ -74,19 +74,7 @@
 /// st are always vertically aligned with the bottom of E
 /// e, g, q, s are always aligned
 
-// Record that represents a single box of area on the screen
-struct comp_area_t {
-    // This screen area...
-    int32_t sy;
-    int32_t sx;
-    int32_t ey;
-    int32_t ex;
-
-    // ...contains this area of this surface
-    surface_t *surface;
-    int32_t x;
-    int32_t y;
-};
+static size_t font_replacement;
 
 comp_area_t *comp_areas;
 size_t comp_areas_capacity;
@@ -158,12 +146,14 @@ static bool surface_is_visible(surface_t *surface)
     return false;
 }
 
-static inline int min(int a, int b)
+_always_inline
+static int min(int a, int b)
 {
     return a <= b ? a : b;
 }
 
-static inline int max(int a, int b)
+_always_inline
+static int max(int a, int b)
 {
     return a >= b ? a : b;
 }
@@ -249,16 +239,16 @@ static bool area_clip_pair(comp_area_t const *incoming,
     int kv = iv + m_h;
 
     // area formed from top region
-    comp_area_t efgh{ ey, ex, iy, fx, existing->surface, eu, ev };
+    comp_area_t efgh{ ey, ex, iy, fx, existing->surface, ev, eu };
 
     // area formed from left side of center region
-    comp_area_t ijkl{ iy, ex, ky, ax, existing->surface, eu, iv };
+    comp_area_t ijkl{ iy, ex, ky, ax, existing->surface, iv, eu };
 
     // area formed from right side of center region
-    comp_area_t mnop{ iy, bx, ky, fx, existing->surface, mu, iv };
+    comp_area_t mnop{ iy, bx, ky, fx, existing->surface, iv, mu };
 
     // area formed by bottom region
-    comp_area_t qrst{ ky, ex, sy, fx, existing->surface, eu, kv };
+    comp_area_t qrst{ ky, ex, sy, fx, existing->surface, kv, eu };
 
     if (area_is_valid(&efgh))
         area_insert_at(&efgh, comp_areas_size);
@@ -291,25 +281,89 @@ static bool area_insert(comp_area_t *area)
     return area_insert_at(area, comp_areas_size);
 }
 
+//
+// Public API
+
+int area_from_surface(surface_t *surface)
+{
+    //comp_area_t *p;
+    return 0;
+}
+
 // Linked in font
 extern bitmap_glyph_t const _binary_u_vga16_raw_start[];
 extern bitmap_glyph_t const _binary_u_vga16_raw_end[];
 
-size_t vga_console_ring_t::replacement;
+static constexpr size_t const font_ascii_min = 32;
+static constexpr size_t const font_ascii_max = 126;
+static uint16_t font_ascii_lookup[1 + font_ascii_max - font_ascii_min];
 
-static constexpr size_t const ascii_min = 32;
-static constexpr size_t const ascii_max = 126;
-static uint8_t ascii_lookup[1 + ascii_max - ascii_min];
+static size_t font_glyph_count;
+static char16_t const *font_glyph_codepoints;
 
-static size_t glyph_count;
-static char16_t *glyph_codepoints;
-
-static constexpr bitmap_glyph_t const * const glyphs =
+static constexpr bitmap_glyph_t const * const font_glyphs =
         _binary_u_vga16_raw_start;
 
 void surface_free(surface_t *pp)
 {
     free(pp);
+}
+
+size_t font_glyph_index(size_t codepoint)
+{
+    if (likely(font_replacement &&
+               codepoint >= font_ascii_min &&
+               codepoint <= font_ascii_max))
+        return font_ascii_lookup[codepoint - font_ascii_min];
+
+    size_t st = 0;
+    size_t en = font_glyph_count;
+    size_t md;
+
+    while (st < en) {
+        md = ((en - st) >> 1) + st;
+        char32_t gcp = font_glyph_codepoints[md];
+        st = gcp <  codepoint ? md + 1 : st;
+        en = gcp >= codepoint ? md : en;
+    }
+
+    if (unlikely(st >= font_glyph_count ||
+                 font_glyph_codepoints[st] != codepoint))
+        return size_t(-1);
+
+    return st;
+}
+
+bitmap_glyph_t const *font_get_glyph(char32_t codepoint)
+{
+    size_t i = font_glyph_index(codepoint);
+
+    return i != size_t(-1)
+            ? &font_glyphs[i]
+            : font_replacement
+              ? &font_glyphs[font_replacement]
+              : &font_glyphs[font_ascii_lookup[' ' - font_ascii_min]];
+}
+
+void font_init()
+{
+    font_glyph_count = (uintptr_t(_binary_u_vga16_raw_end) -
+                   uintptr_t(_binary_u_vga16_raw_start)) /
+            (sizeof(bitmap_glyph_t) + sizeof(uint16_t));
+
+    font_glyph_codepoints = (char16_t*)(_binary_u_vga16_raw_start +
+                                        font_glyph_count);
+
+    size_t i = 0;
+    for (bitmap_glyph_t const *it = _binary_u_vga16_raw_start;
+         it != _binary_u_vga16_raw_end; ++i, ++it) {
+        char16_t codepoint = font_glyph_codepoints[i];
+        if (codepoint >= font_ascii_min && codepoint <= font_ascii_max)
+            font_ascii_lookup[codepoint] = i;
+    }
+
+    // Lookup the unicode replacement character glyph
+    font_replacement = font_glyph_index(0xFFFD);
 }
 
 surface_t *surface_create(int32_t width, int32_t height)
@@ -328,8 +382,6 @@ surface_t *surface_create(int32_t width, int32_t height)
 vga_console_ring_t::vga_console_ring_t(int32_t width, int32_t height)
     : surface_t(width, height, (uint32_t*)(this + 1))
 {
-    // Lookup the unicode replacement character glyph
-    replacement = glyph_index(0xFFFD);
 }
 
 void vga_console_ring_t::reset()
@@ -433,7 +485,7 @@ void vga_console_ring_t::write(const char *data, size_t size,
         bitmap_glyph_t const *glyphs[cp_max];
 
         for (size_t i = 0; i < cp; ++i)
-            glyphs[i] = get_glyph(codepoints[i]);
+            glyphs[i] = font_get_glyph(codepoints[i]);
 
         // Draw glyph into surface
 
@@ -474,40 +526,6 @@ void vga_console_ring_t::write(const char *data, size_t size,
     }
 }
 
-size_t vga_console_ring_t::glyph_index(size_t codepoint)
-{
-    if (likely(replacement &&
-               codepoint >= ascii_min &&
-               codepoint <= ascii_max))
-        return ascii_lookup[codepoint - ascii_min];
-
-    size_t st = 0;
-    size_t en = glyph_count;
-    size_t md;
-
-    while (st < en) {
-        md = ((en - st) >> 1) + st;
-        char32_t gcp = glyph_codepoints[md];
-        st = gcp <  codepoint ? md + 1 : st;
-        en = gcp >= codepoint ? md : en;
-    }
-
-    if (unlikely(st >= glyph_count || glyph_codepoints[st] != codepoint))
-        return size_t(-1);
-
-    return st;
-}
-
-bitmap_glyph_t const *vga_console_ring_t::get_glyph(char32_t codepoint)
-{
-    size_t i = glyph_index(codepoint);
-
-    return i != size_t(-1)
-            ? &glyphs[i]
-            : replacement
-              ? &glyphs[replacement]
-              : &glyphs[ascii_lookup[' ' - ascii_min]];
-}
 
 void surface_t::fill(uint32_t sx, uint32_t sy,
                      uint32_t ex, uint32_t ey, uint32_t color)
