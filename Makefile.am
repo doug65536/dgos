@@ -2529,13 +2529,13 @@ QEMU_DEBUGCON = \
 
 QEMU_SERIAL = \
 	-chardev file,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
-	-device isa-serial,chardev=qemu-debug-out,id=com1 \
+	-device isa-serial,chardev=qemu-debug-out,iobase=0x3f8,irq=4,id=com1 \
 	\
 	-chardev socket,id=qemu-symsrv-socket,host=localhost,port=7789,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-symsrv-socket,id=com2 \
+	-device isa-serial,chardev=qemu-symsrv-socket,iobase=0x2f8,irq=3,id=com2 \
 	\
 	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-serial-socket,id=com3,irq=5
+	-device isa-serial,chardev=qemu-serial-socket,iobase=0x3e8,irq=5,id=com3
 
 QEMU_SOUND = -soundhw es1370
 
