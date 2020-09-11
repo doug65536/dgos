@@ -342,6 +342,7 @@ src/stat/mknod.cc
 src/stat/stat.cc
 src/stat/umask.cc
 src/stat/utimensat.cc
+src/signal/bits/trampoline.S
 src/signal/signal.cc
 src/signal/kill.cc
 src/signal/sigaction.cc
@@ -350,6 +351,8 @@ src/signal/sigaddset.cc
 src/signal/sigemptyset.cc
 src/signal/sigfillset.cc
 src/signal/sigismember.cc
+src/signal/setjmp.S
+src/signal/longjmp.S
 libc.files
 include/pthread.h
 include/termios.h

@@ -10,6 +10,7 @@ public:
     using timeout_t = ext::chrono::steady_clock::time_point;
 
     static uint16_t const com[];
+    static uint8_t const irq[];
 
     uart_dev_t() = default;
     uart_dev_t(uart_dev_t const&) = delete;

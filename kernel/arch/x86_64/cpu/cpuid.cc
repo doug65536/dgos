@@ -67,6 +67,7 @@ void cpuid_init()
         cpuid_cache.has_pge         = info.edx & (1U << 13);
         cpuid_cache.has_sysenter    = info.edx & (1U << 11);
         cpuid_cache.has_pat         = info.edx & (1U << 16);
+        cpuid_cache.has_self_snoop  = info.edx & (1U << 16);
 
         cpuid_cache.has_sse3        = info.ecx & (1U << 0);
         cpuid_cache.has_mwait       = info.ecx & (1U << 3);

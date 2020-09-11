@@ -177,13 +177,13 @@ syscall32_entry:
 syscall_entry:
     .cfi_startproc
     .cfi_signal_frame
-    .cfi_def_cfa_offset 0
+    .cfi_def_cfa rsp,0
 
     // CPU puts rip in rcx
     .cfi_register rip,rcx
 
     // rsp still pointing the caller's stack!
-    .cfi_register rsp,rsp
+    .cfi_same_value rsp
 
     // CFI to encode caller's cs and ss to hardcoded values (because
     // we "know" cs and ss were certain values, since this is the

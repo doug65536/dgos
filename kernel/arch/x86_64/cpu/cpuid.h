@@ -50,6 +50,7 @@ struct cpuid_cache_t {
     bool has_pge        :1;
     bool has_sysenter   :1;
     bool has_pat        :1;
+    bool has_self_snoop :1;
     bool has_sse3       :1;
     bool has_mwait      :1;
     bool has_ssse3      :1;
@@ -297,6 +298,13 @@ CPUID_CONST_INLINE bool cpuid_has_sysenter()
 CPUID_CONST_INLINE bool cpuid_has_pat()
 {
     return cpuid_cache.has_pat;
+}
+
+// Self snoop: "management of conflicting memory types by performing a
+// snoop of its own cache structure for transactions issued to the bus"
+CPUID_CONST_INLINE bool cpuid_has_self_snoop()
+{
+    return cpuid_cache.has_self_snoop;
 }
 
 // 2MB pages

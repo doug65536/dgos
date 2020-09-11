@@ -36,6 +36,15 @@ EXPORT uint16_t const uart_dev_t::com[] = {
     0x2e8
 };
 
+
+EXPORT uint8_t const uart_dev_t::irq[] = {
+    0,
+    4,
+    3,
+    5,
+    7
+};
+
 namespace uart_defs {
 
 enum struct special_val_t : uint16_t {
@@ -1243,7 +1252,9 @@ EXPORT uart_dev_t *uart_dev_t::open(
                 ? uart_defs::uarts[id].get()
                 : new (ext::nothrow) uart_defs::uart_async_t();
 
-    uart_defs::debug_uart.init({0x3F8, 4, 115200,
+    assert(id < countof(com));
+    assert(id < countof(irq));
+    uart_defs::debug_uart.init({com[id], irq[id], 115200,
                                data_bits, parity_type, stop_bits}, false);
 
     return &uart_defs::debug_uart;

@@ -28,8 +28,6 @@ SECTIONS {
 	. = 0xFFFFFFFF80000000;
 
 	/* r-- begins */
-	. = ALIGN(16K);
-
 	PROVIDE(__image_start = .);
 
 	. += SIZEOF_HEADERS;
@@ -48,10 +46,6 @@ SECTIONS {
 		PROVIDE_HIDDEN(___rodata_fixup_insn_st = .);
 		*(.rodata.fixup.insn)
 		PROVIDE_HIDDEN(___rodata_fixup_insn_en = .);
-
-		PROVIDE_HIDDEN(___rodata_fixup_swapgs_st = .);
-		*(.rodata.fixup.swapgs)
-		PROVIDE_HIDDEN(___rodata_fixup_swapgs_en = .);
 
 		*(SORT(.rodata.*))
 
@@ -87,7 +81,9 @@ SECTIONS {
 		PROVIDE_HIDDEN(___rodata_en = .);
 	} :readonly
 
-	.eh_frame_hdr :  ALIGN(64) {
+	. = ALIGN(64);
+
+	.eh_frame_hdr : {
 		KEEP(*(.eh_frame_hdr))
 		KEEP(*(.eh_frame_entry .eh_frame_entry.*))
 	} :readonly

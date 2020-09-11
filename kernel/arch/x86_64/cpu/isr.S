@@ -631,6 +631,7 @@ isr_common:
     lea isr_lookup(%rip),%rax
     movl %ebx,%edi
     movq %r12,%rsi
+    add $ -8,%rsp
     indirect_call_mem rcx,"(%rax,%rbx,8)"
 
     // If context pointer is null, invoke the exception handler for this thread
@@ -659,25 +660,38 @@ isr_common:
     // rcx = this_cpu()
     movq %gs:(%rcx),%rcx
 
-    cmpb $ INTR_EX_NMI,frame_intr(%rbp)
-    jz .Lno_cleanup_call
+    cmpl $ INTR_EX_NMI,frame_intr(%rbp)
+    jz .Ldone_cleanup_call_slow
 
     xor %edx,%edx
 
+    lea thread_clear_busy(%rip),%rsi
+
     // Run cpu-local outgoing cleanup after stack switch (now)
     // Used to adjust outgoing thread state after switching stack
+
+    // Load function pointer
     mov CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
     mov %rdx,CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
 
+    // No cleanup case
     test %rax,%rax
-    jz .Lno_cleanup_call
+    jz .Ldone_cleanup_call_slow
 
+    // Falls through when actually context switching (the important case)
+
+    // Parameter
     mov CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
     mov %rdx,CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
 
-    indirect_call rax
+    // Devirtualize thread_clear_busy or jump to out of line unlikely case
+    cmp %rsi,%rax
+    jnz .Lindirect_cleanup_call_slow
 
-.Lno_cleanup_call:
+    // Fall through hottest case
+
+    call thread_clear_busy
+.Ldone_cleanup_call_slow:
 
     // Avoid giant instruction below
     movl $ 1 << ISR_CTX_CTX_FLAGS_USERGS_QWBIT,%eax
@@ -695,60 +709,65 @@ isr_common:
 
     .cfi_remember_state
 
-    popq %rdi
+    // mov is usually at least 2x faster than pop
+
+    mov 0*8(%rsp),%rdi
     .cfi_same_value rdi
 
-    popq %rsi
+    mov 1*8(%rsp),%rsi
     .cfi_same_value rsi
 
-    popq %rdx
+    mov 2*8(%rsp),%rdx
     .cfi_same_value rdx
 
-    popq %rcx
+    mov 3*8(%rsp),%rcx
     .cfi_same_value rcx
 
-    popq %r8
+    mov 4*8(%rsp),%r8
     .cfi_same_value r8
 
-    popq %r9
+    mov 5*8(%rsp),%r9
     .cfi_same_value r9
 
-    popq %rax
+    mov 6*8(%rsp),%rax
     .cfi_same_value rax
 
-    popq %r10
+    mov 7*8(%rsp),%r10
     .cfi_same_value r10
 
-    popq %r11
+    mov 8*8(%rsp),%r11
     .cfi_same_value r11
 
-    popq %r12
+    mov 9*8(%rsp),%r12
     .cfi_same_value r12
 
-    popq %r13
+    mov 10*8(%rsp),%r13
     .cfi_same_value r13
 
-    popq %r14
+    mov 11*8(%rsp),%r14
     .cfi_same_value r14
 
-    popq %r15
+    mov 12*8(%rsp),%r15
     .cfi_same_value r15
 
-    popq %rbx
+    mov 13*8(%rsp),%rbx
     .cfi_same_value rbx
 
-    popq %rbp
+    mov 14*8(%rsp),%rbp
     .cfi_same_value rbp
 
+    // Discard stuff moved from stack, plus the error code and intr number
+    add_rsp_cfi 17*8
+
     // rbp has been restored, back to raw rsp-relative CFA
-    .cfi_def_cfa rsp,7*8
+    .cfi_def_cfa rsp,5*8
     .cfi_offset ss,-1*8
     .cfi_offset rsp,-2*8
     .cfi_offset rflags,-3*8
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
 
-    testb $ 3,frame_cs(%rsp)
+    testl $ 3,8(%rsp)
     jz .Lnot_iret_to_user
 
     // This could be patched to a long nop
@@ -756,8 +775,6 @@ isr_common:
     call protection_barrier_to_user
 
 .Lnot_iret_to_user:
-    adj_rsp_cfi 16
-
     fn_trace isr_common,exit
 
     iretq
@@ -773,6 +790,10 @@ isr_common:
     js .Lno_swap
     jmp .Lneed_swap
 
+.Lindirect_cleanup_call_slow:
+    indirect_call rax
+    jmp .Ldone_cleanup_call_slow
+
     .cfi_endproc
 
 // Yield as efficiently as possible
@@ -784,8 +805,7 @@ thread_yield:
 
     // Snag return address from the stack,
     // we're replacing that with a synthetic interrupt frame
-    pop_cfi %rcx
-    .cfi_same_value rsp
+    mov (%rsp),%rcx
 
     // Switch to getting return address from a register
     .cfi_register rip,rcx
@@ -793,20 +813,20 @@ thread_yield:
     // At this point, the stack pointer conveniently has
     // the value it will have when the thread resumes
     // Save caller's rsp in rax
-    movq %rsp,%rax
+    leaq 8(%rsp),%rax
     .cfi_register rsp,rax
 
     // push ss:rsp
 
     push_cfi $(GDT_SEL_KERNEL_DATA)
-    .cfi_offset ss,-1*8
+    .cfi_offset ss,-2*8
 
     push_cfi %rax
-    .cfi_offset rsp,-2*8
+    .cfi_offset rsp,-3*8
 
     // push eflags
     pushfq_cfi
-    .cfi_offset rflags,-3*8
+    .cfi_offset rflags,-4*8
 
     // Must be after saving flags
     cli
@@ -816,9 +836,9 @@ thread_yield:
 
     // push cs:rip
     push_cfi $(GDT_SEL_KERNEL_CODE64)
-    .cfi_offset cs,-4*8
+    .cfi_offset cs,-5*8
     push_cfi %rcx
-    .cfi_offset rip,-5*8
+    .cfi_offset rip,-6*8
 
     //          frame      raw
     //   0   8*8(%rbp) 25*8(%rsp) <-- CFA
@@ -860,7 +880,7 @@ thread_yield:
     // Save caller rbp
 
     push_cfi %rbp
-    .cfi_offset rbp,-8*8
+    .cfi_offset rbp,-9*8
 
     // Switch to rbp-relative frame, avoid CFA adjustments I hope
 
@@ -939,67 +959,85 @@ thread_yield:
     lea ISR_CTX_OFS_RBP(%rsp),%rbp
     mov %rax,%rsp
 
+    lea thread_clear_busy(%rip),%rdx
+
     // Run cpu-local outgoing cleanup after stack switch (now)
     // Used to adjust outgoing thread state after switching stack
     mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
-    test %rax,%rax
-    jz .Lno_cleanup_call_fast
     mov %rcx,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+
+    test %rax,%rax
+    jz .Ldone_cleanup_call_fast
+
     mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
     mov %rcx,%gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
-    indirect_call rax
-.Lno_cleanup_call_fast:
+
+    cmp %rdx,%rax
+    jnz .Lindirect_cleanup_call_fast
+
+    // Common case
+    call thread_clear_busy
+
+.Ldone_cleanup_call_fast:
 
     // Discard FPU ctx, segments, cr3, call clobbered registers
     add $ 12*8,%rsp
 
-    popq %r12
+    mov (%rsp),%r12
     .cfi_same_value r12
 
-    popq %r13
+    mov 1*8(%rsp),%r13
     .cfi_same_value r13
 
-    popq %r14
+    mov 2*8(%rsp),%r14
     .cfi_same_value r14
 
-    popq %r15
+    mov 3*8(%rsp),%r15
     .cfi_same_value r15
 
-    popq %rbx
+    mov 4*8(%rsp),%rbx
     .cfi_same_value rbx
 
-    popq %rbp
+    mov 5*8(%rsp),%rbp
     .cfi_same_value rbp
 
     // rbp has been restored, back to raw rsp-relative CFA
-    .cfi_def_cfa rsp,7*8
+    .cfi_remember_state
+    .cfi_def_cfa rsp,8*8+5*8
     .cfi_offset ss,-1*8
     .cfi_offset rsp,-2*8
     .cfi_offset rflags,-3*8
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
 
-    // Discard interrupt number
-    adj_rsp_cfi 8
-
     // Error code is wakeup return value
-    pop_cfi %rax
+    mov 7*8(%rsp),%rax
+
+    add_rsp_cfi 8*8
 
     // Zero all clobbered registers
     xorl %ecx,%ecx
-    xorl %edx,%edx
-    xorl %esi,%esi
-    xorl %r8d,%r8d
-    xorl %r9d,%r9d
-    xorl %r10d,%r10d
-    xorl %r11d,%r11d
+    movl %ecx,%edx
+    movl %ecx,%esi
+    movl %ecx,%edi
+    movl %ecx,%r8d
+    movl %ecx,%r9d
+    movl %ecx,%r10d
+    movl %ecx,%r11d
 
     // Load flags from interrupt frame (reach over intr+errcode+rip+cs)
     push_cfi 2*8(%rsp)
     popfq_cfi
 
-    // Return and pop cs, eflags, rsp, ss
-    retq $ ((5-1)*8)
+    // Return and discard cs, eflags, rsp, ss
+    retq $ ((1+5-1)*8)
+
+    .cfi_restore_state
+
+// Out of line uncommon case
+.Lindirect_cleanup_call_fast:
+    indirect_call rax
+    jmp .Ldone_cleanup_call_fast
 
     .cfi_endproc
 
@@ -1207,7 +1245,7 @@ soft_rdgsbase_r14:
 
     // Set all bits of edx:eax
     movl $ -1,%eax
-    movl %eax,%edx
+    movl $ -1,%edx
 
     // Restore context using instruction passed to macro
     // replaced with best supported instruction
@@ -1353,6 +1391,9 @@ exception_isr_handler:
     .cfi_offset rsi,-21*8
     .cfi_offset rdi,-22*8
 
+    // Align
+    add $ -8,%rsp
+
     call intr_has_handler
     testl %eax,%eax
     jz .Lno_handler
@@ -1361,6 +1402,9 @@ exception_isr_handler:
     movl %ebx,%edi
     movq %r12,%rsi
     call intr_invoke
+
+    // Align
+    add $ 8,%rsp
 
     retq
 
@@ -1437,7 +1481,7 @@ isr_sysret:
     // "setjmp returned 0" path right now
 
     // Copy use64 to bpl
-    mov %cl,%bpl
+    movb %cl,%bpl
     .cfi_undefined rbp
 
     // Entry point in rcx
@@ -1833,9 +1877,9 @@ nofault_strncpy:
 
 .balign 16
 .Lnofault_strncpy_loop:
-    mov (%rsi,%rax),%cl
+    movzbl (%rsi,%rax),%ecx
     movb %cl,(%rdi,%rax)
-    test %cl,%cl
+    test %ecx,%ecx
     jz .Lnofault_strncpy_done
     add $ 1,%rax
     cmp %rdx,%rax
@@ -1921,10 +1965,10 @@ nofault_strnlen:
 
 .balign 16
 .Lnofault_strnlen_loop:
-    movb (%rdi,%rax),%cl
+    movzbl (%rdi,%rax),%ecx
 
     // If the value that was loaded was zero then done
-    test %cl,%cl
+    test %ecx,%ecx
     jz .Lnofault_strnlen_done
 
     // Rather use simplest addressing mode above and increment two registers
@@ -2176,7 +2220,7 @@ nofault_memcpy:
 .Lnofault_memcpy_little_remaining_not32:
     movzbl (%rsi),%eax
     add $ 1,%rsi
-    mov %al,(%rdi)
+    movb %al,(%rdi)
     add $ 1,%rdi
     add $ -1,%rdx
     jz .Lnofault_memcpy_done
@@ -2188,6 +2232,204 @@ nofault_memcpy:
     .cfi_endproc
 
 nofault_define_region nofault_memcpy
+
+.balign 16
+.hidden sys_sigreturn_impl_64
+.global sys_sigreturn_impl_64
+sys_sigreturn_impl_64:
+    .cfi_startproc
+    .cfi_signal_frame
+
+    // Disable interrupts and point stack at context save area
+    cli
+    mov %rdi,%rsp
+
+    .cfi_def_cfa rsp,21*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+    .cfi_offset rbp,-6*8
+    .cfi_offset rbx,-7*8
+    .cfi_offset r15,-8*8
+    .cfi_offset r14,-9*8
+    .cfi_offset r13,-10*8
+    .cfi_offset r12,-11*8
+    .cfi_offset r11,-12*8
+    .cfi_offset r10,-13*8
+    .cfi_offset rax,-14*8
+    .cfi_offset r9,-15*8
+    .cfi_offset r8,-16*8
+    .cfi_offset rcx,-17*8
+    .cfi_offset rdx,-18*8
+    .cfi_offset rsi,-19*8
+    .cfi_offset rdi,-20*8
+    // fpu pointer here
+
+    // Guarantee no funny changes to eflags. We're not that foolish.
+    // Guarantee user code and data segments
+
+    // Get pointer to iret frame so we can use small offsets
+    leaq 16*8(%rsp),%rbx
+
+    // Get pointer to fpu context and load fpu context
+    pop_cfi %rcx
+
+    .cfi_remember_state
+    test %sil,%sil
+    jz .Lold_cpu
+
+    // Likely
+    mov $ -1,%eax
+    mov $ -1,%edx
+    xrstor (%rcx)
+.Ldone_rstor:
+
+    pop_cfi %rdi
+    .cfi_same_value rdi
+
+    // Load eflags image
+    movl 2*8(%rbx),%eax
+
+    pop_cfi %rsi
+    .cfi_same_value rsi
+
+    // Force cs to specific value
+    movq $ GDT_SEL_USER_CODE64|3,1*8(%rbx)
+
+    pop_cfi %rdx
+    .cfi_same_value rdx
+
+    // Clear prohibited eflags bits
+    andl $ ~(CPU_EFLAGS_IOPL | CPU_EFLAGS_NT | CPU_EFLAGS_VIF | \
+        CPU_EFLAGS_VIP | CPU_EFLAGS_VM),%eax
+
+    pop_cfi %rcx
+    .cfi_same_value rcx
+
+    // Force ss to specific value
+    movq $ GDT_SEL_USER_DATA|3,4*8(%rbx)
+
+    pop_cfi %r8
+    .cfi_same_value r8
+
+    // Force interrupts enabled
+    orl $ CPU_EFLAGS_IF,%eax
+
+    pop_cfi %r9
+    .cfi_same_value r9
+
+    // Update eflags in iret frame
+    movl %eax,2*8(%rbx)
+
+    pop_cfi %rax
+    .cfi_same_value rax
+
+    pop_cfi %r10
+    .cfi_same_value r10
+
+    pop_cfi %r11
+    .cfi_same_value r11
+
+    pop_cfi %r12
+    .cfi_same_value r12
+
+    pop_cfi %r13
+    .cfi_same_value r13
+
+    pop_cfi %r14
+    .cfi_same_value r14
+
+    pop_cfi %r15
+    .cfi_same_value r15
+
+    pop_cfi %rbx
+    .cfi_same_value rbx
+
+    pop_cfi %rbp
+    .cfi_same_value rbp
+
+    swapgs
+    iretq
+
+.Lold_cpu:
+    .cfi_restore_state
+    fxrstor (%rcx)
+    jmp .Ldone_rstor
+
+    .cfi_endproc
+
+.balign 16
+.hidden sys_sigreturn_impl_32
+.global sys_sigreturn_impl_32
+sys_sigreturn_impl_32:
+    .cfi_startproc
+    .cfi_signal_frame
+
+    // Interleave pushing an iretq frame,
+    // loading 32 bit register context,
+    // and zeroing upper registers
+    // Two loads and one store per cycle
+
+    cli
+
+    mov %rdi,%r8
+    xor %r15d,%r15d
+    .cfi_undefined r15
+    push_cfi $ GDT_SEL_USER_DATA
+    xor %r14d,%r14d
+    .cfi_undefined r14
+
+    // r9d=return_eip, r10d=return_eflags, r11d=return_esp
+    movl 10*4(%r8),%r11d
+    movl 9*4(%r8),%r10d
+    push_cfi %r11
+    xorl %r13d,%r13d
+    .cfi_undefined r13
+
+    movl 7*4(%r8),%r9d
+    movl 6*4(%r8),%ebp
+    .cfi_undefined rbp
+    push_cfi %r10
+    xorl %r12d,%r12d
+    .cfi_undefined r12
+
+    movl 5*4(%r8),%ebx
+    .cfi_undefined rbx
+    movl 4*4(%r8),%esi
+    push_cfi $ GDT_SEL_USER_CODE32
+    xorl %r11d,%r11d
+
+    movl 3*4(%r8),%edi
+    movl 2*4(%r8),%edx
+    push_cfi %r9
+    xorl %r10d,%r10d
+
+    movl 1*4(%r8),%ecx
+    movl (%r8),%eax
+
+    .cfi_def_cfa rsp,5*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+    .cfi_same_value rax
+    .cfi_same_value rbx
+    .cfi_same_value rcx
+    .cfi_same_value rdx
+    .cfi_same_value rsi
+    .cfi_same_value rdi
+    .cfi_same_value rbp
+
+    xorl %r9d,%r9d
+    xorl %r8d,%r8d
+
+    swapgs
+    iretq
+
+    .cfi_endproc
 
 .global __module_unwind_resume
 .balign 16

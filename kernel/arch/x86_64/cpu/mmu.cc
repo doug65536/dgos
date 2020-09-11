@@ -782,6 +782,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = true)
     thread_cpu_mask_t new_pending = shootdown_pending.atom_or(other_cpu_mask);
     thread_cpu_mask_t need_ipi_mask = new_pending & other_cpu_mask;
 
+    // Take a snapshot of all the counts
     uint64_t shootdown_counts[MAX_CPUS];
     if (synchronous) {
         for (uint32_t i = 0; i < cpu_count; ++i) {
@@ -791,6 +792,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = true)
         }
     }
 
+    // Send the IPI to some or all other cpus
     if (!!other_cpu_mask) {
         if (need_ipi_mask == other_cpu_mask) {
             // Send to all other CPUs
@@ -805,8 +807,9 @@ static void mmu_send_tlb_shootdown(bool synchronous = true)
         }
     }
 
+    // Wait for the shootdowns to proceed
     if (unlikely(synchronous)) {
-        uint64_t wait_st = nano_time();
+        uint64_t wait_st = time_ns();
         uint64_t loops = 0;
         for (int wait_count = cpu_count - 1; wait_count > 0; pause()) {
             for (uint32_t i = 0; i < cpu_count; ++i) {
@@ -819,7 +822,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = true)
             }
             ++loops;
         }
-        uint64_t wait_en = nano_time();
+        uint64_t wait_en = time_ns();
 
         printdbg("TLB shootdown waited for "
                  "%" PRIu64 " loops, %ss\n", loops,
@@ -1446,6 +1449,8 @@ void mmu_init()
     callout_call(callout_type_t::vmm_ready);
 
     assert(malloc_validate(false));
+
+
 
 #if 0 // Hack
     printdbg("Allocating and filling all memory with garbage\n");
@@ -3204,15 +3209,17 @@ void mm_init_process(process_t *process, bool use64)
 
     uintptr_t user_mem_st;
     uintptr_t user_mem_en;
-    uintptr_t userTop = UINT64_C(1) << 47;
+
+    // Reserve 512GB/2MB for 64/32bit
+    uintptr_t reserved_size = UINT64_C(1) << (use64 ? 39 : 21);
+
+    // Top of memory is 128TB/4GB
+    uintptr_t userTop = UINT64_C(1) << (use64 ? 47 : 32);
+
     constexpr uintptr_t fourMB = 4 << 20;
 
-    // 4MB unavailable margin at start and end of memory
-    // (top-4MB) to (top) is reserved (4MB)
-    userTop = use64 ? UINT64_C(1) << 47 : (UINT32_C(1) << 31);
-
     user_mem_st = fourMB;
-    user_mem_en = userTop - fourMB;
+    user_mem_en = userTop - reserved_size;
     allocator->init(user_mem_st, user_mem_en - user_mem_st, "process");
 
     process->set_allocator(allocator);

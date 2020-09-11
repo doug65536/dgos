@@ -1775,7 +1775,8 @@ int start_framebuffer()
 
     mouse_test(&info);
 
-    //return stress(info);
     while (true)
         sleep(UINT_MAX);
+
+    //return stress(info);
 }

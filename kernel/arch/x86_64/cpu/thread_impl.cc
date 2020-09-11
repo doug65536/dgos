@@ -26,6 +26,7 @@
 #include "basic_set.h"
 #include "engunit.h"
 #include "idt.h"
+#include "user_mem.h"
 
 // Implements platform independent thread.h
 
@@ -207,7 +208,7 @@ struct alignas(256) thread_info_t {
 
     char const *name;
 
-    bool closed;
+    //bool closed;
 
     // Iterator points to the node we inserted into
     // scheduler list, otherwise default constructed
@@ -386,6 +387,8 @@ struct alignas(256) cpu_info_t {
             return false;
         }
 
+        printdbg("Enqueuing cross cpu resume, tid=%d\n", tid);
+
         resume_ring[head].tid = tid;
         resume_ring[head].ret_lo = uint32_t(value & 0xFFFFFFFFU);
         resume_ring[head].ret_hi = uint32_t((value >> 32) & 0xFFFFFFFFU);
@@ -441,7 +444,9 @@ uint32_t cpu_count;
 // Holds full count
 uint32_t total_cpus;
 
-void thread_destruct(thread_info_t *thread);
+static void thread_destruct(thread_info_t *thread,
+                            thread_info_t::scoped_lock &lock);
+
 static void thread_signal_completion_locked(
         thread_info_t *thread,
         thread_info_t::scoped_lock &thread_lock);
@@ -479,6 +484,7 @@ static _always_inline thread_info_t *this_thread()
     return cpu_gs_read<thread_info_t*, offsetof(cpu_info_t, cur_thread)>();
 }
 
+_noreturn
 static void thread_cleanup()
 {
     thread_info_t *thread = this_thread();
@@ -491,16 +497,15 @@ static void thread_cleanup()
 
     thread->priority = 0;
 
-    if (likely(thread->state == THREAD_IS_RUNNING))
-        thread->state = THREAD_IS_EXITING_BUSY;
-    else
-        assert(!"Unexpected state!");
+    assert(thread->state == THREAD_IS_RUNNING);
 
-    thread_signal_completion_locked(thread, lock);
+    thread->state = THREAD_IS_EXITING_BUSY;
 
     lock.unlock();
 
     thread_yield();
+
+    __builtin_unreachable();
 }
 
 void thread_startup(thread_fn_t fn, void *p, thread_t id)
@@ -591,29 +596,30 @@ static thread_t thread_create_with_state(
 
     for (i = 0; ; ++i) {
         if (unlikely(i >= MAX_THREADS)) {
-            printdbg("Out of threads, yielding\n");
-            thread_yield();
+//            printdbg("Out of threads, yielding\n");
+//            thread_yield();
+            panic("Out of threads");
             i = 0;
         }
 
         thread = threads + i;
 
+        thread_info_t::scoped_lock thread_lock(
+                    thread->lock, ext::defer_lock_t());
+
+        if (unlikely(!thread_lock.try_lock()))
+            continue;
+
         if (likely(thread->state != THREAD_IS_UNINITIALIZED))
             continue;
 
         // Atomically grab the thread
-        if (likely(atomic_cmpxchg(&thread->state,
-                                  THREAD_IS_UNINITIALIZED,
-                                  THREAD_IS_INITIALIZING) ==
-                   THREAD_IS_UNINITIALIZED))
-        {
-            if (ret_tid)
-                *ret_tid = i;
+        thread->state = THREAD_IS_INITIALIZING;
 
-            break;
-        }
+        if (ret_tid)
+            *ret_tid = i;
 
-        pause();
+        break;
     }
 
     thread->name = name;
@@ -1096,7 +1102,7 @@ static thread_info_t *thread_choose_next(
     return ft;
 }
 
-static void thread_clear_busy(void *outgoing)
+void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = (thread_info_t*)outgoing;
 
@@ -1104,8 +1110,9 @@ static void thread_clear_busy(void *outgoing)
                  THREAD_IS_FINISHED)) {
         // The exiting thread has finished getting off the CPU, immediately
         // delete the thread from the owning process
-        //thread_destruct(thread);
-        thread_free_stacks(thread);
+        thread_info_t::scoped_lock lock(thread->lock);
+        thread_destruct(thread, lock);
+        //thread_free_stacks(thread);
     }
 }
 
@@ -1160,20 +1167,39 @@ static void thread_signal_completion_locked(
         thread_info_t::scoped_lock &thread_lock)
 {
     // Wake up any threads waiting for this thread to exit ASAP
-    assert(thread->state == THREAD_IS_EXITING_BUSY);
+    thread->state = THREAD_IS_FINISHED_BUSY;
     thread_lock.unlock();
     thread->done_cond.notify_all();
 }
 
+static void thread_add_ref(thread_info_t *thread,
+                           thread_info_t::scoped_lock &lock)
+{
+    assert(lock.is_locked());
+    assert(thread->ref_count > 0);
+    ++thread->ref_count;
+}
+
+static void thread_release_ref(thread_info_t *thread,
+                               thread_info_t::scoped_lock &lock)
+{
+    assert(lock.is_locked());
+    //assert(thread->ref_count > 0);
+    thread->ref_count -= (thread->ref_count > 0);
+    if (thread->ref_count == 0)
+        thread->state = (thread_state_t)
+                (THREAD_IS_UNINITIALIZED | (thread->state & THREAD_BUSY));
+}
+
 // Thread is not running anymore, destroy things only needed when it runs
-void thread_destruct(thread_info_t *thread)
+void thread_destruct(thread_info_t *thread,
+                     thread_info_t::scoped_lock &lock)
 {
     thread_free_stacks(thread);
 
     // If everybody has closed their handle to this thread,
     // then mark it for recycling immediately
-    if (thread->ref_count == 0)
-        thread->state = THREAD_IS_UNINITIALIZED;
+    //thread_release_ref(thread, lock);
 }
 
 EXPORT int thread_close(thread_t tid)
@@ -1182,14 +1208,15 @@ EXPORT int thread_close(thread_t tid)
 
     thread_info_t::scoped_lock lock(thread->lock);
 
-    if (thread->closed)
+    if (thread->ref_count == 0)
         return 0;
 
-    thread->closed = true;
+    --thread->ref_count;
 
     if (thread->state == THREAD_IS_FINISHED) {
+        assert(thread->ref_count == 0);
         //mutex_destroy(&thread.lock);
-        thread_destruct(thread);
+        thread_destruct(thread, lock);
         return 1;
     }
 
@@ -1482,7 +1509,11 @@ isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
                     .insert(ext::move(sched_node)).first;
         } else if (thread->state == THREAD_IS_EXITING_BUSY) {
             // Let node destruct
-            thread->state = THREAD_IS_FINISHED_BUSY;
+            thread_info_t::scoped_lock thread_lock(thread->lock);
+
+            cpu_lock.unlock();
+            thread_signal_completion_locked(thread, thread_lock);
+            cpu_lock.lock();
         } else {
             assert(!"?");
         }
@@ -1774,6 +1805,8 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
             uint32_t this_cpu_nr = thread_cpu_number();
 
             if (this_cpu_nr != cpu_nr) {
+                // Alternate algorithm for cross-cpu wakeup
+
                 uint64_t wait_st = 0;
                 while (!cpu.enqueue_resume(tid, exit_code)) {
                     if (!wait_st)
@@ -1781,6 +1814,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
 
                     pause();
                 }
+
                 // tattletale
                 if (unlikely(wait_st)) {
                     uint64_t wait_en = time_ns();
@@ -1794,39 +1828,41 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
                 resumed_thread->state = THREAD_IS_SLEEPING;
                 apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
                 cpu_lock.unlock();
-            } else {
-                // Remove node from the sleep queue for reuse in ready queue
-                ready_set_t::node_type node = cpu.sleep_list.extract(
-                            resumed_thread->schedule_node);
 
-                node.value().first = resumed_thread->timeslice_timestamp;
-
-//                printdbg("Waking sleeping thread %u\n",
-//                         resumed_thread->thread_id);
-                resumed_thread->schedule_node = cpu.ready_list
-                        .insert(ext::move(node)).first;
-
-                //dump_scheduler_list("ready list:", cpu.ready_list);
-
-                // Should be a fast, voluntarily yielded context
-                assert(ISR_CTX_CTX_FLAGS(resumed_thread->ctx) &
-                       (1<<ISR_CTX_CTX_FLAGS_FAST_BIT));
-
-                // Set return value
-                ISR_CTX_ERRCODE(resumed_thread->ctx) = exit_code;
-
-                // Done manipulating it, mark it ready
-                resumed_thread->state = THREAD_IS_READY;
-
-                // True if the resumed thread should run immediately
-                bool need_resched = (resumed_thread->schedule_node ==
-                                cpu.ready_list.cbegin());
-
-                if (need_resched)
-                    thread_request_reschedule_noirq();
-
-                cpu_lock.unlock();
+                return;
             }
+
+            // Remove node from the sleep queue for reuse in ready queue
+            ready_set_t::node_type node = cpu.sleep_list.extract(
+                        resumed_thread->schedule_node);
+
+            node.value().first = resumed_thread->timeslice_timestamp;
+
+//            printdbg("Waking sleeping thread %u\n",
+//                     resumed_thread->thread_id);
+            resumed_thread->schedule_node = cpu.ready_list
+                    .insert(ext::move(node)).first;
+
+            //dump_scheduler_list("ready list:", cpu.ready_list);
+
+            // Should be a fast, voluntarily yielded context
+            assert(ISR_CTX_CTX_FLAGS(resumed_thread->ctx) &
+                   (1<<ISR_CTX_CTX_FLAGS_FAST_BIT));
+
+            // Set return value
+            ISR_CTX_ERRCODE(resumed_thread->ctx) = exit_code;
+
+            // Done manipulating it, mark it ready
+            resumed_thread->state = THREAD_IS_READY;
+
+            // True if the resumed thread should run immediately
+            bool need_resched = (resumed_thread->schedule_node ==
+                            cpu.ready_list.cbegin());
+
+            if (need_resched)
+                thread_request_reschedule_noirq();
+
+            cpu_lock.unlock();
 
             return;
         }
@@ -1844,10 +1880,15 @@ EXPORT intptr_t thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
 
-    thread_info_t::scoped_lock thread_lock(thread->lock);
+    thread_info_t::scoped_lock lock(thread->lock);
 
-    while (thread->state != THREAD_IS_FINISHED)
-        thread->done_cond.wait(thread_lock);
+    thread_add_ref(thread, lock);
+
+    while (thread->state != THREAD_IS_FINISHED &&
+           thread->state != THREAD_IS_FINISHED_BUSY)
+        thread->done_cond.wait(lock);
+
+    thread_release_ref(thread, lock);
 
     return thread->exit_code;
 }
@@ -1859,7 +1900,7 @@ uint32_t thread_cpus_started()
 
 EXPORT thread_t thread_get_id()
 {
-    if (thread_cls_ready) {
+    if (likely(thread_cls_ready)) {
         thread_t thread_id;
 
         thread_info_t *cur_thread = this_thread();
@@ -2406,4 +2447,109 @@ void arch_jump_to_user(uintptr_t ip, uintptr_t sp,
     cpu_altgsbase_set(thread->gsbase);
 
     isr_sysret(ip, sp, kernel_sp, use64, arg0, arg1, arg2);
+}
+
+__BEGIN_DECLS
+
+_noreturn
+void sys_sigreturn_impl_32(void *mctx, bool xsave);
+
+_noreturn
+void sys_sigreturn_impl_64(void *mctx, bool xsave);
+
+__END_DECLS
+
+int sys_sigreturn(void *mctx)
+{
+    process_t *process = fast_cur_process();
+
+    char data[3072];
+
+    bool use_xsave = cpuid_has_xsave();
+
+    size_t fpuctx_sz = sizeof(mcontext_x86_fpu_t);
+
+    uintptr_t data_ptr = uintptr_t(data + sizeof(data));
+    if (use_xsave) {
+        if (unlikely(sse_context_size > sizeof(data) ||
+                     ((data_ptr - sse_context_size) & -64) < uintptr_t(data)))
+            panic("Cannot handle SSE state, too large, please fix");
+
+        fpuctx_sz = sse_context_size;
+    }
+
+    data_ptr -= fpuctx_sz;
+
+    if (cpuid_has_xsave())
+        data_ptr &= -64;
+    else
+        data_ptr &= -16;
+
+    assert(data_ptr >= uintptr_t(data));
+
+    mcontext_x86_fpu_t * fpuctx = (mcontext_x86_fpu_t*)data_ptr;
+
+    if (process->use64) {
+        if (unlikely(!mm_is_user_range(mctx, sizeof(mcontext_t))))
+            return -int(errno_t::EFAULT);
+
+        mcontext_t ctx{};
+
+        // Copy the restored general register context from userspace
+        if (unlikely(!mm_copy_user(&ctx, mctx, sizeof(ctx))))
+            return -int(errno_t::EFAULT);
+
+        // Validate the user FPU context pointer points to userspace
+        if (unlikely(!mm_is_user_range((void*)ctx.__fpu, sizeof(*fpuctx))))
+            return -int(errno_t::EFAULT);
+
+        // Copy the fpu context into kernel space
+        if (unlikely(!mm_copy_user(fpuctx, (void*)ctx.__fpu, fpuctx_sz)))
+            return -int(errno_t::EFAULT);
+
+        // Point kernel copy of context at kernel copy of FPU context
+        ctx.__fpu = uintptr_t(fpuctx);
+
+        assert(ctx.__cs == (GDT_SEL_USER_CODE64|3));
+        assert(ctx.__ss == (GDT_SEL_USER_DATA|3));
+
+        assert(!(ctx.__rflags & (CPU_EFLAGS_IOPL | CPU_EFLAGS_NT |
+                               CPU_EFLAGS_VIF | CPU_EFLAGS_VIP |
+                               CPU_EFLAGS_VM)));
+
+        assert((ctx.__rflags & (CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS)) ==
+               (CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS));
+
+        sys_sigreturn_impl_64(&ctx, use_xsave);
+    } else {
+        if (unlikely(!mm_is_user_range(mctx, sizeof(mcontext32_t))))
+            return -int(errno_t::EFAULT);
+
+        mcontext32_t ctx{};
+
+        if (unlikely(!mm_copy_user(&ctx, mctx, sizeof(ctx))))
+            return -int(errno_t::EFAULT);
+
+        if (unlikely(!mm_is_user_range((void*)uintptr_t(ctx.__fpu),
+                                       sizeof(*fpuctx))))
+            return -int(errno_t::EFAULT);
+
+        if (unlikely(!mm_copy_user(&fpuctx, (void*)(uintptr_t)ctx.__fpu,
+                                   sizeof(*fpuctx))))
+            return -int(errno_t::EFAULT);
+
+        ctx.__fpu = uintptr_t(fpuctx);
+
+        assert(ctx.__cs == (GDT_SEL_USER_CODE32|3));
+        assert(ctx.__ss == (GDT_SEL_USER_DATA|3));
+
+        assert(!(ctx.__eflags & (CPU_EFLAGS_IOPL | CPU_EFLAGS_NT |
+                               CPU_EFLAGS_VIF | CPU_EFLAGS_VIP |
+                               CPU_EFLAGS_VM)));
+
+        assert((ctx.__eflags & (CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS)) ==
+               (CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS));
+
+        sys_sigreturn_impl_32(&ctx, use_xsave);
+    }
 }

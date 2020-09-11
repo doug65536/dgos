@@ -2009,7 +2009,9 @@ static void apic_detect_topology_amd(void)
             topo_core_count = 1 << topo_core_bits;
         }
 
-        topo_thread_bits = bit_log2(topo_thread_count >> topo_core_bits);
+        topo_thread_bits = (topo_thread_count >> topo_core_bits)
+                ? bit_log2(topo_thread_count >> topo_core_bits)
+                : 0;
         topo_thread_count = 1 << topo_thread_bits;
     } else {
         topo_core_count = topo_thread_count;

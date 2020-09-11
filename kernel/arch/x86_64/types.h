@@ -136,5 +136,7 @@ constexpr size_t countof(T const (&)[N]) noexcept
 //#define countof(arr) (sizeof((arr))/sizeof(*(arr)))
 
 typedef int pid_t;
+typedef int uid_t;
+typedef int gid_t;
 
 struct process_t;

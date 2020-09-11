@@ -26,6 +26,9 @@
 #include "nofault.h"
 #include "halt.h"
 #include "bootinfo.h"
+#include "process.h"
+#include "user_mem.h"
+#include "syscall/sys_signal.h"
 
 uint32_t default_mxcsr_mask;
 
@@ -574,29 +577,294 @@ _constructor(ctor_cpu_init_bsp) static void cpu_init_bsp()
     cpu_init(0);
 }
 
+static bool cpu_signal_copy_fpu_ctx(uintptr_t user_addr, bool use64)
+{
+    char data[4096];
+
+    assert(sse_context_size < sizeof(data));
+
+    uintptr_t addr = uintptr_t(data + sizeof(data));
+
+    if (cpuid_has_xsave()) {
+        size_t ctx_sz = sse_context_size;
+
+        addr -= ctx_sz;
+        addr &= -64;
+
+        isr_xsave_context_t *ctx = (isr_xsave_context_t*)addr;
+
+        // The initial content of the memory matters
+        memset(ctx, 0, sizeof(*ctx));
+
+        if (use64)
+            cpu_xsave64(ctx);
+        else
+            cpu_xsave32(ctx);
+
+        if (unlikely(!mm_copy_user((void*)user_addr, ctx, ctx_sz)))
+            return false;
+    } else {
+        addr -= sizeof(isr_fxsave_context_t);
+        addr &= -16;
+
+        isr_fxsave_context_t *ctx = (isr_fxsave_context_t*)addr;
+
+        if (use64)
+            cpu_fxsave64(ctx);
+        else
+            cpu_fxsave32(ctx);
+
+        if (unlikely(!mm_copy_user((void*)user_addr, ctx,
+                                   sizeof(isr_fxsave_context_t))))
+            return false;
+    }
+
+    return true;
+}
+
 extern "C" isr_context_t *cpu_signal_dispatcher(int intr, isr_context_t *ctx)
 {
     // If it is kernel code, unhandled
     if (unlikely(!GDT_SEL_RPL_IS_USER(ISR_CTX_REG_CS(ctx))))
         return nullptr;
 
+    // Lookup restorer
+    process_t *process = fast_cur_process();
+
+    if (unlikely(!process))
+        return nullptr;
+
+    __sig_restorer_t restorer = process_get_restorer(process);
+
+    if (unlikely(!restorer))
+        return nullptr;
+
+    int sig = -1;
+    int code = -1;
+
+    unsigned fsw;
+    unsigned fcw;
+    unsigned fex;
+
+    //FPE_FLTRES   fp_inexact − floating-point inexact result
+    //FPE_FLTDIV   fp_division − floating-point division by zero
+    //FPE_FLTUND   fp_underflow − floating-point underflow
+    //FPE_FLTOVF   fp_overflow − floating-point overflow
+    //FPE_FLTINV   fp_invalid − floating-point invalid operation
     switch (intr) {
     case INTR_EX_DIV:
-    case INTR_EX_STACK:
-    case INTR_EX_MATH:
-    case INTR_EX_OVF:
-    case INTR_EX_DEV_NOT_AV:
-    case INTR_EX_OPCODE:
+        code = FPE_INTDIV;
+        sig = SIGFPE;
+        break;
+
     case INTR_EX_BOUND:
+        // Subscript out of range
+        code = FPE_FLTSUB;
+        sig = SIGSEGV;
+        break;
+
     case INTR_EX_SIMD:
+    case INTR_EX_MATH:
+        fsw = cpu_fsw_get();
+        fcw = cpu_fcw_get();
+
+        // Calculate which exceptions might have caused this interrupt
+        fex = CPU_FPUCW_IM | CPU_FPUCW_DM | CPU_FPUCW_ZM |
+                CPU_FPUCW_OM | CPU_FPUCW_IM | CPU_FPUCW_PM;
+        fex = fsw & (fcw & fex);
+
+        // Precision error
+        if (fex & CPU_FPUSW_PE_BIT)
+            code = FPE_FLTRES;
+        else if (fex & CPU_FPUSW_OE_BIT)
+            code = FPE_FLTOVF;
+        else if (fex & CPU_FPUSW_UE_BIT)
+            code = FPE_FLTUND;
+        else if (fex & CPU_FPUSW_IE_BIT)
+            code = FPE_FLTINV;
+
+        sig = SIGFPE;
+        break;
+
+    case INTR_EX_OVF:
+        code = FPE_INTOVF;
+        sig = SIGFPE;
+        break;
+
+    case INTR_EX_DEBUG:
+    case INTR_EX_BREAKPOINT:
+        sig = SIGTRAP;
+        break;
+
+    case INTR_EX_OPCODE:
+        sig = SIGILL;
+        break;
+
     case INTR_EX_SEGMENT:
+    case INTR_EX_TSS:
+    case INTR_EX_STACK:
+    case INTR_EX_GPF:
+    case INTR_EX_PAGE:
+        sig = SIGSEGV;
+        break;
+
+    case INTR_EX_DEV_NOT_AV:
+        break;
+
+    case INTR_EX_DBLFAULT:
+    case INTR_EX_COPR_SEG:
     case INTR_EX_ALIGNMENT:
+        sig = SIGBUS;
         break;
     }
 
-    assert(!"unimplemented");
+start_over:
+    siginfo_t info{};
 
-    return nullptr;
+    info.si_signo = sig;
+    info.si_status = sig;
+    info.si_code = code;
+    info.si_addr = (void*)ISR_CTX_REG_RIP(ctx);
+    info.si_pid = process->pid;
+    info.si_uid = process->uid;
+
+    bool use64 = GDT_SEL_IS_C64(ISR_CTX_REG_CS(ctx));
+
+    uintptr_t rsp = ISR_CTX_REG_RSP(ctx);
+
+    // Skip over possible red zone and align
+    rsp -= 128;
+    rsp &= -16;
+
+    uintptr_t stack_data_en = rsp;
+
+    // Make room for fxsave context
+    rsp -= ext::max(sizeof(mcontext_x86_fpu_t), sse_context_size);
+
+    // 512-bit alignment for xsave, 128-bit alignment for fxsave
+    if (likely(cpuid_has_xsave() && sse_context_size < 4096))
+        rsp &= -64;
+    else
+        rsp &= -16;
+
+    uintptr_t fpu_ptr = rsp;
+
+    // Make room for siginfo, and align
+    rsp -= sizeof(info);
+    rsp &= -16;
+
+    uintptr_t info_ptr = rsp;
+
+    // Make room for appropriate sized context and align
+    rsp -= use64 ? sizeof(mcontext_t) : sizeof(mcontext32_t);
+    rsp &= -16;
+
+    uintptr_t mctx_ptr = rsp;
+
+    uintptr_t stack_data_st = rsp;
+    uintptr_t stack_data_sz = stack_data_en - stack_data_st;
+
+    // Make sure the siginfo buffer is okay
+    // (from end of last thing to start of first thing)
+    if (unlikely(!mm_is_user_range((void*)stack_data_st, stack_data_sz))) {
+        if (sig != SIGSEGV) {
+            sig = SIGSEGV;
+            goto start_over;
+        }
+
+        return nullptr;
+    }
+
+    if (unlikely(!cpu_signal_copy_fpu_ctx(fpu_ptr, use64))) {
+        if (sig != SIGSEGV) {
+            sig = SIGSEGV;
+            goto start_over;
+        }
+
+        return nullptr;
+    }
+
+    // Copy siginfo into userspace stack
+    if (unlikely(!mm_copy_user((void*)info_ptr, &info, sizeof(info)))) {
+        if (sig != SIGSEGV) {
+            sig = SIGSEGV;
+            goto start_over;
+        }
+
+        return nullptr;
+    }
+
+    if (GDT_SEL_IS_C64(ISR_CTX_REG_CS(ctx))) {
+        mcontext_t ctx64{};
+
+        ctx64.__fpu = fpu_ptr;
+
+        ctx64.__regs[R_RDI] = ISR_CTX_REG_RDI(ctx);
+        ctx64.__regs[R_RSI] = ISR_CTX_REG_RSI(ctx);
+        ctx64.__regs[R_RDX] = ISR_CTX_REG_RDX(ctx);
+        ctx64.__regs[R_RCX] = ISR_CTX_REG_RCX(ctx);
+        ctx64.__regs[R_R8]  =  ISR_CTX_REG_R8(ctx);
+        ctx64.__regs[R_R9]  =  ISR_CTX_REG_R9(ctx);
+        ctx64.__regs[R_RAX] = ISR_CTX_REG_RAX(ctx);
+        ctx64.__regs[R_R10] = ISR_CTX_REG_R10(ctx);
+        ctx64.__regs[R_R11] = ISR_CTX_REG_R11(ctx);
+        ctx64.__regs[R_R12] = ISR_CTX_REG_R12(ctx);
+        ctx64.__regs[R_R13] = ISR_CTX_REG_R13(ctx);
+        ctx64.__regs[R_R14] = ISR_CTX_REG_R14(ctx);
+        ctx64.__regs[R_R15] = ISR_CTX_REG_R15(ctx);
+        ctx64.__regs[R_RBX] = ISR_CTX_REG_RBX(ctx);
+        ctx64.__regs[R_RBP] = ISR_CTX_REG_RBP(ctx);
+
+        ctx64.__rip = (uint64_t)(uintptr_t)ISR_CTX_REG_RIP(ctx);
+        ctx64.__cs = ISR_CTX_REG_CS(ctx);
+        ctx64.__rflags = ISR_CTX_REG_RFLAGS(ctx);
+        ctx64.__rsp = ISR_CTX_REG_RSP(ctx);
+        ctx64.__ss = ISR_CTX_REG_SS(ctx);
+
+        if (unlikely(!mm_copy_user((void*)mctx_ptr, &ctx64, sizeof(ctx64))))
+            return nullptr;
+    } else {
+        mcontext32_t ctx32{};
+
+        ctx32.__fpu = fpu_ptr;
+
+        ctx32.__regs[R_EAX] = uint32_t(ISR_CTX_REG_RAX(ctx));
+        ctx32.__regs[R_EDX] = uint32_t(ISR_CTX_REG_RDX(ctx));
+        ctx32.__regs[R_ECX] = uint32_t(ISR_CTX_REG_RCX(ctx));
+        ctx32.__regs[R_ESI] = uint32_t(ISR_CTX_REG_RSI(ctx));
+        ctx32.__regs[R_EDI] = uint32_t(ISR_CTX_REG_RDI(ctx));
+        ctx32.__regs[R_EBX] = uint32_t(ISR_CTX_REG_RBX(ctx));
+        ctx32.__regs[R_EBP] = uint32_t(ISR_CTX_REG_RBP(ctx));
+
+        ctx32.__eip = (uint32_t)(uintptr_t)ISR_CTX_REG_RIP(ctx);
+        ctx32.__cs = (uint32_t)ISR_CTX_REG_CS(ctx);
+        ctx32.__eflags = (uint32_t)ISR_CTX_CTX_FLAGS(ctx);
+        ctx32.__esp = (uint32_t)ISR_CTX_REG_RSP(ctx);
+        ctx32.__ss = (uint32_t)ISR_CTX_REG_SS(ctx);
+
+        if (unlikely(!mm_copy_user((void*)mctx_ptr, &ctx32, sizeof(ctx32))))
+            return nullptr;
+    }
+
+    // Point rsp at mcontext(32)_t
+    // and instruction pointer at start of restorer (signal trampoline)
+    ISR_CTX_REG_RSP(ctx) = mctx_ptr;
+    ISR_CTX_REG_RIP(ctx) = (intptr_t(*)(void*))(void*)restorer;
+
+    // Three parameters: int, siginfo_t *, void (*)(int, siginfo_t *, void*)
+    if (likely(use64)) {
+        ISR_CTX_REG_RDI(ctx) = sig;
+        ISR_CTX_REG_RSI(ctx) = info_ptr;
+        ISR_CTX_REG_RDX(ctx) = (uintptr_t)process->sighand[sig].sa_sigaction;
+    } else {
+        ISR_CTX_REG_RAX(ctx) = (uint32_t)sig;
+        ISR_CTX_REG_RCX(ctx) = (uint32_t)info_ptr;
+        ISR_CTX_REG_RDX(ctx) = (uint32_t)(uintptr_t)
+                process->sighand[sig].sa_sigaction;
+    }
+
+    // Continue execution with modified context
+    return ctx;
 }
 
 extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
@@ -618,11 +886,8 @@ extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx)
         }
     } else if (GDT_SEL_RPL_IS_USER(ISR_CTX_REG_CS(ctx))) {
         // Inject a signal
-        //
-        // Frame:
-        // <return rip>
-        // <return rsp>
-        //
+
+        return cpu_signal_dispatcher(intr, ctx);
     }
 
     return nullptr;

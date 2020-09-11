@@ -30,10 +30,6 @@ SECTIONS {
 		KEEP(*(.rodata.fixup.insn))
 		PROVIDE_HIDDEN(___rodata_fixup_insn_en = .);
 
-		PROVIDE_HIDDEN(___rodata_fixup_swapgs_st = .);
-		KEEP(*(.rodata.fixup.swapgs))
-		PROVIDE_HIDDEN(___rodata_fixup_swapgs_en = .);
-
 		. = ALIGN(64);
 		PROVIDE_HIDDEN(___rodata = .);
 		*(.rodata)

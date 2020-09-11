@@ -337,3 +337,4 @@
 #define SYS_join                    326
 #define SYS_detach                  327
 #define SYS_is_joinable             328
+#define SYS_sigreturn               329

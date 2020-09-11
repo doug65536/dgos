@@ -10,6 +10,7 @@
 #include "cxxstring.h"
 #include "fileio.h"
 #include "cpu/except_asm.h"
+#include "syscall/sys_signal.h"
 
 struct fd_table_t {
     static constexpr ssize_t max_file = 4096;
@@ -154,6 +155,10 @@ __BEGIN_DECLS
 void *process_get_allocator();
 void process_set_allocator(process_t *process, void *allocator);
 
+
+using __sig_restorer_t = void (*)(int sig, siginfo_t *,
+                                  void (*)(int, siginfo_t, void*));
+
 __END_DECLS
 
 #define CLONE_FLAGS_DETACHED    1
@@ -210,6 +215,12 @@ struct process_t
     int exitcode = -1;
     int cwd = -1;
     bool use64 = true;
+
+    // Signal handlers
+    sigaction sighand[32];
+
+    // Signal trampoline
+    __sig_restorer_t sigrestorer;
 
     using jmpbuf_ptr_t = ext::unique_ptr<__exception_jmp_buf_t>;
 
@@ -284,7 +295,8 @@ struct process_t
         void *arg;
     };
 
-    intptr_t thread_index(thread_t tid, scoped_lock& lock) const noexcept
+    intptr_t thread_index(thread_t tid,
+                          scoped_lock volatile& lock) const noexcept
     {
         assert(lock.is_locked());
         intptr_t i, e;
@@ -324,3 +336,7 @@ __exception_jmp_buf_t *process_get_exit_jmpbuf(
         int tid, process_t::scoped_lock &lock);
 
 __exception_jmp_buf_t *process_get_exit_jmpbuf(int tid);
+
+void process_set_restorer(process_t *p, __sig_restorer_t value);
+
+__sig_restorer_t process_get_restorer(process_t *p);

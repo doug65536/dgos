@@ -371,7 +371,8 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_sleep,
     (syscall_handler_t*)(void*)sys_join,
     (syscall_handler_t*)(void*)sys_detach,
-    (syscall_handler_t*)(void*)sys_is_joinable
+    (syscall_handler_t*)(void*)sys_is_joinable,
+    (syscall_handler_t*)(void*)sys_sigreturn
     //(syscall_handler_t*)(void*)sys_,
 };
 

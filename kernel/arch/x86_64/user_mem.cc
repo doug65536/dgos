@@ -20,6 +20,7 @@ EXPORT bool mm_copy_user(void *dst, const void *src, size_t size)
 {
     if (src)
         return nofault_memcpy(dst, src, size) >= 0;
+
     return nofault_memset(dst, 0, size) >= 0;
 }
 

@@ -51,7 +51,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         0
-#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_READ_STRESS_THREAD   1
 #define ENABLE_SLEEP_THREAD         0 // no affinity or moving across cpus yet
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0

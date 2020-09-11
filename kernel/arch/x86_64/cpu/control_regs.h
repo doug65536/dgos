@@ -28,6 +28,11 @@ static _always_inline void cpu_halt()
     );
 }
 
+static _always_inline void cpu_flush_cache()
+{
+    __asm__ __volatile__ ("wbinvd\n\t");
+}
+
 static _always_inline uint64_t cpu_msr_get(uint32_t msr)
 {
     uint32_t lo, hi;
@@ -531,6 +536,16 @@ static _always_inline uint16_t cpu_fcw_get()
         : [fcw] "=m" (fcw)
     );
     return fcw;
+}
+
+static _always_inline uint16_t cpu_fsw_get()
+{
+    uint16_t fsw;
+    __asm__ __volatile__ (
+        "fnstsw %w[fsw]\n\t"
+        : [fsw] "=m" (fsw)
+    );
+    return fsw;
 }
 
 static _always_inline void cpu_vzeroall_safe()

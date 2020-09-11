@@ -3,6 +3,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <assert.h>
+
+__BEGIN_DECLS
+
+struct siginfo_t;
 
 // The <signal.h> header shall define the following macros,
 // which shall expand to constant expressions with distinct values
@@ -182,6 +187,9 @@ typedef struct sigevent {
 // Background process attempting write.
 #define SIGTTOU     22
 
+// I/O possible
+#define SIGPOLL     23
+
 // CPU time limit exceeded.
 #define SIGXCPU     24
 
@@ -193,6 +201,9 @@ typedef struct sigevent {
 
 // Profiling timer expired.
 #define SIGPROF     27
+
+// Window changed
+#define SIGWINCH    28
 
 // Pollable event.
 #define SIGPOLL     29
@@ -206,7 +217,6 @@ typedef struct sigevent {
 // The <signal.h> header shall declare the sigaction structure,
 // which shall include at least the following members:
 
-typedef struct __siginfo_t siginfo_t;
 typedef struct __stack_t stack_t;
 typedef struct __ucontext_t ucontext_t;
 
@@ -224,6 +234,9 @@ struct sigaction {
 
     // Pointer to a signal-catching function.
     void (*sa_sigaction)(int, siginfo_t *, void *);
+
+    void (*sa_restorer)(int sig, siginfo_t *,
+                        void (*)(int, siginfo_t, void*));
 };
 
 // The storage occupied by sa_handler and sa_sigaction may overlap, and
@@ -283,8 +296,102 @@ struct sigaction {
 
 // The <signal.h> header shall define the mcontext_t type through typedef.
 
-typedef struct mcontext_t {
-} mcontext_t;
+enum reg_index_t {
+    // Parameter registers
+    R_RDI,
+    R_RSI,
+    R_RDX,
+    R_RCX,
+    R_R8,
+    R_R9,
+    // Call clobbered registers
+    R_RAX,
+    R_R10,
+    R_R11,
+    // Call preserved registers
+    R_R12,
+    R_R13,
+    R_R14,
+    R_R15,
+    R_RBX,
+    R_RBP,
+
+    R_REGS
+};
+
+enum reg_index32_t {
+    R_EAX,
+    R_EDX,
+    R_ECX,
+    R_ESI,
+    R_EDI,
+    R_EBX,
+    R_EBP,
+
+    R_REGS32
+};
+
+struct mcontext_t {
+    // FPU
+    uint64_t __fpu;
+
+    // General registers
+    uint64_t __regs[R_REGS];
+
+    // iret frame
+    uint64_t __rip;
+    uint64_t __cs;
+    uint64_t __rflags;
+    uint64_t __rsp;
+    uint64_t __ss;
+};
+
+struct mcontext32_t {
+    // FPU
+    uint32_t __fpu;
+
+    // General registers
+    uint32_t __regs[R_REGS32];
+
+    // iret frame
+    uint32_t __eip;
+    uint32_t __cs;
+    uint32_t __eflags;
+    uint32_t __esp;
+    uint32_t __ss;
+};
+
+struct __fpxreg {
+    uint16_t __significand[4];
+    uint16_t __exponent[1];
+    uint16_t __unused[3];
+};
+
+struct __xmmreg {
+    uint32_t __word[4];
+};
+
+struct mcontext_x86_fpu_t {
+    // Match fxsave format
+    // 32+128+256+96
+
+    // 32 byte header
+    uint16_t __cwd, __swd, __ftw, __fop;
+    uint64_t __rip;
+    uint64_t __rdp;
+    uint32_t __mxcsr, __mxcsr_mask;
+
+    // 8 16-byte x87 registers (128 bytes)
+    __fpxreg __st[8];
+
+    // 16 16-byte sse registers (256 bytes)
+    __xmmreg __xmm[16];
+
+    // Reserved 96 bytes
+    uint32_t __reserved1[24];
+};
+
+static_assert(sizeof(mcontext_x86_fpu_t) == 512, "Expected 512-byte structure");
 
 // The <signal.h> header shall define the stack_t type as a structure,
 // which shall include at least the following members:
@@ -316,7 +423,7 @@ struct __ucontext_t {
 // The <signal.h> header shall define the siginfo_t type as a structure,
 // which shall include at least the following members:
 
-struct __siginfo_t {
+typedef struct siginfo_t {
     // Signal number.
     int           si_signo;
     // Signal code.
@@ -344,7 +451,7 @@ struct __siginfo_t {
 
     // Signal value.
     union sigval  si_value;
-};
+} siginfo_t;
 
 // The <signal.h> header shall define the symbolic constants in the
 // Code column of the following table for use as values of si_code that
@@ -556,8 +663,8 @@ int pthread_sigmask(int, sigset_t const *restrict,
 
 int raise(int);
 
-int sigaction(int, struct sigaction const *restrict,
-           struct sigaction *restrict);
+int sigaction(int, struct sigaction const * restrict action,
+           struct sigaction * restrict old_action);
 int sigaddset(sigset_t *, int);
 
 
@@ -633,4 +740,4 @@ int sigwaitinfo(sigset_t const *restrict, siginfo_t *restrict);
 ///
 ///
 
-
+__END_DECLS

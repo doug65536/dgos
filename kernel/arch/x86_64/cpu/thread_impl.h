@@ -29,7 +29,10 @@ isr_context_t *thread_reschedule_if_requested_noirq(isr_context_t *ctx);
 _pure
 uint32_t thread_get_cpu_apic_id(uint32_t cpu);
 
+_noreturn
 void thread_exit(int exitcode);
+
+void thread_clear_busy(void *outgoing);
 
 // CPU-local storage
 size_t thread_cls_alloc(void);

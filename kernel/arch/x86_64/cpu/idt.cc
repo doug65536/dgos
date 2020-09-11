@@ -839,6 +839,8 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
 isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 {
+    cpu_debug_break();
+
     if (unhandled_exception_handler_vec) {
         isr_context_t *handled_ctx = unhandled_exception_handler_vec(
                     ISR_CTX_INTR(ctx), ctx);
@@ -861,7 +863,6 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
            name ? name : "??", (void*)ISR_CTX_REG_RIP(ctx));
 
     dump_context(ctx, 1);
-    cpu_debug_break();
     halt_forever();
     return ctx;
 }

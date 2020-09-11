@@ -1718,6 +1718,8 @@ libc_a_SOURCES = \
 	libc/src/stat/stat.cc \
 	libc/src/stat/umask.cc \
 	libc/src/stat/utimensat.cc \
+	libc/src/signal/bits/trampoline.S \
+	libc/src/signal/setjmp.S \
 	libc/src/signal/sigaction.cc \
 	libc/src/signal/sigaddset.cc \
 	libc/src/signal/kill.cc \

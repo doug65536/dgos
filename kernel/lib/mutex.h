@@ -369,7 +369,29 @@ public:
         locked = true;
     }
 
+    void lock() volatile noexcept
+    {
+        assert(!locked);
+        m->lock();
+        locked = true;
+    }
+
+    bool try_lock() noexcept
+    {
+        assert(!locked);
+        locked = m->try_lock();
+        return locked;
+    }
+
     void unlock() noexcept
+    {
+        if (locked) {
+            locked = false;
+            m->unlock();
+        }
+    }
+
+    void unlock() volatile noexcept
     {
         if (locked) {
             locked = false;
@@ -410,6 +432,11 @@ public:
     }
 
     _always_inline bool is_locked() const noexcept
+    {
+        return locked;
+    }
+
+    _always_inline bool is_locked() volatile const noexcept
     {
         return locked;
     }

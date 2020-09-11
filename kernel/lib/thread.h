@@ -21,6 +21,7 @@ using thread_fn_t = intptr_t(*)(void*);
 
 void thread_check_stack(int intr);
 
+_noreturn
 void thread_startup(thread_fn_t fn, void *p, thread_t id);
 
 // 9 == 512 CPUs max

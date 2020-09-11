@@ -117,9 +117,6 @@ private:
     void bit8_to_pixels(uint32_t *out, uint8_t bitmap,
                         uint32_t bg, uint32_t fg);
 
-    static size_t replacement;
-
-
     // The place where writing text will go in surface space
     // This is advanced by writing text and newlines
     uint32_t out_x = 0, out_y = 0;
@@ -151,4 +148,18 @@ private:
 
     // The start and end scanline of the cursor in the character cell
     uint32_t crsr_s, crsr_e;
+};
+
+// Record that represents a single box of area on the screen
+struct comp_area_t {
+    // This screen area...
+    int32_t sy;
+    int32_t sx;
+    int32_t ey;
+    int32_t ex;
+
+    // ...contains this area of this surface
+    surface_t *surface;
+    int32_t y;
+    int32_t x;
 };

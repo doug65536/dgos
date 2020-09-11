@@ -158,7 +158,8 @@ intptr_t process_t::start_clone(clone_data_t const& data)
 {
     uintptr_t tid = thread_get_id();
 
-    scoped_lock lock(processes_lock);
+    // Volatile because we expect it to behave well after setjmp returns again
+    scoped_lock volatile lock(processes_lock);
 
     create_tls();
 
@@ -177,6 +178,7 @@ intptr_t process_t::start_clone(clone_data_t const& data)
                    tid, uintptr_t(data.fn), uintptr_t(data.arg));
     }
 
+    // Acquire lock again
     lock.lock();
 
     // It might have moved since releasing the lock
@@ -954,4 +956,14 @@ __exception_jmp_buf_t *process_get_exit_jmpbuf(
 {
     process_t *process = thread_current_process();
     return process->exit_jmpbuf(tid, lock);
+}
+
+void process_set_restorer(process_t *p, __sig_restorer_t value)
+{
+    p->sigrestorer = value;
+}
+
+__sig_restorer_t process_get_restorer(process_t *p)
+{
+    return p->sigrestorer;
 }

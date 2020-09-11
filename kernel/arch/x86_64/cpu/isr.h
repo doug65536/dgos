@@ -153,7 +153,7 @@ struct isr_gpr_context_t {
 };
 
 // FPU/SSE context
-struct isr_fxsave_context_t {
+struct alignas(16) isr_fxsave_context_t {
     // FPU control word
     uint16_t fcw;
     // FPU status word
