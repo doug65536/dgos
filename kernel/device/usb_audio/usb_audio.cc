@@ -71,6 +71,8 @@ bool usb_audio_class_drv_t::probe(usb_config_helper *cfg, usb_bus_t *bus)
 {
     match_result match;
 
+    printk("Probing for USB audio devices\n");
+
     // Try to find usb audio interface
     for (size_t index = 0; ; ++index) {
         match = match_config(cfg, index, int(usb_class_t::audio),

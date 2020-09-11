@@ -2,8 +2,9 @@
 #include "dev_usb_ctl.h"
 
 #define USBHUB_DEBUG 1
+#define USBHUB_ALWAYS(...) printdbg("usbhub: " __VA_ARGS__)
 #if USBHUB_DEBUG
-#define USBHUB_TRACE(...) printdbg("usbhub: " __VA_ARGS__)
+#define USBHUB_TRACE(...) USBHUB_ALWAYS(__VA_ARGS__)
 #else
 #define USBHUB_TRACE(...) ((void)0)
 #endif
@@ -94,9 +95,9 @@ bool usb_hub_t::init(usb_config_helper const* cfg_hlp)
 
         if (status & 1) {
             if (control.add_hub_port(port)) {
-                USBHUB_TRACE("-- Configured port %zu hub device\n", port);
+                USBHUB_ALWAYS("-- Configured port %zu hub device\n", port);
             } else {
-                USBHUB_TRACE("-- FAILED to configure hub port %zu\n", port);
+                USBHUB_ALWAYS("-- FAILED to configure hub port %zu\n", port);
             }
         }
     }
@@ -152,7 +153,7 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     // If not found, try to find single-TT interface
     if (match.dev)
-        USBHUB_TRACE("Found Multi-TT hub interface\n");
+        USBHUB_ALWAYS("Found Multi-TT hub interface\n");
     else {
         //multi_tt = false;
 
@@ -160,7 +161,7 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
                              -1, -1, -1);
 
         if (match.dev)
-            USBHUB_TRACE("Found Single-TT hub interface\n");
+            USBHUB_ALWAYS("Found Single-TT hub interface\n");
         else
             return false;
     }

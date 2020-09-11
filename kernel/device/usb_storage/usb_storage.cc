@@ -391,6 +391,8 @@ long usb_msc_dev_t::info(storage_dev_info_t key)
 
 bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
+    printk("Probing for USB storagee devices\n");
+
     // Match SCSI mass storage devices
     // 6 = SCSI command set
     // 0x50 = bulk only

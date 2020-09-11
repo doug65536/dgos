@@ -8,8 +8,9 @@
 #include "usb_hid_keybd_lookup.h"
 
 #define USBHID_DEBUG 1
+#define USBHID_ALWAYS(...) printdbg("usbhid: " __VA_ARGS__)
 #if USBHID_DEBUG
-#define USBHID_TRACE(...) printdbg("usbhid: " __VA_ARGS__)
+#define USBHID_TRACE(...) USBHID_ALWAYS(__VA_ARGS__)
 #else
 #define USBHID_TRACE(...) ((void)0)
 #endif
@@ -120,6 +121,8 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
     match_result match;
 
+    printk("Probing for HID devices\n");
+
     // Try to find keyboard interface
     match = match_config(cfg_hlp, 0, int(usb_class_t::hid),
                          1, -1, 1, -1, -1);
@@ -161,11 +164,15 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     if (match.iface->iface_proto == 1) {
         dev = new (ext::nothrow)
                 usb_hid_keybd_t(control, in, out, match.iface_idx);
+        USBHID_ALWAYS("Found USB keyboard\n");
     } else if (match.iface->iface_proto == 2) {
         dev = new (ext::nothrow)
                 usb_hid_mouse_t(control, in, out, match.iface_idx);
+        USBHID_ALWAYS("Found USB mouse\n");
     } else {
-        USBHID_TRACE("Unhandled interface protocol: 0x%02x\n",
+        printk("Found unsupported HID device\n");
+
+        USBHID_ALWAYS("Unhandled interface protocol: 0x%02x\n",
                      match.iface->iface_proto);
     }
 
@@ -229,6 +236,7 @@ bool usb_hid_dev_t::get_descriptor(void *data, uint16_t len,
 
 void usb_hid_keybd_t::post_keybd_in(unsigned phase)
 {
+    USBHID_TRACE("Posting keyboard recv\n");
     in_iocp[phase].reset(&usb_hid_keybd_t::keybd_completion, uintptr_t(this));
     in.recv_async(this_keybd_state[phase], sizeof(this_keybd_state[phase]),
                   &in_iocp[phase]);
@@ -243,6 +251,8 @@ void usb_hid_keybd_t::keybd_completion(
 
 void usb_hid_keybd_t::keybd_completion(usb_iocp_result_t const& result)
 {
+    USBHID_TRACE("Got keyboard recv completion\n");
+
     detect_keybd_changes();
 }
 
@@ -325,6 +335,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
 void usb_hid_mouse_t::post_mouse_in(unsigned phase)
 {
+    USBHID_TRACE("Posting mouse recv\n");
     in_iocp[phase].reset(&usb_hid_mouse_t::mouse_completion, uintptr_t(this));
     in.recv_async(this_mouse_state[phase], sizeof(this_mouse_state[phase]),
                   &in_iocp[phase]);
@@ -339,6 +350,8 @@ void usb_hid_mouse_t::mouse_completion(
 
 void usb_hid_mouse_t::mouse_completion(const usb_iocp_result_t &result)
 {
+    USBHID_TRACE("Got mouse recv completion\n");
+
     scoped_lock hold_change_lock(change_lock);
 
     mouse_raw_event_t evt;
