@@ -7,6 +7,8 @@
 #include "inttypes.h"
 #include "cpu/idt.h"
 
+#include "bootinfo.h"
+
 #include "device/serial-uart.h"
 
 #include "cpu/idt.h"
@@ -904,9 +906,16 @@ void gdbstub_t::run()
     // will not interfere with the stub
     mm_fork_kernel_text();
 
-    GDBSTUB_TRACE("Opening serial port\n");
 
-    port = uart_dev_t::open(0x3f8, 4, 115200, 8, 'N', 1, false);
+    int com_port = bootinfo_parameter(bootparam_t::gdb_port);
+
+    uint16_t io_port = uart_dev_t::com[com_port];
+    uint8_t irq = uart_dev_t::irq[com_port];
+
+    GDBSTUB_TRACE("Opening serial port, base=%#x, irq=%u\n",
+                  io_port, irq);
+
+    port = uart_dev_t::open(io_port, irq, 115200, 8, 'N', 1, false);
 
     if (unlikely(!port->route_irq(gdb_cpu_ctrl_t::get_gdb_cpu())))
         GDBSTUB_TRACE("Unable to route serial IRQ to stub CPU, good luck!\n");

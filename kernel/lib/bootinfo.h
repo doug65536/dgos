@@ -19,7 +19,8 @@ enum struct bootparam_t {
     mps_enable,
     msi_enable,
     msix_enable,
-    port_e9_debug
+    port_e9_debug,
+    gdb_port
 };
 
 uintptr_t bootinfo_parameter(bootparam_t param);

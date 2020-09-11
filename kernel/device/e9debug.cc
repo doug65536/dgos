@@ -23,9 +23,12 @@ _constructor(ctor_ctors_ran) static void e9debug_serial_ready(void*)
     // HACK! Enable bochs debugger hardware
     outw(0x8A00, 0x8A00);
 
-    if (bootinfo_parameter(bootparam_t::boot_serial_log)) {
+    int com_port = bootinfo_parameter(bootparam_t::boot_serial_log);
+
+    if (com_port) {
         printk("Enabling serial debug output\n");
-        uart = uart_dev_t::open(0, true, 8, 'N', 1);
+
+        uart = uart_dev_t::open(com_port, true, 8, 'N', 1);
         uart_ready = true;
 
         // Send some VT102 initialization sequences

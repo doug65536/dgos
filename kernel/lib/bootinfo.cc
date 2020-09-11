@@ -52,7 +52,7 @@ EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
         return data->serial_debugout;
 
     case bootparam_t::boot_debugger:
-        return data->wait_gdb;
+        return data->gdb_port;
 
     case bootparam_t::boot_acpi_rsdp:
         return uintptr_t(&data->acpi_rsdt);

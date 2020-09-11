@@ -91,7 +91,7 @@ struct alignas(8) kernel_params_t {
     uint64_t phys_mapping_sz;
     ptr64_t<char> command_line;
 
-    uint8_t wait_gdb;
+    uint8_t gdb_port;
     uint8_t serial_debugout;
     uint8_t serial_baud;
 

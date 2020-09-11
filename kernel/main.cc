@@ -1253,7 +1253,7 @@ extern "C" _noreturn void kernel_main(void)
 
     // Become the idle thread for the boot processor
 
-    if (likely(!kernel_params->wait_gdb))
+    if (likely(!kernel_params->gdb_port))
         thread_create(nullptr, init_thread, nullptr,
                       "init_thread", 0, false, false);
     else

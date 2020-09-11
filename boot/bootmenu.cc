@@ -13,6 +13,7 @@ static tui_str_t tui_timeout[] = {
 };
 
 static tui_str_t tui_com_port[] = {
+    TSTR "Disabled",
     TSTR "COM1",
     TSTR "COM2",
     TSTR "COM3",
@@ -37,7 +38,6 @@ enum tui_menu_item_index_t {
     menu_timeout,
     kernel_debugger,
     serial_output,
-    serial_port,
     serial_baud,
     display_resolution,
     e9_enable,
@@ -51,9 +51,8 @@ enum tui_menu_item_index_t {
 
 static tui_menu_item_t tui_menu[] = {
     { TSTR "menu timeout (sec)", tui_timeout, 0 },
-    { TSTR "kernel debugger", tui_dis_ena, 0 },
-    { TSTR "serial debug output", tui_dis_ena, 1 },
-    { TSTR "serial port", tui_com_port, 0 },
+    { TSTR "kernel debugger", tui_com_port, 0 },
+    { TSTR "serial debug output", tui_com_port, 1 },
     { TSTR "serial baud rate", tui_baud_rates, 0 },
     { TSTR "display resolution", {}, 0 },
     { TSTR "port 0xe9 debug output", tui_dis_ena, 0 },
@@ -242,8 +241,8 @@ void boot_menu_show(kernel_params_t &params)
     memcpy(aligned_mode, mode, sizeof(*aligned_mode));
 
     params.vbe_selected_mode = uintptr_t(aligned_mode);
-    params.wait_gdb = tui_menu[kernel_debugger].index != 0;
-    params.serial_debugout = tui_menu[serial_output].index != 0;
+    params.gdb_port = tui_menu[kernel_debugger].index;
+    params.serial_debugout = tui_menu[serial_output].index;
     params.serial_baud = tui_menu[serial_baud].index;
     params.smp_enable = tui_menu[smp_enable].index;
     params.acpi_enable = tui_menu[acpi_enable].index;
