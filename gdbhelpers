@@ -286,6 +286,11 @@ define modulesyms
 	end
 end
 
+define allsyms
+	modulesyms
+	initsyms
+end
+
 define modulelist
 	set $midx = 0
 	set $mcount = loaded_modules.__sz
