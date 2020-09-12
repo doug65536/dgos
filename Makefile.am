@@ -2704,10 +2704,20 @@ QL_EM = kvm icount tcg mttcg
 define qemu_launcher =
 $(1)-$(2)-$(3)-$(4)-$(5)-$(6)-$(7)-$(8): \
 		$$(call QEMU_IMAGE,$(5)) $$(QEMU_EXTRA_DEPS)
-	echo -e -n '\ec'
-	echo 'Run make monitor-debug-output in another terminal if progress stops'
-	echo -e -n '\ec' >> dump/qemu-debug-out
-	echo Running $$@
+	@echo -e -n -- '\ec'
+	@echo -- 'Run make monitor-debug-output in another terminal if progress stops'
+	@echo -e -n -- '\ec' >> dump/qemu-debug-out
+	@echo --     early: $$(QEMU_EARLY)
+	@echo --    common: $$(QEMU_COMMON)
+	@echo --       emu: $$(call QEMU_EMU,$(8))
+	@echo --       drv: $$(call QEMU_DRV,$(5))
+	@echo --        np: $$(call QEMU_NP,$(2))
+	@echo --     hdctl: $$(call QEMU_HDCTL,$(6),$(5))
+	@echo --      boot: $$(call QEMU_BOOT,$(3))
+	@echo --  run type: $$(call QEMU_RT,$(1))
+	@echo -- bootmedia: $$(call QEMU_BOOTMEDIA,$(4),$(3))
+	@echo --     video: $$(call QEMU_VIDEO,$(7))
+	@echo --     extra: $$(QEMU_EXTRA)
 	$$(QEMU_SUDO) $$(QEMU) \
 		$$(QEMU_EARLY) \
 		$$(QEMU_COMMON) \
