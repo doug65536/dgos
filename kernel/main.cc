@@ -52,7 +52,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 
 #define ENABLE_SHELL_THREAD         0
 #define ENABLE_READ_STRESS_THREAD   1
-#define ENABLE_SLEEP_THREAD         0 // no affinity or moving across cpus yet
+#define ENABLE_SLEEP_THREAD         150
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_MMAP_STRESS_THREAD   0
@@ -280,27 +280,20 @@ void test_read_stress()
 }
 #endif
 
-struct test_thread_param_t {
-    int v;
-    int sleep;
-};
-
 #if ENABLE_SLEEP_THREAD
-static int other_thread(void *p)
+static intptr_t other_thread(void *seed)
 {
-    test_thread_param_t *tp = (test_thread_param_t *)p;
+    rand_lfs113_t rng;
+    rng.seed(uint32_t(uintptr_t(seed)));
     while (1) {
-        int odd = ++tp->v;
-        if (tp->sleep)
-            thread_sleep_for(tp->sleep);
+        thread_sleep_for(rng.lfsr113_rand() & 0x7F);
 
-        thread_set_affinity(thread_get_id(),
-                            thread_cpu_mask_t(odd % thread_get_cpu_count()));
+        //int odd = ++tp->v;
+        //thread_set_affinity(thread_get_id(),
+                            //thread_cpu_mask_t(odd % thread_get_cpu_count()));
     }
     return 0;
 }
-
-static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
 
 void test_sleep()
 {
@@ -308,9 +301,9 @@ void test_sleep()
              ENABLE_SLEEP_THREAD);
 
     for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
-        ttp[i].sleep = i * 100;
-        ttp[i].p = (uint16_t*)0xb8000 + 4 + i;
-        thread_create(other_thread, ttp + i, "test_sleep", 0, false, false);
+        thread_close(thread_create(nullptr, other_thread,
+                                   (void*)uintptr_t(i+1), "test_sleep",
+                                   0, false, false));
     }
 }
 #endif
