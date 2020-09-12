@@ -395,9 +395,9 @@ static _always_inline void cpu_cs_set(uint16_t selector)
     );
 }
 
-static _always_inline void cpu_fsbase_set(void *fs_base)
+static _always_inline void cpu_fsbase_set(void *fsbase)
 {
-    cpu_msr_set(CPU_MSR_FSBASE, (uintptr_t)fs_base);
+    cpu_msr_set(CPU_MSR_FSBASE, (uintptr_t)fsbase);
 }
 
 static _always_inline void *cpu_fsbase_get()
