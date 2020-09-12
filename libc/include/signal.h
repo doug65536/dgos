@@ -218,7 +218,6 @@ typedef struct sigevent {
 // which shall include at least the following members:
 
 typedef struct __stack_t stack_t;
-typedef struct __ucontext_t ucontext_t;
 
 struct sigaction {
     // Pointer to a signal-catching function or one of the
@@ -409,7 +408,7 @@ struct __stack_t {
 // The <signal.h> header shall define the ucontext_t type as a structure
 // that shall include at least the following members:
 
-struct __ucontext_t {
+struct ucontext_t {
     // Pointer to the context that is resumed when this context returns.
     ucontext_t *uc_link;
     // The set of signals that are blocked when this context is active.
@@ -701,7 +700,7 @@ int sigprocmask(int, sigset_t const *restrict, sigset_t *restrict);
 int sigqueue(pid_t, int, union sigval);
 
 
-int sigrelse(int);
+int sigrelset(int);
 void (*sigset(int, void (*)(int)))(int);
 
 
