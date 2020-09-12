@@ -523,9 +523,9 @@ void *process_t::create_tls()
 
     // Point appropriate tls selector register at it
     if (use64)
-        thread_set_fsbase(thread_get_id(), tls_ptr);
+        thread_set_fsbase(-1, tls_ptr);
     else
-        thread_set_gsbase(thread_get_id(), tls_ptr);
+        thread_set_gsbase(-1, tls_ptr);
 
     return (void*)tls_ptr;
 }
