@@ -302,7 +302,7 @@ AC_SUBST([RETPOLINE_FLAGS])
 # fgcse-las causes compiler segfaults
 AS_VAR_SET([OPTIMIZATION_FLAGS], [])
 for flag in \
-	O2 fstrict-aliasing falign-functions=16
+	Os fstrict-aliasing falign-functions=16
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([OPTIMIZATION_FLAGS], [" -$flag"])],
