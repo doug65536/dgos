@@ -122,7 +122,7 @@ tchar const *cpu_choose_kernel()
                 "opt/com.doug16k.dgos.kernel_type", &file_size);
     if (file_size > 0 && selector >= 0 &&
             qemu_fw_cfg(fw_cfg_type, sizeof(fw_cfg_type),
-                        file_size, selector) > 0) {
+                        file_size, selector)) {
         switch (fw_cfg_type[0]) {
         case 'A': return TSTR "boot/dgos-kernel-asan";
         case 'T': return TSTR "boot/dgos-kernel-tracing";
@@ -155,9 +155,8 @@ static kernel_params_t *prompt_kernel_param(
 
     boot_menu_show(*params);
 
-    PRINT("Done boot menu");
+    PRINT("Setting Video Mode");
 
-    // Map framebuffer
     if (params->vbe_selected_mode) {
         auto& mode = *params->vbe_selected_mode;
 
@@ -168,16 +167,9 @@ static kernel_params_t *prompt_kernel_param(
               ", size=%" PRIx64 "\n",
               mode.framebuffer_addr,
               mode.framebuffer_bytes);
-
-//        paging_map_physical(mode.framebuffer_addr,
-//                            linear_addr,
-//                            mode.framebuffer_bytes, PTE_EX_PHYSICAL |
-//                            PTE_PRESENT | PTE_WRITABLE |
-//                            PTE_ACCESSED | PTE_DIRTY |
-//                            PTE_NX | PTE_PTPAT);
-
-        //mode.framebuffer_addr = linear_addr;
     }
+
+    PRINT("Done boot menu");
 
     return params;
 }
