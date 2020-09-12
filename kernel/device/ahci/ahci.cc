@@ -1478,7 +1478,7 @@ errno_t ahci_if_t::cancel_io(size_t port_num, iocp_t *iocp)
         }
     }
 
-    return errno_t::ENOSYS;
+    return errno_t::OK;
 }
 
 bool ahci_if_t::port_stall_ncq(hba_port_info_t &pi,
