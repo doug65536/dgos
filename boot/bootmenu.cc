@@ -195,11 +195,9 @@ void apply_bootmenu_fw_cfg(tui_list_t<tui_menu_item_t>& boot_menu_items)
 
 void boot_menu_show(kernel_params_t &params)
 {
-
     tui_list_t<tui_menu_item_t> boot_menu_items(tui_menu);
 
     apply_bootmenu_fw_cfg(boot_menu_items);
-
 
     tui_menu_renderer_t boot_menu(boot_menu_items);
 

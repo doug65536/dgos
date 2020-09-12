@@ -357,7 +357,7 @@ size_t tchar_to_utf8(char *output, size_t output_sz,
     return utf16_to_utf8(output, output_sz, input, input_sz);
 }
 
-int tchar_strcmp_utf8(const char16_t *lhs, const char *rhs)
+int tchar_strcmp_utf8(char16_t const *lhs, char const *rhs)
 {
     int diff;
     char32_t lhs_codepoint;
@@ -372,7 +372,7 @@ int tchar_strcmp_utf8(const char16_t *lhs, const char *rhs)
     return diff;
 }
 
-int tchar_strcmp_utf8(const char *lhs, const char *rhs)
+int tchar_strcmp_utf8(char const *lhs, char const *rhs)
 {
     return strcmp(lhs, rhs);
 }
