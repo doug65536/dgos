@@ -100,7 +100,7 @@ bool pollkey()
     regs.eax = 0x1100;
     bioscall(&regs, 0x16);
 
-    if (!regs.flags_ZF())
+    if (likely(!regs.flags_ZF()))
         return true;
 
     return false;
