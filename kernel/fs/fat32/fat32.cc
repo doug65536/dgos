@@ -467,7 +467,7 @@ char *fat32_fs_t::name_from_lfns(char *pathname, full_lfn_t const *full)
         char16_t const *in = chunk;
         while ((in < (chunk + countof(chunk))) &&
                *in && (*in != 0xFFFFU)) {
-            int codepoint = utf16_to_ucs4(in, &in);
+            int codepoint = utf16_to_ucs4_upd(in);
             out += ucs4_to_utf8(out, codepoint);
         }
     }

@@ -260,7 +260,7 @@ char *utf8_from_tchar(char16_t *block)
 
     // Measure the buffer size needed
     for (char16_t const *in = block;
-         (codepoint = utf16_to_ucs4(in, &in)) != 0;
+         (codepoint = utf16_to_ucs4_upd(in)) != 0;
          len += ucs4_to_utf8(nullptr, codepoint));
 
     // Allocate output buffer

@@ -1,5 +1,11 @@
 #include "utf.h"
 
+#if defined(__DGOS_KERNEL__) || defined(__DGOS_BOOTLOADER__)
+#include "likely.h"
+#else
+#include <sys/likely.h>
+#endif
+
 #if !defined(__DGOS_KERNEL__) && !defined(__DGOS_BOOTLOADER__)
 #include <string.h>
 #include <stdint.h>
@@ -22,9 +28,10 @@
 // would have wrote to out, not including null terminator
 // Returns 0 for values outside 0 <= in < 0x101000 range
 // Always writes null terminator if out is not null
-EXPORT int ucs4_to_utf8(char *out, char32_t in)
+EXPORT size_t ucs4_to_utf8(char *out, char32_t in)
 {
-    int len;
+    size_t len;
+
     if (in < 0x80) {
         if (out) {
             *out++ = (char)in;
@@ -313,7 +320,59 @@ size_t utf8_count(char const *in)
 size_t utf16_count(char16_t const *in)
 {
     size_t count;
-    for (count = 0; *in; utf16_to_ucs4(in, &in))
+    for (count = 0; *in; utf16_to_ucs4_upd(in))
         ++count;
     return count;
+}
+
+size_t utf16_to_utf8(char *output, size_t output_sz,
+                     char16_t const *input, size_t input_sz)
+{
+    char *output_end = output + output_sz;
+    //char16_t const *input_end = input + input_sz;
+    char *output_start = output;
+
+    for (size_t i = 0; i < input_sz; ++i) {
+        char32_t codepoint = utf16_to_ucs4_upd(input);
+        size_t output_need = ucs4_to_utf8(nullptr, codepoint);
+        if (unlikely(output + output_need > output_end))
+            break;
+        output += ucs4_to_utf8(output, codepoint);
+    }
+
+    return output - output_start;
+}
+
+size_t tchar_to_utf8(char *output, size_t output_sz,
+                     char const *input, size_t input_sz)
+{
+    size_t sz = input_sz < output_sz ? input_sz : output_sz;
+    strncpy(output, input, sz);
+    return sz;
+}
+
+size_t tchar_to_utf8(char *output, size_t output_sz,
+                     char16_t const *input, size_t input_sz)
+{
+    return utf16_to_utf8(output, output_sz, input, input_sz);
+}
+
+int tchar_strcmp_utf8(const char16_t *lhs, const char *rhs)
+{
+    int diff;
+    char32_t lhs_codepoint;
+    char32_t rhs_codepoint;
+    do {
+        lhs_codepoint = utf16_to_ucs4_upd(lhs);
+        rhs_codepoint = utf8_to_ucs4_upd(rhs);
+
+        diff = int(lhs_codepoint) - int(rhs_codepoint);
+    } while (!diff && lhs_codepoint && rhs_codepoint);
+
+    return diff;
+}
+
+int tchar_strcmp_utf8(const char *lhs, const char *rhs)
+{
+    return strcmp(lhs, rhs);
 }

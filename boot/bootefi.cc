@@ -296,7 +296,7 @@ private:
         tchar const *in = filename;
         int codepoint;
         do {
-            codepoint = utf16_to_ucs4(in, &in);
+            codepoint = utf16_to_ucs4_upd(in);
             out += ucs4_to_utf8(out, codepoint);
         } while (codepoint);
 
