@@ -443,7 +443,7 @@ lib/mutex.h
 lib/mutex.cc
 lib/work_queue.cc
 lib/work_queue.h
-../.travis.yml
+../.github/workflows/github-ci.yml
 ../diskfat.mk
 ../diskiso.mk
 ../symbols.mk
