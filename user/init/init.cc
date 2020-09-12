@@ -848,7 +848,7 @@ int main(int argc, char **argv, char **envp)
 
     test_signal();
 
-    //load_module("boot/symsrv.km");
+    load_module("boot/symsrv.km");
 
 
     //syscall_perf_test();
