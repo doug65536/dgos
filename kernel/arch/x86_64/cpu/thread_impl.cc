@@ -242,7 +242,7 @@ C_ASSERT(sizeof(thread_info_t) == THREAD_INFO_SIZE);
     THREAD_FLAGS_USER_FPU)
 
 // Store in a big array, for now
-#define MAX_THREADS 4096
+#define MAX_THREADS 65536
 HIDDEN thread_info_t threads[MAX_THREADS];
 
 // Separate to avoid constantly sharing dirty lines
@@ -1915,28 +1915,36 @@ EXPORT thread_t thread_get_id()
 
 EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
 {
-    cpu_info_t *cpu = this_cpu();
+    if (unlikely(!mm_is_user_range((void*)gsbase, 1)))
+        panic("Almost set insecure user gsbase!");
 
-    if (tid < 0)
-        tid = cpu->cur_thread->thread_id;
+    thread_info_t *thread = this_thread();
 
-    if (uintptr_t(tid) < countof(threads))
+    if (likely(tid < 0))
+        tid = thread->thread_id;
+
+    if (likely(uintptr_t(tid) < thread_count))
         threads[tid].gsbase = (void*)gsbase;
+
+    if (likely(thread->thread_id == tid))
+        cpu_altgsbase_set((void*)gsbase);
 }
 
 EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
 {
-    cpu_info_t *cpu = this_cpu();
+    if (unlikely(!mm_is_user_range((void*)fsbase, 1)))
+        panic("Almost set insecure user fsbase!");
 
-    if (tid < 0)
-        tid = cpu->cur_thread->thread_id;
+    thread_info_t *self = this_thread();
+
+    if (likely(tid < 0))
+        tid = self->thread_id;
 
     if (uintptr_t(tid) < countof(threads))
         threads[tid].fsbase = (void*)fsbase;
 
-//    int cur_tid = cpu->cur_thread->thread_id;
-//    if (cur_tid == tid)
-//        cpu_fsbase_set((void*)fsbase);
+    if (likely(self->thread_id == tid))
+        cpu_fsbase_set((void*)fsbase);
 }
 
 EXPORT thread_cpu_mask_t const* thread_get_affinity(int id)
