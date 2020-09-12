@@ -69,6 +69,7 @@ struct tui_list_t {
 };
 
 struct tui_menu_item_t {
+    tui_str_t name;
     tui_str_t title;
     tui_list_t<tui_str_t> options;
 
@@ -78,10 +79,12 @@ struct tui_menu_item_t {
     tchar *text;
     size_t text_limit;
 
-    constexpr tui_menu_item_t(tui_str_t const& title,
+    constexpr tui_menu_item_t(tui_str_t const& name,
+                              tui_str_t const& title,
                               tui_list_t<tui_str_t> const& options,
                               size_t index)
-        : title(title)
+        : name(name)
+        , title(title)
         , options(options)
         , index(index)
         , text(nullptr)
@@ -89,8 +92,10 @@ struct tui_menu_item_t {
     {
     }
 
-    constexpr tui_menu_item_t(tui_str_t const& title, size_t text_sz)
-        : title(title)
+    constexpr tui_menu_item_t(tui_str_t const& name,
+                              tui_str_t const& title, size_t text_sz)
+        : name(name)
+        , title(title)
         , options()
         , index(-1)
         , text(nullptr)

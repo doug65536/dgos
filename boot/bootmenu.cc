@@ -3,6 +3,9 @@
 #include "vesa.h"
 #include "paging.h"
 #include "malloc.h"
+#include "qemu.h"
+#include "screen.h"
+#include "utf.h"
 
 static tui_str_t tui_timeout[] = {
     TSTR "1.5",
@@ -13,11 +16,11 @@ static tui_str_t tui_timeout[] = {
 };
 
 static tui_str_t tui_com_port[] = {
-    TSTR "Disabled",
-    TSTR "COM1",
-    TSTR "COM2",
-    TSTR "COM3",
-    TSTR "COM4"
+    TSTR "disabled",
+    TSTR "com1",
+    TSTR "com2",
+    TSTR "com3",
+    TSTR "com4"
 };
 
 static tui_str_t tui_baud_rates[] = {
@@ -37,6 +40,7 @@ static tui_str_t tui_baud_rates[] = {
 enum tui_menu_item_index_t {
     menu_timeout,
     kernel_debugger,
+    testrun_port,
     serial_output,
     serial_baud,
     display_resolution,
@@ -49,19 +53,33 @@ enum tui_menu_item_index_t {
     command_line
 };
 
+//opt/com.doug16k.dgos.bootmenu.timeout
+//opt/com.doug16k.dgos.bootmenu.kd_port
+//opt/com.doug16k.dgos.bootmenu.dbgout_port
+//opt/com.doug16k.dgos.bootmenu.dbgout_rate
+//opt/com.doug16k.dgos.bootmenu.display_res
+//opt/com.doug16k.dgos.bootmenu.e9_out
+//opt/com.doug16k.dgos.bootmenu.smp
+//opt/com.doug16k.dgos.bootmenu.acpi
+//opt/com.doug16k.dgos.bootmenu.mps
+//opt/com.doug16k.dgos.bootmenu.msi
+//opt/com.doug16k.dgos.bootmenu.msix
+//opt/com.doug16k.dgos.bootmenu.cmdline
+
 static tui_menu_item_t tui_menu[] = {
-    { TSTR "menu timeout (sec)", tui_timeout, 0 },
-    { TSTR "kernel debugger", tui_com_port, 0 },
-    { TSTR "serial debug output", tui_com_port, 1 },
-    { TSTR "serial baud rate", tui_baud_rates, 0 },
-    { TSTR "display resolution", {}, 0 },
-    { TSTR "port 0xe9 debug output", tui_dis_ena, 0 },
-    { TSTR "SMP", tui_dis_ena, 1 },
-    { TSTR "ACPI", tui_dis_ena, 1 },
-    { TSTR "MPS", tui_dis_ena, 1 },
-    { TSTR "MSI", tui_dis_ena, 1 },
-    { TSTR "MSI-X", tui_dis_ena, 1 },
-    { TSTR "command line", 511 }
+    { TSTR "timeout", TSTR "menu timeout (sec)", tui_timeout, 0 },
+    { TSTR "kd_port", TSTR "kernel debugger", tui_com_port, 0 },
+    { TSTR "testrun_port", TSTR "Test run port", tui_com_port, 1 },
+    { TSTR "dbgout_port", TSTR "serial debug output", tui_com_port, 1 },
+    { TSTR "dbgout_rate", TSTR "serial baud rate", tui_baud_rates, 0 },
+    { TSTR "display_res", TSTR "display resolution", {}, 0 },
+    { TSTR "e9_out", TSTR "port 0xe9 debug output", tui_dis_ena, 0 },
+    { TSTR "smp", TSTR "SMP", tui_dis_ena, 1 },
+    { TSTR "acpi", TSTR "ACPI", tui_dis_ena, 1 },
+    { TSTR "mps", TSTR "MPS", tui_dis_ena, 1 },
+    { TSTR "msi", TSTR "MSI", tui_dis_ena, 1 },
+    { TSTR "msix", TSTR "MSI-X", tui_dis_ena, 1 },
+    { TSTR "cmdline", TSTR "command line", 511 }
 };
 
 template<typename T>
@@ -123,9 +141,65 @@ bool mode_is_bgrx32(vbe_selected_mode_t const& mode)
             (mode.mask_size_b) == 8;
 }
 
+void apply_bootmenu_fw_cfg(tui_list_t<tui_menu_item_t>& boot_menu_items)
+{
+    char name[48];
+    char value[16];
+    constexpr tui_str_t prefix{TSTR "opt/com.doug16k.dgos.bootmenu."};
+    size_t prefix_len = tchar_to_utf8(name, sizeof(name),
+                                      prefix.str, prefix.len);
+    size_t prefix_remain = sizeof(name) - prefix_len;
+
+    PRINT("applying bootmenu fw_cfg");
+
+    for (size_t i = 0; i < boot_menu_items.count; ++i) {
+        tui_menu_item_t& menu_item = boot_menu_items.items[i];
+        tui_str_t& menu_item_name = menu_item.name;
+
+        tchar_to_utf8(name + prefix_len, prefix_remain,
+                      menu_item_name.str, menu_item_name.len);
+
+        uint32_t file_sz = 0;
+        int selector = qemu_selector_by_name(name, &file_sz);
+
+        if (likely(selector < 0)) {
+            PRINT("selector not found for %s", name);
+            continue;
+        }
+
+        size_t read_size = file_sz < sizeof(value) ? file_sz : sizeof(value);
+        if (unlikely(!qemu_fw_cfg(value, read_size, file_sz, selector))) {
+            PRINT("failed to read selector!");
+            continue;
+        }
+
+        assert(file_sz < sizeof(value) - 1);
+        value[file_sz] = 0;
+
+        bool found = false;
+        for (size_t index = 0; index < menu_item.options.count; ++index) {
+            tui_str_t const& option = menu_item.options.items[index];
+            if (!tchar_strcmp_utf8(option.str, value)) {
+                menu_item.index = index;
+                found = true;
+                break;
+            }
+        }
+
+        if (unlikely(!found)) {
+            PRINT("Failed to find value %s for option %s",
+                  value, menu_item.name.str);
+        }
+    }
+}
+
 void boot_menu_show(kernel_params_t &params)
 {
+
     tui_list_t<tui_menu_item_t> boot_menu_items(tui_menu);
+
+    apply_bootmenu_fw_cfg(boot_menu_items);
+
 
     tui_menu_renderer_t boot_menu(boot_menu_items);
 
@@ -242,6 +316,7 @@ void boot_menu_show(kernel_params_t &params)
 
     params.vbe_selected_mode = uintptr_t(aligned_mode);
     params.gdb_port = tui_menu[kernel_debugger].index;
+    params.testrun_port = tui_menu[testrun_port].index;
     params.serial_debugout = tui_menu[serial_output].index;
     params.serial_baud = tui_menu[serial_baud].index;
     params.smp_enable = tui_menu[smp_enable].index;

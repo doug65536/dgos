@@ -92,6 +92,7 @@ struct alignas(8) kernel_params_t {
     ptr64_t<char> command_line;
 
     uint8_t gdb_port;
+    uint8_t testrun_port;
     uint8_t serial_debugout;
     uint8_t serial_baud;
 
