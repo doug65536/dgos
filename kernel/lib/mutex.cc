@@ -23,105 +23,105 @@ template class ext::unique_lock<ext::noirq_lock<ext::irqlock>>;
 //template class ext::unique_lock<ext::noirq_lock<ext::mcslock>>;
 #pragma GCC visibility pop
 
-EXPORT ext::mutex::mutex()
+ext::mutex::mutex()
 {
     mutex_init(&m);
 }
 
-EXPORT ext::mutex::~mutex()
+ext::mutex::~mutex()
 {
     mutex_destroy(&m);
 }
 
-EXPORT void ext::mutex::lock()
+void ext::mutex::lock()
 {
     mutex_lock(&m);
 }
 
-EXPORT bool ext::mutex::try_lock()
+bool ext::mutex::try_lock()
 {
     return mutex_try_lock(&m);
 }
 
-EXPORT void ext::mutex::unlock()
+void ext::mutex::unlock()
 {
     mutex_unlock(&m);
 }
 
-EXPORT ext::shared_mutex::shared_mutex()
+ext::shared_mutex::shared_mutex()
 {
     rwlock_init(&m);
 }
 
-EXPORT ext::shared_mutex::~shared_mutex()
+ext::shared_mutex::~shared_mutex()
 {
     rwlock_destroy(&m);
 }
 
-EXPORT void ext::shared_mutex::lock()
+void ext::shared_mutex::lock()
 {
     rwlock_ex_lock(&m);
 }
 
-EXPORT bool ext::shared_mutex::try_lock()
+bool ext::shared_mutex::try_lock()
 {
     return rwlock_ex_try_lock(&m);
 }
 
-EXPORT void ext::shared_mutex::unlock()
+void ext::shared_mutex::unlock()
 {
     rwlock_ex_unlock(&m);
 }
 
-EXPORT void ext::shared_mutex::lock_shared()
+void ext::shared_mutex::lock_shared()
 {
     rwlock_sh_lock(&m);
 }
 
-EXPORT void ext::shared_mutex::try_lock_shared()
+void ext::shared_mutex::try_lock_shared()
 {
     rwlock_sh_try_lock(&m);
 }
 
-EXPORT void ext::shared_mutex::unlock_shared()
+void ext::shared_mutex::unlock_shared()
 {
     rwlock_sh_unlock(&m);
 }
 
-EXPORT void ext::shared_mutex::upgrade_lock()
+void ext::shared_mutex::upgrade_lock()
 {
     rwlock_upgrade(&m);
 }
 
 // ---
 
-EXPORT ext::unique_lock<ext::mcslock>::unique_lock(ext::mcslock &attached_lock)
+ext::unique_lock<ext::mcslock>::unique_lock(ext::mcslock &attached_lock)
     : m(&attached_lock)
     , locked(false)
 {
     lock();
 }
 
-EXPORT ext::unique_lock<ext::mcslock>::unique_lock(
+ext::unique_lock<ext::mcslock>::unique_lock(
         ext::mcslock &lock, ext::defer_lock_t) noexcept
     : m(&lock)
     , locked(false)
 {
 }
 
-EXPORT ext::unique_lock<ext::mcslock>::~unique_lock() noexcept
+ext::unique_lock<ext::mcslock>::~unique_lock() noexcept
 {
     unlock();
 }
 
-EXPORT void ext::unique_lock<ext::mcslock>::lock() noexcept
+void ext::unique_lock<ext::mcslock>::lock() noexcept
 {
     assert(!locked);
     m->lock(&node);
     locked = true;
 }
 
-EXPORT void ext::unique_lock<ext::mcslock>::unlock() noexcept
+void ext::unique_lock<ext::mcslock>::unlock() noexcept
 {
     if (locked) {
         locked = false;
@@ -129,13 +129,13 @@ EXPORT void ext::unique_lock<ext::mcslock>::unlock() noexcept
     }
 }
 
-EXPORT void ext::unique_lock<ext::mcslock>::release() noexcept
+void ext::unique_lock<ext::mcslock>::release() noexcept
 {
     locked = false;
     m = nullptr;
 }
 
-EXPORT void ext::unique_lock<ext::mcslock>::swap(
+void ext::unique_lock<ext::mcslock>::swap(
         unique_lock<ext::mcslock> &rhs) noexcept
 {
     ext::swap(rhs.m, m);
@@ -145,42 +145,42 @@ EXPORT void ext::unique_lock<ext::mcslock>::swap(
 
 // ---
 
-EXPORT ext::condition_variable::condition_variable()
+KERNEL_API ext::condition_variable::condition_variable()
 {
     condvar_init(&m);
 }
 
-EXPORT ext::condition_variable::~condition_variable()
+ext::condition_variable::~condition_variable()
 {
     condvar_destroy(&m);
 }
 
-EXPORT void ext::condition_variable::notify_one()
+void ext::condition_variable::notify_one()
 {
     condvar_wake_one(&m);
 }
 
-EXPORT void ext::condition_variable::notify_all()
+void ext::condition_variable::notify_all()
 {
     condvar_wake_all(&m);
 }
 
-EXPORT void ext::condition_variable::notify_n(size_t n)
+void ext::condition_variable::notify_n(size_t n)
 {
     condvar_wake_n(&m, n);
 }
 
-EXPORT void ext::spinlock::lock()
+void ext::spinlock::lock()
 {
     spinlock_lock(&m);
 }
 
-EXPORT bool ext::spinlock::try_lock()
+bool ext::spinlock::try_lock()
 {
     return spinlock_try_lock(&m);
 }
 
-EXPORT void ext::spinlock::unlock()
+void ext::spinlock::unlock()
 {
     spinlock_unlock(&m);
 }

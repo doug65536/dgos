@@ -1,14 +1,14 @@
 #pragma once
 #include "types.h"
 
-__BEGIN_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
 template<typename _L>
 class unique_lock;
-__END_NAMESPACE_STD
+__END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_EXT
 template<typename _L>
-class noirq_lock
+class KERNEL_API noirq_lock
 {
 public:
     using mutex_type = typename _L::mutex_type;

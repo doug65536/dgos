@@ -36,7 +36,7 @@ public:
 
 // Not a "real" lock, just saves and disables IRQs when locked,
 // and restores saved IRQ mask when unlocked
-class irqlock {
+class KERNEL_API irqlock {
 public:
     using mutex_type = int;
 
@@ -67,7 +67,7 @@ private:
 };
 
 // Meets BasicLockable requirements
-class spinlock : public base_lock<spinlock>
+class KERNEL_API spinlock : public base_lock<spinlock>
 {
 public:
     typedef spinlock_t mutex_type;
@@ -91,7 +91,7 @@ private:
     spinlock_t m;
 };
 
-class shared_spinlock : public base_lock<shared_spinlock> {
+class KERNEL_API shared_spinlock : public base_lock<shared_spinlock> {
 public:
     typedef rwspinlock_t mutex_type;
 
@@ -137,7 +137,7 @@ private:
 
 // Does not meet BasicLockable requirements, lock holder maintains node
 // The size of this thing is the size of one pointer
-class mcslock : public base_lock<mcslock> {
+class KERNEL_API mcslock : public base_lock<mcslock> {
 public:
     constexpr mcslock()
         : m(nullptr)
@@ -162,7 +162,7 @@ private:
 };
 
 template<typename _L>
-class noirq_lock
+class KERNEL_API noirq_lock
 {
 public:
     using mutex_type = typename _L::mutex_type;
@@ -216,7 +216,7 @@ private:
 };
 
 template<>
-class noirq_lock<mcslock>
+class KERNEL_API noirq_lock<mcslock>
 {
 public:
     using mutex_type = typename mcslock::mutex_type;
@@ -268,7 +268,7 @@ using irq_spinlock = noirq_lock<spinlock>;
 using irq_ticketlock = noirq_lock<ticketlock>;
 
 // Meets BasicLockable requirements
-class mutex : public base_lock<mutex> {
+class KERNEL_API mutex : public base_lock<mutex> {
 public:
     typedef mutex_t mutex_type;
 
@@ -312,7 +312,7 @@ bool mutex::try_lock_until(chrono::time_point<_Clock, _Duration>
 }
 
 // Meets SharedMutex requirements
-class shared_mutex : public ext::base_lock<shared_mutex> {
+class KERNEL_API shared_mutex : public ext::base_lock<shared_mutex> {
 public:
     typedef rwlock_t mutex_type;
 
@@ -339,7 +339,7 @@ private:
 };
 
 template<typename T>
-class unique_lock
+class KERNEL_API unique_lock
 {
 public:
     _hot
@@ -662,7 +662,7 @@ enum class cv_status
     timeout
 };
 
-class condition_variable
+class KERNEL_API condition_variable
 {
 public:
     condition_variable();

@@ -13,4 +13,5 @@ fi
 
 x86_64-elf-objdump --wide --dynamic-syms $objdump_args $src | \
     grep -oP '(.text|.data|.bss|.rodata).*' | \
-    sed -E 's/^\S+\s+\S+\s+//g'
+    sed -E 's/^\S+\s+\S+\s+//g' | \
+    sed -E 's/^\.protected\ //g'
