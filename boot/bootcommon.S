@@ -125,6 +125,9 @@ pmode_entry:
     xorl %eax,%eax
     lldt %ax
 
+    mov %esp,%ebp
+    and $ -16,%esp
+
     // Clean eflags
     pushl $ 2
     popfl
@@ -135,12 +138,11 @@ pmode_entry:
 
     movl %ebx,%eax
     movl %esi,%edx
-    mov %esp,%ebp
-    and $ -16,%esp
     call *%edi
-    mov %ebp,%esp
 
     call cpu_a20_exitpm
+
+    mov %ebp,%esp
 
     // Jump to 16 bit protected mode and load segments
     ljmp $ GDT_SEL_PM_CODE16,$ 0f
