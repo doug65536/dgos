@@ -119,35 +119,35 @@ more_sectors:
     movw $ dap,%si
     movb boot_drive,%dl
     int $ 0x13
-	jnc okay
+    jnc okay
 
-	// It may be an error, or just a partial success. Check.
+    // It may be an error, or just a partial success. Check.
 
-	// Read number of blocks actally transferred
-	movw dap+dap_block_count,%ax
+    // Read number of blocks actally transferred
+    movw dap+dap_block_count,%ax
 
-	// If no blocks transferred, it really failed
-	test %ax,%ax
-	jz fail
+    // If no blocks transferred, it really failed
+    test %ax,%ax
+    jz fail
 
-	// It was a partial success...
+    // It was a partial success...
 
-	// Adjust (remaining) sector count
-	movw sector_count,%si
-	subw %ax,%si
-	movw %si,dap+dap_block_count
-	movw %si,sector_count
+    // Adjust (remaining) sector count
+    movw sector_count,%si
+    subw %ax,%si
+    movw %si,dap+dap_block_count
+    movw %si,sector_count
 
-	// Multiply the number of sectors transferred by the sector size
-	mulw ddp+ddp_sector_size
+    // Multiply the number of sectors transferred by the sector size
+    mulw ddp+ddp_sector_size
 
-	// Advance the address that many bytes
+    // Advance the address that many bytes
     // (by advancing the segment 1/16th as much)
     // Makes sense because the smallest sectors are much larger than 16 bytes
     shrw $ 4,%ax
-	addw %ax,dap+dap_address+2
-	test %si,%si
-  	jnz more_sectors
+    addw %ax,dap+dap_address+2
+    test %si,%si
+    jnz more_sectors
 
 okay:
     // Setup register parameters for stage 1
