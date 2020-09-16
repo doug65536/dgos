@@ -387,7 +387,7 @@ struct alignas(256) cpu_info_t {
             return false;
         }
 
-        printdbg("Enqueuing cross cpu resume, tid=%d\n", tid);
+        THREAD_TRACE("Enqueuing cross cpu resume, tid=%d\n", tid);
 
         resume_ring[head].tid = tid;
         resume_ring[head].ret_lo = uint32_t(value & 0xFFFFFFFFU);
