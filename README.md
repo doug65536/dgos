@@ -191,6 +191,7 @@ from the following pattern:
     make -j$(nproc) {debug|run|test|testdbg}-{up|smp|numa}-{bios|efi}-{pxe|hd}-{iso|mbr|gpt|hyb}-{none|ahci|ide|nvme|usb|virtio}-{vga|gl}-{kvm|icount|tcg|mttcg}
 
 For example, `make -j$(nproc) debug-smp-efi-hd-gpt-ahci-vga-kvm` will build
-a VM with SMP (multiple CPUs), EFI firmware/boot, disk boot (not LAN),
-GPT partition, AHCI disk controller, standard VGA graphics adapter, running
-with hardware virtualization under kvm.
+a VM that waits for the debugger to attach before booting, with SMP
+(multiple CPUs), EFI firmware/boot, disk boot (not LAN), GPT partition,
+AHCI disk controller, standard VGA graphics adapter, running with
+hardware virtualization under KVM.
