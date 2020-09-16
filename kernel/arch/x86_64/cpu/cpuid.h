@@ -389,6 +389,11 @@ CPUID_CONST_INLINE bool cpuid_is_tcg()
     return cpuid_cache.hv_type == hv_type_t::TCG;
 }
 
+CPUID_CONST_INLINE bool cpuid_is_qemu()
+{
+    return cpuid_is_tcg() || cpuid_is_kvm();
+}
+
 CPUID_CONST_INLINE char const *cpuid_brand()
 {
     return cpuid_cache.brand;
