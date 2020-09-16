@@ -105,3 +105,40 @@
 - Support 16-, 24-, and 32-bit per pixel modes. Specialized fast implemetation
   internals for common modes, arbitrary pixel format is still handled. No
   palette support.
+
+## Build Instructions
+
+These instructions are not strict. You could name your directories whatever
+and place them wherever (a ramdrive?). These instructions are meant to be
+simple.
+
+- Make a directory where you want it stored and cd into it
+
+- clone the source repo. This will create a directory called dgos
+
+    mkdir toolchain
+    mkdir build
+
+At this point there should be dgos created by git clone,
+and the two created directories.
+
+### Dependencies
+
+You need the following packages:
+`lemon` `mtools` `genisoimage` `qemu-system-x86`
+
+### Toolchain
+
+Starting from the storage location (which contains dgos, build, toolchain)
+
+    cd toolchain
+    ../dgos/toolchain/build-crossgcc.sh -o toolchain_build -p toolchain_install
+
+    export PATH="$PWD/toolchain_install/bin:$PATH"
+    cd ..
+
+### Bootstrap
+
+    cd build
+    ../dgos/bootstrap --enable-lto --enable-optimize
+    make disks -j$(nproc)
