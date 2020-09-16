@@ -88,6 +88,15 @@ struct perf_ctr_t {
     { "Div Op", 0x4300D4 },
 };
 
+#define CSI "\x1b" "["
+#define ITALIC
+#define COLOR4_STR(code, str) CSI #code "m" str "\x1b" "[0m"
+#define COLOR8_STR(code, str) CSI #code "m" str "\x1b" "[0m"
+#define YELLOW_STR(str) COLOR4_STR(33, str)
+#define BLUE_STR(str) COLOR4_STR(34, str)
+#define WHITE_STR(str)  COLOR4_STR(37, str)
+#define CYAN_STR(str)  COLOR4_STR(36, str)
+
 class symbol_server_t {
     uart_dev_t *port = nullptr;
     thread_t tid = -1;
@@ -252,14 +261,15 @@ class symbol_server_t {
             memcpy(edited_name + 96 - 3, "...", 3);
 
         char fileline[96];
-        int fileline_len = snprintf(fileline, sizeof(fileline), "%s(%d)",
+        int fileline_len = snprintf(fileline, sizeof(fileline),
+                                    BLUE_STR("%s") "(" BLUE_STR("%d") ")",
                                     last_slash, line);
 
-        char buf[128];
+        char buf[160];
         int sz = snprintf(buf, sizeof(buf),
                           "\x1b" "[%zu;1H"
                           "\x1b" "[0K"
-                          "%3d.%06d%% %s %.*s\n",
+                          "%3d.%06d%% %s " WHITE_STR("%.*s") "\n",
                           top_rows,
                           percent, micropercent, fileline,
                           ext::max(0, 96 - fileline_len - 1), name);
@@ -298,12 +308,11 @@ class symbol_server_t {
         return "Unknown";
     }
 
-#define YELLOW_STR(str) "\x1b" "[33m" str "\x1b" "[0m"
-
-    void modal_top(uint64_t total_samples, char command)
+    void modal_top(char command)
     {
         port->write(ext::string(16, '\n'));
 
+        uint64_t total_samples = 0;
         uint64_t last_samples;
         uint64_t delta_samples;
 
@@ -324,7 +333,7 @@ class symbol_server_t {
                 delta_samples = total_samples - last_samples;
 
             while (top_rows <= 16) {
-                port->wrstr("\x1b" "[");
+                port->wrstr(CSI);
                 port->write(ext::to_string(top_rows++));
                 port->wrstr(";1H");
                 clear_to_eol();
@@ -421,19 +430,19 @@ class symbol_server_t {
                     now + ext::chrono::seconds(1);
 
             if (auto_divisor) {
-                if (delta_samples <= 1250)
+                if (delta_samples <= 312)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 4));
-                else if (delta_samples <= 1500)
+                else if (delta_samples <= 625)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) / 2));
-                else if (delta_samples >= 24000)
+                else if (delta_samples >= 9600)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 8));
-                else if (delta_samples >= 12000)
+                else if (delta_samples >= 4800)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 4));
-                else if (delta_samples >= 6000)
+                else if (delta_samples >= 2400)
                     perf_set_divisor(ext::max(UINT64_C(1),
                                               perf_adj_divisor(0) * 2));
             }
@@ -753,7 +762,7 @@ class symbol_server_t {
                 break;
 
             case 't':
-                modal_top(total_samples, command);
+                modal_top(command);
 
                 break;
 
