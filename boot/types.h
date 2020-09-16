@@ -31,7 +31,6 @@ typedef int64_t off_t;
 
 #define _stdcall                __attribute__((__stdcall__))
 
-#define _no_asan                __attribute((__no_address_safety_analysis__))
 #define _packed                 __attribute((__packed__))
 #define _const                  __attribute__((__const__))
 #define _pure                   __attribute__((__pure__))
@@ -51,12 +50,20 @@ typedef int64_t off_t;
 #define _flatten                __attribute__((__flatten__))
 #define _assume_aligned(n)      __attribute__((__assume_aligned__(n)))
 #define _printf_format(m,n)     __attribute__((__format__(__printf__, m, n)))
+#define _artificial             __attribute__((__artificial__))
+#define _no_instrument          __attribute__((__no_instrument_function__))
+#define _no_asan                __attribute__((__no_address_safety_analysis__))
+#define _no_ubsan               __attribute__((no_sanitize("undefined")))
+#define _no_plt                 __attribute__((__noplt__))
 
 #define _constructor(prio)      __attribute__((__constructor__(prio)))
 #define _destructor(prio)       __attribute__((__destructor__(prio)))
 
+#define _ifunc_resolver(fn)     __attribute__((__ifunc__(#fn)))
 #define _section(name)          __attribute__((__section__(name)))
 #define _hot                    __attribute__((__hot__))
+#define _cold                   __attribute__((__cold__))
+
 #define _assume(expr) \
     do { \
         if (!(expr)) \
