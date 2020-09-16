@@ -50,9 +50,23 @@ initial_stack_ptr:
 
 .global boot
 boot:
+    .cfi_startproc
+    .cfi_def_cfa esp,0
+    .cfi_register eip,ebx
+
     pushl %ebx
+    .cfi_adjust_cfa_offset 4
+    .cfi_offset ebx,2*-4
+
     pushl %ebp
+    .cfi_offset ebp,3*-4
+
     movl %esp,%ebp
+    .cfi_def_cfa ebp,3*4
+    .cfi_offset eip,1*-4
+    .cfi_offset ebx,2*-4
+    .cfi_offset ebp,3*-4
+
     pushl %edi
     pushl %esi
 
@@ -78,9 +92,13 @@ boot:
 
     movw $ GDT_SEL_PM_DATA32,%dx
     ljmp $ GDT_SEL_PM_CODE32,$ pmode_entry
+
+    .cfi_endproc
+
 pmode_entry:
 .code32
     .cfi_startproc
+    .cfi_def_cfa esp,0
     // Tell stack traces to give up here
     .cfi_undefined eip
     .cfi_undefined esp

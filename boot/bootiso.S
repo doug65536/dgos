@@ -38,6 +38,9 @@ bootinfo_reserved:
     .space 10*4
 
 entry_start:
+    .cfi_startproc
+    .cfi_def_cfa esp,0
+    .cfi_undefined eip
     cli
     cld
 
@@ -56,9 +59,14 @@ entry_start:
 
     ljmpw $ 0,$ relocated_bootiso_entry
 
+    .cfi_endproc
+
 // This is linked after head
 .section .early, "wx", @progbits
 relocated_bootiso_entry:
+    .cfi_startproc
+    .cfi_def_cfa esp,0
+    .cfi_undefined eip
     callw clear_bss
 
 .Lretry_io:
@@ -135,6 +143,8 @@ load_done:	// utility label for placing debugger breakpoint
     jmp boot
 0:  hlt
     jmp 0b
+
+    .cfi_endproc
 
 .balign 64
 .global boot_drive
