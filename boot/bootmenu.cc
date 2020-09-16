@@ -66,10 +66,53 @@ enum tui_menu_item_index_t {
 //opt/com.doug16k.dgos.bootmenu.msix
 //opt/com.doug16k.dgos.bootmenu.cmdline
 
+// When present, enables automated display mode selection
+// When absent, pixel width is don't care
+// Strips all modes that are not the specified pixel width
+//opt/com.doug16k.dgos.bootmenu.display_w
+
+// When present, enables automated display mode selection
+// When absent, pixel height is don't care
+// Strips all modes that are not the specified pixel height
+//opt/com.doug16k.dgos.bootmenu.display_h
+
+// When present, enables automated display mode selection
+// When absent, pixel depth is don't care
+// Strips all modes that are not the specified pixel bit depth
+//opt/com.doug16k.dgos.bootmenu.display_bpp
+
+// When present, enables automated display mode selection
+// When absent, pixel field order becomes don't care
+// Makes BGRA (fastest) pixel format required or banned
+//opt/com.doug16k.dgos.bootmenu.display_bgra
+
+// When automated display mode selection is enabled, select the first
+// mode that meets all the specified requirements
+// If no mode meets the requirements, leave it on the first enumerated mode
+
+struct autodisplay_info_t {
+    int display_w = -1;
+    int display_h = -1;
+    int display_bpp = -1;
+    int display_bgra = -1;
+};
+
+struct autodisplay_field_t {
+    tui_str_t name;
+    int autodisplay_info_t::*member;
+};
+
+static autodisplay_field_t const autodisplay_fields[] = {
+    { TSTR "display_w", &autodisplay_info_t::display_w },
+    { TSTR "display_h", &autodisplay_info_t::display_h },
+    { TSTR "display_bpp", &autodisplay_info_t::display_bpp },
+    { TSTR "display_bgra", &autodisplay_info_t::display_bgra }
+};
+
 static tui_menu_item_t tui_menu[] = {
     { TSTR "timeout", TSTR "menu timeout (sec)", tui_timeout, 0 },
     { TSTR "kd_port", TSTR "kernel debugger", tui_com_port, 0 },
-    { TSTR "testrun_port", TSTR "Test run port", tui_com_port, 1 },
+    { TSTR "testrun_port", TSTR "Test run port", tui_com_port, 0 },
     { TSTR "dbgout_port", TSTR "serial debug output", tui_com_port, 1 },
     { TSTR "dbgout_rate", TSTR "serial baud rate", tui_baud_rates, 0 },
     { TSTR "display_res", TSTR "display resolution", {}, 0 },
@@ -141,7 +184,30 @@ bool mode_is_bgrx32(vbe_selected_mode_t const& mode)
             (mode.mask_size_b) == 8;
 }
 
-void apply_bootmenu_fw_cfg(tui_list_t<tui_menu_item_t>& boot_menu_items)
+int32_t read_fw_cfg_value(char const *name, char *value, size_t value_sz)
+{
+    uint32_t file_sz = 0;
+    int selector = qemu_selector_by_name(name, &file_sz);
+
+    if (likely(selector < 0)) {
+        PRINT("selector not found for %s", name);
+        return -1;
+    }
+
+    size_t read_size = file_sz < value_sz ? file_sz : value_sz;
+    if (unlikely(!qemu_fw_cfg(value, read_size, file_sz, selector))) {
+        PRINT("failed to read selector!");
+        return -1;
+    }
+
+    assert(file_sz < INT32_MAX);
+
+    return int32_t(file_sz);
+}
+
+static void apply_bootmenu_fw_cfg(
+        tui_list_t<tui_menu_item_t>& boot_menu_items,
+        vbe_mode_list_t const& vbe_modes)
 {
     char name[48];
     char value[16];
@@ -159,21 +225,12 @@ void apply_bootmenu_fw_cfg(tui_list_t<tui_menu_item_t>& boot_menu_items)
         tchar_to_utf8(name + prefix_len, prefix_remain,
                       menu_item_name.str, menu_item_name.len);
 
-        uint32_t file_sz = 0;
-        int selector = qemu_selector_by_name(name, &file_sz);
+        int file_sz = read_fw_cfg_value(name, value, sizeof(value));
 
-        if (likely(selector < 0)) {
-            PRINT("selector not found for %s", name);
-            continue;
-        }
+        if (file_sz < 0)
+            return;
 
-        size_t read_size = file_sz < sizeof(value) ? file_sz : sizeof(value);
-        if (unlikely(!qemu_fw_cfg(value, read_size, file_sz, selector))) {
-            PRINT("failed to read selector!");
-            continue;
-        }
-
-        assert(file_sz < sizeof(value) - 1);
+        assert(size_t(file_sz) < sizeof(value) - 1);
         value[file_sz] = 0;
 
         bool found = false;
@@ -191,18 +248,65 @@ void apply_bootmenu_fw_cfg(tui_list_t<tui_menu_item_t>& boot_menu_items)
                   value, menu_item.name.str);
         }
     }
+
+    tui_list_t<autodisplay_field_t const> autodisplay_items(autodisplay_fields);
+
+    autodisplay_info_t autodisplay_info{};
+
+    for (size_t i = 0; i < autodisplay_items.count; ++i) {
+        autodisplay_field_t const& field = autodisplay_items.items[i];
+
+        tchar_to_utf8(name + prefix_len, prefix_remain,
+                      field.name, field.name.len);
+
+        uint32_t file_sz = read_fw_cfg_value(name, value, sizeof(value));
+
+        // ASCII to decimal
+        int n = 0;
+        for (size_t i = 0; i < file_sz; ++i) {
+            if (unlikely(value[i] > '9'))
+                break;
+
+            if (likely(value[i] >= '0' && value[i] <= '9')) {
+                n *= 10;
+                n += value[i] - '0';
+            }
+        }
+
+        autodisplay_info.*field.member = n;
+    }
+
+    for (size_t i = 0; i < vbe_modes.count; ++i) {
+        vbe_selected_mode_t const& mode = vbe_modes.modes[i];
+
+        bool is_bgra = mode.mask_pos_b < mode.mask_pos_g &&
+                mode.mask_pos_g < mode.mask_pos_r;
+
+        // Select the first mode meeting the criteria
+        if ((autodisplay_info.display_w < 0 ||
+             autodisplay_info.display_w == mode.width) &&
+            (autodisplay_info.display_h < 0 ||
+             autodisplay_info.display_h == mode.height) &&
+            (autodisplay_info.display_bpp < 0 ||
+             autodisplay_info.display_bpp == mode.bpp) &&
+            (autodisplay_info.display_bgra < 0 ||
+             autodisplay_info.display_bgra == is_bgra)) {
+            boot_menu_items[i].index = i;
+            break;
+        }
+    }
 }
 
 void boot_menu_show(kernel_params_t &params)
 {
     tui_list_t<tui_menu_item_t> boot_menu_items(tui_menu);
 
-    apply_bootmenu_fw_cfg(boot_menu_items);
-
-    tui_menu_renderer_t boot_menu(boot_menu_items);
-
     vbe_mode_list_t const& vbe_modes =
             vbe_enumerate_modes();
+
+    apply_bootmenu_fw_cfg(boot_menu_items, vbe_modes);
+
+    tui_menu_renderer_t boot_menu(boot_menu_items);
 
     // format is %dx%d-%d:%d:%d:%d-%dbpp (fastest)
     //            ^  ^  ^  ^  ^  ^  ^

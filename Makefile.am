@@ -109,7 +109,8 @@ mbr_elf_CXXFLAGS = \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(NO_LTO_FLAGS) -static -DS00 \
+	$(NO_LTO_FLAGS) \
+	-static -DS00 \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	-D__DGOS_BOOTLOADER__
 
@@ -2543,8 +2544,10 @@ QEMU_SERIAL = \
 
 QEMU_SOUND = -soundhw es1370
 
+QEMU_DEBUG = -no-shutdown -no-reboot -d unimp,guest_errors
+QEMU_TEST = -no-reboot -d unimp,guest_errors
+
 QEMU_COMMON = \
-	-no-shutdown -no-reboot -d unimp,guest_errors \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS) \
 	$(QEMU_SERIAL) \
@@ -2563,6 +2566,8 @@ QEMU_RT_trace = -s -fw_cfg name=opt/com.doug16k.dgos.kernel_type,string=T
 QEMU_RT_tracedbg = -S $(QEMU_RT_trace)
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
+QEMU_RT_test = -s $(QEMU_TEST)
+QEMU_RT_testdbg = -s -S $(QEMU_TEST)
 
 QEMU_DRV_COMMON = \
 	id=bootdrv,if=none,format=raw,werror=report,rerror=report
@@ -2691,7 +2696,8 @@ monitor-debug-output: $(DUMPDIR)/qemu-debug-out
 monitor-connect:
 	telnet localhost 7777
 
-QL_RT = debug run trace asan tracedbg
+QL_RT = debug run test testdbg
+#QL_RT = tracedbg trace asan
 QL_NP = up smp numa
 QL_BT = bios efi
 QL_BM = pxe hd

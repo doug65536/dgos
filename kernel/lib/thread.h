@@ -290,4 +290,10 @@ void arch_jump_to_user(uintptr_t ip, uintptr_t sp,
                        uintptr_t kernel_sp, bool use64,
                        uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
 
+_noreturn
+void arch_poweroff();
+
+_noreturn
+void arch_ungraceful_stop();
+
 __END_DECLS
