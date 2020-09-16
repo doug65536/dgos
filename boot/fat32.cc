@@ -146,6 +146,9 @@ static bool read_fat(uint64_t lba)
     return ok;
 }
 
+static size_t fat_cache_hits;
+static size_t fat_cache_misses;
+
 // Reads the FAT, finds next cluster, and reads cluster
 // Returns new cluster number, returns 0 at end of file
 // Returns 0xFFFFFFFF on error
@@ -161,11 +164,17 @@ static uint32_t next_cluster(
 
     bool ok = true;
     if (unlikely(fat_buffer_lba != lba)) {
+        ++fat_cache_misses;
+
         ok = read_fat(lba);
         if (ok_ptr)
             *ok_ptr = ok;
         if (unlikely(!ok))
             return 0xFFFFFFFF;
+        if (sector)
+            memcpy(sector, fat_buffer, sector_sz);
+    } else {
+        ++fat_cache_hits;
     }
 
     fat_array = (uint32_t*)fat_buffer;
