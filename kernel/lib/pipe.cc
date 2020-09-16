@@ -2,23 +2,23 @@
 #include "stdlib.h"
 #include "export.h"
 
-EXPORT pipe_t::pipe_t()
+pipe_t::pipe_t()
 {
 
 }
 
-EXPORT pipe_t::~pipe_t()
+pipe_t::~pipe_t()
 {
     scoped_lock lock(pipe_lock);
     cleanup_buffer(lock);
 }
 
-EXPORT size_t pipe_t::capacity() const
+size_t pipe_t::capacity() const
 {
     return page_capacity << PAGE_SCALE;
 }
 
-EXPORT void pipe_t::cleanup_buffer(scoped_lock& lock)
+void pipe_t::cleanup_buffer(scoped_lock& lock)
 {
     if (page_pool) {
         munmap(page_pool, page_capacity * PAGESIZE);
@@ -35,7 +35,7 @@ EXPORT void pipe_t::cleanup_buffer(scoped_lock& lock)
     pipe_not_full.notify_all();
 }
 
-EXPORT pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock,
+pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock,
                                                 int64_t timeout_time)
 {
     ext::cv_status wait_result = ext::cv_status::no_timeout;
@@ -69,7 +69,7 @@ EXPORT pipe_buffer_hdr_t *pipe_t::allocate_page(scoped_lock& lock,
     return nullptr;
 }
 
-EXPORT void pipe_t::free_page(pipe_buffer_hdr_t *page, scoped_lock& lock)
+void pipe_t::free_page(pipe_buffer_hdr_t *page, scoped_lock& lock)
 {
     page->next = free_buffer;
     page->size = 0;
@@ -77,7 +77,7 @@ EXPORT void pipe_t::free_page(pipe_buffer_hdr_t *page, scoped_lock& lock)
     pipe_not_full.notify_one();
 }
 
-EXPORT bool pipe_t::reserve(size_t pages)
+bool pipe_t::reserve(size_t pages)
 {
     scoped_lock lock(pipe_lock);
 
@@ -98,12 +98,12 @@ EXPORT bool pipe_t::reserve(size_t pages)
     return true;
 }
 
-EXPORT size_t pipe_t::overhead() const
+size_t pipe_t::overhead() const
 {
     return sizeof(pipe_buffer_hdr_t);
 }
 
-EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
+ssize_t pipe_t::enqueue(void const *data, size_t size,
                                int64_t timeout_time)
 {
     ssize_t sent = 0;
@@ -174,7 +174,7 @@ EXPORT ssize_t pipe_t::enqueue(void const *data, size_t size,
     return sent;
 }
 
-EXPORT ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout_time)
+ssize_t pipe_t::dequeue(void *data, size_t size, int64_t timeout_time)
 {
     size_t received = 0;
 

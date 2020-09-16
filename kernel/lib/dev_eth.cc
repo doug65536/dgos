@@ -17,7 +17,7 @@ static unsigned eth_factory_count;
 static eth_dev_base_t *eth_devices[MAX_ETH_DEVICES];
 static unsigned eth_device_count;
 
-EXPORT void register_eth_dev_factory(
+void register_eth_dev_factory(
         char const *name, eth_dev_factory_t *factory)
 {
     (void)name;

@@ -259,7 +259,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
     return ctx;
 }
 
-EXPORT time_of_day_t cmos_gettimeofday()
+KERNEL_API time_of_day_t cmos_gettimeofday()
 {
     cmos_scoped_lock lock(cmos_lock);
 

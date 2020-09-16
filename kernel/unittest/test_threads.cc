@@ -2,6 +2,8 @@
 #include "thread.h"
 #include "mutex.h"
 
+__BEGIN_ANONYMOUS
+
 struct test_thread_variation_t {
     size_t seed;
     bool volatile stop;
@@ -160,3 +162,5 @@ DISABLED_UNITTEST(test_thread_context)
                       false, false);
     thread_sleep_for(1000);
 }
+
+__END_ANONYMOUS

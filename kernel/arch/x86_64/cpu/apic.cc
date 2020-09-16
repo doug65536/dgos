@@ -330,6 +330,8 @@ static ext::vector<uint8_t> acpi_slit_table;
 
 #define APIC_MSR_BASE_X2            0x800
 
+__BEGIN_ANONYMOUS
+
 class lapic_t {
 public:
     virtual void set_cpu_count(size_t cpu_count) noexcept {}
@@ -696,6 +698,8 @@ static uint64_t acpi_rsdt_addr;
 static uint64_t acpi_rsdt_len;
 static uint8_t acpi_rsdt_ptrsz;
 
+__END_ANONYMOUS
+
 int acpi_have8259pic(void)
 {
     return !acpi_rsdt_addr ||
@@ -1036,8 +1040,8 @@ static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
     return ptr;
 }
 
-void acpi_process_mcfg(char const *hdr,
-                       acpi_mcfg_hdr_t const& aligned_mcfg_hdr)
+static void acpi_process_mcfg(char const *hdr,
+                              acpi_mcfg_hdr_t const& aligned_mcfg_hdr)
 {
     acpi_ecam_rec_t *ecam_ptr = (acpi_ecam_rec_t*)
             ((char*)hdr + sizeof(acpi_mcfg_hdr_t));
@@ -1066,8 +1070,8 @@ void acpi_process_mcfg(char const *hdr,
     pci_init_ecam_enable();
 }
 
-void acpi_process_srat(char const *hdr,
-                       acpi_srat_hdr_t const& aligned_srat_hdr)
+static void acpi_process_srat(char const *hdr,
+                              acpi_srat_hdr_t const& aligned_srat_hdr)
 {
     ACPI_TRACE("SRAT found\n");
 
@@ -1826,7 +1830,7 @@ uint64_t apic_ns_to_ticks(uint64_t ns)
 // Rounds to nearest when resolution is insufficient due to divisor
 // Returns actual wait (possibly rounded off) wait time
 // in APIC timer ticks
-EXPORT uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask)
+uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask)
 {
     if (ticks <= INT32_MAX) {
         apic_timer_hw_reset(APIC_LVT_DCR_BY_1, ticks,

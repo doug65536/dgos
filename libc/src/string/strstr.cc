@@ -1,5 +1,8 @@
 #include <string.h>
 #include <stdint.h>
+#include <sys/cdefs.h>
+
+__BEGIN_ANONYMOUS
 
 template<typename T>
 static inline T lrot(T n, uint8_t s)
@@ -76,6 +79,8 @@ private:
     uint8_t r;
     size_t c;
 };
+
+__END_ANONYMOUS
 
 char *strstr(char const *haystack, char const *needle)
 {

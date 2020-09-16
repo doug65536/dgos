@@ -778,6 +778,8 @@ user_str_t::user_str_t(const char *user_str, size_t truncate_len, truncate_t)
 
 // =======================================================================
 
+__BEGIN_ANONYMOUS
+
 class socket_fs_t final : public fs_nosys_t {
     //FS_BASE_RW_IMPL
 
@@ -835,6 +837,8 @@ ssize_t socket_fs_t::write(fs_file_info_t *fi,
 }
 
 socket_fs_t socket_fs;
+
+__END_ANONYMOUS
 
 int file_create_socket()
 {

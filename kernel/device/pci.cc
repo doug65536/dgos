@@ -19,6 +19,8 @@
 
 struct pci_ecam_t;
 
+__BEGIN_ANONYMOUS
+
 class pci_config_rw {
 public:
     // Read up to 32 bits from PCI config space.
@@ -63,6 +65,8 @@ public:
 private:
     static size_t ecamofs(pci_addr_t addr, int bus_adj, size_t offset);
 };
+
+__END_ANONYMOUS
 
 //
 // ECAM

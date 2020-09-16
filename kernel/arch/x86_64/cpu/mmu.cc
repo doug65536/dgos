@@ -265,12 +265,12 @@ static contiguous_allocator_t hole_allocator;
 //
 // Contiguous physical memory allocator
 
-EXPORT uintptr_t mm_alloc_contiguous(size_t size)
+KERNEL_API uintptr_t mm_alloc_contiguous(size_t size)
 {
     return contig_phys_allocator.alloc_linear(round_up(size));
 }
 
-EXPORT void mm_free_contiguous(uintptr_t addr, size_t size)
+KERNEL_API void mm_free_contiguous(uintptr_t addr, size_t size)
 {
     assert(!(addr & PAGE_MASK));
     contig_phys_allocator.release_linear(addr, round_up(size));
@@ -1691,12 +1691,12 @@ static _always_inline T select_mask(bool cond, T true_val, T false_val)
     return (true_val & mask) | (false_val & ~mask);
 }
 
-EXPORT void *mm_alloc_space(size_t size)
+KERNEL_API void *mm_alloc_space(size_t size)
 {
     return (void*)linear_allocator.alloc_linear(round_up(size));
 }
 
-EXPORT void *mmap(void *addr, size_t len, int prot,
+KERNEL_API void *mmap(void *addr, size_t len, int prot,
                   int flags, int fd, off_t offset)
 {
     (void)offset;

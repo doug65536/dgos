@@ -8,4 +8,4 @@ int write_debug_str(char const *str, intptr_t len);
 void write_debug_str_set_handler(write_debug_str_handler_t handler);
 
 extern "C" _noinline
-void cpu_debug_break();
+KERNEL_API void cpu_debug_break();

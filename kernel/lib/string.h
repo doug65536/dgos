@@ -21,7 +21,8 @@ char *strstr(char const *str, char const *substr);
 void clear64(void *dest, size_t n);
 
 void *memset(void *dest, int c, size_t n);
-void *memcpy(void * restrict dest, void const * restrict src, size_t n);
+void *memcpy(void * restrict dest,
+                        void const * restrict src, size_t n);
 
 _no_instrument
 void *memcpy_noinstrument(void * restrict dest,

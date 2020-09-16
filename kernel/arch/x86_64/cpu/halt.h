@@ -2,6 +2,8 @@
 #include "types.h"
 #include "control_regs.h"
 
+__BEGIN_DECLS
+
 _always_inline
 static void halt(void)
 {
@@ -9,3 +11,5 @@ static void halt(void)
 }
 
 extern "C" _noreturn void halt_forever(void);
+
+__END_DECLS

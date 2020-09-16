@@ -2,6 +2,8 @@
 #include "chrono.h"
 #include "type_traits.h"
 
+__BEGIN_ANONYMOUS
+
 // 2/3 / 1/6 = 4/1
 static_assert(
         ext::is_same<
@@ -83,3 +85,5 @@ UNITTEST(test_chrono_conversion)
     eq(1440U, dmin.count());
     eq(24U, dhrs.count());
 }
+
+__END_ANONYMOUS

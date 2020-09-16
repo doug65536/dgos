@@ -10,6 +10,8 @@ template class ext::__basic_tree<int, void>::__basic_iterator<true, 1>;
 template class ext::__basic_tree<int, void>::__basic_iterator<false, -1>;
 template class ext::__basic_tree<int, void>::__basic_iterator<true, -1>;
 
+__BEGIN_ANONYMOUS
+
 #define HEAP_VALIDATE 0
 #if HEAP_VALIDATE
 #define heap_validate() eq(true, malloc_validate(false));
@@ -625,3 +627,5 @@ UNITTEST(test_map_key_value_destruct)
     eq(val1_count, 1);
     eq(val2_count, 1);
 }
+
+__END_ANONYMOUS

@@ -1400,7 +1400,7 @@ surface_t surface_t::map(rect_t region)
 }
 #endif
 
-EXPORT void fb_change_backing(vbe_selected_mode_t const& mode)
+KERNEL_API void fb_change_backing(vbe_selected_mode_t const& mode)
 {
 //    assert(mode.framebuffer_addr != 0);
 //    fb.backing = (uint8_t*)mode.framebuffer_addr;

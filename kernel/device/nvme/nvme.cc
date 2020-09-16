@@ -10,7 +10,6 @@ PCI_DRIVER_BY_CLASS(
         PCI_PROGIF_STORAGE_NVM_NVME);
 
 #include "dev_storage.h"
-#include "nvmedecl.h"
 #include "device/pci.h"
 #include "mm.h"
 #include "printk.h"
@@ -37,6 +36,10 @@ int module_main(int argc, char const * const * argv)
 {
     return 0;
 }
+
+__BEGIN_ANONYMOUS
+
+#include "nvmedecl.h"
 
 // 5.11 Identify command
 nvme_cmd_t nvme_cmd_t::create_identify(
@@ -1442,3 +1445,5 @@ nvme_cmp_t *nvme_queue_state_t::cmp_queue_ptr()
 }
 
 static nvme_if_factory_t nvme_if_factory;
+
+__END_ANONYMOUS

@@ -30,6 +30,8 @@
 #define GDBSTUB_TRACE(...) ((void)0)
 #endif
 
+__BEGIN_ANONYMOUS
+
 static uint8_t constexpr X86_BREAKPOINT_OPCODE = 0xCC;
 static uint8_t constexpr X86_MAX_HW_BP = 4;
 
@@ -707,11 +709,6 @@ gdbstub_t::reg_info_t gdbstub_t::regs[] = {
     { "zmm30h",  32, 0 },
     { "zmm31h",  32, 0 },
 };
-
-void gdb_init()
-{
-    gdb_cpu_ctrl_t::start_stub();
-}
 
 gdbstub_t::rx_state_t
 gdbstub_t::replyf_hex(char const *format, ...)
@@ -2756,4 +2753,11 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 
     // Continue execution with potentially modified context
     return ctx;
+}
+
+__END_ANONYMOUS
+
+void gdb_init()
+{
+    gdb_cpu_ctrl_t::start_stub();
 }

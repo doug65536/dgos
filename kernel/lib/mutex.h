@@ -548,7 +548,7 @@ private:
 //}
 
 template<>
-class EXPORT unique_lock<ext::mcslock>
+class KERNEL_API unique_lock<ext::mcslock>
         : public ext::base_lock<unique_lock<ext::mcslock>>
 {
 public:

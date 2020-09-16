@@ -79,7 +79,7 @@ __BEGIN_NAMESPACE_EXT
 struct nothrow_t {
     explicit nothrow_t() = default;
 };
-extern EXPORT nothrow_t const nothrow;
+extern KERNEL_API nothrow_t const nothrow;
 
 __END_NAMESPACE_EXT
 

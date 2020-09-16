@@ -13,7 +13,7 @@ struct pipe_buffer_hdr_t {
 
 C_ASSERT_ISPO2(sizeof(pipe_buffer_hdr_t));
 
-struct pipe_t {
+struct KERNEL_API pipe_t {
     pipe_t();
     ~pipe_t();
 

@@ -2,6 +2,8 @@
 #include "irq.h"
 #include "callout.h"
 
+__BEGIN_ANONYMOUS
+
 class acpi_hw_t {
 public:
     static void init(void *);
@@ -12,6 +14,8 @@ private:
 
     static acpi_hw_t *instance;
 };
+
+__END_ANONYMOUS
 
 acpi_hw_t *acpi_hw_t::instance;
 

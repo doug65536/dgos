@@ -11,7 +11,7 @@
 #endif
 
 #ifdef USE_REP_STRING
-EXPORT void memcpy_movsq(void *dest, void *src, size_t u64_count)
+static void memcpy_movsq(void *dest, void *src, size_t u64_count)
 {
     __asm__ __volatile__ (
         "rep movsq"
@@ -24,7 +24,7 @@ EXPORT void memcpy_movsq(void *dest, void *src, size_t u64_count)
 }
 
 // Parameter order puts parameters in the right registers
-EXPORT void memset_stosq(void *dest, uint64_t value, size_t u64_count)
+static void memset_stosq(void *dest, uint64_t value, size_t u64_count)
 {
     value &= 0xFF;
     value *= UINT64_C(0x0101010101010101);
@@ -55,7 +55,7 @@ EXPORT void *memchr(void const *mem, int ch, size_t count)
     return nullptr;
 }
 
-EXPORT void *memrchr(void const *mem, int ch, size_t count)
+KERNEL_API void *memrchr(void const *mem, int ch, size_t count)
 {
     unsigned char c = (unsigned char)ch;
     unsigned char const *p;
@@ -495,7 +495,7 @@ EXPORT char *strcpy(char *dest, char const *src)
     return dest;
 }
 
-EXPORT char *stpcpy(char *lhs, char const *rhs)
+char *stpcpy(char *lhs, char const *rhs)
 {
     auto d = lhs;
     auto s = rhs;

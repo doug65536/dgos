@@ -3,6 +3,8 @@
 
 #include "utility.h"
 
+__BEGIN_ANONYMOUS
+
 // Top level address space
 
 
@@ -92,3 +94,4 @@ block_data_t *block_data_t::split(uintptr_t md)
     return nullptr;
 }
 
+__END_ANONYMOUS

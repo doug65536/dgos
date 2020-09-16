@@ -8,7 +8,7 @@ namespace dgos {
 
 // I/O completion
 template<typename T, typename S = T>
-class basic_iocp_t
+class KERNEL_API basic_iocp_t
 {
 public:
     typedef void (*callback_t)(T const& err, uintptr_t arg);
@@ -143,7 +143,7 @@ basic_iocp_t<T, S>::~basic_iocp_t()
 }
 
 template<typename T, typename S>
-EXPORT void basic_iocp_t<T, S>::set_expect(unsigned expect)
+void basic_iocp_t<T, S>::set_expect(unsigned expect)
 {
     scoped_lock hold(lock);
     expect_count = expect;

@@ -554,6 +554,8 @@ EXPORT void condvar_destroy(condition_var_t *var)
     spinlock_unlock(&var->lock);
 }
 
+__BEGIN_ANONYMOUS
+
 class condvar_spinlock_t {
 public:
     condvar_spinlock_t(spinlock_t *spinlock)
@@ -670,6 +672,8 @@ protected:
 //    condvar_mutex_t state(mutex);
 //    return condvar_wait_ex(var, state, timeout_time);
 //}
+
+__END_ANONYMOUS
 
 EXPORT void condvar_wake_one(condition_var_t *var)
 {

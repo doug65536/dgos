@@ -14,6 +14,8 @@
 #define MOUSE_TRACE(...) ((void)0)
 #endif
 
+__BEGIN_ANONYMOUS
+
 class mouse_file_reg_t : public dev_fs_file_reg_t {
 public:
     static mouse_file_reg_t *new_registration()
@@ -86,8 +88,10 @@ public:
 
 static mouse_file_reg_t *mouse_file;
 
+__END_ANONYMOUS
+
 // Prepare to receive mouse_event calls
-mouse_file_reg_t *mouse_file_instance()
+static mouse_file_reg_t *mouse_file_instance()
 {
     mouse_file_reg_t *old_mouse_file = atomic_ld_acq(&mouse_file);
 

@@ -202,7 +202,11 @@ void thread_set_affinity(int id, thread_cpu_mask_t const& affinity);
 thread_cpu_mask_t const* thread_get_affinity(int id);
 
 size_t thread_get_cpu_count();
-uint32_t thread_cpu_number();
+
+#if defined(__DGOS_KERNEL__) && !defined(__DGOS_MODULE__)
+__attribute__((__visibility__("protected")))
+#endif
+KERNEL_API uint32_t thread_cpu_number();
 
 // 100,000,000 == 100% usage
 unsigned thread_cpu_usage_x1M(size_t cpu);

@@ -9,6 +9,8 @@
 //static EFI_GUID efi_simple_text_input_protocol_guid =
 //        EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
 
+__BEGIN_ANONYMOUS
+
 static EFI_GUID efi_simple_pointer_protocol_guid =
         EFI_SIMPLE_POINTER_PROTOCOL_GUID;
 
@@ -186,6 +188,8 @@ _constructor(ctor_console) static void conin_init()
     if (unlikely(EFI_ERROR(status)))
         PANIC(TSTR "Could not set timer");
 }
+
+__END_ANONYMOUS
 
 int readkey()
 {

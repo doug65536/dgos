@@ -11,6 +11,8 @@
 #include "elf64.h"
 #include "halt.h"
 
+__BEGIN_ANONYMOUS
+
 class pxe_fragment_t {
     size_t offset;
     size_t length;
@@ -361,6 +363,8 @@ static off_t pxe_boot_filesize(int file)
 
     return desc->size;
 }
+
+__END_ANONYMOUS
 
 void pxe_init_fs()
 {

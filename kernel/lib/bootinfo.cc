@@ -31,7 +31,7 @@ static void bootinfo_remap(void*)
 REGISTER_CALLOUT(bootinfo_remap, nullptr,
                  callout_type_t::vmm_ready, "000");
 
-EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
+uintptr_t bootinfo_parameter(bootparam_t param)
 {
     auto data = kernel_params;
 
@@ -89,7 +89,7 @@ EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
     return 0;
 }
 
-EXPORT void bootinfo_drop_initrd()
+void bootinfo_drop_initrd()
 {
     auto data = kernel_params;
 

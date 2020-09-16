@@ -5,9 +5,9 @@ HIDDEN extern char const ___eh_frame_en[];
 
 HIDDEN extern void *__dso_handle;
 
-EXPORT extern void const * const * __dso_handle_export;
+KERNEL_API extern void const * const * __dso_handle_export;
 
-EXPORT void const * const * __dso_handle_export = &__dso_handle;
+KERNEL_API void const * const * __dso_handle_export = &__dso_handle;
 
 HIDDEN extern char const _eh_frame_hdr[];
 

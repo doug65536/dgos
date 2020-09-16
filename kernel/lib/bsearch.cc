@@ -5,7 +5,7 @@
 // Otherwise returns the ones complement of the insertion point
 // The array is not really accessed, it does have to point to memory
 // Pass nonzero value in unique to early-out on equal comparison
-EXPORT intptr_t binary_search(
+intptr_t binary_search(
         void *va, size_t count, size_t item_size,
         void const *k,
         int (*cmp)(void const *v,

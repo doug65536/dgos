@@ -13,7 +13,7 @@ class workq_impl;
 class workq;
 
 // Abstract work queue work item
-class EXPORT workq_work {
+class KERNEL_API workq_work {
 public:
     workq_work();
 

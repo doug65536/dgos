@@ -5,7 +5,7 @@
 #include "export.h"
 #include "likely.h"
 
-EXPORT void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
+void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
 {
     /**** VERY IMPORTANT **** :
       The initial seeds z1, z2, z3, z4  MUST be larger than
@@ -29,12 +29,12 @@ EXPORT void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
         state->seed_z4 += 293;
 }
 
-EXPORT void lfsr113_autoseed(lfsr113_state_t *state)
+void lfsr113_autoseed(lfsr113_state_t *state)
 {
     lfsr113_seed(state, (uint32_t)nano_time());
 }
 
-EXPORT uint32_t lfsr113_rand(lfsr113_state_t *state)
+uint32_t lfsr113_rand(lfsr113_state_t *state)
 {
    unsigned int b;
    b  = ((state->seed_z1 << 6) ^ state->seed_z1) >> 13;
@@ -49,7 +49,7 @@ EXPORT uint32_t lfsr113_rand(lfsr113_state_t *state)
            state->seed_z3 ^ state->seed_z4);
 }
 
-EXPORT uint32_t rand_range(lfsr113_state_t *state, uint32_t st, uint32_t en)
+uint32_t rand_range(lfsr113_state_t *state, uint32_t st, uint32_t en)
 {
     uint32_t n = en - st;
 

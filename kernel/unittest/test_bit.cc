@@ -2,6 +2,8 @@
 #include "bitsearch.h"
 #include "algorithm.h"
 
+__BEGIN_ANONYMOUS
+
 UNITTEST(test_bit_uint64_t)
 {
     for (uint64_t i = 0; i < 63; ++i) {
@@ -57,3 +59,5 @@ UNITTEST(test_bit_uint8_t)
         eq(i + 1, k);
     }
 }
+
+__END_ANONYMOUS

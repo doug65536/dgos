@@ -9,7 +9,7 @@
 class virtio_base_t;
 struct virtio_pci_common_cfg_t;
 
-class EXPORT virtio_factory_base_t {
+class KERNEL_API virtio_factory_base_t {
 protected:
     int detect_virtio(int dev_class, int device, char const *name);
 
@@ -28,7 +28,7 @@ struct virtq_avail {
 
 struct virtio_pci_cap_hdr_t;
 
-class EXPORT virtio_virtqueue_t {
+class KERNEL_API virtio_virtqueue_t {
 public:
     class virtio_blocking_iocp_success_t {
     public:
@@ -279,7 +279,7 @@ struct virtio_pci_notify_cap_t {
 
 C_ASSERT(sizeof(virtio_pci_notify_cap_t) == 20);
 
-class EXPORT virtio_base_t {
+class KERNEL_API virtio_base_t {
 public:
     virtio_base_t() = default;
     virtio_base_t(virtio_base_t const&) = delete;

@@ -109,7 +109,8 @@ struct pci_config_hdr_t {
 
     // Write the specified address to the BAR and read it back, updating
     // config.base_addr[bar] and config.base_addr[bar+1] if it is 64 bit
-    EXPORT void set_mmio_bar(pci_addr_t pci_addr, size_t bar, uint64_t addr);
+    KERNEL_API void set_mmio_bar(pci_addr_t pci_addr,
+                                 size_t bar, uint64_t addr);
 };
 
 C_ASSERT(sizeof(pci_config_hdr_t) == 0x40);

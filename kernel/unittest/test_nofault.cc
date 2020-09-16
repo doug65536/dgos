@@ -2,6 +2,8 @@
 #include "mm.h"
 #include "user_mem.h"
 
+__BEGIN_ANONYMOUS
+
 DISABLED_UNITTEST(test_mm_copy_user_from_null)
 {
     uint8_t *m = (uint8_t*)mm_alloc_space(PAGE_SIZE * 3);
@@ -72,3 +74,5 @@ UNITTEST(test_mm_copy_user)
     munmap(m, PAGE_SIZE * 3);
     munmap(s, PAGE_SIZE);
 }
+
+__END_ANONYMOUS

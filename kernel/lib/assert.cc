@@ -5,10 +5,10 @@
 #include "export.h"
 #include "debug.h"
 
-EXPORT int __assert_failed(char const *expr,
-                         char const *msg,
-                         char const *file,
-                         int line)
+int __assert_failed(char const *expr,
+                    char const *msg,
+                    char const *file,
+                    int line)
 {
     printdbg("\n** ASSERT FAILED: %s(%d): %s %s\n",
              file, line, expr, msg ? msg : "");

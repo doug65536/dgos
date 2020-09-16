@@ -261,8 +261,8 @@ extern "C" void soft_wrgsbase_r14();
 bool constexpr force_msr_fsgsbase = true;
 
 extern "C"
-EXPORT void cpu_apply_fixups(uint8_t * const *rodata_st,
-                             uint8_t * const *rodata_en)
+KERNEL_API void cpu_apply_fixups(uint8_t * const *rodata_st,
+                                 uint8_t * const *rodata_en)
 {
     // Perform code patch fixups
     for (uint8_t * const *fixup_ptr = rodata_st;
@@ -1319,17 +1319,27 @@ void cpu_init_late_msrs()
     });
 }
 
-EXPORT bool arch_irq_disable()
+KERNEL_API bool arch_irq_disable()
 {
     return cpu_irq_save_disable();
 }
 
-EXPORT void arch_irq_enable()
+KERNEL_API void arch_irq_enable()
 {
     cpu_irq_enable();
 }
 
-EXPORT void arch_irq_toggle(bool en)
+KERNEL_API void arch_irq_toggle(bool en)
 {
     cpu_irq_toggle(en);
+}
+
+KERNEL_API void arch_poweroff()
+{
+    cpu_pv_qemu_x86_poweroff();
+}
+
+KERNEL_API void arch_ungraceful_stop()
+{
+    cpu_triple_fault();
 }

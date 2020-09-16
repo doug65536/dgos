@@ -3,6 +3,8 @@
 
 template class ext::vector<int>;
 
+__BEGIN_ANONYMOUS
+
 struct MockStats {
     size_t nr_construct = 0;
     size_t nr_copycon = 0;
@@ -460,3 +462,5 @@ UNITTEST(test_vector_random_malloc)
             i = 0;
     }
 }
+
+__END_ANONYMOUS

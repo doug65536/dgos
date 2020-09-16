@@ -10,6 +10,7 @@ enum struct bootparam_t {
     boot_drv_serial,
     boot_debugger,
     boot_serial_log,
+    testrun_port,
     boot_acpi_rsdp,
     boot_mptables,
     initrd_base,
@@ -23,7 +24,7 @@ enum struct bootparam_t {
     gdb_port
 };
 
-uintptr_t bootinfo_parameter(bootparam_t param);
-void bootinfo_drop_initrd();
+KERNEL_API uintptr_t bootinfo_parameter(bootparam_t param);
+KERNEL_API void bootinfo_drop_initrd();
 
 __END_DECLS

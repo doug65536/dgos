@@ -7,17 +7,21 @@
 typedef long ssize_t;
 typedef int64_t off_t;
 
+#define KERNEL_API
+
 #ifdef __cplusplus
 
 #define restrict __restrict
 #define __BEGIN_DECLS extern "C" {
 #define __END_DECLS }
 
+#define __BEGIN_ANONYMOUS        namespace {
 #define __BEGIN_NAMESPACE(n)        namespace n {
 #define __BEGIN_NAMESPACE_DETAIL    __BEGIN_NAMESPACE(detail)
 #define __BEGIN_NAMESPACE_STD       __BEGIN_NAMESPACE(std)
 #define __BEGIN_NAMESPACE_EXT       __BEGIN_NAMESPACE(ext)
 #define __END_NAMESPACE             }
+#define __END_ANONYMOUS             __END_NAMESPACE
 #define __END_NAMESPACE_STD         __END_NAMESPACE
 #define __END_NAMESPACE_EXT         __END_NAMESPACE
 #else

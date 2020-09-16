@@ -10,6 +10,8 @@ unittest::unit *unittest::unit::list_en;
 
 __BEGIN_NAMESPACE(unittest)
 
+__BEGIN_ANONYMOUS
+
 class test_filter {
 public:
     test_filter();
@@ -62,6 +64,7 @@ public:
     ext::vector<ext::string> reject;
 };
 
+__END_ANONYMOUS
 __END_NAMESPACE
 
 template<typename T>

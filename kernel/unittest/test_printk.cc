@@ -2,6 +2,8 @@
 #include "vector.h"
 #include "printk.h"
 
+__BEGIN_ANONYMOUS
+
 static void still_0xEE_padded(unittest::unit *unit,
                               ext::vector<char> const& buffer,
                               size_t expect_len,
@@ -170,4 +172,6 @@ UNITTEST(test_printk_float_formatter)
 
 UNITTEST_SET_FLOAT(test_printk_float_formatter, true);
 #endif
+
+__END_ANONYMOUS
 

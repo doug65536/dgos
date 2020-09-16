@@ -390,6 +390,8 @@ EXPORT int keybd_fsa_t::get_modifiers()
     return flags;
 }
 
+__BEGIN_ANONYMOUS
+
 class keybd_file_reg_t : public dev_fs_file_reg_t {
 public:
     static keybd_file_reg_t *get_registration()
@@ -436,6 +438,8 @@ public:
         return new (ext::nothrow) keybd_file_t();
     }
 };
+
+__END_ANONYMOUS
 
 EXPORT void keybd_register(void*)
 {

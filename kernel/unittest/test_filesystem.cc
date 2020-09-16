@@ -4,6 +4,8 @@
 #include "printk.h"
 #include "rand.h"
 
+__BEGIN_ANONYMOUS
+
 UNITTEST(test_filesystem_opendir)
 {
     printk("Opening root directory\n");
@@ -60,3 +62,5 @@ DISABLED_UNITTEST(test_filesystem_create_unlink_churn)
         }
     }
 }
+
+__END_ANONYMOUS

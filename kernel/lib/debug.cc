@@ -15,6 +15,6 @@ int write_debug_str(char const *str, intptr_t len)
     return -1;
 }
 
-EXPORT void cpu_debug_break()
+void cpu_debug_break()
 {
 }

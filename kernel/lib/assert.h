@@ -2,7 +2,7 @@
 #include "types.h"
 #include "likely.h"
 
-extern "C" _noinline int __assert_failed(
+extern "C" KERNEL_API _noinline int __assert_failed(
         char const *expr, char const *msg, char const *file, int line);
 
 #ifndef NDEBUG

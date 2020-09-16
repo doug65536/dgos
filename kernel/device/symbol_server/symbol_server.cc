@@ -6,6 +6,8 @@
 #include "elf64.h"
 #include "cpu/perf.h"
 
+__BEGIN_ANONYMOUS
+
 struct perf_ctr_t {
     char const *text;
     uint32_t event;
@@ -785,3 +787,7 @@ public:
 size_t symbol_server_t::top_rows;
 
 symbol_server_t instance;
+
+__END_ANONYMOUS
+
+

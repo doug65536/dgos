@@ -23,6 +23,8 @@ extern "C" void __cxa_atexit()
 #if 1
 #include "fs.h"
 
+__BEGIN_ANONYMOUS
+
 static EFI_BLOCK_IO_PROTOCOL *efi_blk_io;
 static EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *efi_simple_filesystem;
 static EFI_PXE_BASE_CODE_PROTOCOL *efi_pxe;
@@ -544,6 +546,8 @@ uint64_t file_handle_base_t::boot_drv_serial()
 file_handle_base_t::~file_handle_base_t()
 {
 }
+
+__END_ANONYMOUS
 
 extern char __text_st[];
 

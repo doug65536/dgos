@@ -389,8 +389,8 @@ __BEGIN_NAMESPACE_DETAIL
 ///    hi := hi - 1
 ///
 
-extern uintptr_t quicksort_cmp_count;
-extern uintptr_t quicksort_swp_count;
+KERNEL_API extern uintptr_t quicksort_cmp_count;
+KERNEL_API extern uintptr_t quicksort_swp_count;
 
 // Partition an array given an inclusive index range, return partition index
 template<typename _T, typename _Compare>

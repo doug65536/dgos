@@ -9,6 +9,8 @@
 #include "unique_ptr.h"
 #include "cpu/phys_alloc.h"
 
+__BEGIN_ANONYMOUS
+
 UNITTEST(test_physalloc)
 {
     // Simulate 16GB of RAM
@@ -511,3 +513,5 @@ DISABLED_UNITTEST(test_mmap_oom)
         printdbg("Pass %zu completed\n", pass + 1);
     }
 }
+
+__END_ANONYMOUS

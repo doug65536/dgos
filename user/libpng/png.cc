@@ -22,6 +22,8 @@
 #define _packed __attribute__((__packed__))
 #endif
 
+__BEGIN_ANONYMOUS
+
 static uint8_t png_sig[] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
 
 typedef enum png_type_t {
@@ -287,6 +289,8 @@ static void zlib_free(void *opaque, void *p)
     (void)opaque;
     free(p);
 }
+
+__END_ANONYMOUS
 
 surface_t *surface_from_png(char const *path)
 {

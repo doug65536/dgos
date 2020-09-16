@@ -1,5 +1,6 @@
 #pragma once
 
+#include "export.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <limits.h>
@@ -9,11 +10,13 @@
 # define __BEGIN_DECLS	extern "C" {
 # define __END_DECLS	}
 
+#define __BEGIN_ANONYMOUS        namespace {
 #define __BEGIN_NAMESPACE(n)        namespace n {
 #define __BEGIN_NAMESPACE_DETAIL    __BEGIN_NAMESPACE(detail)
 #define __BEGIN_NAMESPACE_STD       __BEGIN_NAMESPACE(std)
 #define __BEGIN_NAMESPACE_EXT       __BEGIN_NAMESPACE(ext)
 #define __END_NAMESPACE             }
+#define __END_ANONYMOUS             __END_NAMESPACE
 #define __END_NAMESPACE_STD         __END_NAMESPACE
 #define __END_NAMESPACE_EXT         __END_NAMESPACE
 #else
@@ -23,7 +26,6 @@
 
 #if defined(__GNUC__)
 
-#define _no_asan                __attribute__((__no_address_safety_analysis__))
 #define _packed                 __attribute__((__packed__))
 #define _const                  __attribute__((__const__))
 #define _pure                   __attribute__((__pure__))
@@ -44,6 +46,7 @@
 #define _returns_twice          __attribute__((__returns_twice__))
 #define _vector_size(n)         __attribute__((__vector_size__(n)))
 #define _noinline               __attribute__((__noinline__))
+#define _assume_aligned(n)      __attribute__((__assume_aligned__(n)))
 #define _printf_format(m,n)     __attribute__((__format__(printf, m, n)))
 #define _printf_format3(m,n,o)  __attribute__((__format__(printf, (m), (n), (o))))
 #define _artificial             __attribute__((__artificial__))
@@ -51,8 +54,10 @@
 #define _no_asan                __attribute__((__no_address_safety_analysis__))
 #define _no_ubsan               __attribute__((no_sanitize("undefined")))
 #define _no_plt                 __attribute__((__noplt__))
+
 #define _constructor(prio)      __attribute__((__constructor__(prio)))
 #define _destructor(prio)       __attribute__((__destructor__(prio)))
+
 #define _ifunc_resolver(fn)     __attribute__((__ifunc__(#fn)))
 #define _section(name)          __attribute__((__section__(name)))
 #define _hot                    __attribute__((__hot__))

@@ -6,6 +6,8 @@
 #include "chrono.h"
 #include "utility.h"
 
+__BEGIN_ANONYMOUS
+
 UNITTEST(test_sort)
 {
     int cases[4] = {
@@ -69,3 +71,5 @@ UNITTEST(test_stress_sort)
             eq(i, items[i]);
     }
 }
+
+__END_ANONYMOUS

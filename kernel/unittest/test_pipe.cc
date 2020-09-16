@@ -1,6 +1,8 @@
 #include "unittest.h"
 #include "pipe.h"
 
+__BEGIN_ANONYMOUS
+
 UNITTEST(test_pipe_construct)
 {
     pipe_t pipe;
@@ -57,3 +59,5 @@ UNITTEST(test_pipe_easy_enqueue_dequeue)
     // Make sure it can't provide more, because it is completely empty
     eq(0, pipe.dequeue(data, sizeof(data), 0));
 }
+
+__END_ANONYMOUS
