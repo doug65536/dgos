@@ -106,21 +106,30 @@
   internals for common modes, arbitrary pixel format is still handled. No
   palette support.
 
+
 ## Build Instructions
 
 These instructions are not strict. You could name your directories whatever
 and place them wherever (a ramdrive?). These instructions are meant to be
 simple.
 
-- Make a directory where you want it stored and cd into it
+1. Make a directory where you want it stored and cd into it
 
-- clone the source repo. This will create a directory called dgos
+        cd ~/code
+        mkdir dgos
+        cd dgos
 
-    mkdir toolchain
-    mkdir build
+2. Clone the source repo. This will create a directory called dgos
 
-At this point there should be dgos created by git clone,
-and the two created directories.
+        git clone https://github.com/doug65536/dgos.git
+
+3. Make directories for out of source build
+
+        mkdir toolchain
+        mkdir build
+
+At this point there should be a `dgos` directory created by git clone,
+a `toolchain` directory, and a `build` directory in the current directory.
 
 ### Dependencies
 
@@ -142,3 +151,41 @@ Starting from the storage location (which contains dgos, build, toolchain)
     cd build
     ../dgos/bootstrap --enable-lto --enable-optimize
     make disks -j$(nproc)
+
+### Debugging
+
+First, `cd` to the `build` directory.
+
+#### Debug output
+
+Debug output is sent to a fifo in the filesystem, which can be read from
+forever to watch serial output. To do this you need two terminals, one for
+building, launching qemu, and a second terminal for monitoring debug output.
+
+Terminals that can split the screen into two panes are great for this.
+In a second terminal, which I'll call the "debug output terminal",
+run this command in the `build` directory:
+
+    make monitor-debug-output
+
+It will perpetually print serial output to this terminal. You do not need
+to touch this window again, just read it when needed.
+
+Switch back to the build terminal.
+
+To quickly just run it, run this command:
+
+    make run -j$(nproc)
+
+It will run it with TCG emulation. To run it fast, run this command:
+
+    make run-smp-kvm -j$(nproc)
+
+`run` targets don't wait for a debugger, they just run immediately. To
+have it wait for you to attach a debugger, use `debug` instead of `run`.
+
+There are a very large number of targets to run qemu in various
+configurations. You can construct a variation by piecing together a choice
+from the following pattern:
+
+
