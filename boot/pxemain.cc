@@ -377,3 +377,4 @@ void pxe_init_fs()
     fs_api.boot_filesize = pxe_boot_filesize;
     fs_api.boot_drv_serial = pxe_boot_drv_serial;
 }
+
