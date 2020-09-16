@@ -58,7 +58,9 @@ struct disk_address_packet_t {
     uint16_t block_count;
     uint32_t segoff;
     uint64_t lba;
-} _packed;
+};
+
+C_ASSERT(sizeof(disk_address_packet_t) == 16);
 
 static bool disk_read_lba_bouncebuffer(
         uint64_t addr, uint64_t lba,
