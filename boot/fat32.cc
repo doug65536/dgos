@@ -32,6 +32,7 @@ static uint_least32_t sector_sz;
 static uint8_t log2_sector_sz;
 static uint8_t log2_sec_per_cluster;
 
+_hot
 static uint32_t next_cluster(uint32_t current_cluster,
                              char *sector, bool *ok_ptr);
 
