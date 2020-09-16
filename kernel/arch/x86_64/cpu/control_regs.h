@@ -64,6 +64,16 @@ static void cpu_pv_qemu_x86_poweroff()
 }
 
 _noreturn _always_inline
+static void cpu_triple_fault()
+{
+    __asm__(
+        "push $ 0\n\t"
+        "push $ 0\n\t"
+        "lidt (%rsp)\n\t"
+        "int $ 42\n\t"
+    );
+}
+
 static _always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
 {
     uint64_t result;
