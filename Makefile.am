@@ -2967,6 +2967,30 @@ run: run-up-efi-hd-hyb-ahci-vga-tcg
 
 .PHONY: run
 
+run-iso: run-up-efi-hd-iso-ahci-vga-tcg
+
+.PHONY: run-iso
+
+run-bios-iso: run-up-bios-hd-iso-ahci-vga-tcg
+
+.PHONY: run-bios-iso
+
+debug-bios-iso: run-up-bios-hd-iso-ahci-vga-tcg
+
+.PHONY: debug-bios-iso
+
+debug-iso: run-up-efi-hd-iso-ahci-vga-tcg
+
+.PHONY: debug-iso
+
+kernel-test: test-smp-efi-hd-hyb-ahci-vga-tcg
+
+.PHONY: kernel-test
+
+kernel-test-kvm: test-smp-efi-hd-hyb-ahci-vga-kvm
+
+.PHONY: kernel-test-kvm
+
 run-all: $(QEMU_LAUNCHERS)
 
 .PHONY: run
