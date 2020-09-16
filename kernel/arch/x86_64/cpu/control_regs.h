@@ -45,6 +45,25 @@ static _always_inline uint64_t cpu_msr_get(uint32_t msr)
     return ((uint64_t)hi << 32) | lo;
 }
 
+_noreturn _always_inline
+static void cpu_pv_qemu_x86_poweroff()
+{
+    // ACPI power off hardware for qemu x6
+    uint16_t off_value = 0x2000;
+    uint32_t off_port = 0x604;
+    __asm__ __volatile__ (
+        "cli\n\t"
+        "0:outw %w[off_value],%[off_port]\n\t"
+        "hlt\n\t"
+        "jmp 0b\n\t"
+        :
+        : [off_value] "a" (off_value)
+        , [off_port] "Nd" (off_port)
+    );
+    __builtin_unreachable();
+}
+
+_noreturn _always_inline
 static _always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
 {
     uint64_t result;
