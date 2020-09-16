@@ -186,8 +186,8 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
         bios_regs_t regs;
         regs.eax = 0x4200;
         regs.edx = boot_drive;
-        regs.esi = uint32_t(&pkt) & 0xF;
-        regs.ds = uint32_t(&pkt) >> 4;
+        regs.esi = uint32_t(uintptr_t(&pkt)) & 0xF;
+        regs.ds = uint32_t(uintptr_t(&pkt)) >> 4;
 
         bioscall(&regs, 0x13);
 
