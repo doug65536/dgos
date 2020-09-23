@@ -3,6 +3,11 @@
 #include "gdt_macros.h"
 #include "pxestruct.h"
 
+// This is linked at 0x1000 but runs at 0x7C00
+// Wrap these up in a couple of macros
+// that offset your argument appropriately
+// This is needed before the bootloader has relocated itself
+
 #define UNRELOCATED(n) ((n)-0x1000+0x7C00)
 #define ZEROBASED(n) ((n)-0x1000)
 
@@ -26,8 +31,16 @@ early_entry:
     movw %sp,%cs:UNRELOCATED(orig_ss_sp)
     movw %ss,%cs:UNRELOCATED(orig_ss_sp+2)
 
+    pushw $ 0xC00
+    movw reloc_self_ptr,%ax
+    movw reloc_self_ptr+2,%dx
+    sub $ 0xC000,%ax
+    //sbb $ 0,%dx
+    pushw %ax
+    lretw
+
     // Jump to relocation code with 0xC000 cs base
-    ljmp $ 0xC00,$ UNRELOCATED(reloc_self) - 0xC000
+    //ljmp $ 0xC00,$ UNRELOCATED(reloc_self) - 0xC000
 
 orig_ss_sp:
     .space 4
@@ -43,6 +56,9 @@ pxenv_ofs:
 
 pxenv_seg:
     .space 2
+
+reloc_self_ptr:
+    .int reloc_self
 
 // Linker script puts this at the end to avoid overwriting itself
 .section .text.reloc, "ax", @progbits
