@@ -10,8 +10,8 @@ noinst_PROGRAMS =
 
 DUMPDIR = dump
 
-STARTUP_FILE_NAMES = crt0 crt0pc80 crt0pc64 crt0pc32
-STARTUP_FILE_NAMES_32 = crt032 crt0pc8032 crt0pc6432 crt0pc3232
+STARTUP_FILE_NAMES = crt0 crti crtn crt0pc80 crt0pc64 crt0pc32
+STARTUP_FILE_NAMES_32 = crt032 crti32 crtn32 crt0pc8032 crt0pc6432 crt0pc3232
 
 STDLIB_FILE_NAMES = c g m stdc++
 STDLIB_FILE_NAMES_32 = c32 g32 m32 stdc++32
@@ -332,18 +332,20 @@ bootfat_elf_SOURCES = \
 	$(BOOT_SOURCES_SHARED)
 
 bootfat_elf_CXXFLAGS = \
-	$(libbootsect_a_CXXFLAGS)
-
-bootfat_elf_CCASFLAGS = \
-	-DFROMCCASFLAGS \
+	$(libbootsect_a_CXXFLAGS) \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
+	$(NO_LTO_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static -DS04 \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
+
+bootfat_elf_CCASFLAGS = \
+	-DFROMCCASFLAGS \
+	$(bootfat_elf_CXXFLAGS)
 
 # -N to turn off section alignment and make all sections rwx
 bootfat_elf_LDFLAGS = \
@@ -352,7 +354,7 @@ bootfat_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,--no-dynamic-linker -Wl,--relax \
+	-Wl,--no-dynamic-linker \
 	-Wl,-Map,bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
@@ -1124,6 +1126,20 @@ EXTRA_kernel_asan_DEPENDENCIES = \
 # ----------------------------------------------------------------------------
 # parse-trace
 
+WHICH_CXX = $(shell $(WHICH) $(CXX))
+$(info cxx: $(WHICH_CXX))
+CXX_DIR = $(dir $(WHICH_CXX))
+TOOLCHAIN_DIR = $(abspath $(CXX_DIR)/..)
+$(info cxx dir: $(CXX_DIR))
+$(info toolchain dir: $(TOOLCHAIN_DIR))
+
+# Autodetect toolchain include dir from stdlib location
+TOOLCHAIN_INCLUDE_PATH_STDLIB_H = \
+	$(shell $(FIND) $(TOOLCHAIN_DIR) -type f -name stdlib.h)
+$(info detected toolchain install stdlib at $(TOOLCHAIN_INCLUDE_PATH_STDLIB_H))
+TOOLCHAIN_INCLUDE_PATH = $(dir $(TOOLCHAIN_INCLUDE_PATH_STDLIB_H))
+$(info detected toolchain install include path $(TOOLCHAIN_INCLUDE_PATH))
+
 trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 	$(CXX_FOR_BUILD) -ggdb3 -o "$@" \
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
@@ -1147,6 +1163,34 @@ else
 TLS_MODEL_FLAGS = -ftls-model=initial-exec
 endif
 
+# ----------------------------------------------------------------------------
+# Inject stdlib headers into toolchain if they are newer
+
+define deploy_toolchain_include=
+
+$$(TOOLCHAIN_INCLUDE_PATH)$(1): $$(top_srcdir)/$(2)/include/$(1)
+	mkdir -p $$(@D)
+	$$(CP) $$< $$@
+
+sysroot/include/$(1): $$(top_srcdir)/$(2)/include/$(1)
+	mkdir -p $$(@D)
+	$$(CP) $$< $$@
+
+all: $$(TOOLCHAIN_INCLUDE_PATH)$(1) sysroot/include/$(1)
+
+endef
+
+STDLIB_INCLUDE_SRC = $(patsubst ./%,%,$(shell \
+	cd $(abs_top_srcdir)/libc/include && $(FIND) -type f -name "*.h"))
+	
+USRLIB_INCLUDE_SRC = $(patsubst ./%,%,$(shell \
+		cd $(abs_top_srcdir)/user/include && $(FIND) -type f -name "*.h"))
+		
+$(foreach include_file,$(STDLIB_INCLUDE_SRC), \
+	$(eval $(call deploy_toolchain_include,$(include_file),libc)))
+
+$(foreach include_file,$(USRLIB_INCLUDE_SRC), \
+	$(eval $(call deploy_toolchain_include,$(include_file),user)))
 
 # ----------------------------------------------------------------------------
 # crt0
@@ -1159,8 +1203,8 @@ STDLIB_INCLUDES_DEPLOYED = \
 	$(patsubst %,sysroot/include/%,$(STDLIB_INCLUDES_NAMES))
 
 USRLIB_INCLUDES_NAMES = $(shell \
-	cd $(top_srcdir)/user/include && \
-	$(FIND) -type f) zconf.h zlib.h
+	cd "$(top_srcdir)/user/include" && \
+	$(FIND) . -type f) zconf.h zlib.h
 
 USRLIB_INCLUDES_DEPLOYED = \
 	$(patsubst %,sysroot/include/%,$(USRLIB_INCLUDES_NAMES))
@@ -1207,6 +1251,12 @@ endef
 
 $(eval $(call \
 	compilestartup,crt0.o,$(top_srcdir)/user/crt0/crt0.S \
+))
+$(eval $(call \
+	compilestartup,crti.o,$(top_srcdir)/user/crt0/crti.S \
+))
+$(eval $(call \
+	compilestartup,crtn.o,$(top_srcdir)/user/crt0/crtn.S \
 ))
 $(eval $(call \
 	compilestartup,crt0pc80.o,$(top_srcdir)/user/crt0/crt0pc80.S \
@@ -1269,9 +1319,15 @@ $(foreach header,$(USRLIB_INCLUDES_NAMES), \
 	$(eval $(call deploy_usrlib_header,$(header))) \
 )
 
-startupcode: $(STARTUPFILES)
+startupcode: \
+	$(STARTUPFILES) \
+	$(ALL_STDLIB_INSTALLED)
+
+usrlib_headers: startupcode \
+	$(ALL_USRLIB_INSTALLED)
 
 .PHONY: startupcode
+.PHONY: usrlib_headers
 
 # ----------------------------------------------------------------------------
 # Shell
@@ -1288,16 +1344,18 @@ shell_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
-	$(USER64_EXE_FLAGS)
+	$(USER64_EXE_FLAGS) \
+	-isystem=/include
 
 #$(RETPOLINE_FLAGS)
 
 shell_CFLAGS = \
 	$(shell_CXXFLAGS)
 
-shell_CCASFLAGS =
+shell_CCASFLAGS = $(shell_CXXFLAGS)
 shell_LDFLAGS = \
-	-Wl,-Map,shell.map
+	-Wl,-Map,shell.map \
+	-Lsysroot/lib
 
 #-Wl,--orphan-handling,warn
 
@@ -1430,6 +1488,7 @@ libc_a_HEADERS = \
 
 libc_a_SOURCES = \
 	libc/src/assert/assert.cc \
+	\
 	libc/src/string/__bytebitmap.cc \
 	libc/src/string/strsignal.cc \
 	libc/src/string/strcoll_l.cc \
@@ -1465,7 +1524,9 @@ libc_a_SOURCES = \
 	libc/src/string/memchr.cc \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
+	\
 	libc/src/new/operator-new.cc \
+	\
 	libc/src/dirent/opendir.cc \
 	libc/src/dirent/closedir.cc \
 	libc/src/dirent/fdopendir.cc \
@@ -1475,6 +1536,7 @@ libc_a_SOURCES = \
 	libc/src/dirent/dirfd.cc \
 	libc/src/dirent/readdir_r.cc \
 	libc/src/dirent/seekdir.cc \
+	\
 	libc/src/stdlib/new.cc \
 	libc/src/stdlib/malloc_arena.cc	\
 	libc/src/stdlib/malloc_arena.h	\
@@ -1485,31 +1547,54 @@ libc_a_SOURCES = \
 	libc/src/stdlib/realloc.cc \
 	libc/src/stdlib/calloc.cc \
 	libc/src/stdlib/free.cc \
+	\
 	libc/src/fcntl/creat.cc \
 	libc/src/fcntl/fcntl.cc \
 	libc/src/fcntl/open.cc \
 	libc/src/fcntl/openat.cc \
 	libc/src/fcntl/posix_fadvise.cc \
 	libc/src/fcntl/posix_fallocate.cc \
+	\
 	libc/src/stdio/bits/cfile.cc \
 	libc/src/stdio/bits/cfile.h \
 	libc/src/stdio/bits/formatter.cc \
 	libc/src/stdio/bits/formatter.h \
-	libc/src/stdio/stdin_out_err.cc \
+	libc/src/stdio/clearerr.cc \
+	libc/src/stdio/fclose.cc \
 	libc/src/stdio/fdopen.cc \
+	libc/src/stdio/feof.cc \
+	libc/src/stdio/ferror.cc \
+	libc/src/stdio/fflush.cc \
+	libc/src/stdio/fgetpos.cc \
+	libc/src/stdio/fgets.cc \
+	libc/src/stdio/fileno.cc \
+	libc/src/stdio/fopen.cc \
 	libc/src/stdio/fprintf.cc \
 	libc/src/stdio/fputc.cc \
-	libc/src/stdio/putchar.cc \
-	libc/src/stdio/fgets.cc \
-	libc/src/stdio/printf.cc \
-	libc/src/stdio/vfprintf.cc \
-	libc/src/stdio/vsnprintf.cc \
-	libc/src/stdio/snprintf.cc \
-	libc/src/stdio/vprintf.cc \
 	libc/src/stdio/fread.cc \
+	libc/src/stdio/freopen.cc \
+	libc/src/stdio/fseek.cc \
+	libc/src/stdio/fsetpos.cc \
+	libc/src/stdio/ftell.cc \
 	libc/src/stdio/fwrite.cc \
+	libc/src/stdio/printf.cc \
+	libc/src/stdio/putchar.cc \
 	libc/src/stdio/puts.cc \
+	libc/src/stdio/remove.cc \
+	libc/src/stdio/rename.cc \
+	libc/src/stdio/rewind.cc \
+	libc/src/stdio/setbuf.cc \
+	libc/src/stdio/setvbuf.cc \
+	libc/src/stdio/snprintf.cc \
+	libc/src/stdio/stdin_out_err.cc \
+	libc/src/stdio/tmpfile.cc \
+	libc/src/stdio/tmpnam.cc \
+	libc/src/stdio/vfprintf.cc \
+	libc/src/stdio/vprintf.cc \
+	libc/src/stdio/vsnprintf.cc \
+	\
 	libc/src/sys/indirect-thunk.S \
+	\
 	libc/src/sys/mman/mmap.cc \
 	libc/src/sys/mman/munmap.cc \
 	libc/src/sys/mman/mremap.cc \
@@ -1518,11 +1603,15 @@ libc_a_SOURCES = \
 	libc/src/sys/mman/mlock.cc \
 	libc/src/sys/mman/munlock.cc \
 	libc/src/sys/mman/madvise.cc \
+	\
 	libc/src/sys/ioctl/ioctl.cc \
+	\
 	libc/src/sys/time/clock_gettime.cc \
 	libc/src/sys/time/clock_getres.cc \
+	\
 	libc/src/sys/tls/tls_get_addr.h \
 	libc/src/sys/tls/tls_get_addr.cc \
+	\
 	libc/src/unistd/access.cc \
 	libc/src/unistd/alarm.cc \
 	libc/src/unistd/chdir.cc \
@@ -1605,7 +1694,9 @@ libc_a_SOURCES = \
 	libc/src/unistd/unlinkat.cc \
 	libc/src/unistd/unlink.cc \
 	libc/src/unistd/write.cc \
+	\
 	libc/src/errno/errno.cc \
+	\
 	libc/src/posix_spawn/posix_spawn.cc \
 	libc/src/posix_spawn/posix_spawnp.cc \
 	libc/src/posix_spawn/posix_spawn_file_actions_init.cc \
@@ -1627,6 +1718,7 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
+	\
 	libc/src/pthread/pthread_spin_trylock.cc \
 	libc/src/pthread/pthread_rwlockattr_init.cc \
 	libc/src/pthread/pthread_cancel.cc \
@@ -1697,6 +1789,7 @@ libc_a_SOURCES = \
 	libc/src/pthread/pthread_mutex_init.cc \
 	libc/src/pthread/__futex.cc \
 	libc/src/pthread/__clone.cc \
+	\
 	libc/src/aio/aio_cancel.cc \
 	libc/src/aio/aio_error.cc \
 	libc/src/aio/aio_fsync.cc \
@@ -1704,6 +1797,7 @@ libc_a_SOURCES = \
 	libc/src/aio/aio_return.cc \
 	libc/src/aio/aio_suspend.cc \
 	libc/src/aio/aio_write.cc \
+	\
 	libc/src/stat/chmod.cc \
 	libc/src/stat/fchmodat.cc \
 	libc/src/stat/fchmod.cc \
@@ -1720,6 +1814,7 @@ libc_a_SOURCES = \
 	libc/src/stat/stat.cc \
 	libc/src/stat/umask.cc \
 	libc/src/stat/utimensat.cc \
+	\
 	libc/src/signal/bits/trampoline.S \
 	libc/src/signal/setjmp.S \
 	libc/src/signal/sigaction.cc \
@@ -1730,10 +1825,12 @@ libc_a_SOURCES = \
 	libc/src/signal/sigismember.cc \
 	libc/src/signal/sigemptyset.cc \
 	libc/src/signal/sigfillset.cc \
+	\
 	libc/src/sys/socket/socket.cc \
 	libc/src/sys/module/init_module.cc \
 	libc/src/sys/module/probe_pci_for.cc \
 	libc/src/sys/framebuffer/framebuffer_enum.cc \
+	\
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
 	libc/src/sys/syscall2.S \
@@ -1741,6 +1838,7 @@ libc_a_SOURCES = \
 	libc/src/sys/syscall4.S \
 	libc/src/sys/syscall5.S \
 	libc/src/sys/syscall6.S \
+	\
 	$(libc_a_HEADERS)
 
 libc_a_CXXFLAGS = \
@@ -2090,16 +2188,17 @@ noinst_LIBRARIES += libpng.a
 
 libpng_a_SOURCES = \
 	user/libpng/png.cc \
-	user/libpng/png.h \
 	user/libpng/surface.cc \
-	user/libpng/surface.h
+	user/include/png.h \
+	user/include/surface.h
 
 libpng_a_CXXFLAGS = \
 	-DFROMCXXFLAGS  \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS) \
 	$(USER64_EXE_FLAGS) \
-	-I$(top_srcdir)/user/libutf
+	-I$(top_srcdir)/user/libutf \
+	-I$(top_srcdir)/user/include
 
 libpng_a_CFLAGS = \
 	-DFROMCFLAGS  \
@@ -2390,6 +2489,7 @@ SBIN_FILES = \
 
 LIB_FILES = \
 	libc.a \
+	libstdc++.a \
 	libc32.a
 
 # ISO only (EFI boot partition)
@@ -2767,7 +2867,7 @@ debug-tcg: debug-smp-bios-hd-gpt-ahci-vga-tcg
 # check modules, module imports, kernel exports
 
 show-kernel-exports: all-kernel
-	"$(top_srcdir)/kernel_exports.sh"
+	"$(top_srcdir)/kernel_exports.bash"
 
 show-srcdir:
 	printf "%s\n" $(top_srcdir)
@@ -2775,7 +2875,7 @@ show-srcdir:
 .PHONY: show-kernel-exports
 
 check-module-imports: all-kernel
-	"$(top_srcdir)/module_checkimports.sh" $(MODULE_LIST) | $(CXXFILT)
+	"$(top_srcdir)/module_checkimports.bash" $(MODULE_LIST) | $(CXXFILT)
 
 .PHONY: check-module-imports
 
@@ -2851,10 +2951,10 @@ $(foreach name,$(generate_kallsym_list), \
 define gensym =
 
 sym/$(1).sym: $(1) \
-		$$(top_srcdir)/symbols.mk $$(top_srcdir)/gensymtab.sh
+		$$(top_srcdir)/symbols.mk $$(top_srcdir)/gensymtab.bash
 	$$(MKDIR) -p $$(@D)
 	OBJDUMP=$$(OBJDUMP) SORT=$(SORT) \
-		$$(top_srcdir)/gensymtab.sh "$$(OBJDUMP)" e "$$@" "$$<"
+		$$(top_srcdir)/gensymtab.bash "$$(OBJDUMP)" e "$$@" "$$<"
 
 endef
 

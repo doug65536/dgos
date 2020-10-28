@@ -15,7 +15,7 @@ static uint32_t pool_round_up(uint32_t n, int8_t log2m)
     return (n + ((1U<<log2m)-1)) & (~0U << log2m);
 }
 
-EXPORT bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
+bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
 {
     // Round item size up to multiple of cache line
     item_size = pool_round_up(item_size, POOL_LOG2_ALIGN);
@@ -23,7 +23,7 @@ EXPORT bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
     size_t size = item_size * capacity;
 
     void *pool_mem = mmap(nullptr, size, PROT_READ | PROT_WRITE,
-                          MAP_UNINITIALIZED);
+                          MAP_POPULATE);
 
     if (unlikely(!pool_mem || pool_mem == MAP_FAILED))
         return false;
@@ -32,12 +32,12 @@ EXPORT bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
     item_count = 0;
     item_capacity = capacity;
     item_size = item_size;
-    first_free = ~0;
+    first_free = -1U;
 
     return true;
 }
 
-EXPORT pool_base_t::pool_base_t()
+pool_base_t::pool_base_t()
     : items(nullptr)
     , item_size(0)
     , item_capacity(0)
@@ -46,7 +46,7 @@ EXPORT pool_base_t::pool_base_t()
 {
 }
 
-EXPORT pool_base_t::~pool_base_t()
+pool_base_t::~pool_base_t()
 {
     // Cache line align first item slot
     size_t hdr_size = pool_round_up(sizeof(pool_base_t), POOL_LOG2_ALIGN);
@@ -57,13 +57,13 @@ EXPORT pool_base_t::~pool_base_t()
     munmap(this, size);
 }
 
-EXPORT void *pool_base_t::item(uint32_t index)
+void *pool_base_t::item(uint32_t index)
 {
     assert(index < item_capacity);
     return items + index * item_size;
 }
 
-EXPORT void *pool_base_t::alloc()
+void *pool_base_t::alloc()
 {
     void *slot;
 
@@ -72,6 +72,8 @@ EXPORT void *pool_base_t::alloc()
     if (first_free != ~0U) {
         // Reuse freed item
         slot = (uint32_t*)item(first_free);
+        // Items in the free chain have next free index
+        // patched into 1st 4 bytes
         memcpy(&first_free, slot, sizeof(first_free));
     } else if (item_count < item_capacity) {
         // Use a new slot
@@ -81,24 +83,37 @@ EXPORT void *pool_base_t::alloc()
         slot = nullptr;
     }
 
+#if HEAP_DEBUG
+    if (likely(slot))
+        memset(slot, 0xf0, item_size);
+#endif
+
     return slot;
 }
 
-EXPORT void *pool_base_t::calloc()
+void *pool_base_t::calloc()
 {
-    void *item = alloc();
-    if (likely(item))
-        memset(item, 0, item_size);
-    return item;
+    void *slot = alloc();
+
+    if (likely(slot))
+        memset(slot, 0, item_size);
+
+    return slot;
 }
 
-EXPORT void pool_base_t::free(uint32_t index)
+void pool_base_t::free(uint32_t index)
 {
     scoped_lock lock(pool_lock);
 
-    void *item = items + (index * item_size);
+    void *slot = item(index);
+
+#if HEAP_DEBUG
+    memset(slot, 0xfe, item_size);
+#endif
+
     // Patch next link index into block memory
-    memcpy(item, &first_free, sizeof(uint32_t));
+    memcpy(slot, &first_free, sizeof(first_free));
+
     first_free = index;
 }
 

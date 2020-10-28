@@ -146,8 +146,8 @@ private:
     struct virtio_gpu_resp_display_info_t {
         virtio_gpu_resp_display_info_t()
             : hdr(0)
+            , pmodes{}
         {
-            memset(pmodes, 0, sizeof(pmodes));
         }
 
         virtio_gpu_ctrl_hdr_t hdr;

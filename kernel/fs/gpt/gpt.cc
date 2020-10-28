@@ -10,6 +10,8 @@
 #define GPT_TRACE(...) ((void)0)
 #endif
 
+__BEGIN_ANONYMOUS
+
 struct guid_t {
     uint8_t v[16];
 
@@ -28,8 +30,6 @@ static constexpr const guid_t efi_part = {
     0x28, 0x73, 0x2A, 0xC1, 0x1F, 0xF8, 0xD2, 0x11,
     0xBA, 0x4B, 0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B
 };
-
-struct part_dev_t;
 
 struct gpt_hdr_t {
     static constexpr const uint64_t sig_expected = UINT64_C(0x5452415020494645);
@@ -162,3 +162,5 @@ ext::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
 }
 
 static gpt_part_factory_t gpt_part_factory;
+
+__END_ANONYMOUS

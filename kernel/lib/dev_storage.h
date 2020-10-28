@@ -30,7 +30,7 @@ struct disk_vec_t {
     uint16_t byte_count;
 };
 
-struct disk_io_plan_t {
+struct KERNEL_API disk_io_plan_t {
     void *dest;
     disk_vec_t *vec;
     uint16_t count;
@@ -123,7 +123,7 @@ public:
     }
 };
 
-struct EXPORT storage_dev_base_t : public dev_base_t {
+struct KERNEL_API storage_dev_base_t : public dev_base_t {
     virtual ~storage_dev_base_t() = 0;
 
     // Startup/shutdown
@@ -195,7 +195,7 @@ struct EXPORT storage_dev_base_t : public dev_base_t {
 
 struct storage_if_base_t;
 
-struct EXPORT storage_if_factory_t {
+struct KERNEL_API storage_if_factory_t {
     storage_if_factory_t(char const *factory_name);
     virtual ~storage_if_factory_t();
 
@@ -205,13 +205,13 @@ struct EXPORT storage_if_factory_t {
     char const * const name;
 };
 
-#pragma GCC visibility push(default)
-struct EXPORT storage_if_base_t {
+//#pragma GCC visibility push(default)
+struct KERNEL_API storage_if_base_t {
     virtual ~storage_if_base_t() = 0;
     virtual void cleanup_if() = 0;
     virtual ext::vector<storage_dev_base_t*> detect_devices() = 0;
 };
-#pragma GCC visibility pop
+//#pragma GCC visibility pop
 
 #define STORAGE_IF_IMPL                         \
     void cleanup_if() override final;           \
@@ -221,8 +221,8 @@ struct EXPORT storage_if_base_t {
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
         & name##_factory, callout_type_t::late_dev, "000")
 
-bool storage_if_unregister_factory(storage_if_factory_t *factory);
-void storage_if_register_factory(storage_if_factory_t *factory);
+KERNEL_API bool storage_if_unregister_factory(storage_if_factory_t *factory);
+KERNEL_API void storage_if_register_factory(storage_if_factory_t *factory);
 
 typedef int dev_t;
 
@@ -318,7 +318,7 @@ struct fs_stat_t {
 
 struct fs_base_t;
 
-struct fs_factory_t {
+struct KERNEL_API fs_factory_t {
     explicit fs_factory_t(char const *factory_name);
     virtual ~fs_factory_t();
 
@@ -558,13 +558,13 @@ struct fs_base_t {
 
 // Base for read-only filesystems,
 // provides implementation for all methods that write
-class EXPORT fs_base_ro_t : public fs_base_t {
+class KERNEL_API fs_base_ro_t : public fs_base_t {
     FS_BASE_WR_IMPL
 };
 
 #define FS_DEV_PTR(type, p) type *self = (type*)(p)
 
-class EXPORT fs_nosys_t : public fs_base_t {
+class KERNEL_API fs_nosys_t : public fs_base_t {
     // fs_base_t interface
 public:
     void unmount() override;
@@ -631,7 +631,7 @@ public:
 };
 
 
-void fs_register_factory(fs_factory_t *fs);
+KERNEL_API void fs_register_factory(fs_factory_t *fs);
 
 //
 // Partitioning scheme (MBR, GPT, and special types like CPIO, etc)
@@ -658,10 +658,10 @@ struct part_factory_t {
 
 __BEGIN_DECLS
 
-void part_register_factory(part_factory_t *factory);
+KERNEL_API void part_register_factory(part_factory_t *factory);
 
-void fs_mount(char const *fs_name, fs_init_info_t *info);
-void fs_add(fs_factory_t *reg, fs_base_t *fs);
+KERNEL_API void fs_mount(char const *fs_name, fs_init_info_t *info);
+KERNEL_API void fs_add(fs_factory_t *reg, fs_base_t *fs);
 fs_base_t *fs_from_id(size_t id);
 
 void probe_storage_factory(storage_if_factory_t *factory);

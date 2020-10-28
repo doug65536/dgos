@@ -84,6 +84,24 @@ uintptr_t bootinfo_parameter(bootparam_t param)
     case bootparam_t::port_e9_debug:
         return data->e9_enable;
 
+    case bootparam_t::testrun_port:
+        return data->testrun_port;
+
+    case bootparam_t::gdb_port:
+        return data->gdb_port;
+
+    case bootparam_t::phys_mem_table:
+        return data->phys_mem_table;
+
+    case bootparam_t::phys_mem_table_size:
+        return data->phys_mem_table_size;
+
+    case bootparam_t::phys_mapping:
+        return data->phys_mapping;
+
+    case bootparam_t::phys_mapping_sz:
+        return data->phys_mapping_sz;
+
     }
 
     return 0;

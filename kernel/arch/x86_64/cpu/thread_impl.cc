@@ -149,7 +149,7 @@ struct alignas(256) thread_info_t {
 
     // Higher numbers are higher priority
     thread_priority_t priority;
-    thread_priority_t priority_reserved;
+    uint8_t reserved5[3];
 
     uint64_t volatile wake_time;
 
@@ -622,6 +622,8 @@ static thread_t thread_create_with_state(
         break;
     }
 
+    thread_info_t::scoped_lock thread_lock(thread->lock);
+
     thread->name = name;
 
     // Pick CPU based on thread id for now
@@ -784,6 +786,8 @@ static thread_t thread_create_with_state(
     uint64_t timeslice_timestamp = now;
     uint64_t preempt_time = thread->used_time + 64000000;
 
+    thread_lock.unlock();
+
     cpu_info_t& cpu = schedule_thread_on_cpu(
                 thread, timeslice_timestamp, cpu_nr, preempt_time);
 
@@ -793,38 +797,39 @@ static thread_t thread_create_with_state(
     if (thread_cpu_number() != cpu_nr)
         apic_send_ipi(cpu.apic_id, INTR_IPI_RESCHED);
     // Hand over the cpu if new thread should run sooner than running thread
-    else if (thread->sched_timestamp > 0 &&
-             parent->sched_timestamp >= thread->sched_timestamp)
+    else if (//thread->sched_timestamp > 0 &&
+             parent->sched_timestamp > thread->sched_timestamp)
         thread_yield();
 
     return i;
 }
 
-EXPORT thread_t thread_create(thread_t *ret_tid,
-                              thread_fn_t fn, void *userdata, char const *name,
-                              size_t stack_size, bool user, bool is_float,
-                              thread_cpu_mask_t const& affinity)
+thread_t thread_create(thread_t *ret_tid,
+                       thread_fn_t fn, void *userdata, char const *name,
+                       size_t stack_size, bool user, bool is_float,
+                       thread_cpu_mask_t const& affinity, int priority)
 {
     thread_create_info_t info{};
     info.fn = fn;
     info.userdata = userdata;
     info.name = name;
     info.stack_size = stack_size;
+    info.affinity = affinity;
     info.ret_tid = ret_tid;
+    info.priority = priority;
     info.user = user;
     info.is_float = is_float;
-    info.affinity = affinity;
 
     return thread_create_with_info(&info);
 }
 
-EXPORT thread_t thread_create_with_info(thread_create_info_t const* info)
+thread_t thread_create_with_info(thread_create_info_t const* info)
 {
     return thread_create_with_state(
                 info->ret_tid,
                 info->fn, info->userdata, info->name, info->stack_size,
                 info->suspended ? THREAD_IS_SLEEPING : THREAD_IS_READY,
-                info->affinity, 0, info->user, info->is_float);
+                info->affinity, info->priority, info->user, info->is_float);
 }
 
 #if 0
@@ -992,11 +997,13 @@ void thread_init(int ap)
 
         mm_init_process(thread->process, true);
 
-        thread->sched_timestamp = time_ns();
+        // 0x00 is minimum priority, 0xFF is maximum priority
+        thread->priority = 0;
+        thread->sched_timestamp = (uint64_t(thread->priority ^ 0xFF) << 56) |
+                time_ns();
         thread->used_time = 0;
         thread->preempt_time = 64000000;
         thread->ctx = nullptr;
-        thread->priority = -256;
 
         // BSP stack (grows down)
         thread->stack = kernel_stack + kernel_stack_size;
@@ -1034,7 +1041,7 @@ void thread_init(int ap)
                     smp_idle_thread, nullptr, "Idle(AP)", 0,
                     THREAD_IS_INITIALIZING,
                     thread_cpu_mask_t(cpu_nr),
-                    -256, false, false);
+                    0, false, false);
 
         thread->process = threads[0].process;
 
@@ -1058,14 +1065,14 @@ static thread_info_t *thread_choose_next(
         // ...don't even think about context switching
         return outgoing;
 
-//    cpu_info_t::scoped_lock cpu_lock(cpu->queue_lock);
-
     // Service the sleep queue
     for (ready_set_t::const_iterator en = cpu->sleep_list.cend(),
          sleeping = cpu->sleep_list.cbegin(), next;
          sleeping != en && sleeping->first <= now;
          sleeping = next) {
         thread_info_t *sleeping_thread = (thread_info_t*)sleeping->second;
+
+        thread_info_t::scoped_lock thread_lock(sleeping_thread->lock);
 
         THREAD_TRACE("Sleep ended for tid=%d\n", sleeping_thread->thread_id);
 
@@ -1077,10 +1084,9 @@ static thread_info_t *thread_choose_next(
                 ? THREAD_IS_READY
                 : THREAD_IS_READY_BUSY;
 
-        thread_state_t old_state = atomic_cmpxchg(
-                    &sleeping_thread->state,
-                    expect_state, ready_state);
-        assert(old_state == expect_state);
+        assert(expect_state == sleeping_thread->state);
+
+        sleeping_thread->state = ready_state;
 
         ready_set_t::node_type node = cpu->sleep_list.extract(sleeping);
 
@@ -1091,12 +1097,14 @@ static thread_info_t *thread_choose_next(
                 .insert(ext::move(node))
                 .first;
 
+        thread_lock.unlock();
+
         next = cpu->sleep_list.cbegin();
     }
 
     assert(!cpu->ready_list.empty());
     ready_set_t::const_iterator it = cpu->ready_list.cbegin();
-    thread_info_t *ft = (thread_info_t *)it->second;
+    thread_info_t *ft = reinterpret_cast<thread_info_t *>(it->second);
     assert(ft->state == THREAD_IS_READY ||
            (ft->state == THREAD_IS_READY_BUSY && outgoing == ft));
     return ft;
@@ -1202,7 +1210,7 @@ void thread_destruct(thread_info_t *thread,
     //thread_release_ref(thread, lock);
 }
 
-EXPORT int thread_close(thread_t tid)
+int thread_close(thread_t tid)
 {
     thread_info_t* thread = threads + tid;
 
@@ -1648,7 +1656,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
             cpu_page_directory_set(ISR_CTX_REG_CR3(ctx));
     }
 
-    thread->sched_timestamp = now;
+    thread->sched_timestamp = (uint64_t(thread->priority ^ 0xFF) << 56) | now;
 
     assert(thread->state == THREAD_IS_RUNNING);
 
@@ -1684,25 +1692,33 @@ static void thread_early_sleep(uint64_t timeout_time)
         halt();
 }
 
-EXPORT void thread_sleep_until(uint64_t timeout_time)
+void thread_sleep_until(uint64_t timeout_time)
 {
+
     if (thread_idle_ready) {
         thread_info_t *thread = this_thread();
 
+        // Mask timer while transitioning to sleeping
+        cpu_scoped_irq_disable irq_dis;
+        thread_info_t::scoped_lock thread_lock(thread->lock);
+
         thread->wake_time = timeout_time;
         thread->state = THREAD_IS_SLEEPING_BUSY;
+
+        thread_lock.unlock();
+
         thread_yield();
     } else {
         thread_early_sleep(timeout_time);
     }
 }
 
-EXPORT void thread_sleep_for(uint64_t ms)
+void thread_sleep_for(uint64_t ms)
 {
     thread_sleep_until(time_ns() + ms * 1000000);
 }
 
-EXPORT uint64_t thread_get_usage(int id)
+uint64_t thread_get_usage(int id)
 {
     if (unlikely(unsigned(id) >= unsigned(countof(threads))))
         return -1;
@@ -1712,7 +1728,7 @@ EXPORT uint64_t thread_get_usage(int id)
 }
 
 // specify UINT64_MAX in timeout_time for infinite timeout
-EXPORT uintptr_t thread_sleep_release(
+uintptr_t thread_sleep_release(
         spinlock_t *lock, thread_t *thread_id, uint64_t timeout_time)
 {
     thread_info_t *thread = this_thread();
@@ -1777,7 +1793,7 @@ isr_context_t *thread_reschedule_if_requested(isr_context_t *ctx)
 }
 
 _hot
-EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
+void thread_resume(thread_t tid, intptr_t exit_code)
 {
     thread_info_t *resumed_thread = threads + tid;
 
@@ -1876,7 +1892,7 @@ EXPORT void thread_resume(thread_t tid, intptr_t exit_code)
     }
 }
 
-EXPORT intptr_t thread_wait(thread_t thread_id)
+intptr_t thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
 
@@ -1898,7 +1914,7 @@ uint32_t thread_cpus_started()
     return thread_aps_running + 1;
 }
 
-EXPORT thread_t thread_get_id()
+thread_t thread_get_id()
 {
     if (likely(thread_cls_ready)) {
         thread_t thread_id;
@@ -1913,7 +1929,7 @@ EXPORT thread_t thread_get_id()
     return 0;
 }
 
-EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
+void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
 {
     if (unlikely(!mm_is_user_range((void*)gsbase, 1)))
         panic("Almost set insecure user gsbase!");
@@ -1930,7 +1946,7 @@ EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
         cpu_altgsbase_set((void*)gsbase);
 }
 
-EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
+void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
 {
     if (unlikely(!mm_is_user_range((void*)fsbase, 1)))
         panic("Almost set insecure user fsbase!");
@@ -1947,17 +1963,17 @@ EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
         cpu_fsbase_set((void*)fsbase);
 }
 
-EXPORT thread_cpu_mask_t const* thread_get_affinity(int id)
+thread_cpu_mask_t const* thread_get_affinity(int id)
 {
     return &threads[id].cpu_affinity;
 }
 
-EXPORT size_t thread_get_cpu_count()
+size_t thread_get_cpu_count()
 {
     return cpu_count;
 }
 
-EXPORT void thread_set_affinity(int id, thread_cpu_mask_t const &affinity)
+void thread_set_affinity(int id, thread_cpu_mask_t const &affinity)
 {
     cpu_scoped_irq_disable intr_was_enabled;
 
@@ -1989,12 +2005,12 @@ EXPORT void thread_set_affinity(int id, thread_cpu_mask_t const &affinity)
     }
 }
 
-EXPORT thread_priority_t thread_get_priority(thread_t thread_id)
+thread_priority_t thread_get_priority(thread_t thread_id)
 {
     return threads[thread_id].priority;
 }
 
-EXPORT void thread_set_priority(thread_t thread_id,
+void thread_set_priority(thread_t thread_id,
                                 thread_priority_t priority)
 {
     threads[thread_id].priority = priority;
@@ -2124,7 +2140,7 @@ uint32_t thread_cpu_number()
 }
 
 _hot
-EXPORT isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
+isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
 {
     cpu_info_t *cur_cpu = this_cpu();
     thread_info_t *cur_thread = cur_cpu->cur_thread;
@@ -2140,13 +2156,13 @@ EXPORT isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
     return ctx;
 }
 
-EXPORT isr_context_t *thread_schedule_if_requested(isr_context_t *ctx)
+isr_context_t *thread_schedule_if_requested(isr_context_t *ctx)
 {
     cpu_scoped_irq_disable irq_dis;
     return thread_schedule_if_requested_noirq(ctx);
 }
 
-EXPORT isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx)
+isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx)
 {
     cpu_info_t *cpu = this_cpu();
 
@@ -2158,13 +2174,13 @@ EXPORT isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx)
     return ctx;
 }
 
-EXPORT process_t *thread_current_process()
+process_t *thread_current_process()
 {
     thread_info_t *thread = this_thread();
     return thread->process;
 }
 
-EXPORT unsigned thread_current_cpu(thread_t tid)
+unsigned thread_current_cpu(thread_t tid)
 {
     cpu_info_t *cpu = tid < 0 ? this_cpu() : &cpus[run_cpu[tid]];
     return cpu->cpu_nr;
@@ -2306,7 +2322,7 @@ void thread_pcid_free(int pcid)
     pcid_alloc_map[0] &= ~(UINT64_C(1) << word);
 }
 
-EXPORT unsigned thread_cpu_usage_x1M(size_t cpu)
+unsigned thread_cpu_usage_x1M(size_t cpu)
 {
     return cpus[cpu].busy_percent_x1M;
 }

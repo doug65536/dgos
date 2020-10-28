@@ -15,9 +15,9 @@ fatpart.img: \
 		mbr-bin \
 		boot1-bin \
 		bootfat-bin \
-		$(top_srcdir)/mkposixdirs.sh \
+		$(top_srcdir)/mkposixdirs.bash \
 		$(top_srcdir)/diskfat.mk \
-		$(top_srcdir)/populate_fat.sh
+		$(top_srcdir)/populate_fat.bash
 	printf "Truncating fatpart.img\n" \
 		&& \
 		$(TRUNCATE) --size=0 "$@" \
@@ -89,7 +89,7 @@ fatpart.img: \
 		printf "Populating fat partition with files and directories\n" \
 		&& \
 		SRCDIR="$(top_srcdir)" \
-			"$(top_srcdir)/populate_fat.sh" fatpart.img "$(top_srcdir)" && \
+			"$(top_srcdir)/populate_fat.bash" fatpart.img "$(top_srcdir)" && \
 		$(TOUCH) fatpart.img
 
 DGOS_MBRID=0x0615151f

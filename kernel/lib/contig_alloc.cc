@@ -7,7 +7,7 @@
 #include "mmu.h"
 
 #define DEBUG_LINEAR_SANITY     0
-#define DEBUG_ADDR_ALLOC        0
+#define DEBUG_ADDR_ALLOC        1
 #define DEBUG_ADDR_EARLY        0
 
 //
@@ -74,7 +74,7 @@ uintptr_t contiguous_allocator_t::early_init(size_t size, char const *name)
     return aligned_base;
 }
 
-EXPORT void contiguous_allocator_t::init(
+void contiguous_allocator_t::init(
         linaddr_t addr, size_t size, char const *name)
 {
     scoped_lock lock(free_addr_lock);
@@ -92,7 +92,7 @@ EXPORT void contiguous_allocator_t::init(
     ready = true;
 }
 
-EXPORT uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
+uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 {
     linaddr_t addr;
 
@@ -227,7 +227,7 @@ EXPORT uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
  *
  */
 
-EXPORT bool contiguous_allocator_t::take_linear(
+bool contiguous_allocator_t::take_linear(
         linaddr_t addr, size_t size, bool require_free)
 {
     scoped_lock lock(free_addr_lock);
@@ -246,7 +246,10 @@ EXPORT bool contiguous_allocator_t::take_linear(
     uintptr_t end = addr + size;
 
     tree_t::iterator lo_it = free_addr_by_addr.lower_bound({addr, 0});
-    tree_t::iterator hi_it = free_addr_by_addr.lower_bound({end, 0});
+    // Fastpath finding end if the start inserts at end
+    tree_t::iterator hi_it = lo_it != free_addr_by_addr.end()
+            ? free_addr_by_addr.lower_bound({end, 0})
+            : lo_it;
     tree_t::value_type item;
     tree_t::value_type pred;
     tree_t::iterator pred_it;
@@ -402,7 +405,7 @@ EXPORT bool contiguous_allocator_t::take_linear(
     return true;
 }
 
-EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
+void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 {
     scoped_lock lock(free_addr_lock);
 
@@ -565,7 +568,7 @@ EXPORT void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 
 
 
-EXPORT void contiguous_allocator_t::dump(char const *format, ...) const
+void contiguous_allocator_t::dump(char const *format, ...) const
 {
     va_list ap;
     va_start(ap, format);
@@ -573,13 +576,13 @@ EXPORT void contiguous_allocator_t::dump(char const *format, ...) const
     va_end(ap);
 }
 
-EXPORT void contiguous_allocator_t::dumpv(char const *format, va_list ap) const
+void contiguous_allocator_t::dumpv(char const *format, va_list ap) const
 {
     scoped_lock lock(free_addr_lock);
     return dump_lockedv(lock, format, ap);
 }
 
-EXPORT void contiguous_allocator_t::dump_lockedv(
+void contiguous_allocator_t::dump_lockedv(
         scoped_lock &lock, char const *format, va_list ap) const
 {
     vprintdbg(format, ap);
@@ -619,7 +622,7 @@ bool contiguous_allocator_t::validate() const
 }
 
 
-EXPORT void contiguous_allocator_t::dump_locked(
+void contiguous_allocator_t::dump_locked(
         scoped_lock &lock, char const *format, ...) const
 {
     va_list ap;
@@ -628,7 +631,7 @@ EXPORT void contiguous_allocator_t::dump_locked(
     va_end(ap);
 }
 
-EXPORT bool contiguous_allocator_t::validate_locked(scoped_lock& lock) const
+bool contiguous_allocator_t::validate_locked(scoped_lock& lock) const
 {
     free_addr_by_addr.validate();
     free_addr_by_size.validate();

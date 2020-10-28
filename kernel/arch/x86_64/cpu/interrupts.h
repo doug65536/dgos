@@ -104,6 +104,8 @@
 #define INTR_PIC_DSP_LAST   255
 // Everything preceding here needs PIC EOI
 
+#define INTR_COUNT 256
+
 #ifndef __ASSEMBLER__
 
 #include "assert.h"

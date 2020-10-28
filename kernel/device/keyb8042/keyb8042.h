@@ -1,4 +1,5 @@
 #pragma once
+#include "types.h"
 
 struct keyb8042_layout_t {
     char const * const name;
@@ -8,6 +9,6 @@ struct keyb8042_layout_t {
 };
 
 // Layouts
-extern keyb8042_layout_t keyb8042_layout_us;
+KERNEL_API extern keyb8042_layout_t keyb8042_layout_us;
 
 void keyb8042_init(void);

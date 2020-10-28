@@ -33,8 +33,7 @@ static uint8_t log2_sector_sz;
 static uint8_t log2_sec_per_cluster;
 
 _hot
-static uint32_t next_cluster(uint32_t current_cluster,
-                             char *sector, bool *ok_ptr);
+static uint32_t next_cluster(uint32_t current_cluster, bool *ok_ptr);
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
@@ -96,8 +95,8 @@ static int fat32_sector_iterator_begin(
 
     // Cache cluster chain
     int cluster_count = 0;
-    for (int walk = cluster; walk; ++cluster_count) {
-        walk = next_cluster(walk, nullptr, &iter->ok);
+    for (uint32_t walk = cluster; walk; ++cluster_count) {
+        walk = next_cluster(walk, &iter->ok);
         if (unlikely(!iter->ok))
             return -1;
     }
@@ -120,7 +119,7 @@ static int fat32_sector_iterator_begin(
     cluster_count = 0;
     for (int walk = cluster; walk; ++cluster_count) {
         iter->clusters[cluster_count] = walk;
-        walk = next_cluster(walk, nullptr, &iter->ok);
+        walk = next_cluster(walk, &iter->ok);
         if (unlikely(!iter->ok))
             return -1;
     }
@@ -155,12 +154,13 @@ static size_t fat_cache_misses;
 // Returns 0xFFFFFFFF on error
 _hot
 static uint32_t next_cluster(
-        uint32_t current_cluster, char *sector, bool *ok_ptr)
+        uint32_t current_cluster, bool *ok_ptr)
 {
+    // minus 2 because 32 bit (2^2 byte) FAT entries
     uint32_t fat_sector_index = current_cluster >> (log2_sector_sz-2);
     uint32_t fat_sector_offset = current_cluster &
             ((1U << (log2_sector_sz-2))-1);
-    uint32_t const *fat_array = (uint32_t *)sector;
+    uint32_t const *fat_array = nullptr;
     uint64_t lba = bpb.first_fat_lba + fat_sector_index;
 
     bool ok = true;
@@ -168,35 +168,23 @@ static uint32_t next_cluster(
         ++fat_cache_misses;
 
         ok = read_fat(lba);
+
         if (ok_ptr)
             *ok_ptr = ok;
+
         if (unlikely(!ok))
             return 0xFFFFFFFF;
-        if (sector)
-            memcpy(sector, fat_buffer, sector_sz);
     } else {
         ++fat_cache_hits;
     }
 
     fat_array = (uint32_t*)fat_buffer;
-    if (sector)
-        memcpy(sector, fat_buffer, sector_sz);
 
     current_cluster = fat_array[fat_sector_offset] & 0x0FFFFFFF;
 
     // Check for end of chain
-    if (is_eof_cluster(current_cluster))
+    if (unlikely(is_eof_cluster(current_cluster)))
         return 0;
-
-    if (sector) {
-        lba = lba_from_cluster(current_cluster);
-
-        ok = disk_read_lba(uint64_t(sector), lba, log2_sector_sz, 1);
-        if (ok_ptr)
-            *ok_ptr = ok;
-        if (ok)
-            return 0xFFFFFFFF;
-    }
 
     return current_cluster;
 }
@@ -221,7 +209,7 @@ static int sector_iterator_next(
 
         // Advance to the next cluster
         //iter->cluster = next_cluster(
-        //            iter->cluster, sector, &iter->ok);
+        //            iter->cluster, &iter->ok);
 
         if (iter->position >= iter->cluster_count)
             return 0;
@@ -764,17 +752,16 @@ static int fat32_boot_open(char const *filename)
     if (file < 0)
         return -1;
 
+    // Get ready to read the file
+    file_handles[file].reset();
+
     PRINT("Storing file size: %" PRIu32, file_size);
 
+    // Stash start cluster until cluster chain gets preloaded
+    file_handles[file].cluster = cluster;
     file_handles[file].file_size = file_size;
 
-    PRINT("Starting iterator");
-
-    // Get ready to read the file
-    int16_t status = fat32_sector_iterator_begin(
-                file_handles + file, sector_buffer, cluster);
-    if (status < 0)
-        return -1;
+    PRINT("Resetting iterator");
 
     PRINT("Open complete");
 
@@ -811,7 +798,14 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     if (unlikely(!check_fd(file)))
         return -1;
 
-    auto& desc = file_handles[file];
+    fat32_sector_iterator_t &desc = file_handles[file];
+
+    if (!desc.clusters) {
+        int status = fat32_sector_iterator_begin(
+                    file_handles + file, sector_buffer, desc.cluster);
+        if (status < 0)
+            return -1;
+    }
 
     disk_io_plan_t plan(buf, log2_sector_sz);
 

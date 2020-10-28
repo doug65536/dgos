@@ -1,8 +1,14 @@
 ENTRY(entry)
 OUTPUT_FORMAT(elf32-i386)
 
+PHDRS {
+	rwx	PT_LOAD FLAGS(7);
+}
+
 SECTIONS {
-	.text 0x1000 : AT(0x1000) {
+	. = 0x1000;
+
+	.text : {
 		___text_st = .;
 		KEEP(*(.head))
 		KEEP(*(.early))
@@ -46,6 +52,19 @@ SECTIONS {
 		. = ALIGN(512);
 		___initialized_data_en = .;
 
+		*(.text)
+		*(.text.*)
+		*(.text.unlikely)
+
+		___text_en = .;
+
+		___data_st = .;
+		*(.data)
+		*(.data.*)
+		*(.rodata)
+		*(.rodata.*)
+		___data_en = .;
+
 		___bss_st = .;
 		*(.bss)
 		*(.bss.*)
@@ -53,26 +72,20 @@ SECTIONS {
 		*(COMMON.*)
 		*(COMMON*)
 		___bss_en = .;
+	} :rwx =0
 
-		*(.text)
-		*(.text.*)
-		*(.text.unlikely)
+	/* Max 124KB image */
+	. = 0x1F000;
 
-		*(.data)
-		*(.data.*)
-		*(.rodata)
-		*(.rodata.*)
-	} = 0
-
-	. = ABSOLUTE(0x20000);
+	. = 0x20000;
 	___initial_stack_limit = .;
-	. = ABSOLUTE(0x30000);
+	. = 0x30000;
 	___initial_stack = .;
 	. += 16;
 	___heap_st = .;
 	___end = .;
 
-
+/*
 	.eh_frame       0 : { *(.eh_frame)      }
 	.debug          0 : { *(.debug)         }
 	.debug_info		0 : { *(.debug_info)    }
@@ -89,4 +102,5 @@ SECTIONS {
 	/DISCARD/		0 : { *(.interp)               }
 	/DISCARD/		0 : { *(.comment)              }
 	/DISCARD/		0 : { *(.note.gnu.build-id)    }
+*/
 }

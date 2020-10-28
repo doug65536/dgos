@@ -920,7 +920,7 @@ private:
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     void irq_handler(int irq_ofs);
     uint32_t mmio_read_intr_status();
-    void mmio_irq_acknowledge_port(unsigned port_num);
+    void mmio_irq_acknowledge_ports(unsigned port_mask);
 
     void port_stop(unsigned port_num);
     void port_start(unsigned port_num);
@@ -1163,7 +1163,7 @@ void ahci_if_t::handle_port_irq(unsigned port_num)
                            port_num, error, sata_err);
             }
 
-            if (error != 0) {
+            if (unlikely(error != 0)) {
                 AHCI_TRACE("Error %d on interface=%p port=%zu\n",
                            error, (void*)this, pi - port_info);
             }
@@ -1231,10 +1231,10 @@ uint32_t ahci_if_t::mmio_read_intr_status()
 }
 
 // Measured KVM 3950X 340ns-390ns
-void ahci_if_t::mmio_irq_acknowledge_port(unsigned port_num)
+void ahci_if_t::mmio_irq_acknowledge_ports(unsigned port_mask)
 {
 //    uint64_t st = time_ns();
-    mmio_base->intr_status = (UINT32_C(1) << port_num);
+    mm_wr(mmio_base->intr_status, port_mask);
 //    uint64_t en = time_ns();
 //    uint64_t el = en - st;
 //    printdbg("AHCI irq acknowledge port %d %ss\n",
@@ -1245,6 +1245,8 @@ void ahci_if_t::irq_handler(int irq_ofs)
 {
     // Handle every port that has an interrupt pending
     unsigned port;
+    uint32_t accumulated_acks = 0;
+    
     // Loop for each set bit
     for (uint32_t intr_status = mmio_read_intr_status();
          intr_status != 0; intr_status &= ~(UINT32_C(1) << port)) {
@@ -1254,8 +1256,10 @@ void ahci_if_t::irq_handler(int irq_ofs)
         handle_port_irq(port);
 
         // Acknowledge the interrupt on the port
-        mmio_irq_acknowledge_port(port);
+        accumulated_acks |= UINT32_C(1) << port;        
     }
+    
+    mmio_irq_acknowledge_ports(accumulated_acks);
 }
 
 void ahci_if_t::port_stop(unsigned port_num)
@@ -1264,7 +1268,7 @@ void ahci_if_t::port_stop(unsigned port_num)
 
     // Clear start bit
     // Clear FIS receive enable bit
-    port->cmd &= ~(AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE);
+    mm_and(port->cmd, ~(AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE));
 
     // Wait until there is not a command running,
     // and there is not a FIS receive running
@@ -1282,7 +1286,7 @@ void ahci_if_t::port_start(unsigned port_num)
         pause();
 
     // Set start and FIS receive enable bit
-    port->cmd |= AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE;
+    mm_or(port->cmd, AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE);
 }
 
 // Stop each implemented port
@@ -1388,7 +1392,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
     // 10.1.2 System Software Specific Initialization
 
     // 1. Set AHCI enable in GHC
-    mmio_base->host_ctl |= AHCI_HC_HC_AE;
+    mm_or(mmio_base->host_ctl, AHCI_HC_HC_AE);
 
     AHCI_TRACE("Performing BIOS handoff\n");
     bios_handoff();
@@ -1819,7 +1823,7 @@ void ahci_if_t::port_reset(unsigned port_num)
     hba_port_t volatile *port = mmio_base->ports + port_num;
 
     // Enable FIS receive
-    port->cmd |= AHCI_HP_CMD_FRE;
+    mm_or(port->cmd, AHCI_HP_CMD_FRE);
 
     // Put port into INIT state
     AHCI_HP_SC_DET_SET(port->sata_ctl, AHCI_HP_SC_DET_INIT);
@@ -1831,7 +1835,7 @@ void ahci_if_t::port_reset(unsigned port_num)
     AHCI_HP_SC_DET_SET(port->sata_ctl, AHCI_HP_SC_DET_NONE);
 
     // Clear FIS receive bit
-    port->cmd &= ~AHCI_HP_CMD_FRE;
+    mm_and(port->cmd, ~AHCI_HP_CMD_FRE);
 
     // Acknowledge all interrupts
     port->intr_status = port->intr_status;
@@ -1842,6 +1846,7 @@ void ahci_if_t::port_reset(unsigned port_num)
 void ahci_if_t::rebase()
 {
     AHCI_TRACE("Stopping all ports\n");
+    
     // Stop all ports
     port_stop_all();
 
@@ -1886,7 +1891,7 @@ void ahci_if_t::rebase()
         if (port->sig == ahci_sig_t::SATA_SIG_ATAPI) {
             pi->is_atapi = 1;
             pi->log2_sector_size = 11;
-            port->cmd |= AHCI_HP_CMD_ATAPI;
+            mm_or(port->cmd, AHCI_HP_CMD_ATAPI);
             AHCI_TRACE("Found ATAPI device, port %d\n", port_num);
         } else if (port->sig == ahci_sig_t::SATA_SIG_ATA) {
             pi->is_atapi = 0;
@@ -1969,7 +1974,7 @@ void ahci_if_t::rebase()
     AHCI_TRACE("Enabling IRQ\n");
 
     // Enable interrupts overall
-    mmio_base->host_ctl |= AHCI_HC_HC_IE;
+    mm_or(mmio_base->host_ctl, AHCI_HC_HC_IE);
 
     AHCI_TRACE("Rebase done\n");
 }

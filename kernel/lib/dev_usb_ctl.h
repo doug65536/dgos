@@ -5,7 +5,7 @@
 
 class usb_bus_t;
 
-struct usb_iocp_result_t {
+struct KERNEL_API usb_iocp_result_t {
     usb_iocp_result_t() = default;
 
     operator bool() const
@@ -39,7 +39,7 @@ struct usb_iocp_result_t {
 using usb_iocp_t = dgos::basic_iocp_t<usb_iocp_result_t>;
 using usb_blocking_iocp_t = dgos::basic_blocking_iocp_t<usb_iocp_result_t>;
 
-class usb_pipe_t {
+class KERNEL_API usb_pipe_t {
 public:
     usb_pipe_t();
 
@@ -84,7 +84,7 @@ private:
 };
 
 // Interface to a host controller
-class usb_bus_t {
+class KERNEL_API usb_bus_t {
 public:
     virtual ~usb_bus_t() {}
 
@@ -142,7 +142,7 @@ public:
             int slotid, usb_hub_desc const& hub_desc) = 0;
 };
 
-class usb_class_drv_t {
+class KERNEL_API usb_class_drv_t {
 public:
     static usb_class_drv_t *find_driver(usb_config_helper *cfg, usb_bus_t *bus);
 

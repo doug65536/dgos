@@ -1,50 +1,123 @@
 #!/bin/bash
 
-#set -x
-
 scriptroot="$(cd "$(dirname "$0")" && pwd)"
+
+. "$scriptroot/toolchain/build-crossgcc-versions"
+
+printf "Using gcc version: %s\n" "$gccver"
+
+TARGET=x86_64-dgos
+
+NPROC="$(nproc)"
+
+function help() {
+	:
+}
+
+cleanbuild=
+quiet=
+while getopts ch?qj arg
+do
+	case $arg in
+		c ) cleanbuild=1 ; shift ;;
+		q ) quiet=1 ; shift ;;
+		h ) help && exit ;;
+		? ) help && exit ;;
+		* ) echo "unrecognized option '$arg'" ; exit 1 ;;
+	esac
+done
+
+toolchain_build_dir=toolchain_build
+toolchain_install_dir=toolchain_install
+
+if ! [[ -z $cleanbuild ]]; then
+	echo "Cleaning toolchain_build/build $toolchain_build_dir/src $toolchain_install_dir..."
+	rm -rf "$toolchain_build_dir/build" "$toolchain_build_dir/src" \
+		"$toolchain_build_dir/build.log" "$toolchain_install_dir" || exit
+fi
+
+export PATH="$PATH"":""$PWD/toolchain_install/bin"
+printf "PATH=%s\n" "$PATH"
+
+if ! which $TARGET-g++ || [[ ! -f toolchain_install/bin/$TARGET-g++ ]]; then
+	time AR=gcc-ar RANLIB=gcc-ranlib \
+		"$scriptroot/toolchain/build-crossgcc.bash" -a "$TARGET" \
+		-o toolchain_build \
+		-p toolchain_install -q || exit
+	printf "Toolchain built successfully\n"
+fi
+
+printf '# Run this command in a shell to use this: . ./set_toolchain_path\n' \
+	| tee "$toolchain_install_dir/set_toolchain_path"
+
+ln -rs "$toolchain_install_dir/set_toolchain_path" set_toolchain_path
+
+printf 'export PATH="%s/toolchain_install/bin:$PATH"\n' "$PWD" \
+	| tee -a set_toolchain_path
 
 function join_by {
 	local IFS="$1"
 	shift
-	echo "$*"
+	printf "%s" "$*"
 }
 
-HOST=x86_64-elf
-AR="$HOST-gcc-ar"
-RANLIB="$HOST-gcc-ranlib"
-NM="$HOST-gcc-nm"
+export AR="$TARGET-gcc-ar"
+export RANLIB="$TARGET-gcc-ranlib"
+export NM="$TARGET-gcc-nm"
 
-export AR
-export RANLIB
-export NM
+(cd -- "$scriptroot" && 
+	autoreconf -f && 
+	git submodule update --init) || exit
 
-(cd -- "$scriptroot" && autoreconf -f && git submodule update --init)
+echo Bootstrapping sysroot
+compileflags=( "-nostdlib" "-nostartfiles" )
+configureflags=()
 
-if [[ ! -f sysroot/libc/libc.a ]]; then
-	echo Bootstrapping sysroot
-	compileflags=( "-nostdlib" "-nostartfiles" )
-	configureflags=()
+rm -rf sysroot || exit
 
-	"$scriptroot/configure" --host "$HOST" \
-		CFLAGS="$(join_by ' ' ${compileflags[@]})" \
-			CXXFLAGS="$CFLAGS" \
-			LDFLAGS="$CFLAGS" \
-		"$(join_by ' ' ${configureflags[@]})" "$@" && \
-		nice make -j $(nproc) \
-			sysroot/lib/crt0.o \
-			sysroot/lib/32/crt0.o \
-			sysroot/lib/crt0pc32.o \
-			sysroot/lib/32/crt0pc32.o \
-			sysroot/lib/crt0pc64.o \
-			sysroot/lib/32/crt0pc64.o \
-			sysroot/lib/crt0pc80.o \
-			sysroot/lib/32/crt0pc80.o \
-			sysroot/lib/libc.a \
-			sysroot/lib/32/libc.a \
-			startupcode
+"$scriptroot/configure" --host "$TARGET" \
+	CFLAGS="$(join_by ' ' ${compileflags[@]})" \
+		CXXFLAGS="$CFLAGS" \
+		LDFLAGS="$CFLAGS" \
+	"$(join_by ' ' ${configureflags[@]})" "$@" && \
+	make -j "$NPROC" \
+		sysroot/lib/crt0.o \
+		sysroot/lib/32/crt0.o \
+		sysroot/lib/crt0pc32.o \
+		sysroot/lib/32/crt0pc32.o \
+		sysroot/lib/crt0pc64.o \
+		sysroot/lib/32/crt0pc64.o \
+		sysroot/lib/crt0pc80.o \
+		sysroot/lib/32/crt0pc80.o \
+		sysroot/lib/libc.a \
+		sysroot/lib/32/libc.a \
+		sysroot/lib/libm.a \
+		sysroot/lib/32/libm.a \
+		sysroot/lib/libstdc++.a \
+		sysroot/lib/32/libstdc++.a \
+		startupcode
 
-fi
+echo Copying include files to toolchain install
+cp -R -u -t "toolchain_install/lib/gcc/$TARGET/$gccver/include" \
+	sysroot/include/* && \
+	echo Successfully copied include files || exit
+
+echo Copying lib files to toolchain install
+cp -R -u -t "toolchain_install/lib/gcc/$TARGET/$gccver/" \
+	sysroot/lib/* && \
+	echo Successfully copied lib files || exit
+
+make -j "$NPROC" usrlib_headers || exit
+
+echo Copying include files to toolchain install
+cp -R -u -t "toolchain_install/lib/gcc/$TARGET/$gccver/include" \
+	sysroot/include/* && \
+	echo Successfully copied include files || exit
+
+echo Copying lib files to toolchain install
+cp -R -u -t "toolchain_install/lib/gcc/$TARGET/$gccver/" \
+	sysroot/lib/* && \
+	echo Successfully copied lib files || exit
 
 compileflags=( "--sysroot sysroot" )
 configureflags=()
@@ -54,5 +127,7 @@ echo flags: "${compileflags[@]}"
 CFLAGS="$(join_by ' ' ${compileflags[@]})" \
 	CXXFLAGS="$CFLAGS" \
 	LDFLAGS="$CFLAGS" \
-	"$scriptroot/configure" --host "$HOST" \
-	$(join_by ' ' ${configureflags[@]}) "$@"
+	"$scriptroot/configure" --host "$TARGET" \
+	$(join_by ' ' "${configureflags[@]}") "$@" || exit
+
+echo Completed successfully

@@ -7,45 +7,47 @@
 
 __BEGIN_DECLS
 
-size_t strlen(char const *src);
-void *memchr(void const *mem, int ch, size_t count);
+KERNEL_API_BUILTIN size_t strlen(char const *src);
+KERNEL_API_BUILTIN void *memchr(void const *mem, int ch, size_t count);
 void *memrchr(void const *mem, int ch, size_t count);
-char *strchr(char const *s, int ch);
-char *strrchr(char const *s, int ch);
+KERNEL_API_BUILTIN char *strchr(char const *s, int ch);
+KERNEL_API_BUILTIN char *strrchr(char const *s, int ch);
 
-int strcmp(char const *lhs, char const *rhs);
-int strncmp(char const *lhs, char const *rhs, size_t count);
-int memcmp(void const *lhs, void const *rhs, size_t count);
-char *strstr(char const *str, char const *substr);
+KERNEL_API_BUILTIN int strcmp(char const *lhs, char const *rhs);
+KERNEL_API_BUILTIN int strncmp(char const *lhs, char const *rhs, size_t count);
+KERNEL_API_BUILTIN int memcmp(void const *lhs, void const *rhs, size_t count);
+KERNEL_API_BUILTIN char *strstr(char const *str, char const *substr);
+KERNEL_API int const_time_memcmp(void const *lhs, void const *rhs,
+                                 size_t count);
 
 void clear64(void *dest, size_t n);
 
-void *memset(void *dest, int c, size_t n);
-void *memcpy(void * restrict dest,
-                        void const * restrict src, size_t n);
+KERNEL_API_BUILTIN void *memset(void *dest, int c, size_t n);
+KERNEL_API_BUILTIN void *memcpy(void * restrict dest,
+                                void const * restrict src, size_t n);
 
 _no_instrument
 void *memcpy_noinstrument(void * restrict dest,
                           void const * restrict src, size_t n);
-void *memmove(void *dest, void const *src, size_t n);
+KERNEL_API_BUILTIN void *memmove(void *dest, void const *src, size_t n);
 
-char *strcpy(char * restrict dest, char const * restrict src);
-char *strcat(char * restrict dest, char const * restrict src);
+KERNEL_API_BUILTIN char *strcpy(char * restrict dest, char const * restrict src);
+KERNEL_API_BUILTIN char *strcat(char * restrict dest, char const * restrict src);
 
 char *stpcpy(char *dest, char const *src);
 
-size_t strspn(char const *src, char const *chars);
-size_t strcspn(char const *src, char const *chars);
+KERNEL_API_BUILTIN size_t strspn(char const *src, char const *chars);
+KERNEL_API_BUILTIN size_t strcspn(char const *src, char const *chars);
 
-char *strncpy(char * restrict dest, char const * restrict src, size_t n);
-char *strncat(char * restrict dest, char const * restrict src, size_t n);
-
-void *aligned16_memset(void *dest, int c, size_t n);
+KERNEL_API_BUILTIN char *strncpy(char * restrict dest,
+                                 char const * restrict src, size_t n);
+KERNEL_API_BUILTIN char *strncat(char * restrict dest,
+                                 char const * restrict src, size_t n);
 
 // Aligned fill of naturally aligned values
-void memfill_16(void *dest, uint16_t v, size_t count);
-void memfill_32(void *dest, uint32_t v, size_t count);
-void memfill_64(void *dest, uint64_t v, size_t count);
+KERNEL_API void memfill_16(void *dest, uint16_t v, size_t count);
+KERNEL_API void memfill_32(void *dest, uint32_t v, size_t count);
+KERNEL_API void memfill_64(void *dest, uint64_t v, size_t count);
 
 __END_DECLS
 

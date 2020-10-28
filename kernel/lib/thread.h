@@ -16,7 +16,7 @@ struct isr_context_t;
 // Platform independent thread API
 
 using thread_t = int;
-using thread_priority_t = int16_t;
+using thread_priority_t = uint8_t;
 using thread_fn_t = intptr_t(*)(void*);
 
 void thread_check_stack(int intr);
@@ -27,7 +27,7 @@ void thread_startup(thread_fn_t fn, void *p, thread_t id);
 // 9 == 512 CPUs max
 #define thread_cpu_mask_t_log2_max 9
 #define thread_max_cpu (1 << thread_cpu_mask_t_log2_max)
-struct thread_cpu_mask_t
+struct KERNEL_API thread_cpu_mask_t
 {
 #ifdef __cplusplus
     static constexpr size_t log2_max = thread_cpu_mask_t_log2_max;
@@ -161,20 +161,19 @@ struct thread_create_info_t
     // Thread startup function and argument
     thread_fn_t fn;
     void *userdata;
-
+    char const *name;
     size_t stack_size;
-    thread_priority_t priority;
+    uintptr_t tls_base;
+
+    thread_cpu_mask_t affinity;
+
     thread_t *ret_tid;
+    void *stack_ptr;
+
+    thread_priority_t priority;
     bool user;
     bool is_float;
     bool suspended;
-
-    uintptr_t tls_base;
-    thread_cpu_mask_t affinity;
-
-    char const *name;
-
-    void *stack_ptr;
 };
 
 // Holds 0 if single cpu, otherwise holds -1
@@ -183,25 +182,27 @@ extern int spincount_mask;
 extern int use_mwait;
 
 // Implemented in arch
-thread_t thread_create(thread_t *ret_tid,
-                       thread_fn_t fn, void *userdata, char const *name,
-                       size_t stack_size, bool user, bool is_float,
-                       thread_cpu_mask_t const& affinity = thread_cpu_mask_t());
+KERNEL_API thread_t thread_create(
+        thread_t *ret_tid,
+        thread_fn_t fn, void *userdata, char const *name,
+        size_t stack_size, bool user, bool is_float,
+        thread_cpu_mask_t const& affinity = thread_cpu_mask_t(),
+        int priority = 0x40);
 
-thread_t thread_create_with_info(thread_create_info_t const* info);
+KERNEL_API thread_t thread_create_with_info(thread_create_info_t const* info);
 
 uintptr_t thread_yield(void);
-void thread_sleep_until(uint64_t expiry);
-void thread_sleep_for(uint64_t ms);
-uint64_t thread_get_usage(int id);
+KERNEL_API void thread_sleep_until(uint64_t expiry);
+KERNEL_API void thread_sleep_for(uint64_t ms);
+KERNEL_API uint64_t thread_get_usage(int id);
 
-void thread_set_fsbase(thread_t tid, uintptr_t fsbase);
-void thread_set_gsbase(thread_t tid, uintptr_t gsbase);
+KERNEL_API void thread_set_fsbase(thread_t tid, uintptr_t fsbase);
+KERNEL_API void thread_set_gsbase(thread_t tid, uintptr_t gsbase);
 
-void thread_set_affinity(int id, thread_cpu_mask_t const& affinity);
-thread_cpu_mask_t const* thread_get_affinity(int id);
+KERNEL_API void thread_set_affinity(int id, thread_cpu_mask_t const& affinity);
+KERNEL_API thread_cpu_mask_t const* thread_get_affinity(int id);
 
-size_t thread_get_cpu_count();
+KERNEL_API size_t thread_get_cpu_count();
 
 #if defined(__DGOS_KERNEL__) && !defined(__DGOS_MODULE__)
 __attribute__((__visibility__("protected")))
@@ -209,36 +210,37 @@ __attribute__((__visibility__("protected")))
 KERNEL_API uint32_t thread_cpu_number();
 
 // 100,000,000 == 100% usage
-unsigned thread_cpu_usage_x1M(size_t cpu);
+KERNEL_API unsigned thread_cpu_usage_x1M(size_t cpu);
 
-thread_t thread_get_id(void);
+KERNEL_API thread_t thread_get_id(void);
 
 // Suspend the thread, then release the lock,
 // DOES NOT reacquire lock before returning
-uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
-                               uint64_t timeout_time);
+KERNEL_API uintptr_t thread_sleep_release(
+        spinlock_t *lock, thread_t *thread_id, uint64_t timeout_time);
 
 // Request a reschedule on this cpu
 void thread_request_reschedule_noirq();
 void thread_request_reschedule();
 
 // Perform a reschedule if one was requested
-isr_context_t *thread_schedule_if_requested(isr_context_t *ctx);
-isr_context_t *thread_schedule_if_requested_noirq(isr_context_t *ctx);
+KERNEL_API isr_context_t *thread_schedule_if_requested(isr_context_t *ctx);
+KERNEL_API isr_context_t *thread_schedule_if_requested_noirq(
+        isr_context_t *ctx);
 
-void thread_resume(thread_t thread, intptr_t exit_code);
+KERNEL_API void thread_resume(thread_t thread, intptr_t exit_code);
 
-thread_priority_t thread_get_priority(thread_t thread_id);
-void thread_set_priority(thread_t thread_id, thread_priority_t priority);
+KERNEL_API thread_priority_t thread_get_priority(thread_t thread_id);
+KERNEL_API void thread_set_priority(thread_t thread_id, thread_priority_t priority);
 
-intptr_t thread_wait(thread_t thread_id);
+KERNEL_API intptr_t thread_wait(thread_t thread_id);
 
 void thread_idle_set_ready(void);
 
 void *thread_get_exception_top(void);
 void *thread_set_exception_top(void *chain);
 
-process_t *thread_current_process();
+KERNEL_API process_t *thread_current_process();
 
 // Get the TLB shootdown counter for the specified CPU
 uint64_t thread_shootdown_count(int cpu_nr);
@@ -251,10 +253,10 @@ void thread_cls_init_early(int ap);
 _noreturn
 void thread_idle();
 
-int thread_close(thread_t tid);
+KERNEL_API int thread_close(thread_t tid);
 
 _use_result
-unsigned thread_current_cpu(thread_t tid);
+KERNEL_API unsigned thread_current_cpu(thread_t tid);
 
 _use_result
 thread_t thread_proc_0(void (*fn)());

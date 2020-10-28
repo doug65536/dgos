@@ -2546,7 +2546,7 @@ void gdb_cpu_ctrl_t::gdb_thread()
     gdb_cpu = cpus.size();
 
     // Set GDB stub to time critical priority
-    thread_set_priority(stub_tid, 32767);
+    thread_set_priority(stub_tid, 0xF0);
 
     ext::unique_ptr<gdbstub_t> stub(new (ext::nothrow) gdbstub_t);
 

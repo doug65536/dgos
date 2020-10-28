@@ -87,33 +87,33 @@ static heap_t *heap_get_block_heap(void *block)
     return default_heaps[id];
 }
 
-EXPORT void *calloc(size_t num, size_t size)
+void *calloc(size_t num, size_t size)
 {
     return heap_calloc(this_cpu_heap(), num, size);
 }
 
-EXPORT void *malloc(size_t size)
+void *malloc(size_t size)
 {
     return heap_alloc(this_cpu_heap(), size);
 }
 
-EXPORT void *realloc(void *p, size_t new_size)
+void *realloc(void *p, size_t new_size)
 {
     return heap_realloc(heap_get_block_heap(p), p, new_size);
 }
 
-EXPORT void free(void *p)
+void free(void *p)
 {
     heap_free(heap_get_block_heap(p), p);
 }
 
-EXPORT bool malloc_validate(bool dump)
+bool malloc_validate(bool dump)
 {
     return heap_validate(this_cpu_heap(), dump);
 }
 #else
 
-EXPORT bool malloc_validate(bool dump)
+bool malloc_validate(bool dump)
 {
     return true;//not supported
 }
@@ -137,29 +137,29 @@ void malloc_startup(void *p)
     callout_call(callout_type_t::heap_ready);
 }
 
-EXPORT void *calloc(size_t num, size_t size)
+void *calloc(size_t num, size_t size)
 {
     return pageheap_calloc(default_heaps[0], num, size);
 }
 
-EXPORT void *malloc(size_t size)
+void *malloc(size_t size)
 {
     return pageheap_alloc(default_heaps[0], size);
 }
 
-EXPORT void *realloc(void *p, size_t new_size)
+void *realloc(void *p, size_t new_size)
 {
     return pageheap_realloc(default_heaps[0], p, new_size);
 }
 
-EXPORT void free(void *p)
+void free(void *p)
 {
     pageheap_free(default_heaps[0], p);
 }
 
 #endif
 
-EXPORT char *strdup(char const *s)
+char *strdup(char const *s)
 {
     size_t len = strlen(s);
     char *b = (char*)malloc(len+1);
@@ -167,12 +167,12 @@ EXPORT char *strdup(char const *s)
 }
 
 // banned throwing new, linker error please
-//EXPORT void *operator new(size_t size)
+//void *operator new(size_t size)
 //{
 //    return malloc(size);
 //}
 
-EXPORT void *operator new(size_t size, ext::nothrow_t const&) noexcept
+void *operator new(size_t size, ext::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
@@ -183,32 +183,32 @@ EXPORT void *operator new(size_t size, ext::nothrow_t const&) noexcept
 //    return malloc(size);
 //}
 
-EXPORT void *operator new[](size_t size, ext::nothrow_t const&) noexcept
+void *operator new[](size_t size, ext::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
 
-EXPORT void operator delete(void *block, size_t) noexcept
+void operator delete(void *block, size_t) noexcept
 {
     free(block);
 }
 
-EXPORT void operator delete(void *block) noexcept
+void operator delete(void *block) noexcept
 {
     free(block);
 }
 
-EXPORT void operator delete[](void *block) noexcept
+void operator delete[](void *block) noexcept
 {
     free(block);
 }
 
-EXPORT void operator delete[](void *block, size_t) noexcept
+void operator delete[](void *block, size_t) noexcept
 {
     free(block);
 }
 
-EXPORT void *operator new(size_t, void *p) noexcept
+void *operator new(size_t, void *p) noexcept
 {
     return p;
 }
@@ -253,27 +253,27 @@ static T strto(char const *str, char **end, int base)
     return !sign ? n : n * sign;
 }
 
-EXPORT int strtoi(char const *str, char **end, int base)
+int strtoi(char const *str, char **end, int base)
 {
     return strto<int>(str, end, base);
 }
 
-EXPORT long strtol(char const *str, char **end, int base)
+long strtol(char const *str, char **end, int base)
 {
     return strto<long>(str, end, base);
 }
 
-EXPORT unsigned long strtoul(char const *str, char **end, int base)
+unsigned long strtoul(char const *str, char **end, int base)
 {
     return strto<unsigned long>(str, end, base);
 }
 
-EXPORT long long strtoll(char const *str, char **end, int base)
+long long strtoll(char const *str, char **end, int base)
 {
     return strto<long long>(str, end, base);
 }
 
-EXPORT unsigned long long strtoull(char const *str, char **end, int base)
+unsigned long long strtoull(char const *str, char **end, int base)
 {
     return strto<unsigned long long>(str, end, base);
 }

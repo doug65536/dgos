@@ -667,6 +667,7 @@ void free_phys(phys_alloc_t freed, size_t hint)
         // Insert the second half of the split block and advance current index
         physmap_insert_at(++st, after);
     } else {
+        // It shouldn't be this hard, something is wrong
         PRINT("Uh oh, what is happening");
         assert(false);
     }

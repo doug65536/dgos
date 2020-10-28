@@ -30,22 +30,19 @@ jobs:
         # A list of files, directories, and wildcard patterns to cache and restore
         path: ./cibuild/toolchain_install
         # An explicit key for restoring and saving the cache
-        key: toolchain
+        key: toolchain-${{ hashFiles('toolchain/**', 'bootstrap') }}-${{ runner.os }}
         # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
         #restore-keys: # optional
 
     - name: dependencies
       run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86 cpu-checker
 
-    - name: toolchain
-      run: mkdir -p cibuild && cd cibuild && ../toolchain/build-crossgcc.sh -q -o toolchain_build -p toolchain_install
-      if: steps.cache.outputs.cache-hit != 'true'
-
-    - name: bootstrap
-      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && ../bootstrap
+    - name: toolchain and/or bootstrap
+      run: mkdir -p cibuild && cd cibuild && ../bootstrap
+      #if: steps.cache.outputs.cache-hit != 'true'
 
     - name: disks
-      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc)
+      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && (. ./set_toolchain_path ; make disks -j$(nproc))
 
     - uses: actions/upload-artifact@v2
       with:

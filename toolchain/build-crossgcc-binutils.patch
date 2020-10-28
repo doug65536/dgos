@@ -1,0 +1,122 @@
+diff -Nur orig-src/binutils-2.35/bfd/config.bfd src/binutils-2.35/bfd/config.bfd
+--- orig-binutils-2.35/bfd/config.bfd	2020-09-24 23:03:43.639549750 -0400
++++ binutils-2.35/bfd/config.bfd	2020-09-24 23:10:32.065595320 -0400
+@@ -637,7 +637,17 @@
+     targ_selvecs=
+     targ64_selvecs=x86_64_elf64_vec
+     ;;
++  i[3-7]86-*-dgos*)
++    targ_defvec=i386_elf32_vec
++    targ_selvecs=
++    targ64_selvecs=x86_64_elf64_vec
++    ;;
+ #ifdef BFD64
++  x86_64-*-dgos*)
++    targ_defvec=x86_64_elf64_vec
++    targ_selvecs=i386_elf32_vec
++    want64=true
++    ;;
+   x86_64-*-cloudabi*)
+     targ_defvec=x86_64_elf64_cloudabi_vec
+     want64=true
+diff -Nur orig-src/binutils-2.35/config.sub src/binutils-2.35/config.sub
+--- orig-binutils-2.35/config.sub	2020-09-24 23:03:43.303552036 -0400
++++ binutils-2.35/config.sub	2020-09-24 23:49:22.027243042 -0400
+@@ -1364,7 +1364,7 @@
+ 	     | morphos* | superux* | rtmk* | windiss* \
+ 	     | powermax* | dnix* | nx6 | nx7 | sei* | dragonfly* \
+ 	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
+-	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
++	     | onefs* | tirtos* | phoenix* | fuchsia* | dgos* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+diff -Nur orig-src/binutils-2.35/gas/configure.tgt src/binutils-2.35/gas/configure.tgt
+--- orig-binutils-2.35/gas/configure.tgt	2020-09-24 23:03:43.459550975 -0400
++++ binutils-2.35/gas/configure.tgt	2020-09-24 23:13:15.201135771 -0400
+@@ -219,6 +219,7 @@
+   i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
+   i386-*-elf*)				fmt=elf ;;
+   i386-*-fuchsia*)			fmt=elf ;;
++  i386-*-dgos*)			fmt=elf ;;
+   i386-*-bsd*)				fmt=aout em=386bsd ;;
+   i386-*-netbsdpe*)			fmt=coff em=pe ;;
+   i386-*-netbsd*-gnu* | \
+diff -Nur orig-src/binutils-2.35/ld/configure.tgt src/binutils-2.35/ld/configure.tgt
+--- orig-binutils-2.35/ld/configure.tgt	2020-09-24 23:03:43.355551682 -0400
++++ binutils-2.35/ld/configure.tgt	2020-09-24 23:20:26.472380429 -0400
+@@ -310,6 +310,10 @@
+ i[3-7]86-*-rdos*)	targ_emul=elf_i386
+ 			targ_extra_emuls=elf_iamcu
+ 			;;
++x86_64-*-dgos*)
++			targ_emul=elf_x86_64_dgos
++			targ_extra_emuls="elf_i386_dgos elf_x86_64 elf_i386 i386pe i386pep"
++			;;
+ i[3-7]86-*-bsd)		targ_emul=i386bsd
+ 			targ_extra_ofiles=
+ 			;;
+@@ -354,7 +358,7 @@
+ i[3-7]86-*-elfiamcu)   targ_emul=elf_iamcu
+ 			targ_extra_emuls=elf_i386
+ 			;;
+-i[3-7]86-*-elf* | i[3-7]86-*-rtems*)
++i[3-7]86-*-elf* | i[3-7]86-*-rtems* | i[3-7]86-*-dgos*)
+ 			targ_emul=elf_i386
+ 			targ_extra_emuls=elf_iamcu
+ 			;;
+@@ -954,7 +958,7 @@
+ 					sed -e 's/netbsd/netbsdelf/'`;;
+ 			esac
+ 			;;
+-x86_64-*-elf* | x86_64-*-rtems* | x86_64-*-fuchsia*)
++x86_64-*-elf* | x86_64-*-rtems* | x86_64-*-fuchsia* | x86_64-*-dgos*)
+ 			targ_emul=elf_x86_64
+ 			targ_extra_emuls="elf_i386 elf_iamcu elf32_x86_64 elf_l1om elf_k1om"
+ 			targ_extra_libpath="elf_i386 elf_iamcu elf32_x86_64 elf_l1om elf_k1om"
+diff -Nur orig-src/binutils-2.35/ld/emulparams/elf_i386_dgos.sh src/binutils-2.35/ld/emulparams/elf_i386_dgos.sh
+--- orig-binutils-2.35/ld/emulparams/elf_i386_dgos.sh	1969-12-31 19:00:00.000000000 -0500
++++ binutils-2.35/ld/emulparams/elf_i386_dgos.sh	2020-09-24 23:22:50.328220182 -0400
+@@ -0,0 +1,4 @@
++. ${srcdir}/emulparams/elf_i386.sh
++GENERATE_SHLIB_SCRIPT=yes
++GENERATE_PIE_SCRIPT=yes
++
+diff -Nur orig-src/binutils-2.35/ld/emulparams/elf_x86_64_dgos.sh src/binutils-2.35/ld/emulparams/elf_x86_64_dgos.sh
+--- orig-binutils-2.35/ld/emulparams/elf_x86_64_dgos.sh	1969-12-31 19:00:00.000000000 -0500
++++ binutils-2.35/ld/emulparams/elf_x86_64_dgos.sh	2020-09-24 23:23:18.212192610 -0400
+@@ -0,0 +1,2 @@
++. ${srcdir}/emulparams/elf_x86_64.sh
++
+diff -Nur orig-src/binutils-2.35/ld/Makefile.am src/binutils-2.35/ld/Makefile.am
+--- orig-binutils-2.35/ld/Makefile.am	2020-09-24 23:03:43.355551682 -0400
++++ binutils-2.35/ld/Makefile.am	2020-09-24 23:38:55.266450150 -0400
+@@ -286,6 +286,7 @@
+ 	eelf_i386_ldso.c \
+ 	eelf_i386_sol2.c \
+ 	eelf_i386_vxworks.c \
++	eelf_i386_dgos.c \
+ 	eelf_iamcu.c \
+ 	eelf_s390.c \
+ 	eh8300elf.c \
+@@ -451,7 +452,8 @@
+ 	eelf_x86_64.c \
+ 	eelf_x86_64_cloudabi.c \
+ 	eelf_x86_64_fbsd.c \
+ 	eelf_x86_64_sol2.c \
++	eelf_x86_64_dgos.c \
+ 	ehppa64linux.c \
+ 	ei386pep.c \
+ 	emmo.c
+diff -Nur orig-src/binutils-2.35/configure.ac src/binutils-2.35/configure.ac
+--- orig-binutils-2.35/configure.ac	2020-07-24 10:38:01.000000000 +0100
++++ binutils-2.35/configure.ac	2020-09-24 04:59:17.967182028 +0100
+@@ -336,7 +336,7 @@
+       *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
+       | *-*-linux* | *-*-gnu* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
+       | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-dragonfly* \
+-      | *-*-solaris2* | *-*-nto* | *-*-nacl*)
++      | *-*-solaris2* | *-*-nto* | *-*-nacl* | *-*-dgos*)
+         case "${target}" in
+           *-*-linux*aout* | *-*-linux*oldld*)
+             ;;

@@ -76,16 +76,16 @@ void irq_set_unhandled_irq_handler(
         irq_unhandled_irq_handler_t handler);
 
 // Change irq mask
-void irq_setmask(int irq, bool unmask);
+KERNEL_API void irq_setmask(int irq, bool unmask);
 
 // Change irq mask IF the IRQ is level triggered
-bool irq_islevel(int irq);
+KERNEL_API bool irq_islevel(int irq);
 
 // Set the appropriate interrupt vector for the specified irq
-void irq_hook(int irq, intr_handler_t handler, char const *name);
+KERNEL_API void irq_hook(int irq, intr_handler_t handler, char const *name);
 
 // Reset the appropriate interrupt vector for the specified irq
-void irq_unhook(int irq, intr_handler_t handler);
+KERNEL_API void irq_unhook(int irq, intr_handler_t handler);
 
 //
 // Interrupt vector manipulation and dispatch

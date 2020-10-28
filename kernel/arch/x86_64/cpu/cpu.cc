@@ -1275,14 +1275,19 @@ bool cpu_msr_set_safe(uint32_t msr, uint64_t value)
     return nofault_wrmsr(msr, value) == 0;
 }
 
-extern "C" uint128_t nofault_rdmsr(uint32_t msr);
+struct value_status_pair_t {
+    uint64_t value;
+    int64_t status;
+};
+
+extern "C" value_status_pair_t nofault_rdmsr(uint32_t msr);
 
 bool cpu_msr_get_safe(uint32_t msr, uint64_t &value)
 {
     auto result = nofault_rdmsr(msr);
 
-    value = uint64_t(result);
-    return (result >> 64) == 0;
+    value = result.value;
+    return result.status == 0;
 }
 
 // Runs once on each CPU at early boot

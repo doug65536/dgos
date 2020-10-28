@@ -14,7 +14,7 @@ typedef uintptr_t linaddr_t;
 
 HIDDEN extern physaddr_t root_physaddr;
 
-HIDDEN extern void mmu_init();
+//HIDDEN extern void mmu_init(int ap);
 uintptr_t mm_create_process(void);
 void mm_destroy_process(void);
 

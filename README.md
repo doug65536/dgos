@@ -141,7 +141,7 @@ You need the following packages:
 Starting from the storage location (which contains dgos, build, toolchain)
 
     cd toolchain
-    ../dgos/toolchain/build-crossgcc.sh -o toolchain_build -p toolchain_install
+    ../dgos/toolchain/build-crossgcc.bash -o toolchain_build -p toolchain_install
 
     export PATH="$PWD/toolchain_install/bin:$PATH"
     cd ..

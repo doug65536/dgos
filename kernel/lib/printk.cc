@@ -11,7 +11,7 @@
 #include "inttypes.h"
 #include "debug.h"
 
-EXPORT debug_out_t dbgout;
+debug_out_t dbgout;
 
 typedef enum length_mod_t {
     length_none,
@@ -828,7 +828,7 @@ intptr_t formatter(
     return chars_written;
 }
 
-EXPORT int cprintf(char const * restrict format, ...)
+int cprintf(char const * restrict format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -864,7 +864,7 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
 
 static ext::noirq_lock<ext::spinlock> cprintf_lock;
 
-EXPORT int vcprintf(char const * restrict format, va_list ap)
+int vcprintf(char const * restrict format, va_list ap)
 {
     ext::unique_lock<ext::noirq_lock<ext::spinlock>>
             hold_cprintf_lock(cprintf_lock);
@@ -883,7 +883,7 @@ EXPORT int vcprintf(char const * restrict format, va_list ap)
     return chars_written;
 }
 
-EXPORT void printk(char const *format, ...)
+void printk(char const *format, ...)
 {
     va_list ap;
 //    va_start(ap, format);
@@ -894,13 +894,13 @@ EXPORT void printk(char const *format, ...)
     va_end(ap);
 }
 
-EXPORT void vprintk(char const * restrict format, va_list ap)
+void vprintk(char const * restrict format, va_list ap)
 {
     vcprintf(format, ap);
 }
 
 _noreturn
-EXPORT void panic(char const *format, ...)
+void panic(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -909,13 +909,13 @@ EXPORT void panic(char const *format, ...)
 }
 
 _noreturn
-EXPORT void panic_oom()
+void panic_oom()
 {
     panic("Out of memory");
 }
 
 _noreturn
-EXPORT void vpanic(char const * restrict format, va_list ap)
+void vpanic(char const * restrict format, va_list ap)
 {
     printk("KERNEL PANIC! ");
     vprintk(format, ap);
@@ -986,7 +986,7 @@ int vsnprintf(char * restrict buf, size_t limit,
     return chars_needed;
 }
 
-EXPORT int snprintf(char * restrict buf, size_t limit,
+int snprintf(char * restrict buf, size_t limit,
                     char const * restrict format, ...)
 {
     va_list ap;
@@ -996,7 +996,7 @@ EXPORT int snprintf(char * restrict buf, size_t limit,
     return result;
 }
 
-EXPORT int putsdbg(char const *s)
+int putsdbg(char const *s)
 {
     size_t len = strlen(s);
     write_debug_str(s, len);
@@ -1004,7 +1004,7 @@ EXPORT int putsdbg(char const *s)
     return len + 1;
 }
 
-EXPORT int writedbg(char const * restrict s, size_t len)
+int writedbg(char const * restrict s, size_t len)
 {
     return write_debug_str(s, intptr_t(len));
 }
@@ -1027,12 +1027,12 @@ static int printdbg_emit_chars(char const * restrict s,
     return write_debug_str(s, ch);
 }
 
-EXPORT int vprintdbg(char const * restrict format, va_list ap)
+int vprintdbg(char const * restrict format, va_list ap)
 {
     return formatter(format, ap, printdbg_emit_chars, nullptr);
 }
 
-EXPORT int printdbg(char const * restrict format, ...)
+int printdbg(char const * restrict format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -1093,12 +1093,12 @@ static int hex_dump_formatter(void const volatile *mem,
     return written;
 }
 
-EXPORT int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
+int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
 {
     return hex_dump_formatter(mem, size, base, printdbg);
 }
 
-EXPORT size_t format_flags_register(
+size_t format_flags_register(
         char *buf, size_t buf_size,
         uintptr_t flags, format_flag_info_t const *info)
 {
@@ -1157,7 +1157,7 @@ EXPORT size_t format_flags_register(
     return total_written;
 }
 
-EXPORT debug_out_t &debug_out_t::operator<<(debug_out_modifier_t modifier)
+debug_out_t &debug_out_t::operator<<(debug_out_modifier_t modifier)
 {
     switch (modifier) {
     case dec:
@@ -1180,7 +1180,7 @@ EXPORT debug_out_t &debug_out_t::operator<<(debug_out_modifier_t modifier)
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::write_unsigned(uint64_t value, size_t sz)
+debug_out_t &debug_out_t::write_unsigned(uint64_t value, size_t sz)
 {
     printdbg(use_hex ? "%#" PRIx64
             : use_plus ? "+%" PRIu64
@@ -1188,7 +1188,7 @@ EXPORT debug_out_t &debug_out_t::write_unsigned(uint64_t value, size_t sz)
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::write_signed(int64_t value, size_t sz)
+debug_out_t &debug_out_t::write_signed(int64_t value, size_t sz)
 {
     printdbg(use_hex ? "%#" PRIx64
             : use_plus ? "%+" PRId64
@@ -1196,25 +1196,25 @@ EXPORT debug_out_t &debug_out_t::write_signed(int64_t value, size_t sz)
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::write_str(char const *rhs)
+debug_out_t &debug_out_t::write_str(char const *rhs)
 {
     printdbg("%s", rhs);
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::write_ptr(void const *rhs)
+debug_out_t &debug_out_t::write_ptr(void const *rhs)
 {
     printdbg("%#zx", uintptr_t(rhs));
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::write_char(char rhs)
+debug_out_t &debug_out_t::write_char(char rhs)
 {
     printdbg("%c", rhs);
     return *this;
 }
 
-EXPORT debug_out_t &debug_out_t::write_bool(bool value)
+debug_out_t &debug_out_t::write_bool(bool value)
 {
     return write_str(value ? "true" : "false");
 }

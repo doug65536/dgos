@@ -1,23 +1,64 @@
+diff -durN -x Makefile.in -x autom4te.cache -x configure -x crossconfig.m4 orig-src/gdb-9.1/bfd/config.bfd src/gdb-9.1/bfd/config.bfd
+--- orig-gdb-9.1/bfd/config.bfd     2020-09-24 23:03:45.063540073 -0400
++++ gdb-9.1/bfd/config.bfd  2020-10-07 03:06:57.834058517 -0400
+@@ -648,7 +648,17 @@
+     targ_selvecs=
+     targ64_selvecs=x86_64_elf64_vec
+     ;;
++  i[3-7]86-*-dgos*)
++    targ_defvec=i386_elf32_vec
++    targ_selvecs=
++    targ64_selvecs=x86_64_elf64_vec
++    ;;
+ #ifdef BFD64
++  x86_64-*-dgos*)
++    targ_defvec=x86_64_elf64_vec
++    targ_selvecs=i386_elf32_vec
++    want64=true
++    ;;
+   x86_64-*-cloudabi*)
+     targ_defvec=x86_64_elf64_cloudabi_vec
+     want64=true
 diff -durN gdb-8.1/gdb/remote-original.c gdb-8.1/gdb/remote.c
 --- gdb-8.1/gdb/remote-original.c	2018-06-17 03:03:53.086269371 -0400
 +++ gdb-8.1/gdb/remote.c	2018-06-17 03:15:01.954346521 -0400
-@@ -7569,7 +7569,7 @@
+@@ -7980,7 +7980,7 @@
    buf_len = strlen (rs->buf);
-
+ 
    /* Further sanity checks, with knowledge of the architecture.  */
 -  if (buf_len > 2 * rsa->sizeof_g_packet)
 +  if (0 && (buf_len > 2 * rsa->sizeof_g_packet))
      error (_("Remote 'g' packet reply is too long (expected %ld bytes, got %d "
  	     "bytes): %s"), rsa->sizeof_g_packet, buf_len / 2, rs->buf);
-
+ 
 --- gdb-9.1-orig/gdb/i386-tdep.c	2020-05-30 23:35:32.204688927 -0400
 +++ gdb-9.1/gdb/i386-tdep.c	2020-05-30 23:38:10.416447646 -0400
 @@ -8514,7 +8514,7 @@
    set_gdbarch_get_longjmp_target (gdbarch, i386_get_longjmp_target);
-
+ 
    /* Call dummy code.  */
 -  set_gdbarch_call_dummy_location (gdbarch, ON_STACK);
 +  set_gdbarch_call_dummy_location (gdbarch, AT_ENTRY_POINT);
    set_gdbarch_push_dummy_code (gdbarch, i386_push_dummy_code);
    set_gdbarch_push_dummy_call (gdbarch, i386_push_dummy_call);
    set_gdbarch_frame_align (gdbarch, i386_frame_align);
+--- orig-gdb-9.1/config.sub 2020-09-24 23:03:45.059540100 -0400
++++ gdb-9.1/config.sub      2020-10-07 01:18:00.736370961 -0400
+@@ -1346,7 +1346,7 @@
+ 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
+ 	     | sym* | kopensolaris* | plan9* \
+ 	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
+-	     | aos* | aros* | cloudabi* | sortix* \
++	     | aos* | aros* | cloudabi* | sortix* | dgos* \
+ 	     | nindy* | vxsim* | vxworks* | ebmon* | hms* | mvs* \
+ 	     | clix* | riscos* | uniplus* | iris* | isc* | rtu* | xenix* \
+ 	     | knetbsd* | mirbsd* | netbsd* \
+@@ -1367,7 +1367,7 @@
+ 	     | morphos* | superux* | rtmk* | windiss* \
+ 	     | powermax* | dnix* | nx6 | nx7 | sei* | dragonfly* \
+ 	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
+-	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
++	     | onefs* | tirtos* | phoenix* | fuchsia* | dgos* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;

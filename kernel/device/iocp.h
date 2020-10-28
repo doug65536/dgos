@@ -41,7 +41,7 @@ private:
 
     callback_t callback;
     uintptr_t arg;
-    unsigned volatile done_count;
+    unsigned done_count;
     unsigned expect_count;
     int result_count;
     lock_type lock;

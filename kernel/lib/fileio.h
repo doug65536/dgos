@@ -13,40 +13,116 @@
 #define SEEK_DATA   3
 #define SEEK_HOLE   4
 
+// fcntl.h constants
+
+// Duplicate file descriptor.
+#define F_DUPFD     1
+
+// Duplicate file descriptor with the close-on- exec flag FD_CLOEXEC set.
+#define F_DUPFD_CLOEXEC 2
+
+// Get file descriptor flags.
+#define F_GETFD 3
+
+// Set file descriptor flags.
+#define F_SETFD 4
+
+// Get file status flags and file access modes.
+#define F_GETFL 5
+
+// Set file status flags.
+#define F_SETFL 6
+
+// Get record locking information.
+#define F_GETLK 7
+
+// Set record locking information.
+#define F_SETLK 8
+
+// Set record locking information; wait if blocked.
+#define F_SETLKW 9
+
+// Get process or process group ID to receive SIGURG signals.
+#define F_GETOWN 10
+
+// Set process or process group ID to receive SIGURG signals.
+#define F_SETOWN 11
+
+//
+// sys_flock 'what'
+
+#define LOCK_EX 0
+#define LOCK_SH 1
+#define LOCK_UN 2
+#define LOCK_NB 4
+
+//
+// flock::l_type
+
+// Unlock.
+#define F_UNLCK 1
+
+// Shared or read lock.
+#define F_RDLCK 2
+
+// Exclusive or write lock.
+#define F_WRLCK 3
+
+struct flock {
+    // Type of lock; F_RDLCK, F_WRLCK, F_UNLCK. 
+    short l_type;
+    
+    // Flag for starting offset. 
+    short l_whence;
+    
+    // 4 bytes of asinine padding here because 
+    // original author apparently "knew" off_t was 32 bits
+    
+    // Relative offset in bytes. 
+    off_t l_start;
+    
+    // Size; if 0 then until EOF. 
+    off_t l_len;
+
+    pid_t l_pid;
+};
+
 struct path_t;
 
 bool file_ref_filetab(int id);
 
-int file_creatat(int dirid, char const *path, mode_t mode);
-int file_openat(int dirid, char const* path, int flags, mode_t mode = 0);
-int file_close(int id);
-ssize_t file_read(int id, void *buf, size_t bytes);
-ssize_t file_write(int id, void const *buf, size_t bytes);
-ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs);
-ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs);
-off_t file_seek(int id, off_t ofs, int whence);
-int file_ftruncate(int id, off_t size);
-int file_fsync(int id);
-int file_fdatasync(int id);
-int file_syncfs(int id);
-int file_ioctl(int id, int cmd, void* arg, unsigned flags, void *data);
+KERNEL_API int file_creatat(int dirid, char const *path, mode_t mode);
+KERNEL_API int file_openat(int dirid, char const* path, 
+                           int flags, mode_t mode = 0);
+KERNEL_API int file_close(int id);
+KERNEL_API ssize_t file_read(int id, void *buf, size_t bytes);
+KERNEL_API ssize_t file_write(int id, void const *buf, size_t bytes);
+KERNEL_API ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs);
+KERNEL_API ssize_t file_pwrite(int id, void const *buf, 
+                               size_t bytes, off_t ofs);
+KERNEL_API off_t file_seek(int id, off_t ofs, int whence);
+KERNEL_API int file_ftruncate(int id, off_t size);
+KERNEL_API int file_fsync(int id);
+KERNEL_API int file_fdatasync(int id);
+KERNEL_API int file_syncfs(int id);
+KERNEL_API int file_ioctl(int id, int cmd, void* arg, unsigned flags, void *data);
+KERNEL_API int file_lock_op(int id, flock &info, bool wait);
+KERNEL_API int file_opendirat(int dirid, char const *path);
+KERNEL_API ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result);
+KERNEL_API off_t file_telldir(int id);
+KERNEL_API off_t file_seekdir(int id, off_t ofs);
+KERNEL_API int file_closedir(int id);
 
-int file_opendirat(int dirid, char const *path);
-ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result);
-off_t file_telldir(int id);
-off_t file_seekdir(int id, off_t ofs);
-int file_closedir(int id);
-
-int file_mkdirat(int dirid, char const *path, mode_t mode);
-int file_rmdirat(int dirid, char const *path);
-int file_renameat(int olddirid, char const *old_path,
+KERNEL_API int file_mkdirat(int dirid, char const *path, mode_t mode);
+KERNEL_API int file_rmdirat(int dirid, char const *path);
+KERNEL_API int file_renameat(int olddirid, char const *old_path,
                   int newdirid, char const *new_path);
-int file_unlinkat(int dirid, char const *path);
+KERNEL_API int file_unlinkat(int dirid, char const *path);
 
-int file_fchmod(int id, mode_t mode);
-int file_chown(int id, int uid, int gid);
+KERNEL_API int file_fchmod(int id, mode_t mode);
+KERNEL_API int file_chown(int id, int uid, int gid);
 
-int file_fstatfs(int id, fs_statvfs_t *buf);
+KERNEL_API int file_fstatfs(int id, fs_statvfs_t *buf);
 
 #define AT_FDCWD -100
 

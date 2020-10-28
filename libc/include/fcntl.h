@@ -72,27 +72,28 @@ __BEGIN_DECLS
 // The values shall be bitwise-distinct and shall be suitable for use in
 // #if preprocessing directives.
 
-#define O_RDONLY    (1<<0)
-#define O_WRONLY    (1<<1)
+#define O_RDONLY    0x1
+#define O_WRONLY    0x2
 #define O_RDWR      (O_RDONLY|O_WRONLY)
-#define O_APPEND    (1<<2)
-#define O_ASYNC     (1<<3)
-#define O_CLOEXEC   (1<<4)
-#define O_CREAT     (1<<5)
-#define O_DIRECT    (1<<6)
-#define O_DIRECTORY (1<<7)
-#define O_DSYNC     (1<<8)
-#define O_EXCL      (1<<9)
-#define O_LARGEFILE (1<<10)
-#define O_NOATIME   (1<<11)
-#define O_NOCTTY    (1<<12)
-#define O_NOFOLLOW  (1<<13)
-#define O_NBLOCK    (1<<14)
+#define O_APPEND    0x4
+#define O_ASYNC     0x8
+#define O_CLOEXEC   0x10
+#define O_CREAT     0x20
+#define O_DIRECT    0x40
+#define O_DIRECTORY 0x80
+#define O_DSYNC     0x100
+#define O_EXCL      0x200
+#define O_LARGEFILE 0x400
+#define O_NOATIME   0x800
+#define O_NOCTTY    0x1000
+#define O_NOFOLLOW  0x2000
+#define O_NBLOCK    0x4000
+#define O_PATH      0x8000
+#define O_SYNC      0x10000
+#define O_TMPFILE   0x20000
+#define O_TRUNC     0x40000
+#define O_EXEC      0x80000
 #define O_NDELAY    O_NBLOCK
-#define O_PATH      (1<<15)
-#define O_SYNC      (1<<16)
-#define O_TMPFILE   (1<<17)
-#define O_TRUNC     (1<<18)
 
 // The FD_CLOEXEC flag associated with the new descriptor shall be set to
 // close the file descriptor upon execution of an exec family function.
@@ -104,7 +105,7 @@ __BEGIN_DECLS
 // Fail if file is a non-directory file.
 #define O_DIRECTORY (1<<7)
 
-// Exclusive use flag.
+// Fail if exists
 #define O_EXCL (1<<9)
 
 // Do not assign controlling terminal.
@@ -155,13 +156,13 @@ __BEGIN_DECLS
 
 // Open for execute only (non-directory files). The result is unspecified if
 // this flag is applied to a directory.
-#define O_EXEC
+//#define O_EXEC
 
 // Open for reading only.
-//#define O_RDONLY
+//#define O_RDONLY 1
 
 // Open for reading and writing.
-#define O_RDWR
+//#define O_RDWR 2
 
 // Open directory for search only. The result is unspecified if this flag is
 // applied to a non-directory file.

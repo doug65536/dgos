@@ -126,25 +126,25 @@ int thread_run_data_t::invoke() const
 
 
 
-EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator+=(size_t bit)
+thread_cpu_mask_t &thread_cpu_mask_t::operator+=(size_t bit)
 {
     bitmap[(bit >> 6)] |= (UINT64_C(1) << (bit & 63));
     return *this;
 }
 
-EXPORT thread_cpu_mask_t &thread_cpu_mask_t::atom_set(size_t bit)
+thread_cpu_mask_t &thread_cpu_mask_t::atom_set(size_t bit)
 {
     atomic_or(&bitmap[(bit >> 6)], (UINT64_C(1) << (bit & 63)));
     return *this;
 }
 
-EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator-=(size_t bit)
+thread_cpu_mask_t &thread_cpu_mask_t::operator-=(size_t bit)
 {
     bitmap[(bit >> 6)] &= ~(UINT64_C(1) << (bit & 63));
     return *this;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator-(
+thread_cpu_mask_t thread_cpu_mask_t::operator-(
         thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result{*this};
@@ -153,7 +153,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator-(
     return result;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator+(
+thread_cpu_mask_t thread_cpu_mask_t::operator+(
         thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result{*this};
@@ -162,12 +162,12 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator+(
     return result;
 }
 
-EXPORT void thread_cpu_mask_t::atom_clr(size_t bit) volatile
+void thread_cpu_mask_t::atom_clr(size_t bit) volatile
 {
     atomic_and(&bitmap[(bit >> 6)], ~(UINT64_C(1) << (bit & 63)));
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator&(
+thread_cpu_mask_t thread_cpu_mask_t::operator&(
         thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result;
@@ -176,7 +176,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator&(
     return result;
 }
 
-EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator&=(
+thread_cpu_mask_t &thread_cpu_mask_t::operator&=(
         thread_cpu_mask_t const& rhs)
 {
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -184,7 +184,7 @@ EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator&=(
     return *this;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::atom_and(
+thread_cpu_mask_t thread_cpu_mask_t::atom_and(
         thread_cpu_mask_t const& rhs) volatile
 {
     thread_cpu_mask_t result;
@@ -193,7 +193,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::atom_and(
     return result;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator|(
+thread_cpu_mask_t thread_cpu_mask_t::operator|(
         thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result;
@@ -202,7 +202,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator|(
     return result;
 }
 
-EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator|=(
+thread_cpu_mask_t &thread_cpu_mask_t::operator|=(
         thread_cpu_mask_t const& rhs)
 {
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -210,7 +210,7 @@ EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator|=(
     return *this;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::atom_or(
+thread_cpu_mask_t thread_cpu_mask_t::atom_or(
         thread_cpu_mask_t const& rhs) volatile
 {
     thread_cpu_mask_t result;
@@ -219,7 +219,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::atom_or(
     return result;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator^(
+thread_cpu_mask_t thread_cpu_mask_t::operator^(
         thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result;
@@ -228,7 +228,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator^(
     return result;
 }
 
-EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator^=(
+thread_cpu_mask_t &thread_cpu_mask_t::operator^=(
         thread_cpu_mask_t const& rhs)
 {
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -236,7 +236,7 @@ EXPORT thread_cpu_mask_t &thread_cpu_mask_t::operator^=(
     return *this;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::atom_xor(
+thread_cpu_mask_t thread_cpu_mask_t::atom_xor(
         thread_cpu_mask_t const& rhs) volatile
 {
     thread_cpu_mask_t result;
@@ -245,7 +245,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::atom_xor(
     return result;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator~() const
+thread_cpu_mask_t thread_cpu_mask_t::operator~() const
 {
     thread_cpu_mask_t comp{};
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -253,7 +253,7 @@ EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator~() const
     return comp;
 }
 
-EXPORT bool thread_cpu_mask_t::operator!() const
+bool thread_cpu_mask_t::operator!() const
 {
     uint64_t un = bitmap[0];
     for (size_t i = 1, e = countof(bitmap); i != e; ++i)
@@ -261,12 +261,12 @@ EXPORT bool thread_cpu_mask_t::operator!() const
     return un == 0;
 }
 
-EXPORT bool thread_cpu_mask_t::operator[](size_t bit) const
+bool thread_cpu_mask_t::operator[](size_t bit) const
 {
     return bitmap[(bit >> 6)] & (UINT64_C(1) << (bit & 63));
 }
 
-EXPORT size_t thread_cpu_mask_t::lsb_set() const
+size_t thread_cpu_mask_t::lsb_set() const
 {
     for (size_t i = 0; i < bitmap_entries; ++i) {
         if (bitmap[i]) {
@@ -277,14 +277,14 @@ EXPORT size_t thread_cpu_mask_t::lsb_set() const
     return ~size_t(0);
 }
 
-EXPORT thread_cpu_mask_t &thread_cpu_mask_t::set_all()
+thread_cpu_mask_t &thread_cpu_mask_t::set_all()
 {
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
         bitmap[i] = ~(UINT64_C(0));
     return *this;
 }
 
-EXPORT bool thread_cpu_mask_t::operator==(thread_cpu_mask_t const& rhs) const
+bool thread_cpu_mask_t::operator==(thread_cpu_mask_t const& rhs) const
 {
     bool is_equal = bitmap[0] == rhs.bitmap[0];
     for (size_t i = 1, e = countof(bitmap); i != e; ++i)
@@ -292,7 +292,7 @@ EXPORT bool thread_cpu_mask_t::operator==(thread_cpu_mask_t const& rhs) const
     return is_equal;
 }
 
-EXPORT bool thread_cpu_mask_t::operator!=(thread_cpu_mask_t const& rhs) const
+bool thread_cpu_mask_t::operator!=(thread_cpu_mask_t const& rhs) const
 {
     bool not_equal = bitmap[0] != rhs.bitmap[0];
     for (size_t i = 1, e = countof(bitmap); i != e; ++i)
@@ -300,14 +300,14 @@ EXPORT bool thread_cpu_mask_t::operator!=(thread_cpu_mask_t const& rhs) const
     return not_equal;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator-(size_t bit)
+thread_cpu_mask_t thread_cpu_mask_t::operator-(size_t bit)
 {
     thread_cpu_mask_t result{*this};
     result -= bit;
     return result;
 }
 
-EXPORT thread_cpu_mask_t thread_cpu_mask_t::operator+(size_t bit)
+thread_cpu_mask_t thread_cpu_mask_t::operator+(size_t bit)
 {
     thread_cpu_mask_t result{*this};
     result += bit;

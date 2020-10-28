@@ -124,10 +124,10 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             }
 
             // Notify the device that a virtio driver has found it
-            common_cfg->device_status |= VIRTIO_STATUS_ACKNOWLEDGE;
+            mm_or(common_cfg->device_status, VIRTIO_STATUS_ACKNOWLEDGE);
 
             // Notify the device that a virtio driver is accessing it
-            common_cfg->device_status |= VIRTIO_STATUS_DRIVER;
+            mm_or(common_cfg->device_status, VIRTIO_STATUS_DRIVER);
 
             // Negotiate features
             do {
@@ -138,7 +138,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 // Offer the feature bitmap to the subclass
                 if (!offer_features(features)) {
                     // Tell the device we gave up
-                    common_cfg->device_status |= VIRTIO_STATUS_FAILED;
+                    mm_or(common_cfg->device_status, VIRTIO_STATUS_FAILED);
                     return false;
                 }
 
@@ -150,18 +150,18 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
                 if (!verify_features(features)) {
                     // Tell the device we gave up
-                    common_cfg->device_status |= VIRTIO_STATUS_FAILED;
+                    mm_or(common_cfg->device_status, VIRTIO_STATUS_FAILED);
                     return false;
                 }
             } while (false);
 
             atomic_fence();
-            common_cfg->device_status |= VIRTIO_STATUS_FEATURES_OK;
+            mm_or(common_cfg->device_status, VIRTIO_STATUS_FEATURES_OK);
 
             atomic_fence();
             if (!(common_cfg->device_status & VIRTIO_STATUS_FEATURES_OK)) {
                 // Tell the device we gave up
-                common_cfg->device_status |= VIRTIO_STATUS_FAILED;
+                mm_or(common_cfg->device_status, VIRTIO_STATUS_FAILED);
                 return false;
             }
 
@@ -172,7 +172,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
             if (unlikely(!queues)) {
                 // Tell the device we gave up
-                common_cfg->device_status |= VIRTIO_STATUS_FAILED;
+                mm_or(common_cfg->device_status, VIRTIO_STATUS_FAILED);
                 return false;
             }
 
@@ -222,15 +222,15 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                                       notify_off_multiplier,
                                       queue_msix_vector))) {
                     // Tell the device we gave up
-                    common_cfg->device_status |= VIRTIO_STATUS_FAILED;
+                    mm_or(common_cfg->device_status, VIRTIO_STATUS_FAILED);
                     return false;
                 }
             }
 
             atomic_fence();
-            common_cfg->device_status |= VIRTIO_STATUS_FEATURES_OK;
+            mm_or(common_cfg->device_status, VIRTIO_STATUS_FEATURES_OK);
             atomic_fence();
-            common_cfg->device_status |= VIRTIO_STATUS_DRIVER_OK;
+            mm_or(common_cfg->device_status, VIRTIO_STATUS_DRIVER_OK);
 
             VIRTIO_TRACE("Successfully negotiated features\n");
 

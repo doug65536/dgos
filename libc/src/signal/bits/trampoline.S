@@ -1,3 +1,4 @@
+#include <sys/cpu_bug.h>
 #include "sys/syscall_num.h"
 
 #if defined(__x86_64__)
@@ -57,7 +58,7 @@ __signal_restorer:
 
     // Call signal handler (3rd parameter)
     lfence
-    callq *%rbx
+    indirect_call rbx
 
     // Call signal return syscall
     mov %rsp,%rdi
@@ -114,7 +115,7 @@ __signal_restorer:
     leal 16(%esp),%eax
     movl %eax,8(%esp)
     lfence
-    call *%ecx
+    indirect_call ecx
 
     // Restore the ucontext_t context (pass as first parameter)
     mov %esp,(%esp)

@@ -23,7 +23,7 @@ declare -A kernel_syms
 
 while IFS= read -r line; do
     kernel_syms+=([$line]=1)
-done < <("$scriptroot/kernel_exports.sh" $objdump_args)
+done < <("$scriptroot/kernel_exports.bash" $objdump_args)
 
 echo Found ${#kernel_syms[@]} kernel symbols...
 
@@ -53,7 +53,7 @@ for module in $modules; do
         echo ...needs $need
         while IFS= read -r line; do
             syms+=([$line]=1)
-        done < <("$scriptroot/kernel_exports.sh" $objdump_args "$need")
+        done < <("$scriptroot/kernel_exports.bash" $objdump_args "$need")
     done
 
     #echo ${#syms[@]} symbols available
@@ -68,7 +68,7 @@ for module in $modules; do
             echo Import failure: "$line"
             failed=1
         fi
-    done < <("$scriptroot/module_imports.sh" $objdump_args "$module")
+    done < <("$scriptroot/module_imports.bash" $objdump_args "$module")
 done
 
 if [[ -n "$failed" ]]; then

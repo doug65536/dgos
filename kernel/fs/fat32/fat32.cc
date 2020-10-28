@@ -26,6 +26,8 @@
 
 typedef int32_t cluster_t;
 
+__BEGIN_ANONYMOUS
+
 struct fat32_fs_t final : public fs_base_t {
     FS_BASE_RW_IMPL
 
@@ -46,18 +48,9 @@ struct fat32_fs_t final : public fs_base_t {
     };
 
     struct file_handle_t : public fs_file_info_t {
-        file_handle_t()
-            : fs(nullptr)
-            , dirent(nullptr)
-            , cached_offset(0)
-            , cached_cluster(0)
-            , dirty(false)
-        {
-        }
+        file_handle_t() = default;
 
-        virtual ~file_handle_t()
-        {
-        }
+        virtual ~file_handle_t() = default;
 
         // fs_file_info_t interface
         ino_t get_inode() const override
@@ -65,13 +58,13 @@ struct fat32_fs_t final : public fs_base_t {
             return dirent->start_lo | (dirent->start_hi << 16);
         }
 
-        fat32_fs_t *fs;
-        fat32_dir_entry_t *dirent;
+        fat32_fs_t *fs = nullptr;
+        fat32_dir_entry_t *dirent = nullptr;
         ext::string filename;
 
-        off_t cached_offset;
-        cluster_t cached_cluster;
-        bool dirty;
+        off_t cached_offset = 0;
+        cluster_t cached_cluster = 0;
+        bool dirty = false;
     };
 
     static pool_t<file_handle_t> handles;
@@ -1199,14 +1192,14 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
         }
     }
 
-    void *file_memory = handles.alloc();
+    file_handle_t *file = handles.alloc();
 
-    if (unlikely(!file_memory)) {
+    if (unlikely(!file)) {
         err = errno_t::EMFILE;
         return nullptr;
     }
 
-    file_handle_t *file = new (file_memory) file_handle_t();
+//    file_handle_t *file = new (file_memory) file_handle_t();
 
     file->filename = path;
 
@@ -2016,3 +2009,5 @@ ext::string fat32_fs_t::full_lfn_t::str() const
     size_t len = name_from_dirents(name, this);
     return ext::string(name, name + len);
 }
+
+__END_ANONYMOUS

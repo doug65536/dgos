@@ -23,26 +23,26 @@ __BEGIN_DECLS
 void malloc_startup(void *p);
 
 _malloc _assume_aligned(16) _alloc_size(1, 2)
-void *calloc(size_t num, size_t size);
+KERNEL_API_BUILTIN void *calloc(size_t num, size_t size);
 
 _malloc _assume_aligned(16) _alloc_size(1)
-void *malloc(size_t size);
+KERNEL_API_BUILTIN void *malloc(size_t size);
 
 _assume_aligned(16) _alloc_size(2)
-void *realloc(void *p, size_t new_size);
+KERNEL_API_BUILTIN void *realloc(void *p, size_t new_size);
 
-void free(void *p);
+KERNEL_API_BUILTIN void free(void *p);
 
-bool malloc_validate(bool dump);
+KERNEL_API bool malloc_validate(bool dump);
 
 _malloc _assume_aligned(16)
-char *strdup(char const *s);
+KERNEL_API char *strdup(char const *s);
 
-int strtoi(char const *str, char **end, int base);
-long strtol(char const *str, char **end, int base);
-unsigned long strtoul(char const *str, char **end, int base);
-long long strtoll(char const *str, char **end, int base);
-unsigned long long strtoull(char const *str, char **end, int base);
+KERNEL_API int strtoi(char const *str, char **end, int base);
+KERNEL_API long strtol(char const *str, char **end, int base);
+KERNEL_API unsigned long strtoul(char const *str, char **end, int base);
+KERNEL_API long long strtoll(char const *str, char **end, int base);
+KERNEL_API unsigned long long strtoull(char const *str, char **end, int base);
 
 int atoi(char const *str);
 int atol(char const *str);
@@ -51,26 +51,25 @@ int atoll(char const *str);
 __END_DECLS
 
 _malloc _assume_aligned(16)
-void *operator new(size_t size);
+KERNEL_API_BUILTIN void *operator new(size_t size);
 
 _const
-void *operator new(size_t size, void *p) noexcept;
+KERNEL_API_BUILTIN void *operator new(size_t size, void *p) noexcept;
 
 _malloc _assume_aligned(16)
-void *operator new[](size_t size);
+KERNEL_API_BUILTIN void *operator new[](size_t size);
 
-void operator delete(void *block) noexcept;
-void operator delete[](void *block) noexcept;
-void operator delete[](void *block, unsigned int);
-
+KERNEL_API_BUILTIN void operator delete(void *block) noexcept;
+KERNEL_API_BUILTIN void operator delete[](void *block) noexcept;
+KERNEL_API_BUILTIN void operator delete[](void *block, unsigned int);
 
 __BEGIN_NAMESPACE_STD
 
-struct nothrow_t {
+struct KERNEL_API nothrow_t {
     explicit nothrow_t() = default;
 };
 enum class align_val_t : size_t {};
-extern nothrow_t const nothrow;
+KERNEL_API extern nothrow_t const nothrow;
 
 __END_NAMESPACE_STD
 
@@ -93,15 +92,17 @@ constexpr _T abs(_T __rhs)
 
 __END_NAMESPACE_STD
 
-void* operator new[](size_t count, std::align_val_t alignment);
-void* operator new[](size_t count, std::align_val_t alignment,
+KERNEL_API_BUILTIN void* operator new[](size_t count,
+        std::align_val_t alignment);
+KERNEL_API void* operator new[](size_t count, std::align_val_t alignment,
     std::nothrow_t const&);
-void *operator new(size_t size, ext::nothrow_t const&) noexcept;
-void *operator new[](size_t size, ext::nothrow_t const&) noexcept;
+KERNEL_API void *operator new(size_t size, ext::nothrow_t const&) noexcept;
+KERNEL_API void *operator new[](size_t size, ext::nothrow_t const&) noexcept;
 
-void operator delete(void *block, unsigned long size) noexcept;
+KERNEL_API_BUILTIN void operator delete(
+        void *block, unsigned long size) noexcept;
 
-class zero_init_t
+class KERNEL_API zero_init_t
 {
 public:
     void *operator new(size_t size, ext::nothrow_t const&) noexcept

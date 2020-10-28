@@ -75,6 +75,7 @@ struct cpuid_cache_t {
     bool has_umip       :1;
     bool has_smep       :1;
     bool has_erms       :1;
+    bool has_clzero     :1;
     bool has_invpcid    :1;
     bool has_avx512f    :1;
     bool has_smap       :1;
@@ -341,6 +342,12 @@ CPUID_CONST_INLINE uint8_t cpuid_laddr_bits()
 CPUID_CONST_INLINE uint8_t cpuid_paddr_bits()
 {
     return cpuid_cache.paddr_bits;
+}
+
+// Cache line zero
+CPUID_CONST_INLINE uint8_t cpuid_has_clzero()
+{
+    return cpuid_cache.has_clzero;
 }
 
 CPUID_CONST_INLINE bool cpuid_has_bug_meltdown()

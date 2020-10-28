@@ -610,11 +610,9 @@ bool paging_access_virtual_memory(uint64_t vaddr, void *data, size_t data_sz,
                 ? spot_space
                 : data_sz;
 
-        if (is_read)
-            memcpy(data, (void*)spot_physaddr, spot_space);
-        else
-            memcpy((void*)spot_physaddr, data, spot_space);
-
+        memcpy(is_read ? data : (void*)spot_physaddr, 
+            is_read ? (void*)spot_physaddr : data, spot_space);
+        
         vaddr += spot_space;
         data = (char*)data + spot_space;
         data_sz -= spot_space;

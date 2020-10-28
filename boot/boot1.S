@@ -31,7 +31,11 @@
 // + 0x1FE  |    2 | signature (0x55AA) |
 // +--------+------+--------------------+
 
-#define UNRELOCATED(n) (n)-0xF000+0x7C00
+// Linked at 0, relocated to real mode seg 0x3000, offset 0
+#define RELOC_SEG   0x3000
+#define RELOC_OFS   0x7C00
+#define RELOC_ADDR 0x37C00
+#define UNRELOCATED(n) (n)
 
 .section .head, "x", @progbits
 // The linker script puts this at the beginning of the image
@@ -63,7 +67,6 @@ bootstrap_code:
     // Initialize the data segment registers and stack
     xorw %ax,%ax
     movw %ax,%ds
-    movw %ax,%es
 
     // Entire 64KB from 0x20000 thru 0x2FFFF is the stack
     // (1st push will wrap it around to 0x1000:0xFFFE (0x1FFFE))
@@ -86,32 +89,77 @@ bootstrap_code:
     adcw $ 0,%cx
     movw %bx,UNRELOCATED(sector_lba)
     movw %cx,UNRELOCATED(sector_lba+2)
+    movw %bx,UNRELOCATED(dap+dap_lba)
+    movw %cx,UNRELOCATED(dap+dap_lba+2)
+    xor %ax,%ax
+    movw %ax,UNRELOCATED(dap+dap_lba+4)
+    movw %ax,UNRELOCATED(dap+dap_lba+6)
 
-    // Relocate 512 bytes
-    mov $ entry,%di
-    mov $ 0x7C00,%si
-    mov $ 256,%cx
+    // Relocate up to __image_end bytes
+    mov $ entry,%si
+    mov %si,%di
+    mov $ RELOC_SEG,%ax
+    mov %ax,%es
+    mov $ ___image_end,%cx
+    sub %si,%cx
+    shrw $ 1,%cx
     cld
     rep movsw
 
+    // Move data segments up so there are 3 preceding 64KB regions
+    mov %ax,%ds
+    mov %ax,%es
+
     // Relocation done, no more weird unrelocated offsets
 
-    ljmp $ 0,$ relocated_boot1_entry
+    // gdb doesn't know about cs base.
+    // use: monitor x /1i ($cs.base)+($eip&0xFFFF)
+    // to have gdb stub disassemble the right thing,
+    // This would work: x /1i ($cs * 16) + ($eip & 0xFFFF)
+    // but the cross gdb is stuck in protected mode disassembly
+
+    ljmp $ RELOC_SEG,$ relocated_boot1_entry
 relocated_boot1_entry:
 
     // Get drive parameters size (for sector size)
-    mov $ 0x4800,%ax
-    mov $ ddp,%si
+    movw $ 0x4800,%ax
+    movw $ ddp,%si
+    movw $ ddp_length,(%si)
     movb boot_drive,%dl
     int $ 0x13
     jc fail
 
-    // Calculate stage2 sector count
-    // Load 60KB
-    movw $ 0xE000,%ax
-    xorw %dx,%dx
+chunk_loop:
+    movw chunk_index,%si
+    incw chunk_index
+    shlw $ 3,%si
+
+    // Fetch chunk file offset, divide by sector size
+    movw chunks+4(%si),%ax
+    movw chunks+4+2(%si),%dx
     divw ddp+ddp_sector_size
+    addw sector_lba,%ax
+    adcw sector_lba+2,%dx
+    movw %ax,dap+dap_lba
+    movw %dx,dap+dap_lba+2
+
+    // Fetch chunk destination and update destination address
+    movw chunks+2(%si),%ax
+    movw $ 0,dap+dap_address
+    movw %ax,dap+dap_address+2
+
+    // Fetch chunk size for sector size div
+    movw chunks(%si),%ax
+
+    // Calculate stage2 sector count, portion before 64KB
+    // Load 0x1000-0x10000 region
+    //movw $ 0xF000,%ax
+    xor %dx,%dx
+    divw ddp+ddp_sector_size
+    // Update sector count that isn't overwritten
     mov %ax,sector_count
+    // Update sector count dap parameter that is overwritten
+    mov %ax,dap+dap_block_count
 
     // Load stage2
 more_sectors:
@@ -150,12 +198,21 @@ more_sectors:
     jnz more_sectors
 
 okay:
+    cmpw $ 3,chunk_index
+    jb chunk_loop
+
+    xor %si,%si
+    mov %si,%ds
+    mov %si,%es
+
     // Setup register parameters for stage 1
-    // ds:si -> partition table entry
+    // es:si -> partition table entry
     // dl = boot drive
+    push %cs
+    pop %es
     mov $ ptbl_ent,%si
 
-    ljmpw *load_addr
+    ljmpw $ 0,$ 0x1000 //*load_addr
 
 fail:
     int $ 0x18
@@ -166,12 +223,12 @@ fail:
 dap:
     .byte 16
     .byte 0
-sector_count:
+//dap_sector_count:
     .hword 0
-load_addr:
+//dap_load_addr:
     .hword 0x1000
     .hword 0x0000
-sector_lba:
+//dap_sector_lba:
     .quad 0
 
 ptbl_ent:
@@ -179,15 +236,44 @@ ptbl_ent:
     .skip 7,0
 
 part_st:
-    .skip 4,0
+    .int 0
 part_en:
-    .skip 4,0
+    .int 0
+
+sector_count:
+    .hword 0
+
+//load_addr:
+//    .hword 0x1000
+//    .hword 0x0000
+
+chunk_index:
+    .word 0
+
+chunks:
+    // Load 0xF000 bytes to 0x1000, file offset 0
+    .hword 0xF000
+    .hword 0x100
+    .int 0
+    // Load 0x8000 bytes to 0x10000, file offset 0xF000
+    .hword 0x8000
+    .hword 0x1000
+    .int 0xF000
+    // Load 0x8000 bytes to 0x18000, file offset 0x17000
+    .hword 0x8000
+    .hword 0x1800
+    .int 0x17000
+chunks_end:
 
 boot_drive: .skip 1,0
-ddp: .hword ddp_length
-.skip (ddp_length - 2),0
 
 .byte 0xEE
 
 .section .uninit, "w", @nobits
+
+ddp:
+    .skip ddp_length,0
+
+sector_lba:
+    .skip 8
 

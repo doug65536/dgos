@@ -148,7 +148,7 @@ static ext::string module_reloc_type(size_t sym_type)
     return "Unknown";
 }
 
-class module_t
+class KERNEL_API module_t
 {
 public:
     bool load(char const *path);
@@ -1320,14 +1320,14 @@ public:
 
 ext::spinlock __module_register_frame_lock;
 
-EXPORT void __module_register_frame(void const * const *__module_dso_handle,
+void __module_register_frame(void const * const *__module_dso_handle,
                                     void *__frame, size_t __size)
 {
     ext::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
     __register_frame(__frame, __size);
 }
 
-EXPORT void __module_unregister_frame(void const * const *__module_dso_handle,
+void __module_unregister_frame(void const * const *__module_dso_handle,
                                       void *__frame)
 {
     ext::unique_lock<ext::spinlock> lock{__module_register_frame_lock};
@@ -1364,7 +1364,7 @@ _constructor(ctor_mmu_init) static void atexit_init()
     atexit_ready = true;
 }
 
-EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
+int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
 {
 //    ext::find_if(loaded_modules.begin(), loaded_modules.end(),
 //                 [dso_handle](ext::unique_ptr<module_t> const& mp) {
@@ -1382,7 +1382,7 @@ EXPORT int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle)
     return 0;
 }
 
-EXPORT module_t *modload_closest(ptrdiff_t address)
+module_t *modload_closest(ptrdiff_t address)
 {
     if (address >= ptrdiff_t(__image_start) &&
             address < ptrdiff_t(___init_brk)) {
@@ -1408,39 +1408,39 @@ EXPORT module_t *modload_closest(ptrdiff_t address)
     return closest_module;
 }
 
-EXPORT ext::string const& modload_get_name(module_t *module)
+ext::string const& modload_get_name(module_t *module)
 {
     return module->module_name;
 }
 
-EXPORT uintptr_t modload_get_vaddr_min(module_t *module)
+uintptr_t modload_get_vaddr_min(module_t *module)
 {
     return module->min_vaddr;
 }
 
-EXPORT uintptr_t modload_get_base_adj(module_t *module)
+uintptr_t modload_get_base_adj(module_t *module)
 {
     return module->base_adj;
 }
 
-EXPORT module_t *modload_get_index(size_t i)
+module_t *modload_get_index(size_t i)
 {
     return i < loaded_modules.size()
             ? loaded_modules[i].get()
             : nullptr;
 }
 
-EXPORT size_t modload_get_count()
+size_t modload_get_count()
 {
     return loaded_modules.size();
 }
 
-EXPORT size_t modload_get_size(module_t *module)
+size_t modload_get_size(module_t *module)
 {
     return module->max_vaddr - module->min_vaddr;
 }
 
-//EXPORT void *__tls_get_addr(void *a, void *b)
+//void *__tls_get_addr(void *a, void *b)
 //{
 //    return nullptr;
 //}

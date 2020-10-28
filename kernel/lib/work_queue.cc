@@ -113,11 +113,11 @@ void workq::slih_startup(void*)
 REGISTER_CALLOUT(workq::slih_startup, nullptr,
                  callout_type_t::smp_online, "900");
 
-EXPORT workq_work::workq_work()
+workq_work::workq_work()
 {
 }
 
-EXPORT workq_work::~workq_work()
+workq_work::~workq_work()
 {
     __asm__ __volatile__ ("":::"memory");
 }

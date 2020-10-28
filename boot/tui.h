@@ -54,12 +54,12 @@ struct tui_list_t {
     {
     }
 
-    T& operator[](size_t index)
+    constexpr T& operator[](size_t index)
     {
         return items[index];
     }
 
-    T const& operator[](size_t index) const
+    constexpr T const& operator[](size_t index) const
     {
         return items[index];
     }
@@ -106,7 +106,7 @@ struct tui_menu_item_t {
 
 class tui_menu_renderer_t {
 public:
-    constexpr tui_menu_renderer_t(tui_list_t<tui_menu_item_t> &items);
+    tui_menu_renderer_t(tui_list_t<tui_menu_item_t> &items);
 
     void center(int offset = 0);
     void position(int x, int y);
@@ -130,23 +130,6 @@ private:
     int scroll_pos = 0;
     int hscroll_pos = 0;
 };
-
-constexpr tui_menu_renderer_t::tui_menu_renderer_t(
-        tui_list_t<tui_menu_item_t> &items)
-    : items(items)
-{
-    for (size_t i = 0; i < items.count; ++i) {
-        tui_menu_item_t &item = items[i];
-
-        if (unlikely(item.text_limit)) {
-            item.text = (tchar*)calloc(sizeof(tchar),
-                                      item.text_limit + 1);
-
-            if (unlikely(!item.text))
-                PANIC_OOM();
-        }
-    }
-}
 
 int readkey();
 int64_t systime();

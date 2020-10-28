@@ -13,7 +13,7 @@
 //
 // Wait chain
 
-EXPORT void thread_wait_add(thread_wait_link_t *root,
+void thread_wait_add(thread_wait_link_t *root,
                      thread_wait_link_t *node)
 {
     thread_wait_link_t *insafter = root->prev;
@@ -23,7 +23,7 @@ EXPORT void thread_wait_add(thread_wait_link_t *root,
     root->prev = node;
 }
 
-EXPORT thread_wait_link_t *thread_wait_del(
+thread_wait_link_t *thread_wait_del(
         thread_wait_link_t *node)
 {
     thread_wait_link_t *next = node->next;
@@ -38,7 +38,7 @@ EXPORT thread_wait_link_t *thread_wait_del(
 //
 // Mutex
 
-EXPORT void mutex_init(mutex_t *mutex)
+void mutex_init(mutex_t *mutex)
 {
     mutex->owner = -1;
     mutex->lock = 0;
@@ -48,7 +48,7 @@ EXPORT void mutex_init(mutex_t *mutex)
     mutex->link.prev = &mutex->link;
 }
 
-EXPORT bool mutex_try_lock(mutex_t *mutex)
+bool mutex_try_lock(mutex_t *mutex)
 {
     bool result;
 
@@ -71,7 +71,7 @@ EXPORT bool mutex_try_lock(mutex_t *mutex)
 }
 
 _hot
-EXPORT bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
+bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
 {
     bool result = true;
     assert(mutex->owner != thread_get_id());
@@ -140,7 +140,7 @@ EXPORT bool mutex_try_lock_until(mutex_t *mutex, uint64_t timeout_time)
 }
 
 _hot
-EXPORT bool mutex_lock(mutex_t *mutex)
+bool mutex_lock(mutex_t *mutex)
 {
     bool result = true;
     assert(mutex->owner != thread_get_id());
@@ -207,7 +207,7 @@ EXPORT bool mutex_lock(mutex_t *mutex)
     return result;
 }
 
-EXPORT void mutex_unlock(mutex_t *mutex)
+void mutex_unlock(mutex_t *mutex)
 {
     spinlock_lock(&mutex->lock);
 
@@ -234,14 +234,14 @@ EXPORT void mutex_unlock(mutex_t *mutex)
     }
 }
 
-EXPORT void mutex_destroy(mutex_t *mutex)
+void mutex_destroy(mutex_t *mutex)
 {
     (void)mutex;
     assert(mutex->link.next == mutex->link.prev);
     assert(mutex->owner == -1);
 }
 
-EXPORT int mutex_held(mutex_t *mutex)
+int mutex_held(mutex_t *mutex)
 {
     return mutex->owner == thread_get_id();
 }
@@ -249,7 +249,7 @@ EXPORT int mutex_held(mutex_t *mutex)
 //
 // Reader/Writer lock
 
-EXPORT void rwlock_init(rwlock_t *rwlock)
+void rwlock_init(rwlock_t *rwlock)
 {
     rwlock->lock = 0;
     rwlock->ex_link.next = &rwlock->ex_link;
@@ -261,14 +261,14 @@ EXPORT void rwlock_init(rwlock_t *rwlock)
             (SPINCOUNT_MIN + ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1));
 }
 
-EXPORT void rwlock_destroy(rwlock_t *rwlock)
+void rwlock_destroy(rwlock_t *rwlock)
 {
     (void)rwlock;
     assert(rwlock->ex_link.next == rwlock->ex_link.prev);
     assert(rwlock->sh_link.next == rwlock->sh_link.prev);
 }
 
-EXPORT bool rwlock_ex_try_lock(rwlock_t *rwlock)
+bool rwlock_ex_try_lock(rwlock_t *rwlock)
 {
     if (rwlock->reader_count < 0)
         return false;
@@ -292,7 +292,7 @@ EXPORT bool rwlock_ex_try_lock(rwlock_t *rwlock)
     return result;
 }
 
-EXPORT bool rwlock_ex_lock(rwlock_t *rwlock, uint64_t timeout_time)
+bool rwlock_ex_lock(rwlock_t *rwlock, uint64_t timeout_time)
 {
     bool result = true;
     thread_t tid = thread_get_id();
@@ -330,10 +330,9 @@ EXPORT bool rwlock_ex_lock(rwlock_t *rwlock, uint64_t timeout_time)
 
             if (result) {
                 assert(wait.thread == tid);
-                assert(rwlock->lock != 0);
+                assert(rwlock->reader_count == -wait.thread);
                 assert(wait.link.next == nullptr);
                 assert(wait.link.prev == nullptr);
-                assert(rwlock->reader_count == -wait.thread);
             }
 
             return result;
@@ -345,7 +344,7 @@ EXPORT bool rwlock_ex_lock(rwlock_t *rwlock, uint64_t timeout_time)
     return result;
 }
 
-EXPORT bool rwlock_upgrade(rwlock_t *rwlock, uint64_t timeout_time)
+bool rwlock_upgrade(rwlock_t *rwlock, uint64_t timeout_time)
 {
     bool result = true;
     thread_t tid = thread_get_id();
@@ -382,7 +381,7 @@ EXPORT bool rwlock_upgrade(rwlock_t *rwlock, uint64_t timeout_time)
     return result;
 }
 
-EXPORT void rwlock_ex_unlock(rwlock_t *rwlock)
+void rwlock_ex_unlock(rwlock_t *rwlock)
 {
     spinlock_lock(&rwlock->lock);
 
@@ -416,7 +415,7 @@ EXPORT void rwlock_ex_unlock(rwlock_t *rwlock)
     }
 }
 
-EXPORT bool rwlock_sh_try_lock(rwlock_t *rwlock)
+bool rwlock_sh_try_lock(rwlock_t *rwlock)
 {
     if (rwlock->reader_count < 0)
         return false;
@@ -436,7 +435,7 @@ EXPORT bool rwlock_sh_try_lock(rwlock_t *rwlock)
     return result;
 }
 
-EXPORT bool rwlock_sh_lock(rwlock_t *rwlock, uint64_t timeout_time)
+bool rwlock_sh_lock(rwlock_t *rwlock, uint64_t timeout_time)
 {
     bool result = true;
     int spin = 0;
@@ -489,7 +488,7 @@ EXPORT bool rwlock_sh_lock(rwlock_t *rwlock, uint64_t timeout_time)
     return result;
 }
 
-EXPORT void rwlock_sh_unlock(rwlock_t *rwlock)
+void rwlock_sh_unlock(rwlock_t *rwlock)
 {
     spinlock_lock(&rwlock->lock);
 
@@ -514,7 +513,7 @@ EXPORT void rwlock_sh_unlock(rwlock_t *rwlock)
     }
 }
 
-EXPORT bool rwlock_have_ex(rwlock_t *rwlock)
+bool rwlock_have_ex(rwlock_t *rwlock)
 {
     return rwlock->reader_count == -thread_get_id();
 }
@@ -522,14 +521,14 @@ EXPORT bool rwlock_have_ex(rwlock_t *rwlock)
 //
 // Condition variable
 
-EXPORT void condvar_init(condition_var_t *var)
+void condvar_init(condition_var_t *var)
 {
     var->lock = 0;
     var->link.next = &var->link;
     var->link.prev = &var->link;
 }
 
-EXPORT void condvar_destroy(condition_var_t *var)
+void condvar_destroy(condition_var_t *var)
 {
     // Lock the condition variable
     spinlock_lock(&var->lock);
@@ -643,21 +642,21 @@ protected:
     mutex_t *mutex;
 };
 
-//EXPORT bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock,
+//bool condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock,
 //                                  uint64_t timeout_time)
 //{
 //    condvar_spinlock_t state(lock);
 //    return condvar_wait_ex(var, state, timeout_time);
 //}
 
-//EXPORT bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock,
+//bool condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock,
 //                                    uint64_t timeout_time)
 //{
 //    condvar_ticketlock_t state(lock);
 //    return condvar_wait_ex(var, state, timeout_time);
 //}
 
-//EXPORT bool condvar_wait_mcslock(condition_var_t *var,
+//bool condvar_wait_mcslock(condition_var_t *var,
 //                                 mcs_queue_ent_t * volatile *root,
 //                                 mcs_queue_ent_t *node, uint64_t timeout_time)
 //{
@@ -665,7 +664,7 @@ protected:
 //    return condvar_wait_ex(var, state, timeout_time);
 //}
 
-//EXPORT bool condvar_wait_mutex(condition_var_t *var, mutex_t *mutex,
+//bool condvar_wait_mutex(condition_var_t *var, mutex_t *mutex,
 //                               uint64_t timeout_time)
 //{
 //    assert(mutex->owner == thread_get_id());
@@ -675,7 +674,7 @@ protected:
 
 __END_ANONYMOUS
 
-EXPORT void condvar_wake_one(condition_var_t *var)
+void condvar_wake_one(condition_var_t *var)
 {
     spinlock_lock(&var->lock);
 
@@ -691,7 +690,7 @@ EXPORT void condvar_wake_one(condition_var_t *var)
     spinlock_unlock(&var->lock);
 }
 
-EXPORT void condvar_wake_n(condition_var_t *var, size_t n)
+void condvar_wake_n(condition_var_t *var, size_t n)
 {
     spinlock_lock(&var->lock);
 
@@ -707,7 +706,7 @@ EXPORT void condvar_wake_n(condition_var_t *var, size_t n)
     spinlock_unlock(&var->lock);
 }
 
-EXPORT void condvar_wake_all(condition_var_t *var)
+void condvar_wake_all(condition_var_t *var)
 {
     spinlock_lock(&var->lock);
 

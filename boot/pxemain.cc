@@ -235,7 +235,7 @@ public:
         while (received < offset) {
             if (unlikely(!bounce_buf)) {
                 bounce_buf = malloc(block_size);
-                if (!bounce_buf)
+                if (unlikely(!bounce_buf))
                     return false;
                 bounce_buf_sz = block_size;
             }

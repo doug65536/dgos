@@ -49,7 +49,7 @@ bioscall:
     shr $ 4,%edx
 
     // Jump to 16 bit protected mode to load 64KB segment limits
-    ljmp $ GDT_SEL_PM_CODE16,$ 0f
+    ljmpl $ GDT_SEL_PM_CODE16,$ 0f
 .code16
     // 16-bit protected mode
 
@@ -67,7 +67,7 @@ bioscall:
     mov %eax,%cr0
 
     // Real mode
-    ljmp $ 0,$ 0f
+    ljmpl $ 0,$ 0f
 
     // Point ss:esp to where %esp was, where we copied the bios_regs_t
 0:  mov %dx,%ss
@@ -129,7 +129,7 @@ bioscall:
     or $ 1,%eax
     movl %eax,%cr0
 
-    ljmpw $ GDT_SEL_PM_CODE32,$ 0f
+    ljmpl $ GDT_SEL_PM_CODE32,$ 0f
 
 .code32
 0:  movl $ GDT_SEL_KERNEL_DATA,%eax

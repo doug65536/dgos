@@ -21,7 +21,11 @@ enum struct bootparam_t {
     msi_enable,
     msix_enable,
     port_e9_debug,
-    gdb_port
+    gdb_port,
+    phys_mem_table,
+    phys_mem_table_size,
+    phys_mapping,
+    phys_mapping_sz
 };
 
 KERNEL_API uintptr_t bootinfo_parameter(bootparam_t param);

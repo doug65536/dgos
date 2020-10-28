@@ -23,13 +23,13 @@ struct mouse_raw_event_t {
 #define MOUSE_BUTTON(n) (1 << n)
 
 // Ensure required memory is allocated before a mouse_event call occurs
-void mouse_file_init();
+KERNEL_API void mouse_file_init();
 
 // Used by mouse drivers to report mouse activity
 // It is illegal to call mouse_event before a call
 // to mouse_file_init() has returned.
 // Mouse input device drivers must complete at least one call to
 // mouse_file_init before the driver can make a call to mouse_event.
-void mouse_event(mouse_raw_event_t event);
+KERNEL_API void mouse_event(mouse_raw_event_t event);
 
 __END_DECLS

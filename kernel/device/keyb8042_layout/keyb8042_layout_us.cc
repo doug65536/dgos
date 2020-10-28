@@ -114,7 +114,7 @@ static int const keyb8042_scancode_us_0xE0[128] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-EXPORT keyb8042_layout_t keyb8042_layout_us = {
+keyb8042_layout_t keyb8042_layout_us = {
     "us",
     keyb8042_scancode_us,
     keyb8042_scancode_us_0xE0,

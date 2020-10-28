@@ -1,3 +1,225 @@
+#include "callout.h"
+#include "mm.h"
+#include "mmu.h"
+#include "bootinfo.h"
+#include "contig_alloc.h"
+
+#if 0
+
+__BEGIN_ANONYMOUS
+
+struct bump_allocator_t {
+    uint64_t start;
+    uint64_t place;
+
+    bump_allocator_t()
+        : start()
+        , place()
+    {
+    }
+
+    explicit bump_allocator_t(uint64_t start)
+        : start(start)
+        , place(start)
+    {
+    }
+
+    bump_allocator_t(bump_allocator_t const&) = default;
+
+    ~bump_allocator_t() = default;
+
+    bump_allocator_t &operator=(bump_allocator_t const&) = delete;
+
+    void *allocate(uint64_t size)
+    {
+        size = size + ((PAGESIZE - 1) & -PAGESIZE);
+        void *result = (void*)(uintptr_t)place;
+        place += size;
+        return result;
+    }
+};
+
+__END_ANONYMOUS
+
+static void mmu_init(int ap)
+{
+    // Secured virtual address map:
+    //
+    //       illegal address space above
+    //
+    //     +TOP2 ->========================== <--- max ram physaddr + 4MB
+    //             physmap
+    //      +4MB ->--------------------------
+    //             4MB guard region
+    //         0 ->==========================
+    //             4MB guard region
+    //      -4MB ->--------------------------
+    //
+    //             high kernel pool (gigantic)
+    //
+    //   <= -1TB ->-------------------------- <= 0xFFFF'FF00'0000'0000
+    //             4MB guard region
+    //             --------------------------
+    //             kernel image
+    //    random ->--------------------------
+    //             4MB guard region
+    // >= -127TB ->-------------------------- >= 0xFFFF'8100'0000'0000
+    //
+    //             low kernel pool (gigantic)
+    //
+    //             --------------------------
+    //             early bump allocs
+    //             --------------------------
+    //             page table pool
+    //    -128TB ->========================== 0xFFFF'8000'0000'0000
+    //       illegal address space below
+    // }
+    //
+    // Debug map has kernel at 0xffffffff80000000
+
+    physmem_range_t *ranges = (physmem_range_t*)bootinfo_parameter(
+                bootparam_t::phys_mem_table);
+
+    size_t range_count = bootinfo_parameter(
+                bootparam_t::phys_mem_table_size);
+
+    // Find end of system memory
+    uint64_t top_mem = 0;
+    uint64_t free_mem = 0;
+    uint64_t total_mem = 0;
+
+    for (size_t i = 0; i < range_count; ++i) {
+        if (unlikely(!ranges[i].valid))
+            continue;
+
+        uint64_t block_en = ranges[i].base + ranges[i].size;
+
+        uint64_t aligned_st = (ranges[i].base + (PAGESIZE - 1)) & -PAGESIZE;
+
+        if (aligned_st < 0x100000)
+            continue;
+
+        uint64_t aligned_en = block_en & -PAGESIZE;
+        uint64_t aligned_sz = aligned_en >= aligned_st
+                ? aligned_en - aligned_st
+                : 0;
+
+        if (unlikely(!aligned_sz))
+            continue;
+
+        if (ranges[i].type == PHYSMEM_TYPE_NORMAL) {
+            free_mem += aligned_sz;
+            total_mem += aligned_sz;
+        }
+
+        if (ranges[i].type == PHYSMEM_TYPE_ALLOCATED)
+            total_mem += aligned_sz;
+
+        if (top_mem < aligned_en &&
+                (ranges[i].type == PHYSMEM_TYPE_ALLOCATED ||
+                 ranges[i].type == PHYSMEM_TYPE_NORMAL))
+            top_mem = aligned_en;
+    }
+
+    // Allocate enough page tables for 4x overcommit
+    uint64_t max_mapped_4k_pages = (total_mem * 4) >> 12;
+
+    // 512 PTEs per page table, assume half wasted (256 used entries per page)
+    uint64_t max_page_tables = max_mapped_4k_pages >> 8;
+
+    printdbg("Reserving %" PRIu64 " pages"
+             " for page table pool\n", max_page_tables);
+
+
+}
+
+_constructor(ctor_mmu_init)
+static void mmu_init_bsp()
+{
+    mmu_init(0);
+}
+
+uintptr_t mm_fork_kernel_text()
+{
+    return 0;
+}
+
+void *mmap(void *addr, size_t len, int prot,
+           int flags, int fd, off_t offset)
+{
+    return MAP_FAILED;
+}
+
+void *mremap(void *old_address, size_t old_size, size_t new_size,
+             int flags, void *new_address, errno_t *ret_errno)
+{
+    return MAP_FAILED;
+}
+
+int munmap(void *addr, size_t size)
+{
+    return -1;
+}
+
+int mprotect(void *__addr, size_t __len, int __prot)
+{
+    return -1;
+}
+
+int madvise(void *addr, size_t len, int advice)
+{
+    return -1;
+}
+
+int msync(const void *addr, size_t len, int flags)
+{
+    return -1;
+}
+
+uintptr_t mm_new_process(process_t *process, bool use64)
+{
+    return 0;
+}
+
+void mm_set_master_pagedir()
+{
+}
+
+void *mm_alloc_space(size_t size)
+{
+    return nullptr;
+}
+
+void mm_init_process(process_t *process, bool use64)
+{
+}
+
+uintptr_t mm_alloc_hole(size_t size)
+{
+    return 0;
+}
+
+void mm_free_hole(uintptr_t addr, size_t size)
+{
+
+}
+
+uintptr_t mphysaddr(void const volatile *addr)
+{
+    return 0;
+}
+
+isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
+{
+    return ctx;
+}
+
+bool mpresent(uintptr_t addr, size_t size)
+{
+    return false;
+}
+
+#else
 #include "mmu.h"
 #include "debug.h"
 #include "assert.h"
@@ -588,7 +810,7 @@ static _always_inline constexpr T *init_phys(uint64_t addr)
 // Zero initialization
 
 struct clear_phys_state_t {
-    using lock_type = ext::noirq_lock<ext::spinlock>;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = ext::unique_lock<lock_type>;
     lock_type locks[64];
 
@@ -759,7 +981,7 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-static void mmu_send_tlb_shootdown(bool synchronous = true)
+static void mmu_send_tlb_shootdown(bool synchronous = false)
 {
     ext::unique_lock<ext::irq_spinlock> lock(shootdown_lock);
 
@@ -1162,11 +1384,6 @@ static void mmu_configure_pat(void)
 #define TRACE_INIT(...) ((void)0)
 #endif
 
-_constructor(ctor_mmu_init) static void mmu_init_bsp()
-{
-    mmu_init();
-}
-
 static bool mmu_init_pagedir(size_t idx, uint8_t log2_pagesz, physaddr_t paddr)
 {
     clear_phys(paddr);
@@ -1174,7 +1391,7 @@ static bool mmu_init_pagedir(size_t idx, uint8_t log2_pagesz, physaddr_t paddr)
     return true;
 }
 
-void mmu_init()
+static void mmu_init()
 {
     // just a curiosity, crashes in qemu-kvm
 //    uint64_t topmem = cpu_msr_get(CPU_MSR_TOPMEM);
@@ -1495,6 +1712,11 @@ void mmu_init()
 #endif
 }
 
+_constructor(ctor_mmu_init) static void mmu_init_bsp()
+{
+    mmu_init();
+}
+
 // Returns the present mask for the new page
 static _always_inline int ptes_step(pte_t **ptes)
 {
@@ -1696,7 +1918,7 @@ KERNEL_API void *mm_alloc_space(size_t size)
     return (void*)linear_allocator.alloc_linear(round_up(size));
 }
 
-KERNEL_API void *mmap(void *addr, size_t len, int prot,
+void *mmap(void *addr, size_t len, int prot,
                   int flags, int fd, off_t offset)
 {
     (void)offset;
@@ -2099,7 +2321,7 @@ KERNEL_API void *mmap(void *addr, size_t len, int prot,
     return (void*)(linear_addr + misalignment);
 }
 
-EXPORT void *mremap(
+void *mremap(
         void *old_address,
         size_t old_size,
         size_t new_size,
@@ -2216,7 +2438,7 @@ EXPORT void *mremap(
     return (void*)new_st;
 }
 
-EXPORT int munmap(void *addr, size_t size)
+int munmap(void *addr, size_t size)
 {
     __asan_freeN_noabort(addr, size);
 
@@ -2329,7 +2551,7 @@ EXPORT int munmap(void *addr, size_t size)
     return 0;
 }
 
-EXPORT int mprotect(void *addr, size_t len, int prot)
+int mprotect(void *addr, size_t len, int prot)
 {
     // Fail on invalid protection mask
     if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC)))) {
@@ -2506,7 +2728,7 @@ static int present_ranges(F callback, linaddr_t rounded_addr, size_t len,
 // paged state with MADV_DONTNEED.
 // Support enabling/disabling write combining
 // with MADV_WEAKORDER/MADV_STRONGORDER
-EXPORT int madvise(void *addr, size_t len, int advice)
+int madvise(void *addr, size_t len, int advice)
 {
     if (unlikely(len == 0))
         return 0;
@@ -2699,7 +2921,7 @@ EXPORT int madvise(void *addr, size_t len, int advice)
     return 0;
 }
 
-EXPORT int msync(void const *addr, size_t len, int flags)
+int msync(void const *addr, size_t len, int flags)
 {
     // Check for validity, particularly accidentally using O_SYNC
     assert((flags & (MS_SYNC | MS_INVALIDATE)) == flags);
@@ -2736,7 +2958,7 @@ EXPORT int msync(void const *addr, size_t len, int flags)
     return result;
 }
 
-EXPORT uintptr_t mphysaddr(void volatile const *addr)
+uintptr_t mphysaddr(void volatile const *addr)
 {
     linaddr_t linaddr = linaddr_t(addr);
 
@@ -2851,7 +3073,7 @@ static _always_inline int mphysranges_callback(
     return 1;
 }
 
-EXPORT size_t mphysranges(
+size_t mphysranges(
         mmphysrange_t *ranges, size_t ranges_count,
         void const *addr, size_t size, size_t max_size)
 {
@@ -2883,8 +3105,8 @@ EXPORT size_t mphysranges(
     return state.count;
 }
 
-EXPORT bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
-                              size_t count_limit, uint8_t log2_boundary)
+bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
+                       size_t count_limit, uint8_t log2_boundary)
 {
     if (unlikely(ranges_count == 0))
         return true;
@@ -2918,7 +3140,7 @@ EXPORT bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
     return true;
 }
 
-EXPORT void *mmap_register_device(void *context,
+void *mmap_register_device(void *context,
                            uint64_t block_size,
                            uint64_t block_count,
                            int prot,
@@ -2975,18 +3197,18 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
 }
 
 
-EXPORT uintptr_t mm_alloc_hole(size_t size)
+uintptr_t mm_alloc_hole(size_t size)
 {
     size = (size + 63) & -64;
     return hole_allocator.alloc_linear(size);
 }
 
-EXPORT void mm_free_hole(uintptr_t addr, size_t size)
+void mm_free_hole(uintptr_t addr, size_t size)
 {
     hole_allocator.release_linear(addr, size);
 }
 
-EXPORT void *mmap_window(size_t size)
+void *mmap_window(size_t size)
 {
     size = round_up(size);
 
@@ -3006,7 +3228,7 @@ void munmap_window(void *addr, size_t size)
     linear_allocator.release_linear((uintptr_t)addr, size);
 }
 
-EXPORT int alias_window(void *addr, size_t size,
+int alias_window(void *addr, size_t size,
                         mmphysrange_t const *ranges,
                         size_t range_count)
 {
@@ -3329,3 +3551,4 @@ uint_least64_t mm_get_phys_mem_size()
 {
     return phys_allocator.get_phys_mem_size();
 }
+#endif

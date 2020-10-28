@@ -36,9 +36,9 @@ ethq_pkt_t *ethq_pkt_acquire(void);
 void ethq_pkt_release(ethq_pkt_t *pkt);
 
 struct ethq_queue_t {
-    ethq_pkt_t * volatile head;
-    ethq_pkt_t * volatile tail;
-    size_t volatile count;
+    ethq_pkt_t * head;
+    ethq_pkt_t * tail;
+    size_t count;
 };
 
 void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt);

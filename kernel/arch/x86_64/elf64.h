@@ -13,7 +13,7 @@ void __module_dynamic_linker(plt_stub_data_t *data);
 
 void modload_init(void);
 
-class module_t;
+class KERNEL_API module_t;
 
 module_t *modload_load(char const *path, bool run = true);
 module_t *modload_load_image(void const *image, size_t image_sz,
@@ -24,15 +24,15 @@ module_t *modload_load_image(void const *image, size_t image_sz,
 
 int modload_run(module_t *module);
 
-module_t *modload_closest(ptrdiff_t address);
-ext::string const& modload_get_name(module_t *module);
-uintptr_t modload_get_base_adj(module_t *module);
-uintptr_t modload_get_vaddr_min(module_t *module);
-size_t modload_get_size(module_t *module);
-size_t modload_get_count();
-module_t *modload_get_index(size_t i);
+KERNEL_API module_t *modload_closest(ptrdiff_t address);
+KERNEL_API ext::string const& modload_get_name(module_t *module);
+KERNEL_API uintptr_t modload_get_base_adj(module_t *module);
+KERNEL_API uintptr_t modload_get_vaddr_min(module_t *module);
+KERNEL_API size_t modload_get_size(module_t *module);
+KERNEL_API size_t modload_get_count();
+KERNEL_API module_t *modload_get_index(size_t i);
 
-int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle);
+KERNEL_API int __cxa_atexit(void (*func)(void *), void *arg, void *dso_handle);
 
 void *__tls_get_addr(void *a, void *b);
 

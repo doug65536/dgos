@@ -2,6 +2,9 @@
 #include "types.h"
 #include "likely.h"
 
+// HACK!
+//#define NDEBUG
+
 extern "C" KERNEL_API _noinline int __assert_failed(
         char const *expr, char const *msg, char const *file, int line);
 
@@ -14,8 +17,8 @@ extern "C" KERNEL_API _noinline int __assert_failed(
 #define assert_msg(e, msg) \
     (likely((e)) ? 1 : __assert_failed(#e, (msg), __FILE__, __LINE__))
 #else
-#define assert(e) (1)
-#define assert_msg(e, msg) (1)
+#define assert(e) assume(e)
+#define assert_msg(e, msg) assume(e)
 #endif
 
 // Assert that a value is an integer power of two

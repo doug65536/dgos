@@ -108,8 +108,10 @@ typedef long ssize_t;
 
 #endif
 
+
+
 __extension__ typedef __int128 int128_t;
-__extension__ typedef __int128 unsigned uint128_t;
+__extension__ typedef unsigned __int128 uint128_t;
 
 typedef int_fast64_t off_t;
 typedef intptr_t ssize_t;

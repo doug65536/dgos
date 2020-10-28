@@ -129,7 +129,7 @@ void tui_menu_renderer_t::interact_timeout(int ms)
 
     int ms_ticks = ms / 54;
 
-    if (!wait_input(ms))
+    if (unlikely(!wait_input(ms)))
         return;
 
     // Wait timeout seconds for a keystroke
@@ -232,5 +232,21 @@ void tui_menu_renderer_t::interact_timeout(int ms)
         // Exit on esc
         if (key == '\x1b')
             break;
+    }
+}
+
+tui_menu_renderer_t::tui_menu_renderer_t(tui_list_t<tui_menu_item_t> &items)
+    : items(items)
+{
+    for (size_t i = 0; i < items.count; ++i) {
+        tui_menu_item_t &item = items[i];
+
+        if (unlikely(item.text_limit)) {
+            item.text = (tchar*)calloc(sizeof(tchar),
+                                       item.text_limit + 1);
+
+            if (unlikely(!item.text))
+                PANIC_OOM();
+        }
     }
 }

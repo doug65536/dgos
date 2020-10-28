@@ -13,15 +13,23 @@
 ap_entry:
     cli
     cld
-    xor %ax,%ax
+
+    // ds = cs
+    movl %cs,%eax
+    movw %ax,%ds
+
+    // Expect 32 bit operations and addressing modes to be much faster
+    // even though they need prefixes in real mode
+    xor %eax,%eax
     mov %ax,%ss
-    mov $ 0xFFF0,%sp
+    mov $ 0xFFF0,%esp
 
     // Enable the cache immediately, in case the BIOS is bad
     // Enable write protection and configure FPU to modern operation
     movl %cr0,%eax
     andl $ ~CPU_CR0_CD & ~CPU_CR0_NW & ~CPU_CR0_EM,%eax
     orl $ CPU_CR0_WP | CPU_CR0_MP | CPU_CR0_NE,%eax
+    wbinvd
     movl %eax,%cr0
 
     // Get linear address of ap_entry into ebx
@@ -33,33 +41,33 @@ ap_entry:
     //
 
     // Calculate the cs-relative offset of gdtr
-    movw $ gdtr - ap_entry,%di
+    movl $ gdtr - ap_entry,%edi
 
     // Calculate the linear address of gdt
     leal gdt - ap_entry(%ebx),%ecx
 
     // Update the offset of the GDTR
-    cs movl %ecx,2(%di)
+    movl %ecx,2(%edi)
 
     // Load the cs-relative GDTR
-    cs lgdtl (%di)
+    lgdtl (%edi)
 
     //
     // Patch the linear address of the pm_entry label into pm_entry_vector
 
     // Calculate the cs-relative offset of pm_entry_vector
-    movw $ pm_entry_vector - ap_entry,%di
+    movl $ pm_entry_vector - ap_entry,%edi
 
     // Calculate the linear address of pm_entry
     leal pm_entry - ap_entry(%ebx),%ecx
 
     // Update the offset part of the pm_entry_vector far pointer
-    cs movl %ecx,(%di)
+    movl %ecx,(%edi)
 
     // Enable protected mode and far jump into protected mode, loading cs
     orl $ CPU_CR0_PE,%eax
     movl %eax,%cr0
-    cs ljmpl *(%di)
+    ljmpl *(%edi)
 
 .balign 16
 pm_entry:

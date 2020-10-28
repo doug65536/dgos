@@ -17,6 +17,13 @@
 #define FILEHANDLE_TRACE(...) ((void)0)
 #endif
 
+#define MAX_FILES 1000
+
+template<typename Dest>
+concept Something = requires(Dest& s) {
+    { s.data() };
+};
+
 struct filetab_t {
     // Default and move construct allowed
     filetab_t() = default;
@@ -28,32 +35,31 @@ struct filetab_t {
     filetab_t& operator=(filetab_t&&) = delete;
 
     // Filesystem specific per-file structure
-    fs_file_info_t *fi;
+    fs_file_info_t *fi = nullptr;
 
     // Filesystem implementation
-    fs_base_t *fs;
+    fs_base_t *fs = nullptr;
 
     // Current seek position
-    off_t pos;
-
-    // Free list pointer
-    filetab_t *next_free;
+    off_t pos = 0;
 
     // Reference count
-    int refcount;
+    int refcount = 0;
 
-    bool close_on_exec;
-    bool async;
-    bool nonblock;
+    uint32_t next_free;
+
+    bool close_on_exec = false;
+    bool async = false;
+    bool nonblock = false;
 
     // Size align
-    char reserved[25];
+    char reserved[28] = {};
 };
 
 // Make it fast to compute index from pointer difference
 C_ASSERT_ISPO2(sizeof(filetab_t));
 
-using file_table_lock_type = ext::noirq_lock<ext::spinlock>;
+using file_table_lock_type = ext::irq_spinlock;
 using file_table_scoped_lock = ext::unique_lock<file_table_lock_type>;
 
 static file_table_lock_type file_table_lock;
@@ -62,14 +68,14 @@ static file_table_lock_type file_table_lock;
 static ext::vector<filetab_t> file_table;
 
 // First free
-static filetab_t *file_table_ff;
+static uint32_t file_table_ff = -1U;
 
 static dev_fs_t *dev_fs;
 
 static void file_init(void *)
 {
     file_table_scoped_lock lock(file_table_lock);
-    if (unlikely(!file_table.reserve(1000)))
+    if (unlikely(!file_table.reserve(MAX_FILES)))
         panic_oom();
 }
 
@@ -120,20 +126,24 @@ static fs_base_t *file_fs_from_path(int dirid, char const *path,
 static filetab_t *file_new_filetab(void)
 {
     file_table_scoped_lock lock(file_table_lock);
+
     filetab_t *item = nullptr;
-    if (file_table_ff) {
+
+    if (file_table_ff != -1U) {
         // Reuse freed item
-        item = file_table_ff;
+        item = file_table.data() + file_table_ff;
         file_table_ff = item->next_free;
-        item->next_free = nullptr;
+        item->next_free = -1U;
     } else if (file_table.size() < file_table.capacity()) {
-        // Add another item
-        if (unlikely(!file_table.emplace_back()))
-            return nullptr;
+        assert(file_table.capacity() >= MAX_FILES);
+        // Bump allocate another item
+        bool ok = file_table.emplace_back();
+        assert(ok);
         item = &file_table.back();
     } else {
         return nullptr;
     }
+
     assert(item->refcount == 0);
     item->fi = nullptr;
     item->fs = nullptr;
@@ -148,7 +158,9 @@ static bool file_del_filetab(filetab_t *item)
     assert(item->refcount != 0);
     if (--item->refcount == 0) {
         item->next_free = file_table_ff;
-        file_table_ff = item;
+        size_t index = item - file_table.data();
+        assert(index < file_table.size());
+        file_table_ff = index;
         return true;
     }
 
@@ -170,7 +182,7 @@ bool file_ref_filetab(int id)
 REGISTER_CALLOUT(file_init, nullptr,
                  callout_type_t::heap_ready, "000");
 
-EXPORT int file_creatat(int dirid, char const *path, mode_t mode)
+int file_creatat(int dirid, char const *path, mode_t mode)
 {
     return file_openat(dirid, path, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }
@@ -187,7 +199,7 @@ static int file_root_dirid()
     return dirid;
 }
 
-EXPORT int file_openat(int dirid, char const *path, int flags, mode_t mode)
+int file_openat(int dirid, char const *path, int flags, mode_t mode)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
@@ -223,7 +235,7 @@ EXPORT int file_openat(int dirid, char const *path, int flags, mode_t mode)
     return id;
 }
 
-EXPORT int file_close(int id)
+int file_close(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -232,15 +244,20 @@ EXPORT int file_close(int id)
     int status = 0;
 
     fs_file_info_t *saved_file_info = fh->fi;
-    if (file_del_filetab(fh))
-        status = fh->fs->release(saved_file_info);
+    fs_base_t *saved_fs = fh->fs;
+
+    // If reference count reached zero
+    if (file_del_filetab(fh)) {
+        // Release resources used to track this file
+        status = saved_fs->release(saved_file_info);
+    }
 
     FILEHANDLE_TRACE("closed fd=%d\n", id);
 
     return status;
 }
 
-EXPORT ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
+ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -249,7 +266,7 @@ EXPORT ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
     return fh->fs->read(fh->fi, (char*)buf, bytes, ofs);
 }
 
-EXPORT ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs)
+ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -258,7 +275,7 @@ EXPORT ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs)
     return fh->fs->write(fh->fi, (char*)buf, bytes, ofs);
 }
 
-EXPORT int file_syncfs(int id)
+int file_syncfs(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -267,7 +284,7 @@ EXPORT int file_syncfs(int id)
     return fh->fs->flush(fh->fi);
 }
 
-EXPORT off_t file_seek(int id, off_t ofs, int whence)
+off_t file_seek(int id, off_t ofs, int whence)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -297,7 +314,7 @@ EXPORT off_t file_seek(int id, off_t ofs, int whence)
         if (unlikely(status < 0))
             return status;
 
-        if (st.st_size + ofs < 0)
+        if (unlikely(st.st_size + ofs < 0))
             return -int(errno_t::EINVAL);
 
         fh->pos = st.st_size + ofs;
@@ -315,7 +332,7 @@ EXPORT off_t file_seek(int id, off_t ofs, int whence)
     return fh->pos;
 }
 
-EXPORT int file_ftruncate(int id, off_t size)
+int file_ftruncate(int id, off_t size)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -324,7 +341,7 @@ EXPORT int file_ftruncate(int id, off_t size)
     return fh->fs->ftruncate(fh->fi, size);
 }
 
-EXPORT int file_ioctl(int id, int cmd, void* arg,
+int file_ioctl(int id, int cmd, void* arg,
                       unsigned int flags, void* data)
 {
     filetab_t *fh = file_fh_from_id(id);
@@ -334,7 +351,7 @@ EXPORT int file_ioctl(int id, int cmd, void* arg,
     return fh->fs->ioctl(fh->fi, cmd, arg, flags, data);
 }
 
-EXPORT int file_fstatfs(int id, fs_statvfs_t *buf)
+int file_fstatfs(int id, fs_statvfs_t *buf)
 {
     filetab_t *fh = file_fh_from_id(id);
 
@@ -344,7 +361,7 @@ EXPORT int file_fstatfs(int id, fs_statvfs_t *buf)
     return fh->fs->statfs(buf);
 }
 
-EXPORT ssize_t file_read(int id, void *buf, size_t bytes)
+ssize_t file_read(int id, void *buf, size_t bytes)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -357,9 +374,83 @@ EXPORT ssize_t file_read(int id, void *buf, size_t bytes)
     return size;
 }
 
-EXPORT ssize_t file_write(int id, void const *buf, size_t bytes)
+struct flock_ent_t {
+    uint64_t st;
+    uint64_t en;
+    int id;
+    int pid;
+    
+    // Order by {id,st}
+    _always_inline bool operator<(flock_ent_t const& rhs) const noexcept
+    {
+        uint128_t lhs_n, rhs_n;
+        
+        lhs_n = (uint128_t(unsigned(id)) << 64) | uint64_t(st);
+        rhs_n = (uint128_t(unsigned(rhs.id)) << 64) | uint64_t(rhs.st);
+        
+        return lhs_n < rhs_n;
+    }
+};
+
+using scoped_flock_lock = ext::unique_lock<ext::mutex>;
+static ext::mutex sys_flock_lock;
+static ext::condition_variable sys_flock_cond;
+static ext::set<flock_ent_t> sys_flock_locks;
+
+int file_lock_op(int id, flock &info, bool wait)
 {
     filetab_t *fh = file_fh_from_id(id);
+    
+    if (unlikely(!fh))
+        return -int(errno_t::EBADF);
+    
+    off_t off;
+    
+    switch (info.l_whence) {
+    case SEEK_SET:
+        // Absolute start position
+        off = info.l_start;
+        break;
+        
+    case SEEK_CUR:
+        // Relative start position
+        off = fh->pos + info.l_start;
+        break;
+        
+    default:
+        return -int(errno_t::EINVAL);
+        
+    case SEEK_END:
+        // Relative to end position
+        int status;
+        fs_stat_t st;
+        
+        status = fh->fs->fstat(fh->fi, &st);
+        
+        if (unlikely(status < 0))
+            return status;
+
+        if (unlikely(st.st_size + info.l_start < 0))
+            return -int(errno_t::EINVAL);
+
+        off = st.st_size + info.l_start;
+        
+        break;
+        
+    }
+    
+    off_t end = info.l_len 
+            ? off + info.l_len 
+            : ext::numeric_limits<off_t>::max();
+    
+    scoped_flock_lock lock(sys_flock_lock);
+    return -int(errno_t::ENOSYS);    
+}
+
+ssize_t file_write(int id, void const *buf, size_t bytes)
+{
+    filetab_t *fh = file_fh_from_id(id);
+    
     if (unlikely(!fh))
         return -int(errno_t::EBADF);
 
@@ -370,7 +461,7 @@ EXPORT ssize_t file_write(int id, void const *buf, size_t bytes)
     return size;
 }
 
-EXPORT int file_fsync(int id)
+int file_fsync(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -379,7 +470,7 @@ EXPORT int file_fsync(int id)
     return fh->fs->fsync(fh->fi, 0);
 }
 
-EXPORT int file_fdatasync(int id)
+int file_fdatasync(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -388,7 +479,7 @@ EXPORT int file_fdatasync(int id)
     return fh->fs->fsync(fh->fi, 1);
 }
 
-EXPORT int file_opendirat(int dirid, char const *path)
+int file_opendirat(int dirid, char const *path)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
@@ -418,7 +509,7 @@ EXPORT int file_opendirat(int dirid, char const *path)
     return fh - file_table.data();
 }
 
-EXPORT ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
+ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -435,7 +526,7 @@ EXPORT ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
     return size;
 }
 
-EXPORT off_t file_telldir(int id)
+off_t file_telldir(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -444,7 +535,7 @@ EXPORT off_t file_telldir(int id)
     return fh->pos;
 }
 
-EXPORT off_t file_seekdir(int id, off_t ofs)
+off_t file_seekdir(int id, off_t ofs)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -454,7 +545,7 @@ EXPORT off_t file_seekdir(int id, off_t ofs)
     return 0;
 }
 
-EXPORT int file_closedir(int id)
+int file_closedir(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -469,7 +560,7 @@ EXPORT int file_closedir(int id)
     return status;
 }
 
-EXPORT int file_mkdirat(int dirid, char const *path, mode_t mode)
+int file_mkdirat(int dirid, char const *path, mode_t mode)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
@@ -483,7 +574,7 @@ EXPORT int file_mkdirat(int dirid, char const *path, mode_t mode)
                        path + consumed, mode);
 }
 
-EXPORT int file_rmdirat(int dirid, char const *path)
+int file_rmdirat(int dirid, char const *path)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
@@ -497,7 +588,7 @@ EXPORT int file_rmdirat(int dirid, char const *path)
                        path + consumed);
 }
 
-EXPORT int file_renameat(int olddirid, char const *old_path,
+int file_renameat(int olddirid, char const *old_path,
                          int newdirid, char const *path)
 {
     size_t old_consumed = 0;
@@ -521,7 +612,7 @@ EXPORT int file_renameat(int olddirid, char const *old_path,
                         path + consumed);
 }
 
-EXPORT int file_unlinkat(int dirid, char const *path)
+int file_unlinkat(int dirid, char const *path)
 {
     size_t consumed = 0;
     fs_base_t *fs = file_fs_from_path(dirid, path, consumed);
@@ -535,7 +626,7 @@ EXPORT int file_unlinkat(int dirid, char const *path)
                         path + consumed);
 }
 
-EXPORT int file_fchmod(int id, mode_t mode)
+int file_fchmod(int id, mode_t mode)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -547,7 +638,7 @@ EXPORT int file_fchmod(int id, mode_t mode)
     return fh->fs->fchmod(fh->fi, mode);
 }
 
-EXPORT int file_chown(int id, int uid, int gid)
+int file_chown(int id, int uid, int gid)
 {
     filetab_t *fh = file_fh_from_id(id);
 

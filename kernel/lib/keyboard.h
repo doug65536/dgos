@@ -227,13 +227,13 @@ class keybd_dev_t {
 };
 
 // Plugged in by drivers
-extern int (*keybd_set_layout_name)(char const *name);
-extern int (*keybd_get_modifiers)(void);
-extern int (*keybd_set_indicators)(int indicators);
+KERNEL_API extern int (*keybd_set_layout_name)(char const *name);
+KERNEL_API extern int (*keybd_get_modifiers)(void);
+KERNEL_API extern int (*keybd_set_indicators)(int indicators);
 
 void keybd_init(void);
 
-class keybd_fsa_t {
+class KERNEL_API keybd_fsa_t {
 public:
     keybd_fsa_t();
 
@@ -253,3 +253,4 @@ private:
     int alt_code;
     uint8_t shift_state;
 };
+

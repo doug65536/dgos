@@ -1705,7 +1705,7 @@ __module_dynlink_plt_thunk:
 cs_leave_asm:
     .cfi_startproc
     xorl %eax,%eax
-    addl $ -1,%gs:CPU_INFO_LOCKS_HELD_OFS
+    addl $ -1,%gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
     js .Lpanic
     jnz .Lreturn
 

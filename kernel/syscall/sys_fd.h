@@ -114,3 +114,7 @@ int sys_statfs(char const *path, fs_statvfs_t *buf);
 int sys_fstatfs(int fd, fs_statvfs_t *buf);
 
 int sys_pipe(int *user_fds);
+int sys_flock(int fd, int what);
+
+// fixme: from fcntl.h
+

@@ -10,6 +10,7 @@
 #include <surface.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <limits.h>
 
 #include <sys/mman.h>
 #include <sys/likely.h>
@@ -766,6 +767,101 @@ void test_xmm_hi_ctx()
         printf("XMM context test (hi) FAILED\n");
 }
 
+__BEGIN_ANONYMOUS
+
+class perf_test_thread_t {
+public:
+    perf_test_thread_t() = default;
+    perf_test_thread_t(perf_test_thread_t const&) = delete;
+
+    ~perf_test_thread_t()
+    {
+        if (tid != (pthread_t)-1) {
+            pthread_join(tid, nullptr);
+            tid = -1;
+        }
+    }
+
+    void start()
+    {
+        int err = pthread_create(&tid, nullptr,
+                                 &perf_test_thread_t::worker_entry, this);
+
+        if (err)
+            printf("Thread creation error: %d\n", err);
+    }
+
+private:
+    void *worker()
+    {
+        uint64_t sum_open = 0;
+        uint64_t sum_clos = 0;
+        uint64_t worst_open = 0;
+        uint64_t worst_clos = 0;
+        uint64_t best_open = ~0ULL;
+        uint64_t best_clos = ~0ULL;
+        size_t i;
+
+        uint64_t st = __builtin_ia32_rdtsc();
+        for (i = 0; i < 1000000; ++i) {
+            uint64_t sto = __builtin_ia32_rdtsc();
+            int fd = openat(AT_FDCWD, path, O_RDONLY);
+            uint64_t eno = __builtin_ia32_rdtsc();
+
+            uint64_t stc = __builtin_ia32_rdtsc();
+            // Close it even if -1 like a sloppy program would
+            close(fd);
+            uint64_t enc = __builtin_ia32_rdtsc();
+
+            eno -= sto;
+            enc -= stc;
+
+            sum_open += eno;
+            sum_clos += enc;
+
+            worst_open = worst_open < eno ? eno : worst_open;
+            worst_clos = worst_clos < enc ? enc : worst_clos;
+
+            best_open = eno < best_open ? eno : best_open;
+            best_clos = enc < best_clos ? enc : best_clos;
+        }
+        uint64_t en = __builtin_ia32_rdtsc();
+        en -= st;
+
+        printf("Open close %zu files, each=%" PRIu64 ", perf:\n", i, en / i);
+        printf("open: min=%" PRIu64 " mean=%" PRIu64 " max=%" PRIu64 "\n",
+               best_open, sum_open / i, worst_open);
+        printf("clos: min=%" PRIu64 " mean=%" PRIu64 " max=%" PRIu64 "\n",
+               best_clos, sum_clos / i, worst_clos);
+
+        return nullptr;
+    }
+
+    static void *worker_entry(void *arg)
+    {
+        return reinterpret_cast<perf_test_thread_t*>(arg)->worker();
+    }
+
+    pthread_t tid = -1;
+    char const * const path = "/usr/share/background.png";
+};
+
+static void test_perf_open_close(size_t parallelism)
+{
+    perf_test_thread_t *threads = new perf_test_thread_t[parallelism]();
+
+    for (size_t i = 0; i < parallelism; ++i)
+        threads[i].start();
+
+    for (size_t i = 0; i < parallelism; ++i)
+        threads[i].start();
+
+    // Destructors join them one by one
+    delete[] threads;
+}
+
+__END_ANONYMOUS
+
 int test_signal()
 {
     struct sigaction ill_act = {};
@@ -848,8 +944,9 @@ int main(int argc, char **argv, char **envp)
 
     test_signal();
 
-    load_module("boot/symsrv.km");
+    test_perf_open_close(1);
 
+    load_module("boot/symsrv.km");
 
     //syscall_perf_test();
 

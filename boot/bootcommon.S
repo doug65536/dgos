@@ -327,35 +327,66 @@ update_eflags:
 
 .global idt_init
 idt_init:
-    mov $ idt,%edx
-    mov %edx,%ecx
-    shr $ 4,%ecx
-    and $ 0xF,%edx
-    mov %cx,%ds
-    mov $ 0,%ecx
+    push %edi
+    push %esi
 
-0:  movw %cs:isr_table(,%ecx,4),%ax
-    movw %ax,(%edx,%ecx,8)
-    movw $ GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
-    movw $ 0,4(%edx,%ecx,8)
-    movw $ 0x8e,5(%edx,%ecx,8)
-    movw $ 0,6(%edx,%ecx,8)
+    // Set up a far pointer to isr_table at %es:(%esi,%ecx,4)
+    movl $ isr_table,%eax
+    mov %eax,%esi
+    shr $ 4,%eax
+    and $ 0xF,%esi
+    movw %ax,%es
+
+    // Setup a far pointer to idt at %ds:(%edi,%ecx,8)
+    mov $ idt,%eax
+    mov %eax,%edi
+    shr $ 4,%eax
+    and $ 0xF,%edi
+    mov %cx,%ds
+
+    xor %ecx,%ecx
+
+    // Fetch function pointer from table
+0:  movl %es:(%esi,%ecx,4),%eax
+
+    // offset 15:0
+    movw %ax,(%edi,%ecx,8)
+
+    // cs selector
+    movw $ GDT_SEL_KERNEL_CODE64,2(%edi,%ecx,8)
+
+    // unused 0
+    movb $ 0,4(%edi,%ecx,8)
+
+    // type_attr
+    movw $ 0x8e,5(%edi,%ecx,8)
+
+    // offset 31:16
+    shr $ 16,%eax
+    movw %ax,6(%edi,%ecx,8)
+
+    // Loop
     addl $ 1,%ecx
     cmpl $ 32,%ecx
     jb 0b
 
+    // Far pointer to idtr in %ds:(%eax)
     mov $ idtr_64,%ecx
     mov %ecx,%eax
     shr $ 4,%ecx
     and $ 0xF,%eax
     movw %cx,%ds
-    xor %eax,%eax
 
     // Set limit
     movw $ 32 * 8 - 1,6(%eax)
     movl $ idt,8(%eax)
-    mov %ax,%ds
 
+    xor %eax,%eax
+    mov %ax,%ds
+    mov %ax,%es
+
+    pop %esi
+    pop %edi
     ret
 
 .Lidt_ptr:

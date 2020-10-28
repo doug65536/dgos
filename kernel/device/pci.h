@@ -7,7 +7,7 @@
 #include "vector.h"
 #include "export.h"
 
-struct pci_addr_t {
+struct KERNEL_API pci_addr_t  {
     // Legacy PCI supports 256 busses, 32 slots, 8 functions, and 64 dwords
     // PCIe supports 16777216 busses, 32 slots, 8 functions, 1024 dwords
     // PCIe organizes the busses into up to 65536 segments of 256 busses
@@ -49,7 +49,7 @@ struct pci_bar_size_t {
     int log2_size;
 };
 
-struct pci_config_hdr_t {
+struct KERNEL_API pci_config_hdr_t {
     // 0x00
     uint16_t vendor;
     uint16_t device;
@@ -134,7 +134,7 @@ C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
 #define PCI_CFG_STATUS_CAPLIST_BIT  4
 #define PCI_CFG_STATUS_CAPLIST      (1<<PCI_CFG_STATUS_CAPLIST_BIT)
 
-struct pci_dev_t {
+struct KERNEL_API pci_dev_t {
     pci_config_hdr_t config;
     pci_addr_t addr;
 
@@ -142,7 +142,7 @@ struct pci_dev_t {
     ~pci_dev_t();
 };
 
-struct pci_dev_iterator_t : public pci_dev_t {
+struct KERNEL_API pci_dev_iterator_t : public pci_dev_t {
     pci_dev_iterator_t();
     ~pci_dev_iterator_t();
 
@@ -172,11 +172,12 @@ struct pci_dev_iterator_t : public pci_dev_t {
 
 // Update pci_describe_device if any device classes,
 // subclasses, or progif are added here
-char const *pci_describe_device(pci_dev_iterator_t const& pci_iter);
+KERNEL_API char const *pci_describe_device(pci_dev_iterator_t const& pci_iter);
 
 __BEGIN_DECLS
 
-char const *pci_describe_device(uint8_t cls, uint8_t sc, uint8_t pif);
+KERNEL_API char const *pci_describe_device(
+        uint8_t cls, uint8_t sc, uint8_t pif);
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
 #define PCI_DEV_CLASS_STORAGE           0x01
@@ -441,27 +442,28 @@ char const *pci_describe_device(uint8_t cls, uint8_t sc, uint8_t pif);
 
 int pci_init(void);
 
-int pci_enumerate_begin(pci_dev_iterator_t *iter,
-                        int dev_class = -1, int subclass = -1,
-                        int vendor = -1, int device = -1);
-int pci_enumerate_next(pci_dev_iterator_t *iter);
+KERNEL_API int pci_enumerate_begin(pci_dev_iterator_t *iter,
+                                   int dev_class = -1, int subclass = -1,
+                                   int vendor = -1, int device = -1);
+KERNEL_API int pci_enumerate_next(pci_dev_iterator_t *iter);
 
-uint32_t pci_config_read(pci_addr_t addr, int offset, int size);
+KERNEL_API uint32_t pci_config_read(pci_addr_t addr, int offset, int size);
 
-bool pci_config_write(pci_addr_t addr,
+KERNEL_API bool pci_config_write(pci_addr_t addr,
                       size_t offset, void *values, size_t size);
 
-void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size);
+KERNEL_API void pci_config_copy(pci_addr_t addr, void *dest,
+                                int ofs, size_t size);
 
 // Returns positive count for msix, or negated count for msi
-int pci_max_vectors(pci_addr_t addr);
+KERNEL_API int pci_max_vectors(pci_addr_t addr);
 
-int pci_find_capability(pci_addr_t addr,
-        int capability_id, int start = 0);
+KERNEL_API int pci_find_capability(pci_addr_t addr,
+                                   int capability_id, int start = 0);
 
-int pci_enum_capabilities(int start, pci_addr_t addr,
-                          int (*callback)(uint8_t, int, uintptr_t),
-                          uintptr_t context);
+KERNEL_API int pci_enum_capabilities(int start, pci_addr_t addr,
+                                     int (*callback)(uint8_t, int, uintptr_t),
+                                     uintptr_t context);
 
 //
 // PCI capability IDs
@@ -532,35 +534,36 @@ void pci_init_ecam_entry(uint64_t base, uint16_t seg,
                          uint8_t st_bus, uint8_t en_bus);
 void pci_init_ecam_enable();
 
-bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
-                     pci_irq_range_t *irq_range,
-                     int cpu, bool distribute, int req_count,
-                     intr_handler_t handler, char const *name,
-                     int const *target_cpus = nullptr,
-                     int const *vector_offsets = nullptr);
+KERNEL_API bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
+                                pci_irq_range_t *irq_range,
+                                int cpu, bool distribute, int req_count,
+                                intr_handler_t handler, char const *name,
+                                int const *target_cpus = nullptr,
+                                int const *vector_offsets = nullptr);
 
-bool pci_set_msi_irq(pci_dev_iterator_t const& pci_dev,
-                     pci_irq_range_t *irq_range,
-                     int cpu, bool distribute, size_t req_count,
-                     intr_handler_t handler, char const *name,
-                     int const *target_cpus = nullptr,
-                     int const *vector_offsets = nullptr);
+KERNEL_API bool pci_set_msi_irq(pci_dev_iterator_t const& pci_dev,
+                                pci_irq_range_t *irq_range,
+                                int cpu, bool distribute, size_t req_count,
+                                intr_handler_t handler, char const *name,
+                                int const *target_cpus = nullptr,
+                                int const *vector_offsets = nullptr);
 
-bool pci_set_irq_unmask(pci_addr_t addr,
-                        bool unmask);
+KERNEL_API bool pci_set_irq_unmask(pci_addr_t addr,
+                                   bool unmask);
 
-void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line);
+KERNEL_API void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line);
 
-void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin);
+KERNEL_API void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin);
 
-void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
+KERNEL_API void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
                           uint16_t set, uint16_t clr);
 
-void pci_clear_status_bits(pci_addr_t addr, uint16_t bits);
+KERNEL_API void pci_clear_status_bits(pci_addr_t addr, uint16_t bits);
 
-char const * pci_device_class_text(uint8_t cls);
+KERNEL_API char const * pci_device_class_text(uint8_t cls);
 
-int pci_vector_count_from_offsets(int const *vector_offsets, int count);
+KERNEL_API int pci_vector_count_from_offsets(
+        int const *vector_offsets, int count);
 
 __END_DECLS
 
@@ -754,11 +757,18 @@ public:
     uint32_t size;
 };
 
-class pci_bar_accessor_t {
+class KERNEL_API pci_bar_accessor_t final {
 public:
     pci_bar_accessor_t() = default;
     pci_bar_accessor_t(pci_dev_iterator_t const &pci_iter,
                        unsigned bar, size_t length);
+    pci_bar_accessor_t(uint64_t addr, uint64_t size, bool port)
+        : mmio_base(port ? 0 : uintptr_t(map(addr, size)))
+        , mmio_size(size)
+        , port_base(port ? addr : 0)
+    {
+    }
+
     pci_bar_accessor_t(pci_bar_accessor_t const&) = delete;
     ~pci_bar_accessor_t();
 
@@ -772,7 +782,34 @@ public:
     uint32_t rd_32(pci_bar_register_t reg);
     uint64_t rd_64(pci_bar_register_t reg);
 
+    operator bool() const
+    {
+        return mmio_size &&
+                ((mmio_base && (void*)mmio_base != MAP_FAILED) || port_base);
+    }
+
     uint64_t mmio_base = 0;
     uint64_t mmio_size = 0;
     uint16_t port_base = 0;
+
+private:
+    void *map(uint64_t addr, size_t length);
 };
+
+template<typename T, typename R>
+static _always_inline void mm_and(T volatile& dest, R rhs)
+{
+    mm_wr(dest, mm_rd(dest) & rhs);
+}
+
+template<typename T, typename R>
+static _always_inline void mm_or(T volatile& dest, R rhs)
+{
+    mm_wr(dest, mm_rd(dest) | rhs);
+}
+
+template<typename T, typename R>
+static _always_inline void mm_xor(T volatile& dest, R rhs)
+{
+    mm_wr(dest, mm_rd(dest) ^ rhs);
+}

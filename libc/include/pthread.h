@@ -3,6 +3,16 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+// JS hex to string:
+// '50545f5370696e4c'.match(/../g).map((h) =>
+//    String.fromCharCode(parseInt(h,16))).join('')
+//
+// JS string to hex:
+// 'PT_SpinL'.match(/./g).map((c) =>
+//    ('0' + c.charCodeAt(0).toString(16)).substr(-2)).join('')
+//
+// Note that little endian architectures store the string backwards
+
 // "PT_Bad!!"
 #define __PTHREAD_BAD_SIG \
     0x50545f4261642121
@@ -45,13 +55,17 @@ struct pthread_cond_t {
 
 #define PTHREAD_COND_INITIALIZER { __PTHREAD_COND_SIG, 0 }
 
-#define __PTHREAD_CONDATTR_SIG
+// "PT_CVAtt"
+#define __PTHREAD_CONDATTR_SIG \
+    0x50545f4356417474
 
 struct pthread_condattr_t {
     uint64_t sig;
 };
 
-#define __PTHREAD_KEY_SIG
+// "PT_Key__"
+#define __PTHREAD_KEY_SIG \
+    0x50545f4b65795f5f
 
 struct pthread_key_t {
     uint64_t sig;
@@ -73,6 +87,7 @@ struct pthread_mutexattr_t {
     uint64_t sig;
 };
 
+// "PT_Once "
 #define __PTHREAD_ONCE_SIG \
     0x50545f4f6e636520
 
@@ -80,6 +95,7 @@ struct pthread_once_t {
     uint64_t sig;
 };
 
+// "PT_RWLoc"
 #define __PTHREAD_RWLOCK_SIG \
     0x50545f52574c6f63
 
@@ -99,6 +115,7 @@ struct pthread_rwlock_t {
 
 #define PTHREAD_RWLOCK_INITIALIZER  { __PTHREAD_RWLOCK_SIG, 0, -1 };
 
+// "PT_RWLAt"
 #define __PTHREAD_RWLOCKATTR_SIG \
     0x50545f52574c4174
 
@@ -106,6 +123,7 @@ struct pthread_rwlockattr_t {
     uint64_t sig;
 };
 
+// "PT_SpinL"
 #define __PTHREAD_SPINLOCK_SIG \
     0x50545f5370696e4c
 

@@ -101,7 +101,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_msgrcv,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_msgctl,
     (syscall_handler_t*)(void*)sys_fcntl,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_flock,
+    (syscall_handler_t*)(void*)sys_flock,
     (syscall_handler_t*)(void*)sys_fsync,
     (syscall_handler_t*)(void*)sys_fdatasync,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_truncate,

@@ -10,45 +10,45 @@
 __BEGIN_DECLS
 
 _noreturn _printf_format(1, 0)
-void vpanic(char const * restrict format, va_list ap);
+KERNEL_API void vpanic(char const * restrict format, va_list ap);
 
 _noreturn _printf_format(1, 2)
-void panic(char const *format, ...);
+KERNEL_API void panic(char const *format, ...);
 
 _noreturn
-void panic_oom();
+KERNEL_API void panic_oom();
 
 _printf_format(3, 0)
 int vsnprintf(char * restrict buf, size_t limit,
               char const * restrict format, va_list ap);
 
 _printf_format(3, 4)
-int snprintf(char * restrict buf, size_t limit,
-             char const * restrict format, ...);
+KERNEL_API_BUILTIN int snprintf(char * restrict buf, size_t limit,
+                                char const * restrict format, ...);
 
 _printf_format(1, 2)
-void printk(char const *format, ...);
+KERNEL_API void printk(char const *format, ...);
 
 _printf_format(1, 0)
-void vprintk(char const *format, va_list ap);
+KERNEL_API void vprintk(char const *format, va_list ap);
 
 _printf_format(1, 2)
-int printdbg(char const * restrict format, ...);
+KERNEL_API int printdbg(char const * restrict format, ...);
 
 _printf_format(1, 0)
-int vprintdbg(char const * restrict format, va_list ap);
+KERNEL_API int vprintdbg(char const * restrict format, va_list ap);
 
 _printf_format(1, 2)
-int cprintf(char const * restrict format, ...);
+KERNEL_API int cprintf(char const * restrict format, ...);
 
 _printf_format(1, 0)
-int vcprintf(char const * restrict format, va_list ap);
+KERNEL_API int vcprintf(char const * restrict format, va_list ap);
 
-int hex_dump(void const volatile *mem, size_t size, uintptr_t base = 0);
+KERNEL_API int hex_dump(void const volatile *mem, size_t size, uintptr_t base = 0);
 
-int putsdbg(char const *s);
+KERNEL_API int putsdbg(char const *s);
 
-int writedbg(char const *s, size_t len);
+KERNEL_API int writedbg(char const *s, size_t len);
 
 struct format_flag_info_t {
     char const * const name;
@@ -58,7 +58,7 @@ struct format_flag_info_t {
     uint64_t :56;
 };
 
-size_t format_flags_register(
+KERNEL_API size_t format_flags_register(
         char *buf, size_t buf_size,
         uintptr_t flags, format_flag_info_t const *info);
 
@@ -81,7 +81,7 @@ __END_NAMESPACE_STD
 
 enum debug_out_modifier_t { dec, hex, plus, noplus };
 
-class debug_out_t {
+class KERNEL_API debug_out_t {
 public:
     // unsigned
     template<typename T>
@@ -176,4 +176,4 @@ private:
     debug_out_t& write_ptr(void const *rhs);
 };
 
-extern debug_out_t dbgout;
+KERNEL_API extern debug_out_t dbgout;

@@ -51,6 +51,8 @@ struct _FILE {
     }
 
     int open(int new_fd);
+    int flush();
+    int close();
 
     // Add a character to the buffer
     int add_ch(int ch);

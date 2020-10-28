@@ -7,7 +7,7 @@
 using physaddr_t = uintptr_t;
 using linaddr_t = uintptr_t;
 
-class mmu_phys_allocator_t {
+class KERNEL_API mmu_phys_allocator_t {
     typedef uint32_t entry_t;
     using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = ext::unique_lock<lock_type>;

@@ -128,6 +128,8 @@ void cpuid_init()
     if (cpuid(&info, CPUID_ADDRSIZES, 0)) {
         cpuid_cache.paddr_bits = info.eax & 0xFF;
         cpuid_cache.laddr_bits = (info.eax >> 8) & 0xFF;
+
+        cpuid_cache.has_clzero = info.ebx & (1U << 0);
     } else {
         // Make reasonable guess
         cpuid_cache.paddr_bits = 52;

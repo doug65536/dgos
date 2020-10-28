@@ -148,7 +148,7 @@ case $os in
 	-convergent* | -ncr* | -news | -32* | -3600* | -3100* | -hitachi* |\
 	-c[123]* | -convex* | -sun | -crds | -omron* | -dg | -ultra | -tti* | \
 	-harris | -dolphin | -highlevel | -gould | -cbm | -ns | -masscomp | \
-	-apple | -axis | -knuth | -cray | -microblaze*)
+	-apple | -axis | -knuth | -cray | -microblaze* | -dgos*)
 		os=
 		basic_machine=$1
 		;;
@@ -1409,7 +1409,7 @@ case $os in
 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
 	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* \
-	      | -onefs* | -tirtos* | -phoenix* | -fuchsia*)
+	      | -onefs* | -tirtos* | -phoenix* | -fuchsia* | -dgos*)
 	# Remember, each alternative MUST END IN *, to match a version number.
 		;;
 	-qnx*)

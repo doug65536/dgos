@@ -127,7 +127,7 @@ memset32_fn_t resolve_memset32_nt()
 __attribute__((ifunc("resolve_memset32_nt")))
 void *memset32_nt(void *dest, uint32_t val, size_t n);
 #else
-EXPORT void *memset32_nt(void *dest, uint32_t val, size_t n)
+void *memset32_nt(void *dest, uint32_t val, size_t n)
 {
     int32_t *d = (int32_t*)dest;
 
@@ -139,17 +139,17 @@ EXPORT void *memset32_nt(void *dest, uint32_t val, size_t n)
     return dest;
 }
 
-EXPORT void *memcpy32_nt(void *dest, void const *src, size_t n)
+void *memcpy32_nt(void *dest, void const *src, size_t n)
 {
     return memcpy(dest, src, n);
 }
 
-EXPORT void *memcpy512_nt(void *dest, void const *src, size_t n)
+void *memcpy512_nt(void *dest, void const *src, size_t n)
 {
     return memcpy(dest, src, n);
 }
 
-EXPORT void memcpy_nt_fence()
+void memcpy_nt_fence()
 {
 }
 

@@ -1362,7 +1362,7 @@ void usbxhci::legacy_handoff(uint32_t const volatile *cap)
     bios_owned = (uint8_t volatile *)cap + 2;
     os_owned = (uint8_t volatile *)cap + 3;
 
-    mm_wr(*os_owned, mm_rd(*os_owned) | 1);
+    mm_or(*os_owned, 1);
 
     ext::chrono::steady_clock::time_point now, st, timeout;
     st = ext::chrono::steady_clock::now();
@@ -2337,7 +2337,7 @@ isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
     return ctx;
 }
 
-// Runs in CPU worker thread
+
 void usbxhci::irq_handler(int irq_ofs)
 {
     uint32_t usbsts = mmio_op->usbsts;
@@ -2562,13 +2562,13 @@ int usbxhci::make_setup_trbs(
         uint16_t value, uint16_t index)
 {
     if (unlikely(trb_capacity < 2))
-        return false;
+        return 0;
 
     int data_trb_count = make_data_trbs(&trbs[1].data, trb_capacity - 1,
                                         data, length, dir, false, false);
 
     if (unlikely(trb_capacity < data_trb_count + 2))
-        return false;
+        return 0;
 
     usbxhci_ctl_trb_t *trb = trbs;
 

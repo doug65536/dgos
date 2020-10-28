@@ -4,6 +4,8 @@
 
 #include "iso9660_decl.h"
 
+__BEGIN_ANONYMOUS
+
 //struct part_dev_t;
 
 struct iso9660_part_factory_t : public part_factory_t {
@@ -60,3 +62,5 @@ iso9660_part_factory_t::detect(storage_dev_base_t *drive)
 }
 
 static iso9660_part_factory_t iso9660_part_factory;
+
+__END_ANONYMOUS

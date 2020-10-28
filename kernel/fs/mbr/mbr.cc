@@ -10,7 +10,7 @@
 #define MBR_TRACE(...) ((void)0)
 #endif
 
-struct part_dev_t;
+__BEGIN_ANONYMOUS
 
 struct partition_tbl_ent_t {
     uint8_t  boot;					//0: Boot indicator bit flag: 0 = no,
@@ -115,3 +115,5 @@ ext::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
 }
 
 static mbr_part_factory_t mbr_part_factory;
+
+__END_ANONYMOUS

@@ -12,7 +12,7 @@ int fseek(FILE *stream, off_t offset, int origin)
     }
 
     // fseek undoes the effect of ungetc
-    stream->unget = -1;
+    stream->unget_pos = _FILE::unget_size;
 
     // POSIX states that fseek should flush writes
     if (stream->dirty_pos != stream->dirty_end_pos) {
@@ -28,4 +28,6 @@ int fseek(FILE *stream, off_t offset, int origin)
         if (unlikely(written != write_sz))
             return -1;
     }
+    
+    return 0;
 }

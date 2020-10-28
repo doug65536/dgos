@@ -11,6 +11,7 @@ __BEGIN_DECLS
 #define EXIT_SUCCESS    0
 #define RAND_MAX        0x7FFFFFFF
 #define MB_CUR_MAX      1
+#define _MALLOC_OVERHEAD 0
 
 typedef struct {
     int quot;

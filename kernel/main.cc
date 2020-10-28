@@ -52,7 +52,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 
 #define ENABLE_SHELL_THREAD         0
 #define ENABLE_READ_STRESS_THREAD   1
-#define ENABLE_SLEEP_THREAD         150
+#define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_MMAP_STRESS_THREAD   0

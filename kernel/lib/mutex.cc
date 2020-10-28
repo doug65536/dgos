@@ -17,8 +17,8 @@ template class ext::unique_lock<ext::noirq_lock<ext::mutex>>;
 template class ext::unique_lock<ext::noirq_lock<ext::shared_mutex>>;
 
 template class ext::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
-template class ext::unique_lock<ext::noirq_lock<ext::ticketlock>>;
-template class ext::unique_lock<ext::noirq_lock<ext::spinlock>>;
+template class ext::unique_lock<ext::irq_ticketlock>;
+template class ext::unique_lock<ext::irq_spinlock>;
 template class ext::unique_lock<ext::noirq_lock<ext::irqlock>>;
 //template class ext::unique_lock<ext::noirq_lock<ext::mcslock>>;
 #pragma GCC visibility pop
@@ -185,95 +185,95 @@ void ext::spinlock::unlock()
     spinlock_unlock(&m);
 }
 
-EXPORT spinlock_t &ext::spinlock::native_handle()
+spinlock_t &ext::spinlock::native_handle()
 {
     return m;
 }
 
-EXPORT void ext::shared_spinlock::lock()
+void ext::shared_spinlock::lock()
 {
     rwspinlock_ex_lock(&m);
 }
 
-EXPORT bool ext::shared_spinlock::try_lock()
+bool ext::shared_spinlock::try_lock()
 {
     return rwspinlock_ex_try_lock(&m);
 }
 
-EXPORT void ext::shared_spinlock::unlock()
+void ext::shared_spinlock::unlock()
 {
     rwspinlock_ex_unlock(&m);
 }
 
-EXPORT void ext::shared_spinlock::lock_shared()
+void ext::shared_spinlock::lock_shared()
 {
     rwspinlock_sh_lock(&m);
 }
 
-EXPORT bool ext::shared_spinlock::try_lock_shared()
+bool ext::shared_spinlock::try_lock_shared()
 {
     return rwspinlock_sh_try_lock(&m);
 }
 
-EXPORT void ext::shared_spinlock::unlock_shared()
+void ext::shared_spinlock::unlock_shared()
 {
     rwspinlock_sh_unlock(&m);
 }
 
-EXPORT void ext::shared_spinlock::upgrade_lock()
+void ext::shared_spinlock::upgrade_lock()
 {
     rwspinlock_upgrade(&m);
 }
 
-EXPORT ext::shared_spinlock::mutex_type &ext::shared_spinlock::native_handle()
+ext::shared_spinlock::mutex_type &ext::shared_spinlock::native_handle()
 {
     return m;
 }
 
-EXPORT ext::spinlock::~spinlock()
+ext::spinlock::~spinlock()
 {
     assert(m == 0);
 }
 
-EXPORT void ext::ticketlock::lock()
+void ext::ticketlock::lock()
 {
     ticketlock_lock(&m);
 }
 
-EXPORT bool ext::ticketlock::try_lock()
+bool ext::ticketlock::try_lock()
 {
     return ticketlock_try_lock(&m);
 }
 
-EXPORT void ext::ticketlock::unlock()
+void ext::ticketlock::unlock()
 {
     ticketlock_unlock(&m);
 }
 
-EXPORT ticketlock_t &ext::ticketlock::native_handle()
+ticketlock_t &ext::ticketlock::native_handle()
 {
     return m;
 }
 
-EXPORT
 
 
-EXPORT ext::mcslock::~mcslock()
+
+ext::mcslock::~mcslock()
 {
     assert(m == nullptr);
 }
 
-EXPORT void ext::mcslock::lock(mcs_queue_ent_t *node)
+void ext::mcslock::lock(mcs_queue_ent_t *node)
 {
     mcslock_lock(&m, node);
 }
 
-EXPORT bool ext::mcslock::try_lock(mcs_queue_ent_t *node)
+bool ext::mcslock::try_lock(mcs_queue_ent_t *node)
 {
     return mcslock_try_lock(&m, node);
 }
 
-EXPORT void ext::mcslock::unlock(mcs_queue_ent_t *node)
+void ext::mcslock::unlock(mcs_queue_ent_t *node)
 {
     mcslock_unlock(&m, node);
 }

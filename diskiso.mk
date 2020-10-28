@@ -2,10 +2,10 @@
 #bootia32.efi
 
 isodisk.iso: \
-		$(top_srcdir)/mkposixdirs.sh \
+		$(top_srcdir)/mkposixdirs.bash \
 		$(top_srcdir)/diskiso.mk \
-		$(top_srcdir)/populate_iso.sh
-	$(top_srcdir)/populate_iso.sh $(top_srcdir)
+		$(top_srcdir)/populate_iso.bash
+	$(top_srcdir)/populate_iso.bash $(top_srcdir)
 	size=$$(wc -c < bootiso-bin) \
 		&& \
 		blocks=$$(( ( (size + 2047) / 2048) * 4 )) \

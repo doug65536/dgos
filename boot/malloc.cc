@@ -9,6 +9,8 @@
 #include "ctors.h"
 #include "halt.h"
 
+#define HEAP_DEBUG 1
+
 #define MALLOC_DEBUG 0
 #if MALLOC_DEBUG
 #define MALLOC_TRACE(...) PRINT("malloc: " __VA_ARGS__)
@@ -199,8 +201,10 @@ void *malloc_aligned(size_t bytes, size_t alignment)
                 blk->set_size(bytes);
                 blk->sig = blk_hdr_t::USED;
 
+#if HEAP_DEBUG
                 // Fill freshly allocated memory with a pattern
-                memset(blk + 1, 0xA0, blk->size - sizeof(*blk));
+                memset(blk + 1, 0xF0, blk->size - sizeof(*blk));
+#endif
 
                 MALLOC_CHECK();
 
@@ -270,8 +274,10 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
 
             next->make_invalid();
 
+#if HEAP_DEBUG
             // Fill newly exposed area with a pattern
-            memset(old_end, 0xA0, new_end - old_end);
+            memset(old_end, 0xF0, new_end - old_end);
+#endif
 
             return blk + 1;
         }
@@ -325,9 +331,11 @@ void free(void *p)
     if (unlikely(blk->sig != blk_hdr_t::USED))
         PANIC("Bad free call, block signature is not USED");
 
+#if HEAP_DEBUG
     // Clear freed memory with freed canary to ruin all use after free
     // as much as possible
     memset(blk + 1, 0xFE, blk->size - sizeof(blk_hdr_t));
+#endif
 
     if (unlikely(blk->invalid()))
         malloc_panic();
@@ -344,7 +352,8 @@ void *calloc(size_t num, size_t size)
 {
     uint16_t bytes = num * size;
     void *block = malloc(bytes);
-    memset(block, 0, bytes);
+    if (likely(block))
+        memset(block, 0, bytes);
 
     MALLOC_CHECK();
 

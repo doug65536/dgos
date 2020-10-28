@@ -16,10 +16,8 @@
 #define __FMT8      "hh"
 #define __FMT16     "h"
 #ifdef __clang__
-#define __FMT32     ""
-#else
-#define __FMT32     "l"
 #endif
+#define __FMT32     "l"
 #define __FMT64     "ll"
 #define __FMTMX     "j"
 #define __FMTPT     "t"

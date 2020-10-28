@@ -7,6 +7,7 @@
 #include "mutex.h"
 #include "nano_time.h"
 #include "work_queue.h"
+#include "pci.h"
 
 #define DEBUG_UART  0
 #if DEBUG_UART
@@ -316,6 +317,9 @@ public:
     uart_t() = default;
     uart_t& operator=(uart_t const&) = delete;
     virtual ~uart_t() override;
+
+    // Abstract away port/mmio
+    pci_bar_accessor_t accessor{  };
 
 protected:
     using timeout_t = ext::chrono::steady_clock::time_point;
@@ -1179,7 +1183,8 @@ ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read,
 
         if (reg_lsr.rx_data) {
             // Receive incoming byte
-            ((uint8_t*)buf)[i++] = in(port_t::DAT);
+            uint8_t data = in(port_t::DAT);
+            memcpy((char*)buf + i++, &data, 1);
         } else if (!reg_mcr.rts) {
             // Raise RTS
             reg_mcr.rts = 1;

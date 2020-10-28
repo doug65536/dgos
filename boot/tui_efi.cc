@@ -6,9 +6,6 @@
 #include "debug.h"
 #include "halt.h"
 
-//static EFI_GUID efi_simple_text_input_protocol_guid =
-//        EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
-
 __BEGIN_ANONYMOUS
 
 static EFI_GUID efi_simple_pointer_protocol_guid =
@@ -137,27 +134,6 @@ _constructor(ctor_console) static void conin_init()
 
     EFI_STATUS status;
 
-//    EFI_HANDLE *efi_text_input_handles = nullptr;
-//    UINTN efi_num_text_input_handles = 0;
-
-//    status = efi_systab->BootServices->LocateHandleBuffer(
-//                ByProtocol,
-//                &efi_simple_text_input_protocol_guid,
-//                nullptr,
-//                &efi_num_text_input_handles,
-//                &efi_text_input_handles);
-
-//    if (unlikely(EFI_ERROR(status)))
-//        PANIC(TSTR "Unable to query text input handle");
-
-//    status = efi_systab->BootServices->HandleProtocol(
-//                efi_text_input_handles[0],
-//            &efi_simple_text_input_protocol_guid,
-//            (VOID**)&efi_simple_text_input);
-
-//    if (unlikely(EFI_ERROR(status)))
-//        PANIC(TSTR "Unable to query text input interface");
-
     EFI_HANDLE *efi_pointer_handles = nullptr;
     UINTN efi_num_pointer_handles = 0;
 
@@ -241,7 +217,7 @@ bool wait_input(uint32_t ms_timeout)
     if (unlikely(EFI_ERROR(status)))
         PANIC(TSTR "Could not create timeout event");
 
-    // Set the timer to fire at the passed timeout
+    // Set the timer to fire at the passed timeout (in 100ns units)
     status = efi_systab->BootServices->SetTimer(
                 efi_timeout_event, TimerRelative, ms_timeout * 10000);
 

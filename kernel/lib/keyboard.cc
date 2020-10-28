@@ -28,8 +28,8 @@ struct keyboard_buffer_t {
 static keyboard_buffer_t keybd_buffer;
 
 // Drivers plug implementation into these
-EXPORT int (*keybd_get_modifiers)(void);
-EXPORT int (*keybd_set_layout_name)(char const *name);
+int (*keybd_get_modifiers)(void);
+int (*keybd_set_layout_name)(char const *name);
 
 // The order here must match the order of KEYB_VK_NUMPAD_* enum
 char const keybd_fsa_t::numpad_ascii[] =
@@ -257,14 +257,14 @@ void keybd_init(void)
 {
 }
 
-EXPORT keybd_fsa_t::keybd_fsa_t()
+keybd_fsa_t::keybd_fsa_t()
     : shifted_lookup(shifted_lookup_us)
     , alt_code(0)
     , shift_state(0)
 {
 }
 
-EXPORT void keybd_fsa_t::deliver_vk(int vk)
+void keybd_fsa_t::deliver_vk(int vk)
 {
     int is_keyup = vk < 0;
 
@@ -371,7 +371,7 @@ EXPORT void keybd_fsa_t::deliver_vk(int vk)
     }
 }
 
-EXPORT int keybd_fsa_t::get_modifiers()
+int keybd_fsa_t::get_modifiers()
 {
     int flags = 0;
 
@@ -441,7 +441,7 @@ public:
 
 __END_ANONYMOUS
 
-EXPORT void keybd_register(void*)
+static void keybd_register(void*)
 {
     devfs_register(keybd_file_reg_t::get_registration());
 }

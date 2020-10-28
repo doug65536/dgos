@@ -7,6 +7,8 @@
 #include "printk.h"
 #include "hash_table.h"
 
+__BEGIN_ANONYMOUS
+
 // Queued work item
 struct cpu_broadcast_work_t {
     struct cpu_broadcast_work_t *next;
@@ -22,10 +24,12 @@ struct cpu_broadcast_queue_t {
     cpu_broadcast_work_t *tail;
     cpu_broadcast_work_t *free;
 
-    using lock_type = ext::noirq_lock<ext::spinlock>;
+    using lock_type = ext::irq_spinlock;
     using scoped_lock = ext::unique_lock<lock_type>;
     lock_type lock;
 };
+
+__END_ANONYMOUS
 
 void cpu_broadcast_service(int intr, size_t slot)
 {

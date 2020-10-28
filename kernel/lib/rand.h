@@ -4,8 +4,8 @@
 
 __BEGIN_DECLS
 
-int rand_r(uint64_t *seed);
-int rand_r_range(uint64_t *seed, int min, int max);
+KERNEL_API int rand_r(uint64_t *seed);
+KERNEL_API int rand_r_range(uint64_t *seed, int min, int max);
 
 struct lfsr113_state_t {
     uint32_t seed_z1 = 987654321;

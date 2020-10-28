@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/likely.h>
+#include <sys/framebuffer.h>
 
 struct surface_t {
     int32_t width;
@@ -23,7 +24,7 @@ struct surface_t {
     {
     }
 
-    void *operator new(size_t type_size, int32_t width, int32_t height)
+    void *operator new(size_t type_size, int32_t width, int32_t height) throw()
     {
         size_t sz = type_size + width * height * sizeof(uint32_t);
 
@@ -81,9 +82,40 @@ public:
 
     void new_line(uint32_t color);
 
+    void render(fb_info_t *fb, int dx, int dy, int dw, int dh);
+
     // Font dimensions in pixels
     static constexpr uint32_t font_w = 9;
     static constexpr uint32_t font_h = 16;
+    
+    using bit8_to_pixels_ptr = void (*)
+        (uint32_t * restrict out, uint8_t bitmap, uint32_t bg, uint32_t fg);
+    
+    using bit8_to_pixels_transparent_ptr = void (*)
+        (uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+    
+    static bit8_to_pixels_ptr bit8_to_pixels_resolve()
+    {
+        return __builtin_cpu_supports("avx2") 
+                ? bit8_to_pixels_avx2
+                : __builtin_cpu_supports("sse2")
+                  ? bit8_to_pixels_sse
+                  : bit8_to_pixels_generic;
+    }
+    
+    static bit8_to_pixels_transparent_ptr bit8_to_pixels_transparent_resolve()
+    {
+        return __builtin_cpu_supports("avx2") 
+                ? &vga_console_ring_t::bit8_to_pixels_transparent_avx2
+                : __builtin_cpu_supports("sse2")
+                  ? &vga_console_ring_t::bit8_to_pixels_transparent_sse
+                  : &vga_console_ring_t::bit8_to_pixels_transparent_generic;
+    }
+    
+    static bit8_to_pixels_ptr bit8_to_pixels;
+    static bit8_to_pixels_transparent_ptr bit8_to_pixels_transparent;
+    
+    static void resolver();
 
     inline uint32_t wrap_row(uint32_t row) const
     {
@@ -96,7 +128,7 @@ public:
         // "signed" meaning, handles the case where the row wrapped around
         // past zero and became an enormous unsigned number
         // unsigned(-1) would wrap around to the last row
-        // row must be within char_h rows of a valid range off either end
+        // row must be within ring_h rows of a valid range off either end
         assert(row + ring_h < ring_h * 3U);
         return row >= -ring_h
                 ? row + ring_h
@@ -114,8 +146,23 @@ private:
     size_t glyph_index(size_t codepoint);
     bitmap_glyph_t const *get_glyph(char32_t codepoint);
 
-    void bit8_to_pixels(uint32_t *out, uint8_t bitmap,
-                        uint32_t bg, uint32_t fg);
+    static void bit8_to_pixels_generic(uint32_t * restrict out, uint8_t bitmap,
+                                       uint32_t bg, uint32_t fg);
+
+    static void bit8_to_pixels_sse(uint32_t * restrict out, uint8_t bitmap,
+                                   uint32_t bg, uint32_t fg);
+
+    static void bit8_to_pixels_avx2(uint32_t * restrict out, uint8_t bitmap, 
+                                    uint32_t bg, uint32_t fg);
+
+    static void bit8_to_pixels_transparent_generic(
+            uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+
+    static void bit8_to_pixels_transparent_sse(
+            uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+
+    static void bit8_to_pixels_transparent_avx2(
+            uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
 
     // The place where writing text will go in surface space
     // This is advanced by writing text and newlines

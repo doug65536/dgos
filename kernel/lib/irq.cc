@@ -110,7 +110,7 @@ static bool irq_mask_if_not_unmasked(int irq, bool unmask)
     return true;
 }
 
-EXPORT void irq_setmask(int irq, bool unmask)
+void irq_setmask(int irq, bool unmask)
 {
     cpu_scoped_irq_disable irq_dis;
     intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
@@ -125,17 +125,17 @@ EXPORT void irq_setmask(int irq, bool unmask)
         irq_setmask_vec(irq, unmask);
 }
 
-EXPORT bool irq_islevel(int irq)
+bool irq_islevel(int irq)
 {
     return irq_islevel_vec(irq);
 }
 
-EXPORT void irq_hook(int irq, intr_handler_t handler, char const *name)
+void irq_hook(int irq, intr_handler_t handler, char const *name)
 {
     irq_hook_vec(irq, handler, name);
 }
 
-EXPORT void irq_unhook(int irq, intr_handler_t handler)
+void irq_unhook(int irq, intr_handler_t handler)
 {
     irq_unhook_vec(irq, handler);
 }

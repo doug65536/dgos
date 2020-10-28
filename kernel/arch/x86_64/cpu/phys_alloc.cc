@@ -5,13 +5,13 @@
 
 mmu_phys_allocator_t phys_allocator;
 
-EXPORT size_t mmu_phys_allocator_t::size_from_highest_page(
+size_t mmu_phys_allocator_t::size_from_highest_page(
         physaddr_t page_index)
 {
     return page_index * sizeof(entry_t);
 }
 
-EXPORT void mmu_phys_allocator_t::init(
+void mmu_phys_allocator_t::init(
         void *addr, physaddr_t begin_,
         size_t highest_usable_, uint8_t log2_pagesz_)
 {
@@ -24,7 +24,7 @@ EXPORT void mmu_phys_allocator_t::init(
     ext::fill_n(entries, highest_usable_, next_free);
 }
 
-EXPORT void mmu_phys_allocator_t::add_free_space(
+void mmu_phys_allocator_t::add_free_space(
         physaddr_t base, size_t size)
 {
 #if DEBUG_PHYS_ALLOC
@@ -52,7 +52,7 @@ EXPORT void mmu_phys_allocator_t::add_free_space(
     }
 }
 
-EXPORT physaddr_t mmu_phys_allocator_t::alloc_one()
+physaddr_t mmu_phys_allocator_t::alloc_one()
 {
     scoped_lock lock_(alloc_lock);
 
@@ -86,13 +86,13 @@ EXPORT physaddr_t mmu_phys_allocator_t::alloc_one()
     return addr;
 }
 
-EXPORT void mmu_phys_allocator_t::release_one(physaddr_t addr)
+void mmu_phys_allocator_t::release_one(physaddr_t addr)
 {
     scoped_lock lock(alloc_lock);
     release_one_locked(addr, lock);
 }
 
-EXPORT void mmu_phys_allocator_t::addref(physaddr_t addr)
+void mmu_phys_allocator_t::addref(physaddr_t addr)
 {
     entry_t index = index_from_addr(addr);
     assert(index < highest_usable);
@@ -101,7 +101,7 @@ EXPORT void mmu_phys_allocator_t::addref(physaddr_t addr)
     ++entries[index];
 }
 
-EXPORT void mmu_phys_allocator_t::validate()
+void mmu_phys_allocator_t::validate()
 {
     size_t free_count = 0;
     for (entry_t ent = next_free; ent != entry_t(-1); ent = entries[ent]) {
@@ -112,7 +112,7 @@ EXPORT void mmu_phys_allocator_t::validate()
     assert(free_page_count == free_count);
 }
 
-EXPORT void mmu_phys_allocator_t::adjref_virtual_range(
+void mmu_phys_allocator_t::adjref_virtual_range(
         linaddr_t start, size_t len, int adj)
 {
     unsigned misalignment = start & PAGE_SCALE;

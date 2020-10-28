@@ -2,8 +2,22 @@
 #==========
 # Common module declarations
 
+KERNEL_MODULE_INCLUDE_DIRS = \
+	$(top_srcdir)/boot/include \
+	$(top_srcdir)/kernel \
+	$(top_srcdir)/kernel/lib \
+	$(top_srcdir)/kernel/net \
+	$(top_srcdir)/kernel/lib/cc \
+	$(top_srcdir)/kernel/arch \
+	$(top_srcdir)/kernel/arch/x86_64 \
+	$(top_srcdir)/user/libutf
+
+KERNEL_MODULE_INCLUDE_FLAGS = $(patsubst %,-I%,$(KERNEL_MODULE_INCLUDE_DIRS))
+	
 KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(COMPILER_FLAGS) \
+	$(NO_COMMON_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
@@ -11,20 +25,10 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-D__DGOS_MODULE__ \
 	$(INVISIBILITY_FLAGS) \
 	$(NO_RTTI_FLAGS) \
-	$(YES_EXCEPTIONS) \
+	$(NO_EXCEPTIONS) \
 	-fPIC \
-	-ggdb \
-	-I$(top_srcdir)/boot/include \
-	-I$(top_srcdir)/kernel \
-	-I$(top_srcdir)/kernel/lib \
-	-I$(top_srcdir)/kernel/net \
-	-I$(top_srcdir)/kernel/lib/cc \
-	-I$(top_srcdir)/kernel/arch \
-	-I$(top_srcdir)/kernel/arch/x86_64 \
-	-I$(top_srcdir)/user/libutf \
-	$(OPTIMIZE_SPEED_FLAGS) \
-	$(NO_COMMON_FLAGS) \
-	$(NO_FLOAT_FLAGS) \
+	-g \
+	$(KERNEL_MODULE_INCLUDE_FLAGS) \
 	$(SANITIZE_UNDEFINED_FLAGS) \
 	$(WARN_STACK_USAGE_FLAGS)
 

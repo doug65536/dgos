@@ -782,19 +782,49 @@ int sys_listen(int sockfd, int backlog)
     return nosys_err();
 }
 
+int sys_fcntl_lock_op(int fd, int cmd, void *arg)
+{
+    flock info;
+    
+    if (unlikely(!mm_copy_user(&info, arg, sizeof(info))))
+        return fault_err();
+    
+    int id = id_from_fd(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+    
+    return file_lock_op(id, info, cmd == F_SETLKW);
+}
+
 int sys_fcntl(int fd, int cmd, void *arg)
 {
-    //switch (cmd) {
-//    case F_DUPFD:
-//    case F_DUPFD_CLOEXEC:
-//    case F_GETFD:
-//    case F_SETFD:
-//    case F_GETFL:
-//    case F_SETFL:
-//    case F_SETLK:
-//    case F_SETLKW:
-//    case F_GETLK:
-//    }
+    switch (cmd) {
+    case F_DUPFD:
+        break;
+        
+    case F_DUPFD_CLOEXEC:
+        break;
+        
+    case F_GETFD:
+        break;
+        
+    case F_SETFD:
+        break;
+        
+    case F_GETFL:
+        break;
+        
+    case F_SETFL:
+        break;
+        
+    case F_SETLK:
+    case F_SETLKW:
+    case F_GETLK: 
+        return sys_fcntl_lock_op(fd, cmd, arg);
+        
+    }
+    
     return nosys_err();
 }
 
@@ -814,6 +844,44 @@ int sys_pipe(int *user_fds)
     // create writable fd for user_fds[1]
     //
     return -int(errno_t::ENOSYS);
+}
+
+
+int sys_flock(int fd, int what)
+{    
+    int id = id_from_fd(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+    
+    // Translate it into a fcntl lock of the entire file
+    flock info;
+    
+    switch (what) {
+    case LOCK_EX:
+        info.l_type = F_WRLCK;
+        break;
+        
+    case LOCK_SH:
+        info.l_type = F_RDLCK;
+        break;
+    
+    case LOCK_UN:
+        info.l_type = F_UNLCK;
+        break;
+    
+    default:
+        return arg_err();
+        
+    }
+    
+    info.l_start = 0;
+    info.l_whence = SEEK_SET;
+    info.l_start = 0;
+    info.l_len = 0;
+    info.l_pid = 0;
+    
+    return file_lock_op(id, info, !(what & LOCK_NB));
 }
 
 // Validate the errno and return its negated integer value

@@ -13,6 +13,8 @@ init/frameserver.h
 user64.ld
 bin/ls/ls.cc
 crt0/crt0.S
+crt0/crti.S
+crt0/crtn.S
 shell/parser.cc
 shell/parser.h
 test/test.S

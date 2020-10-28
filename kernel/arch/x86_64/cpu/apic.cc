@@ -81,6 +81,8 @@ static char const * const intr_type_text[] = {
     "EXTINT"
 };
 
+__BEGIN_ANONYMOUS
+
 struct mp_ioapic_t {
     uint8_t id;
     uint8_t base_intr;
@@ -92,6 +94,8 @@ struct mp_ioapic_t {
     using scoped_lock = ext::unique_lock<lock_type>;
     lock_type lock;
 };
+
+__END_ANONYMOUS
 
 static char const *mp_tables;
 
@@ -141,17 +145,17 @@ static uint8_t ioapic_msi_base_irq;
 static ext::vector<uint8_t> isa_irq_lookup;
 
 static unsigned apic_id_count;
-static uint32_t apic_id_list[512];
+static uint32_t apic_id_list[MAX_CPUS];
 // MP tables gives one entry per CPU package, ACPI gives one entry per thread
 static bool apic_id_list_per_pkg;
 
 static uint8_t cpu_to_node[MAX_CPUS];
 
-static int16_t intr_to_irq[256];
-static int16_t irq_to_intr[256];
-static int16_t intr_to_ioapic[256];
-static int16_t irq_is_level[256];
-static int16_t irq_manual_eoi[256];
+static int16_t intr_to_irq[INTR_COUNT];
+static int16_t irq_to_intr[INTR_COUNT];
+static int16_t intr_to_ioapic[INTR_COUNT];
+static int16_t irq_is_level[INTR_COUNT];
+static int16_t irq_manual_eoi[INTR_COUNT];
 
 static uint8_t topo_thread_bits;
 static uint8_t topo_thread_count;
@@ -162,6 +166,8 @@ static uint8_t topo_cpu_count;
 
 static uintptr_t apic_base;
 static uint32_t volatile *apic_ptr;
+
+__BEGIN_ANONYMOUS
 
 struct acpi_mapping_t {
     uint64_t base;
@@ -189,6 +195,8 @@ struct acpi_mapping_t {
         return (base != rhs.base) | (len != rhs.len);
     }
 };
+
+__END_ANONYMOUS
 
 static ext::vector<acpi_mapping_t> acpi_mappings;
 
@@ -705,6 +713,8 @@ int acpi_have8259pic(void)
     return !acpi_rsdt_addr ||
             !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
 }
+
+
 
 static uint8_t ioapic_alloc_vectors(uint8_t count)
 {

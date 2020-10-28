@@ -191,7 +191,7 @@ void run_code64(void (*fn)(void *), void *arg)
         "mov %%r15,%%rsp\n\t"
 
         // Far return to 32 bit compatibility mode code segment
-        "lret $ 8\n\t"
+        "lretl $ 8\n\t"
 
         "1:\n\t"
         ".code32\n\t"

@@ -109,7 +109,7 @@ void *mm_alloc_space(size_t size);
 /// __flags, bitmask, MAP_*
 /// __fd, file descriptor, file backed mapping
 /// __offset, file pointer, position in file to start mapping
-void *mmap(void *__addr,
+KERNEL_API void *mmap(void *__addr,
         size_t __len,
         int __prot,
         int __flags,
@@ -118,7 +118,7 @@ void *mmap(void *__addr,
 
 /// Unmap a range of address space
 /// Unmap the range from __addr to __len
-int munmap(void *__addr,
+KERNEL_API int munmap(void *__addr,
         size_t size);
 
 /// Permit a mapping to be moved to a new address
@@ -137,7 +137,7 @@ int munmap(void *__addr,
 /// __new_size, the quantity of address space needed after the move
 /// __flags, bitmaps, MREMAP_*
 /// __new_address, ignored unless MREMAP_FIXED was specified
-void *mremap(void *__old_address,
+KERNEL_API void *mremap(void *__old_address,
         size_t __old_size,
         size_t __new_size,
         int __flags,
@@ -148,7 +148,7 @@ void *mremap(void *__old_address,
 /// __addr, address, start of range
 /// __len, bytes, length of range
 /// __prot, bitfield, PROT_*
-int mprotect(void *__addr, size_t __len, int __prot);
+KERNEL_API int mprotect(void *__addr, size_t __len, int __prot);
 
 /// Advise normal behavior
 #define MADV_NORMAL         (0)
@@ -216,7 +216,7 @@ int mprotect(void *__addr, size_t __len, int __prot);
 /// __addr, address, start of range
 /// __len, size, of range
 /// __advice, bitfield, MADV_*
-int madvise(void *__addr, size_t __len, int __advice);
+KERNEL_API int madvise(void *__addr, size_t __len, int __advice);
 
 /// Lock a range of address space in memory
 int mlock(void const *__addr, size_t __len);
@@ -225,7 +225,7 @@ int mlock(void const *__addr, size_t __len);
 int munlock(void const *__addr, size_t __len);
 
 /// Ensure a range of address space is written back to the device
-int msync(void const *__addr, size_t __len, int __flags);
+KERNEL_API int msync(void const *__addr, size_t __len, int __flags);
 
 /// msync flags
 #define MS_ASYNC        0
@@ -234,7 +234,7 @@ int msync(void const *__addr, size_t __len, int __flags);
 
 /// Return the physical address for the specified linear address
 /// Page faults if the memory region is not mapped
-uintptr_t mphysaddr(volatile void const *addr);
+KERNEL_API uintptr_t mphysaddr(volatile void const *addr);
 
 struct mmphysrange_t {
     uintptr_t physaddr;
@@ -251,16 +251,16 @@ struct mmphysrange_t {
 /// if necessary a large contiguous range of physical
 /// addresses will be split into smaller ranges with
 /// sizes less than or equal to max_length
-size_t mphysranges(mmphysrange_t *ranges,
-                   size_t ranges_count,
-                   void const *addr, size_t size,
-                   size_t max_size);
+KERNEL_API size_t mphysranges(mmphysrange_t *ranges,
+                              size_t ranges_count,
+                              void const *addr, size_t size,
+                              size_t max_size);
 
 // Ensure no range crosses the specified boundary
 // For example, pass 16 in log2_boundary to modify
 // the region list to never cross a 64KB boundary
-bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
-                         size_t count_limit, uint8_t log2_boundary);
+KERNEL_API bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
+                                  size_t count_limit, uint8_t log2_boundary);
 
 // Return true if the address is present
 bool mpresent(uintptr_t addr, size_t size);
@@ -367,26 +367,26 @@ typedef int (*mm_dev_mapping_callback_t)(
         void *context, void *base_addr,
         uint64_t offset, uint64_t length, bool read, bool flush);
 
-void *mmap_register_device(void *context,
-                         uint64_t block_size,
-                         uint64_t block_count,
-                         int prot,
-                         mm_dev_mapping_callback_t callback,
-                           void *addr = nullptr);
+KERNEL_API void *mmap_register_device(void *context,
+                                      uint64_t block_size,
+                                      uint64_t block_count,
+                                      int prot,
+                                      mm_dev_mapping_callback_t callback,
+                                      void *addr = nullptr);
 
 // Allocate/free contiguous physical memory
 uintptr_t mm_alloc_contiguous(size_t size);
 void mm_free_contiguous(uintptr_t addr, size_t size);
 
 // Allocate/free memory hole (for I/O devices)
-uintptr_t mm_alloc_hole(size_t size);
-void mm_free_hole(uintptr_t addr, size_t size);
+KERNEL_API uintptr_t mm_alloc_hole(size_t size);
+KERNEL_API void mm_free_hole(uintptr_t addr, size_t size);
 
 uintptr_t mm_new_process(process_t *process, bool use64);
 
-void *mmap_window(size_t size);
-void munmap_window(void *addr, size_t size);
-int alias_window(void *addr, size_t size,
+KERNEL_API void *mmap_window(size_t size);
+KERNEL_API void munmap_window(void *addr, size_t size);
+KERNEL_API int alias_window(void *addr, size_t size,
                  mmphysrange_t const *ranges, size_t range_count);
 
 void mm_init_process(process_t *process, bool use64);

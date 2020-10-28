@@ -7,7 +7,7 @@
 //
 // Contiguous allocator
 
-struct contiguous_allocator_t {
+struct KERNEL_API contiguous_allocator_t {
     using lock_type = ext::irq_spinlock;
     using scoped_lock = ext::unique_lock<lock_type>;
 public:

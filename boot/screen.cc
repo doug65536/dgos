@@ -168,7 +168,7 @@ void formatter(tchar const *format, va_list ap,
             } else {
                 s = va_arg(ap, tchar const*);
 
-                if (!s)
+                if (unlikely(!s))
                     s = TSTR "{[(null)]}";
             }
 

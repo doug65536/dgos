@@ -1,8 +1,10 @@
 #!/bin/bash
 
-arches=x86_64-elf
+set +x
+
+arches=x86_64-dgos
 quiet=0
-scriptroot="$(cd "$(dirname "$0")" && pwd)"
+scriptroot=$(realpath "${BASH_SOURCE%/*}")
 gnu_mirror="https://mirrors.kernel.org/gnu"
 outdir=gcc-build
 archives=
@@ -16,7 +18,7 @@ function log() {
 	if [[ -z $logfile ]]; then
 		"$@" || exit
 	elif [[ $quiet = 0 ]]; then
-		"$@" | tee -a "$logfile" || exit
+		"$@" > >(tee -a "$logfile") || exit
 	else
 		"$@" >> "$logfile" 2>&1 || exit
 	fi
@@ -33,8 +35,8 @@ function fullpath() {
 }
 
 function require_cmd() {
-	for command in "$@"; do
-		if ! which "$command" > /dev/null; then
+	for cmd in "$@"; do
+		if ! which "$cmd" > /dev/null; then
 			err "$1 is required"
 		fi
 	done
@@ -43,12 +45,19 @@ function require_cmd() {
 function download_file() {
 	local url="$1"
 	local dest="$2"
+	local filename="${url##*/}"
 
 	if [[ $url = "" ]] || [[ $dest = "" ]]; then
-		err 'Missing argument to download_file'
+		err 'Missing argument to download_file' || exit
 	fi
+	
+	local dest_file="$dest/$filename"
 
-	log wget -P "$dest" -N "$url" || exit
+	if ! [[ -f $dest_file ]]; then
+		log wget -P "$dest" -N "$url" || return
+	else
+		printf "Skipping download of %s\n" "$dest"
+	fi
 }
 
 function require_value() {
@@ -73,9 +82,7 @@ function extract_tool() {
 	local ext="$2"
 	local config="$3"
 
-	local input
-	input=$(fullpath "$base$ext")
-
+	local input="$(fullpath "$base$ext")"
 	local name=${base#$archives/}
 
 	echo "Extracting $name"
@@ -96,6 +103,67 @@ function extract_tool() {
 			log echo Applying patch "$patchname"
 			cd "$name" || exit
 			patch -p1 < "$patchname" || exit
+
+			printf "config=%s\n" "$config"
+
+			reconf_jobs=0
+			for ((i=0; ; ++i)); do
+				if [[ $i -ge $automakes_end ]]; then
+					break
+				fi
+				local key="$config""_""$i"
+				local reconf_dir="${automakes[$key]}"
+
+				if [[ -z $reconf_dir ]]; then
+					continue
+				fi
+				
+				printf "key=%s\n" "$key"
+				printf "Automake dir: %s\n" "$reconf_dir"
+
+				if [[ -d $reconf_dir ]]; then
+					(( ++reconf_jobs ))
+					(cd "$reconf_dir" && pwd && automake) || exit
+				fi
+			done
+			
+#			printf "Waiting for %u jobs\n" "$reconf_jobs"
+#			for ((i=0; i < reconf_jobs; ++i)); do
+#				wait -n || exit
+#				printf "Job completed successfully %d left\n" \
+#					$(( reconf_jobs - i - 1 ))
+#			done
+
+			reconf_jobs=0
+			for ((i=0 ; ; ++i)); do
+				if [[ $i -ge $reconfs_end ]]; then
+					break
+				fi
+				
+				local key="$config""_""$i"
+				local reconf_dir="${reconfs[$key]}"
+
+				if [[ -z $reconf_dir ]]; then
+					continue
+				fi
+				
+				printf "key=%s\n" "$key"
+				printf "Reconf dir: %s\n" "$reconf_dir"
+
+				if [[ -d $reconf_dir ]]; then
+					(( ++reconf_jobs ))
+					
+					printf "Reconfiguring in %s\n" "$reconf_dir"
+					(cd "$reconf_dir" && pwd && autoreconf -f) || exit
+				fi
+			done
+			
+#			printf "Waiting for %u jobs\n" "$reconf_jobs"
+#			for ((i=0; i < reconf_jobs; ++i)); do
+#				wait -n || exit
+#				printf "Job completed successfully %d left\n" \
+#					$(( reconf_jobs - i - 1 ))
+#			done
 		else
 			log echo "No patch for $patchname"
 		fi
@@ -104,32 +172,32 @@ function extract_tool() {
 }
 
 function make_tool() {
-	local base="$1"
-	local ext="$2"
-	local target="$3"
-	local config="$4"
+	local base=$1
+	local ext=$2
+	local target=$3
+	local config=$4
 
-	local name=${base#$archives/}
+	local name="${base#$archives/}"
 
 	local src="$outdir/src"
 	local build="$outdir/build"
 
-	build=$(fullpath "$build")
-	src=$(fullpath "$src")
+	build="$(fullpath "$build")"
+	src="$(fullpath "$src")"
 
 	mkdir -p "$build/$name" || exit
 	pushd "$build/$name" || exit
 	log echo Making "$target" with config "$config" \
 		and prefix "$prefixdir" in cwd "$(pwd)"...
-	if ! [[ -z "${@:6}" ]]
-	then
+	if ! [[ -z "${@:6}" ]]; then
 		log echo "...with extra configure options: ${@:6}"
 	fi
 
-	if ! [[ -f "Makefile" ]]
-	then
+	if ! [[ -f "Makefile" ]]; then
 		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:6}" || exit
 	fi
+	
+	# Add -O to synchronize output
 	log make "$parallel" "$target" || exit
 	popd || exit
 }
@@ -149,7 +217,7 @@ function process_tarball() {
 		*)         err "Unrecognized archive extension" ;;
 	esac
 
-	log $action "$base" "$ext" "$config" "$target" "${@:5}" || exit
+	log "$action" "$base" "$ext" "$config" "$target" "${@:5}" || exit
 }
 
 function help() {
@@ -194,7 +262,7 @@ mkdir -p "$outdir"
 logfile=$(fullpath "$outdir/build.log")
 prefixdir=$(fullpath "$prefixdir")
 
-log_banner="build-crossgcc.sh log"
+log_banner="build-crossgcc.bash log"
 
 if ! [[ -z "$cleanbuild" ]] && [[ -f "$logfile" ]]
 then
@@ -202,17 +270,17 @@ then
 
 	if [[ "$log_head" != "$log_banner" ]]
 	then
-		log echo Refusing to clean unrecognized build directory! Check -o!
+		log echo "Refusing to clean unrecognized build directory! Check -o!"
 		exit 1
 	fi
 
-	rm -rf "$outdir/build" || exit 1
-	rm -f "$logfile" || exit 1
+	rm -rf "$outdir/build" || exit
+	rm -f "$logfile" || exit
 fi
 
 if [[ $quiet = 0 ]]
 then
-	truncate --size 0 "$logfile" || exit 1
+	truncate --size 0 "$logfile" || exit
 	log echo "$log_banner"
 fi
 
@@ -250,7 +318,7 @@ download_file "$mpfurl" "$archives"
 log echo Extracting tarballs...
 
 toolre='/([^/-]+)-[^/]+$'
-for tarball in $archives/*.tar.*; do
+for tarball in "$archives"/*.tar.*; do
 	log echo Extracting tarball $tarball
 	if [[ $tarball =~ $toolre ]]; then
 		toolname="${BASH_REMATCH[1]}"
@@ -280,25 +348,54 @@ if [[ -n $extractonly ]]; then
 	exit 0
 fi
 
-gcc_config="--target=$arches \
+
+bin_config="--target=$arches \
+--enable-targets=x86_64-dgos,x86_64-pe
+--disable-nls \
+--enable-gold \
+--enable-ld \
+--enable-plugins \
+--enable-lto \
+--with-sysroot \
+--enable-shared \
+--enable-multiarch"
+
+gdb_config="--target=$arches \
+--disable-nls \
+--with-python \
+--with-expat \
+--with-system-readline \
 --with-system-zlib \
---enable-multilib --enable-languages=c,c++ \
---with-gnu-as --with-gnu-ld \
+--with-gnu-ld \
+--enable-plugins \
+--enable-gdbserver=no \
+--enable-targets=x86_64-dgos,i686-dgos,x86_64-pe \
+--enable-64-bit-bfd \
+--enable-multiarch"
+
+gcc_config="--target=$arches \
+--enable-languages=c,c++ \
+--enable-multilib \
+--enable-multiarch \
+--with-arch-32=i686 \
+--with-multilib-list=m32,m64,mx32 \
+--disable-nls \
 --enable-initfini-array \
 --enable-gnu-indirect-function \
 --enable-__cxa_atexit \
 --enable-tls \
 --enable-threads \
 --enable-shared \
+--enable-system-zlib \
+--disable-hosted-libc \
+--disable-hosted-libstdcxx \
+--with-system-zlib \
 --without-headers \
 --with-long-double-128 \
 --with-readline \
---disable-nls \
---enable-system-zlib \
---enable-multiarch \
---disable-hosted-libstdcxx \
---with-arch-32=i686 --with-abi=m64 \
---with-multilib-list=m32,m64,mx32"
+--with-abi=m64 \
+--with-gnu-as \
+--with-gnu-ld"
 
 #--enable-threads=posix
 #--disable-hosted-libstdcxx
@@ -307,27 +404,14 @@ gcc_config="--target=$arches \
 
 # disable for now: --enable-threads=posix
 
-bin_config="--target=$arches \
---enable-targets=x86_64-elf,i686-elf,x86_64-pe,i686-pe \
---enable-gold --enable-ld \
---enable-plugins --enable-lto \
---with-sysroot \
---enable-shared"
-
-gdb_config="--target=$arches \
---with-python --with-expat --with-system-readline \
---with-system-zlib --with-gnu-ld \
---enable-plugins --enable-gdbserver=no --enable-targets=all \
---enable-64-bit-bfd"
-
 process_tarball "$archives/$bintar" "make_tool" all "$bin_config" || exit
 process_tarball "$archives/$bintar" "make_tool" install "$bin_config" || exit
 
 process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config" || exit
 process_tarball "$archives/$gdbtar" "make_tool" install "$gdb_config" || exit
 
-for target in all-gcc all-target-libgcc \
-		install-gcc install-target-libgcc; do
+for target in all-gcc install-gcc \
+		all-target-libgcc install-target-libgcc; do
 	process_tarball "$archives/$gcctar" "make_tool" \
 		"$target" "$gcc_config" || exit
 done

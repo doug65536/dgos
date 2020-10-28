@@ -2,7 +2,7 @@
 
 usb_class_drv_t *usb_class_drv_t::first_driver;
 
-EXPORT usb_class_drv_t *usb_class_drv_t::find_driver(
+usb_class_drv_t *usb_class_drv_t::find_driver(
         usb_config_helper *cfg, usb_bus_t *bus)
 {
     usb_class_drv_t *drv = first_driver;
@@ -11,13 +11,13 @@ EXPORT usb_class_drv_t *usb_class_drv_t::find_driver(
     return drv;
 }
 
-EXPORT usb_class_drv_t::usb_class_drv_t()
+usb_class_drv_t::usb_class_drv_t()
 {
     next_driver = first_driver;
     first_driver = this;
 }
 
-EXPORT usb_class_drv_t::match_result
+usb_class_drv_t::match_result
 usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, size_t index,
                               int dev_class, int dev_subclass, int dev_proto,
                               int iface_proto,
@@ -74,7 +74,7 @@ usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, size_t index,
     return result;
 }
 
-EXPORT int usb_pipe_t::send_default_control(
+int usb_pipe_t::send_default_control(
         uint8_t request_type, uint8_t request,
         uint16_t value, uint16_t index,
         uint16_t length, void *data) const
@@ -87,7 +87,7 @@ EXPORT int usb_pipe_t::send_default_control(
                 slotid, request_type, request, value, index, length, data);
 }
 
-EXPORT int usb_pipe_t::send_default_control_async(uint8_t request_type,
+int usb_pipe_t::send_default_control_async(uint8_t request_type,
                                            uint8_t request, uint16_t value,
                                            uint16_t index, uint16_t length,
                                            void *data, usb_iocp_t *iocp) const
@@ -96,30 +96,30 @@ EXPORT int usb_pipe_t::send_default_control_async(uint8_t request_type,
                                    length, data, iocp);
 }
 
-EXPORT int usb_pipe_t::recv(void *data, uint32_t length) const
+int usb_pipe_t::recv(void *data, uint32_t length) const
 {
     return bus->xfer(slotid, epid, 0, length, data, 1);
 }
 
-EXPORT int usb_pipe_t::recv_async(void *data, uint32_t length,
+int usb_pipe_t::recv_async(void *data, uint32_t length,
                                   usb_iocp_t *iocp) const
 {
     return bus->xfer_async(slotid, epid, 0, length, data, 1, iocp);
 }
 
-EXPORT int usb_pipe_t::send(void const *data, uint32_t length) const
+int usb_pipe_t::send(void const *data, uint32_t length) const
 {
     return bus->xfer(slotid, epid, 0, length, const_cast<void*>(data), 0);
 }
 
-EXPORT int usb_pipe_t::send_async(void const *data, uint32_t length,
+int usb_pipe_t::send_async(void const *data, uint32_t length,
                            usb_iocp_t *iocp) const
 {
     return bus->xfer_async(slotid, epid, 0, length, const_cast<void*>(data),
                            0, iocp);
 }
 
-EXPORT int usb_pipe_t::clear_ep_halt(usb_pipe_t const& target)
+int usb_pipe_t::clear_ep_halt(usb_pipe_t const& target)
 {
     // Must be sent to control pipe
     assert(epid == 0);
@@ -142,18 +142,18 @@ EXPORT int usb_pipe_t::clear_ep_halt(usb_pipe_t const& target)
     return ncc;
 }
 
-EXPORT bool usb_pipe_t::add_hub_port(int port)
+bool usb_pipe_t::add_hub_port(int port)
 {
     return bus->configure_hub_port(slotid, port);
 }
 
-EXPORT bool usb_pipe_t::set_hub_port_config(usb_hub_desc const& hub_desc,
+bool usb_pipe_t::set_hub_port_config(usb_hub_desc const& hub_desc,
                                      usb_config_helper const* cfg_hlp)
 {
     return bus->set_hub_port_count(slotid, hub_desc);
 }
 
-EXPORT bool usb_bus_t::alloc_pipe(int slotid, usb_desc_iface const *iface,
+bool usb_bus_t::alloc_pipe(int slotid, usb_desc_iface const *iface,
                            usb_desc_ep const *ep, usb_pipe_t &pipe)
 {
     return alloc_pipe(slotid, pipe, ep->ep_addr, iface->iface_index,
@@ -161,7 +161,7 @@ EXPORT bool usb_bus_t::alloc_pipe(int slotid, usb_desc_iface const *iface,
                       ep->max_packet_sz, ep->interval, ep->ep_attr);
 }
 
-EXPORT usb_pipe_t::usb_pipe_t()
+usb_pipe_t::usb_pipe_t()
     : bus(nullptr)
     , slotid(-1)
     , epid(-1)

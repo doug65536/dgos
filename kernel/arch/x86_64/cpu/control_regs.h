@@ -72,6 +72,7 @@ static void cpu_triple_fault()
         "lidt (%rsp)\n\t"
         "int $ 42\n\t"
     );
+    __builtin_unreachable();
 }
 
 static _always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
@@ -952,9 +953,8 @@ public:
     _always_inline
     void redisable()
     {
-        if (!intr_was_enabled) {
+        if (!intr_was_enabled)
             intr_was_enabled = (cpu_irq_save_disable() << 1) - 1;
-        }
     }
 
 private:

@@ -35,27 +35,27 @@ define startupbreakpoints
 
 	thbreak entry
 	commands
-		#cd ../lto
-		#allow everything
-		#maintenance packet qqemu.sstep=1
-		#allow irqs only
-		#maintenance packet qqemu.sstep=5
-		#b isr_entry_13
-		#b unhandled_exception_handler
-		#b apic_spurious_handler
-		##GP
-		#b isr_entry_8
-		##UD
-		#b isr_entry_6
-		#b vpanic
-		#b validate_failed
+		# cd ../lto
+		# cd ../small
+		# allow everything
+		# maintenance packet qqemu.sstep=1
+		# allow irqs only
+		# maintenance packet qqemu.sstep=5
+		# b isr_entry_13
+		# b unhandled_exception_handler
+		# b apic_spurious_handler
+		# #GP
+		# b isr_entry_8
+		# #UD
+		# b isr_entry_6
+		# b vpanic
+		# b validate_failed
 
-	end
-
-	hbreak modload_load_symbols
-	commands
-		printf "Loading %s with offset 0x%lx",$rdi,$rdx
-		eval "add-symbol-file %s -o 0x%lx",$rdi,$rdx
+		hbreak modload_load_symbols
+		commands
+			printf "Loading %s with offset 0x%lx",$rdi,$rdx
+			eval "add-symbol-file %s -o 0x%lx",$rdi,$rdx
+		end
 	end
 
 	set may-call-functions off

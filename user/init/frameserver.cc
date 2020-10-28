@@ -1768,12 +1768,17 @@ int start_framebuffer()
 
     translate_pixels = translate_pixels_resolver(&info);
 
+    // Create an 80x25 console ring, with 9x16 8-bit per row 1bpp font
     vga_console_ring_t *console = new (80 * 9, 25 * 16)
             vga_console_ring_t(80 * 9, 25 * 16);
 
     console->reset();
 
-    mouse_test(&info);
+    console->write("This is a test", 14, 0, 0x888888);
+    console->new_line(0);
+    //console->render(&info, 10, 10, 720, 400);
+
+    //mouse_test(&info);
 
     while (true)
         sleep(UINT_MAX);

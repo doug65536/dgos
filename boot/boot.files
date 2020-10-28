@@ -3,6 +3,7 @@ boot.cxxflags
 bootentry_efi.S
 gpt.h
 retpoline.S
+utils/watch.bash
 vesa_efi.cc
 vesa_bios.cc
 array_list.cc
@@ -129,5 +130,4 @@ fs.cc
 bioscall.h
 utils/debug-kvm-commands.template
 utils/debug-kernel-kvm-commands.template
-utils/watch.sh
 

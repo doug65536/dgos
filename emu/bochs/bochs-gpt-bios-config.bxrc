@@ -69,12 +69,12 @@ sound: wavein=none, midioutdrv=alsa, midiout=none
 speaker: enabled=1, mode=sound
 parport1: enabled=1, file=none
 parport2: enabled=0
-#com1: enabled=true, turbo=true, mode=socket-server, dev="localhost:8788"
-#com2: enabled=true, turbo=true, mode=socket-server, dev="localhost:8789"
+com1: enabled=true, turbo=true, mode=socket-server, dev="localhost:8788"
+com2: enabled=true, turbo=true, mode=socket-server, dev="localhost:8789"
 #com3: enabled=false
 #com4: enabled=false
-com1: enabled=1, mode=file, dev=/dev/ttyS0, turbo=1
-com2: enabled=1, mode=file, dev=/dev/ttyS0, turbo=1
+#com1: enabled=1, mode=file, dev=/dev/ttyS0, turbo=1
+#com2: enabled=1, mode=file, dev=/dev/ttyS0, turbo=1
 com3: enabled=0
 com4: enabled=0
 #gdbstub: enabled=1

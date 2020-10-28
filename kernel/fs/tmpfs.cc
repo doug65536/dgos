@@ -20,10 +20,10 @@
 #define TMPFS_TRACE(...) ((void)0)
 #endif
 
+__BEGIN_ANONYMOUS
+
 static void *initrd_st;
 static size_t initrd_sz;
-
-
 
 class tmpfs_fs_t final : public fs_base_t {
 public:
@@ -423,7 +423,8 @@ int tmpfs_fs_t::openat(fs_file_info_t **fi,
 
 int tmpfs_fs_t::release(fs_file_info_t *fi)
 {
-    delete fi;
+    auto file = static_cast<tmpfs_file_t*>(fi);
+    delete file;
     return 0;
 }
 
@@ -632,6 +633,8 @@ int tmpfs_fs_t::poll(fs_file_info_t *fi,
     return -int(errno_t::ENOSYS);
 }
 
+__END_ANONYMOUS
+
 bool tmpfs_startup(void *st, size_t sz)
 {
     initrd_st = st;
@@ -651,3 +654,4 @@ bool tmpfs_startup(void *st, size_t sz)
 
     return true;
 }
+

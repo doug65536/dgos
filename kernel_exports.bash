@@ -11,7 +11,7 @@ if [[ -z "$1" ]]; then
     src=kernel-generic
 fi
 
-x86_64-elf-objdump --wide --dynamic-syms $objdump_args $src | \
+x86_64-dgos-objdump --wide --dynamic-syms $objdump_args $src | \
     grep -oP '(.text|.data|.bss|.rodata).*' | \
     sed -E 's/^\S+\s+\S+\s+//g' | \
     sed -E 's/^\.protected\ //g'

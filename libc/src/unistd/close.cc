@@ -8,10 +8,10 @@ int close(int fd)
 {
     long status = syscall1(fd, SYS_close);
 
-    if (status >= 0)
-        return status;
-
-    errno = -status;
-
-    return -1;
+    if (unlikely(status < 0)) {
+        errno = -status;    
+        return -1;
+    }
+    
+    return status;
 }

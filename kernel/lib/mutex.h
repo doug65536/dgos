@@ -114,7 +114,7 @@ private:
 };
 
 // The size of this thing is two unsigned ints
-class ticketlock : public base_lock<ticketlock> {
+class KERNEL_API ticketlock : public base_lock<ticketlock> {
 public:
     typedef ticketlock_t mutex_type;
 
@@ -447,7 +447,7 @@ private:
 };
 
 //template<typename _L>
-//class EXPORT unique_lock<ext::noirq_lock<_L>>
+//class KERNEL_API unique_lock<ext::noirq_lock<_L>>
 //        : public ext::base_lock<unique_lock<ext::noirq_lock<_L>>>
 //{
 //public:
@@ -491,7 +491,7 @@ private:
 //};
 
 //template<typename _T>
-//EXPORT unique_lock<ext::noirq_lock<_T>>::unique_lock(
+//unique_lock<ext::noirq_lock<_T>>::unique_lock(
 //        ext::noirq_lock<_T> &attached_lock)
 //    : m(&attached_lock)
 //    , locked(false)
@@ -500,7 +500,7 @@ private:
 //}
 
 //template<typename _T>
-//EXPORT unique_lock<ext::noirq_lock<_T>>::unique_lock(
+//unique_lock<ext::noirq_lock<_T>>::unique_lock(
 //        ext::noirq_lock<_T> &lock, ext::defer_lock_t) noexcept
 //    : m(&lock)
 //    , locked(false)
@@ -508,13 +508,13 @@ private:
 //}
 
 //template<typename _T>
-//EXPORT unique_lock<ext::noirq_lock<_T>>::~unique_lock() noexcept
+//unique_lock<ext::noirq_lock<_T>>::~unique_lock() noexcept
 //{
 //    unlock();
 //}
 
 //template<typename _T>
-//EXPORT void unique_lock<ext::noirq_lock<_T>>::lock() noexcept
+//void unique_lock<ext::noirq_lock<_T>>::lock() noexcept
 //{
 //    assert(!locked);
 //    irq_was_enabled = cpu_irq_save_disable();
@@ -523,7 +523,7 @@ private:
 //}
 
 //template<typename _T>
-//EXPORT void unique_lock<ext::noirq_lock<_T>>::unlock() noexcept
+//void unique_lock<ext::noirq_lock<_T>>::unlock() noexcept
 //{
 //    if (locked) {
 //        locked = false;
@@ -533,14 +533,14 @@ private:
 //}
 
 //template<typename _T>
-//EXPORT void unique_lock<ext::noirq_lock<_T>>::release() noexcept
+//void unique_lock<ext::noirq_lock<_T>>::release() noexcept
 //{
 //    locked = false;
 //    m = nullptr;
 //}
 
 //template<typename _T>
-//EXPORT void unique_lock<ext::noirq_lock<_T>>::swap(
+//void unique_lock<ext::noirq_lock<_T>>::swap(
 //        unique_lock<ext::noirq_lock<_T>> &rhs) noexcept
 //{
 //    ext::swap(rhs.m, m);
@@ -596,7 +596,7 @@ private:
 };
 
 template<typename T>
-class shared_lock
+class KERNEL_API shared_lock
 {
 public:
     _hot
@@ -713,21 +713,39 @@ public:
 };
 __END_NAMESPACE_STD
 
+
+
 __BEGIN_NAMESPACE_EXT
-struct alignas(64) padded_mutex : public ext::mutex {
+
+__BEGIN_KERNEL_API
+
+struct alignas(64) padded_mutex
+    : public ext::mutex
+{
 };
 
-struct alignas(64) padded_condition_variable : public ext::condition_variable {
+struct alignas(64) padded_condition_variable
+    : public ext::condition_variable
+{
 };
 
-struct alignas(64) padded_ticketlock : public ticketlock {
+struct alignas(64) padded_ticketlock
+    : public ticketlock
+{
 };
 
-struct alignas(64) padded_spinlock : public spinlock {
+struct alignas(64) padded_spinlock
+    : public spinlock
+{
 };
 
-class alignas(64) padded_shared_mutex : public ext::shared_mutex {
+class alignas(64) padded_shared_mutex
+    : public ext::shared_mutex
+{
 };
+
+__END_KERNEL_API
+
 __END_NAMESPACE_EXT
 
 // Explicit instantiations
@@ -745,8 +763,7 @@ extern template class ext::unique_lock<ext::noirq_lock<ext::mutex>>;
 extern template class ext::unique_lock<ext::noirq_lock<ext::shared_mutex>>;
 
 extern template class ext::unique_lock<ext::noirq_lock<ext::shared_spinlock>>;
-extern template class ext::unique_lock<ext::noirq_lock<ext::ticketlock>>;
-extern template class ext::unique_lock<ext::noirq_lock<ext::spinlock>>;
+extern template class ext::unique_lock<ext::irq_ticketlock>;
+extern template class ext::unique_lock<ext::irq_spinlock>;
 extern template class ext::unique_lock<ext::noirq_lock<ext::irqlock>>;
-extern template class ext::unique_lock<ext::noirq_lock<ext::mcslock>>;
 

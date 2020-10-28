@@ -1,3 +1,9 @@
+../gensymtab.bash
+../kernel_exports.bash
+../mkposixdirs.bash
+../populate_fat.bash
+../populate_iso.bash
+../toolchain/build-crossgcc.bash
 kernel.cflags
 kernel.cxxflags
 ../Make-modules.inc.mk
@@ -30,7 +36,6 @@ kernel.cxxflags
 ../emu/qemu/qemu_profiling_syms
 ../emu/qemu/qemu_profile
 ../genfont.py
-../kernel_exports.sh
 ../u_vga16.bdf
 ../user/lib64.ld
 arch/x86_64/cpu/apic.bits.h
@@ -183,8 +188,6 @@ syscall/sys_signal.h
 ../bootstrap
 ../gdbhelpers
 ../genregs.py
-../gensymtab.sh
-../kernel_exports.sh
 ../module_checkimports.sh
 arch/x86_64/cfi_helpers.h
 arch/x86_64/cpu/apic.bits
@@ -202,6 +205,7 @@ syscall/sys_time.h
 syscall/syscall_helper.h
 syscall/syscall_helper.cc
 ../AUTHORS
+../toolchain/build-crossgcc-binutils.patch
 ../toolchain/build-crossgcc-gcc.patch
 ../toolchain/build-crossgcc-gdb.patch
 ../configure.ac
@@ -448,15 +452,11 @@ lib/work_queue.h
 ../diskiso.mk
 ../symbols.mk
 ../zlib.mk
-../mkposixdirs.sh
-../populate_fat.sh
-../populate_iso.sh
 lib/cc/numeric.h
 lib/desc_alloc.cc
 lib/desc_alloc.h
 arch/x86_64/cpu/segrw.h
 arch/x86_64/cpu/segrw.cc
-../toolchain/build-crossgcc.sh
 ../toolchain/build-crossgcc-versions
 unittest/test_allocator.cc
 unittest/test_bit.cc

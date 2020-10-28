@@ -59,7 +59,7 @@ unsigned time_day_of_year(time_of_day_t const& time)
     return yday;
 }
 
-EXPORT uint64_t time_unix(time_of_day_t const& time)
+uint64_t time_unix(time_of_day_t const& time)
 {
     uint64_t y = time.fullYear() - 1900;
 
@@ -73,7 +73,7 @@ EXPORT uint64_t time_unix(time_of_day_t const& time)
             ((y + 299) / 400) * UINT64_C(86400);
 }
 
-EXPORT uint64_t time_unix_ms(time_of_day_t const& time)
+uint64_t time_unix_ms(time_of_day_t const& time)
 {
     return time_unix(time) * 1000 + time.centisec * 10;
 }
@@ -92,7 +92,7 @@ bool time_ns_set_handler(uint64_t (*vec)(), void (*stop)(), bool override)
     return true;
 }
 
-EXPORT uint64_t time_ns(void)
+uint64_t time_ns(void)
 {
     return time_ns_vec();
 }
@@ -112,23 +112,23 @@ bool nsleep_set_handler(uint64_t (*vec)(uint64_t nanosec), void (*stop)(),
     return true;
 }
 
-EXPORT uint64_t nsleep(uint64_t nanosec)
+uint64_t nsleep(uint64_t nanosec)
 {
     assert(nsleep_vec);
     return nsleep_vec(nanosec);
 }
 
-EXPORT void sleep(int ms)
+void sleep(int ms)
 {
     thread_sleep_for(ms);
 }
 
-EXPORT void time_ofday_set_handler(time_ofday_handler_t handler)
+void time_ofday_set_handler(time_ofday_handler_t handler)
 {
     time_gettimeofday_vec = handler;
 }
 
-EXPORT time_of_day_t time_ofday()
+time_of_day_t time_ofday()
 {
     return time_gettimeofday_vec();
 }

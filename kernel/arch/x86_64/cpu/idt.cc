@@ -30,9 +30,9 @@ C_ASSERT(SYSCALL_RFLAGS == (CPU_EFLAGS_IF | 2));
 // will be cleared anyway on sysret
 C_ASSERT((SYSCALL_RFLAGS & ~uintptr_t(0x3C7FD7)) == 0);
 
-irq_dispatcher_handler_t isr_lookup[256];
+irq_dispatcher_handler_t isr_lookup[INTR_COUNT];
 
-idt_entry_64_t idt[256];
+idt_entry_64_t idt[INTR_COUNT];
 
 ext::pair<void *, void *> ist_stacks[MAX_CPUS][IDT_IST_SLOT_COUNT];
 
@@ -370,18 +370,12 @@ static uint8_t idt_vector_type(size_t vec)
     switch (vec) {
     case INTR_EX_DIV:
     case INTR_EX_DEBUG:
-    //case INTR_EX_NMI:
     case INTR_EX_BREAKPOINT:
     case INTR_EX_OVF:
     case INTR_EX_BOUND:
     case INTR_EX_OPCODE:
-    //case INTR_EX_DBLFAULT:
     case INTR_EX_PAGE:
     case INTR_EX_ALIGNMENT:
-    //case INTR_EX_MACHINE:
-    //case INTR_EX_VIRTUALIZE:
-        // Don't mask IRQs
-        return IDT_TRAP;
     case INTR_EX_DEV_NOT_AV:
     case INTR_EX_COPR_SEG:
     case INTR_EX_SEGMENT:
@@ -390,7 +384,14 @@ static uint8_t idt_vector_type(size_t vec)
     case INTR_EX_GPF:
     case INTR_EX_MATH:
     case INTR_EX_SIMD:
+        // Don't mask IRQs
+        return IDT_TRAP;
+
+    case INTR_EX_MACHINE:
+    case INTR_EX_VIRTUALIZE:
+    case INTR_EX_NMI:
     case INTR_THREAD_YIELD:
+    case INTR_EX_DBLFAULT:
     default:
         // Mask IRQs
         return IDT_INTR;

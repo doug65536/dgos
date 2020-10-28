@@ -4,6 +4,8 @@
 #include "vector.h"
 #include "cxxstring.h"
 #include "debug.h"
+#include "bootinfo.h"
+#include "thread.h"
 
 unittest::unit *unittest::unit::list_st;
 unittest::unit *unittest::unit::list_en;
@@ -102,14 +104,27 @@ static intptr_t test_run_thread(void *)
     unittest::unit_ctx ctx;
     unittest::unit::run_all(&ctx);
 
-    if (ctx.failure_count() == 0) {
-        printdbg("All tests passed!\n");
+    size_t failure_count = ctx.failure_count();
 
+    if (failure_count == 0) {
+        printdbg("All tests passed!\n");
     } else {
         printdbg("Test failures: %zu!\n", ctx.failure_count());
-        return 1;
     }
-    return 0;
+
+    if (bootinfo_parameter(bootparam_t::testrun_port)) {
+        printdbg("Powering off\n");
+        failure_count = 1;
+
+        if (failure_count == 0) {
+            arch_poweroff();
+        } else {
+            arch_ungraceful_stop();
+        }
+
+    }
+
+    return failure_count != 0;
 }
 
 int module_main(int argc, char const * const * argv)
@@ -176,10 +191,13 @@ void unittest::unit::set_ctx(unit_ctx *ctx)
 
 template void unittest::unit::eq(int const&, int const&,
     const char *file, int line);
+
 template void unittest::unit::eq(uint32_t const&, uint32_t const&,
     const char *file, int line);
+
 template void unittest::unit::eq(bool const&, bool const&,
     const char *file, int line);
+
 template void unittest::unit::eq(size_t const&, size_t const&,
     const char *file, int line);
 

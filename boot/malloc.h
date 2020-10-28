@@ -4,21 +4,21 @@
 
 __BEGIN_DECLS
 
-_use_result _malloc _leaf
+_use_result _malloc _alloc_size(1) _leaf
 void *malloc(size_t bytes);
 
-_use_result _malloc _leaf
+_use_result _malloc _alloc_size(1, 2) _leaf
 void *calloc(size_t num, size_t size);
 
 void free(void *p);
 
-_use_result _malloc _alloc_align(1) _leaf
+_use_result _malloc _alloc_align(2) _alloc_size(1) _leaf
 void *malloc_aligned(size_t bytes, size_t alignment);
 
-_use_result _malloc _leaf
+_use_result _leaf _alloc_size(2)
 void *realloc(void *p, size_t bytes);
 
-_use_result _malloc _alloc_align(3)
+_use_result _alloc_size(2) _alloc_align(3)
 void *realloc_aligned(void *p, size_t bytes, size_t alignment);
 
 bool malloc_validate();
@@ -36,13 +36,13 @@ void test_malloc();
 
 __END_DECLS
 
-_malloc
+_malloc _alloc_size(1)
 void *operator new(size_t size);
 
 _const
 void *operator new(size_t size, void *p);
 
-_malloc
+_malloc _alloc_size(1) _assume_aligned(16)
 void *operator new[](size_t size);
 void operator delete(void *block, unsigned long size);
 void operator delete(void *block) noexcept;

@@ -6,4 +6,4 @@ set -x
 mkdir -p iso_stage || exit
 
 echo Running mkposixdirs
-"$TOPSRC/mkposixdirs.sh" iso_stage || exit
+"$TOPSRC/mkposixdirs.bash" iso_stage || exit

@@ -4,32 +4,31 @@
 .code16
 
 // Note that this code goes out of its way to avoid using any
-// instructions that will not work on an 8088
+// instructions that will not work on an 8088. Let's assume it's
+// possible for completeness!
 
 // stage1 calls this code with:
-//  DS:SI -> start LBA of partition
+//  ES:SI -> start LBA of partition
 //  DL = boot drive
-
-// MBR calls this entry point with
-//  dl = drive number
-//  ds:si -> partition table entry
 
 .section .early, "wx", @progbits
 .global entry
 entry:
-    mov %dl,boot_drive
-    mov %si,part_tbl_ptr
+    movb %dl,boot_drive
+    movw %si,part_tbl_ptr
+    movw %es,part_tbl_ptr+2
 
-    mov $ .Linit_ret,%bx
+    movw $ .Linit_ret,%bx
     jmp early_init
 .Linit_ret:
 
     // If we make it here, the cpu is at least 32 bit with FPU
 
     // Load partition start LBA into edx:eax
-    mov part_tbl_ptr,%si
-    movl ptbl_ent_stsec(%si),%eax
-    xor %edx,%edx
+    lesw part_tbl_ptr,%si
+    movl %es:ptbl_ent_stsec(%si),%eax
+    xorl %edx,%edx
+    movw %dx,%es
 
     movl $ fat32_boot_partition,%ecx
     movl $ 0f,%ebx
@@ -43,4 +42,5 @@ boot_drive:
 
 .global part_tbl_ptr
 part_tbl_ptr:
+    .hword 0
     .hword 0

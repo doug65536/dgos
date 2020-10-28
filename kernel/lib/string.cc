@@ -5,23 +5,24 @@
 #include "bswap.h"
 #include "assert.h"
 #include "cpu/nontemporal.h"
+#include "cpuid.h"
 
 #if defined(__x86_64__) || defined(__i386__)
 #define USE_REP_STRING
 #endif
 
 #ifdef USE_REP_STRING
-static void memcpy_movsq(void *dest, void *src, size_t u64_count)
-{
-    __asm__ __volatile__ (
-        "rep movsq"
-        : "+D" (dest)
-        , "+S" (src)
-        , "+c" (u64_count)
-        :
-        : "memory"
-    );
-}
+//static void memcpy_movsq(void *dest, void *src, size_t u64_count)
+//{
+//    __asm__ __volatile__ (
+//        "rep movsq"
+//        : "+D" (dest)
+//        , "+S" (src)
+//        , "+c" (u64_count)
+//        :
+//        : "memory"
+//    );
+//}
 
 // Parameter order puts parameters in the right registers
 static void memset_stosq(void *dest, uint64_t value, size_t u64_count)
@@ -38,14 +39,14 @@ static void memset_stosq(void *dest, uint64_t value, size_t u64_count)
 }
 #endif
 
-EXPORT size_t strlen(char const *src)
+size_t strlen(char const *src)
 {
     size_t len = 0;
     for ( ; src[len]; ++len);
     return len;
 }
 
-EXPORT void *memchr(void const *mem, int ch, size_t count)
+void *memchr(void const *mem, int ch, size_t count)
 {
     unsigned char c = (unsigned char)ch;
     unsigned char const *p;
@@ -67,7 +68,7 @@ KERNEL_API void *memrchr(void const *mem, int ch, size_t count)
 
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
-EXPORT char *strchr(char const *s, int ch)
+char *strchr(char const *s, int ch)
 {
     unsigned char v, c = (unsigned char)ch;
     for (size_t i = 0; ; ++i) {
@@ -81,7 +82,7 @@ EXPORT char *strchr(char const *s, int ch)
 
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
-EXPORT char *strrchr(char const *s, int ch)
+char *strrchr(char const *s, int ch)
 {
     unsigned char v, c = (unsigned char)ch;
 
@@ -100,7 +101,7 @@ EXPORT char *strrchr(char const *s, int ch)
     return best ? (char *)(s + best - 1) : nullptr;
 }
 
-EXPORT int strcmp(char const *lhs, char const *rhs)
+int strcmp(char const *lhs, char const *rhs)
 {
     int cmp = 0;
     do {
@@ -110,7 +111,7 @@ EXPORT int strcmp(char const *lhs, char const *rhs)
     return cmp;
 }
 
-EXPORT int strncmp(char const *lhs, char const *rhs, size_t count)
+int strncmp(char const *lhs, char const *rhs, size_t count)
 {
     int cmp = 0;
     if (count) {
@@ -122,7 +123,7 @@ EXPORT int strncmp(char const *lhs, char const *rhs, size_t count)
     return cmp;
 }
 
-EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
+int memcmp(void const *lhs, void const *rhs, size_t count)
 {
 #ifdef USE_REP_STRING
     int result = 0;
@@ -154,7 +155,7 @@ EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
 }
 
 // Security enhanced memcmp which prevents inferring how many characters match
-EXPORT int const_time_memcmp(void const *lhs, void const *rhs, size_t count)
+int const_time_memcmp(void const *lhs, void const *rhs, size_t count)
 {
     uint8_t const *blhs = (uint8_t const *)lhs;
     uint8_t const *brhs = (uint8_t const *)rhs;
@@ -166,7 +167,7 @@ EXPORT int const_time_memcmp(void const *lhs, void const *rhs, size_t count)
     return result;
 }
 
-EXPORT char *strstr(char const *str, char const *substr)
+char *strstr(char const *str, char const *substr)
 {
     // If substr is empty string, return str
     if (*substr == 0)
@@ -202,7 +203,7 @@ static _always_inline void memset_byte(char *&d, uint64_t s, ptrdiff_t &ofs)
     );
 }
 
-EXPORT void *memset(void *dest, int c, size_t n)
+void *memset(void *dest, int c, size_t n)
 {
     char *d = (char*)dest;
     uint64_t s = 0x0101010101010101U * (c & 0xFFU);
@@ -249,7 +250,8 @@ EXPORT void *memset(void *dest, int c, size_t n)
 #ifdef USE_REP_STRING
 void clear64(void *dest, size_t n)
 {
-    memset_stosq(dest, 0, n);
+    memset(dest, 0, n);
+    //memset_stosq(dest, 0, n);
 }
 #else
 // GCC erroneously disables __builtin_ia32_movnti64
@@ -302,7 +304,7 @@ static _always_inline void memcpy64(char *&d, char const *&s, size_t count)
 }
 
 #ifdef USE_REP_STRING
-EXPORT void *memcpy(void *dest, void const *src, size_t n)
+void *memcpy(void *dest, void const *src, size_t n)
 {
     void *ret = dest;
     __asm__ __volatile__ (
@@ -314,7 +316,7 @@ EXPORT void *memcpy(void *dest, void const *src, size_t n)
     return ret;
 }
 #else
-EXPORT void *memcpy(void *dest, void const *src, size_t n)
+void *memcpy(void *dest, void const *src, size_t n)
 {
 #ifdef USE_REP_STRING
     char *d = (char*)dest;
@@ -472,7 +474,7 @@ static _always_inline void memcpy_reverse(
 #endif
 }
 
-EXPORT void *memmove(void *dest, void const *src, size_t n)
+void *memmove(void *dest, void const *src, size_t n)
 {
     char *d = (char *)dest;
     char const *s = (char const *)src;
@@ -488,7 +490,7 @@ EXPORT void *memmove(void *dest, void const *src, size_t n)
     return dest;
 }
 
-EXPORT char *strcpy(char *dest, char const *src)
+char *strcpy(char *dest, char const *src)
 {
     char *d = dest;
     while ((*d++ = *src++) != 0);
@@ -514,7 +516,7 @@ static void makeByteBitmap(uint32_t *map, char const *chars)
     }
 }
 
-EXPORT size_t strspn(char const *src, char const *chars)
+size_t strspn(char const *src, char const *chars)
 {
     size_t i = 0;
 
@@ -538,7 +540,7 @@ EXPORT size_t strspn(char const *src, char const *chars)
 
 // Return the offset of a character in the chars string
 // otherwise, the length of the string
-EXPORT size_t strcspn(char const *src, char const *chars)
+size_t strcspn(char const *src, char const *chars)
 {
     size_t i = 0;
 
@@ -560,13 +562,13 @@ EXPORT size_t strcspn(char const *src, char const *chars)
     return i;
 }
 
-EXPORT char *strcat(char *dest, char const *src)
+char *strcat(char *dest, char const *src)
 {
     strcpy(dest + strlen(dest), src);
     return dest;
 }
 
-EXPORT char *strncpy(char *dest, char const *src, size_t n)
+char *strncpy(char *dest, char const *src, size_t n)
 {
     char *d = dest;
 
@@ -591,7 +593,7 @@ EXPORT char *strncpy(char *dest, char const *src, size_t n)
 // behavior is undefined if either dest is not a pointer
 // to a null-terminated byte string or src is not a
 // pointer to a character array.
-EXPORT char *strncat(char *dest, char const *src, size_t n)
+char *strncat(char *dest, char const *src, size_t n)
 {
     return strncpy(dest + strlen(dest), src, n);
 }

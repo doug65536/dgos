@@ -3,6 +3,7 @@
 #include "assert.h"
 #include "isr.h"
 #include "utility.h"
+#include "interrupts.h"
 
 struct idt_entry_t {
     uint16_t offset_lo; // offset bits 0..15
@@ -93,4 +94,4 @@ void idt_ist_adjust(int cpu, size_t ist, ptrdiff_t adj);
 void idt_set_ist_stack(size_t cpu_nr, size_t ist_slot, void *st, void *en);
 ext::pair<void *, void *> idt_get_ist_stack(size_t cpu_nr, size_t ist_slot);
 
-extern irq_dispatcher_handler_t isr_lookup[256];
+extern irq_dispatcher_handler_t isr_lookup[INTR_COUNT];

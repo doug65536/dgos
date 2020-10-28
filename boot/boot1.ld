@@ -1,6 +1,8 @@
 ENTRY(entry)
 SECTIONS {
-	.text 0xF000 : AT(0xF000) {
+	. = 0x7C00;
+
+	.text : {
 		*(.head)
 
 		/* oem name */
@@ -43,16 +45,19 @@ SECTIONS {
 		___end = .;
 	}
 
-	.debug          0 : { *(.debug)         }
-	.debug_info		0 : { *(.debug_info)    }
-	.debug_abbrev	0 : { *(.debug_abbrev)  }
-	.debug_aranges	0 : { *(.debug_aranges) }
-	.debug_ranges	0 : { *(.debug_ranges)  }
-	.debug_frame	0 : { *(.debug_frame)   }
-	.debug_macro	0 : { *(.debug_macro)   }
-	.debug_line		0 : { *(.debug_line)    }
-	.debug_str		0 : { *(.debug_str)     }
-	.debug_loc		0 : { *(.debug_loc)     }
+	. = ALIGN(2);
+	___image_end = .;
+
+	.debug           : { *(.debug)         }
+	.debug_info		 : { *(.debug_info)    }
+	.debug_abbrev	 : { *(.debug_abbrev)  }
+	.debug_aranges	 : { *(.debug_aranges) }
+	.debug_ranges	 : { *(.debug_ranges)  }
+	.debug_frame	 : { *(.debug_frame)   }
+	.debug_macro	 : { *(.debug_macro)   }
+	.debug_line		 : { *(.debug_line)    }
+	.debug_str		 : { *(.debug_str)     }
+	.debug_loc		 : { *(.debug_loc)     }
 	/*.comment        0 : { *(.comment)       }*/
 
 	/DISCARD/       : { *(.comment)       }

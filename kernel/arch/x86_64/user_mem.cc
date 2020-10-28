@@ -16,7 +16,7 @@ extern "C" int nofault_compare_exchange_32(
 
 extern "C" ptrdiff_t nofault_offsetof(char const *s, int value, size_t size);
 
-EXPORT bool mm_copy_user(void *dst, const void *src, size_t size)
+bool mm_copy_user(void *dst, const void *src, size_t size)
 {
     if (src)
         return nofault_memcpy(dst, src, size) >= 0;
@@ -27,7 +27,7 @@ EXPORT bool mm_copy_user(void *dst, const void *src, size_t size)
 //
 // mm_copy_user_str
 
-EXPORT ptrdiff_t mm_copy_user_str(char *dst, char const *src, size_t max_size)
+ptrdiff_t mm_copy_user_str(char *dst, char const *src, size_t max_size)
 {
     return nofault_strncpy(dst, src, max_size);
 }
@@ -35,19 +35,19 @@ EXPORT ptrdiff_t mm_copy_user_str(char *dst, char const *src, size_t max_size)
 //
 // mm_lenof_user_str
 
-EXPORT intptr_t mm_lenof_user_str(char const *src, size_t max_size)
+intptr_t mm_lenof_user_str(char const *src, size_t max_size)
 {
     return nofault_strnlen(src, max_size);
 }
 
-EXPORT bool mm_is_user_range(void const *buf, size_t size)
+bool mm_is_user_range(void const *buf, size_t size)
 {
     return uintptr_t(buf) >= 0x400000 &&
             (uintptr_t(buf) < 0x7FFFFFFFFFFF) &&
             (uintptr_t(buf) + size) <= 0x7FFFFFFFFFFF;
 }
 
-EXPORT size_t mm_max_user_len(void const *buf)
+size_t mm_max_user_len(void const *buf)
 {
     return (uintptr_t(buf) >= 0x400000 &&
             uintptr_t(buf) < 0x7FFFFFC00000)
@@ -55,7 +55,7 @@ EXPORT size_t mm_max_user_len(void const *buf)
             : 0;
 }
 
-EXPORT mm_copy_string_result_t mm_copy_user_string(
+mm_copy_string_result_t mm_copy_user_string(
         char const *user_src, size_t max_size)
 {
     mm_copy_string_result_t result{};

@@ -10,10 +10,32 @@ int _FILE::open(int new_fd)
     return 0;
 }
 
+int _FILE::flush()
+{
+    return 0;
+}
+
+int _FILE::close()
+{
+    if (unlikely(fflush(this)))
+        return -1;
+    
+    if (unlikely(::close(fd) < 0))
+        return -1;
+    
+    fd = -1;
+    
+    delete this;
+    
+    return 0;
+}
+
 int _FILE::add_ch(int ch)
 {
     unsigned char uc = ch;
+    
     ssize_t sz = write(fd, &uc, 1);
+    
     if (unlikely(sz < 0))
         return -1;
 
@@ -67,8 +89,10 @@ long _FILE::ensure_seek_pos(off_t pos)
 {
     if (fd_seek_pos != pos) {
         int seek_result = lseek(fd, pos, SEEK_SET);
+        
         if (seek_result != pos)
             return EOF;
+            
         fd_seek_pos = pos;
     }
     return pos;

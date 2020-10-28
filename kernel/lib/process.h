@@ -330,6 +330,8 @@ private:
     intptr_t start_clone(clone_data_t const& clone_data);
 
     intptr_t run();
+
+    static size_t sum_str_lengths(const ext::vector<ext::string> &strs);
 };
 
 __exception_jmp_buf_t *process_get_exit_jmpbuf(

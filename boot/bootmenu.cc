@@ -273,7 +273,7 @@ static void apply_bootmenu_fw_cfg(
             }
         }
 
-        autodisplay_info.*field.member = n;
+        autodisplay_info.*(field.member) = n;
     }
 
     for (size_t i = 0; i < vbe_modes.count; ++i) {

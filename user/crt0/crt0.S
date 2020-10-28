@@ -23,7 +23,7 @@ _start:
     mov %edi,%fs:__tid@tpoff
 
     // r12 = argc
-    movq (%rsp),%r12
+    movl (%rsp),%r12d
 
     // r13 = argv
     movq 8(%rsp),%r13
@@ -74,7 +74,7 @@ _start:
     movq (%rbx),%rax
     testq %rax,%rax
     jz .Ldone_init
-    call *%rax
+    indirect_call rax
     addq $ 8,%rbx
     jmp .Lnext_init
 .Ldone_init:

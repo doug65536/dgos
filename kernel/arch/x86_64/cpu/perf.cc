@@ -599,7 +599,7 @@ static void perf_sample(intptr_t (*ip)(void*), size_t cpu_nr)
     }
 }
 
-EXPORT uint64_t perf_gather_samples(
+uint64_t perf_gather_samples(
         void (*callback)(void *arg, int percent, int frac,
                          char const *filename, int line_nr,
                          char const *),
@@ -716,7 +716,7 @@ static void perf_update_all_cpus()
     });
 }
 
-EXPORT void perf_init()
+void perf_init()
 {
     size_t kernel_sz;
 
@@ -843,17 +843,17 @@ EXPORT void perf_init()
     printdbg("Setup perf sampling on all cpus took %" PRIu64 "ns\n", setup_en);
 }
 
-EXPORT void perf_set_zeroing(bool zeroing_enabled)
+void perf_set_zeroing(bool zeroing_enabled)
 {
     perf_zeroing = zeroing_enabled;
 }
 
-EXPORT bool perf_get_zeroing()
+bool perf_get_zeroing()
 {
     return perf_zeroing;
 }
 
-EXPORT uint32_t perf_set_event(uint32_t event)
+uint32_t perf_set_event(uint32_t event)
 {
     perf_event = event;
 
@@ -862,7 +862,7 @@ EXPORT uint32_t perf_set_event(uint32_t event)
     return event;
 }
 
-EXPORT uint64_t perf_set_divisor(uint64_t event_divisor)
+uint64_t perf_set_divisor(uint64_t event_divisor)
 {
     perf_event_divisor = event_divisor;
 
@@ -871,7 +871,7 @@ EXPORT uint64_t perf_set_divisor(uint64_t event_divisor)
     return event_divisor;
 }
 
-EXPORT uint32_t perf_set_event_mask(uint32_t event_mask)
+uint32_t perf_set_event_mask(uint32_t event_mask)
 {
     perf_unit_mask = event_mask;
 
@@ -880,7 +880,7 @@ EXPORT uint32_t perf_set_event_mask(uint32_t event_mask)
     return event_mask;
 }
 
-EXPORT uint32_t perf_set_count_mask(uint32_t count_mask)
+uint32_t perf_set_count_mask(uint32_t count_mask)
 {
     perf_count_mask = count_mask;
 
@@ -889,34 +889,34 @@ EXPORT uint32_t perf_set_count_mask(uint32_t count_mask)
     return count_mask;
 }
 
-EXPORT uint32_t perf_get_event()
+uint32_t perf_get_event()
 {
     return perf_event;
 }
 
-EXPORT uint32_t perf_get_unit_mask()
+uint32_t perf_get_unit_mask()
 {
     return perf_unit_mask;
 }
 
-EXPORT uint32_t perf_get_count_mask()
+uint32_t perf_get_count_mask()
 {
     return perf_count_mask;
 }
 
-EXPORT void perf_set_stacktrace_xlat_fn(stacktrace_xlat_fn_t fn, void *arg)
+void perf_set_stacktrace_xlat_fn(stacktrace_xlat_fn_t fn, void *arg)
 {
     stacktrace_xlat_fn = fn;
     stacktrace_xlat_fn_arg = arg;
 }
 
-EXPORT void perf_stacktrace_xlat(void * const *ips, size_t count)
+void perf_stacktrace_xlat(void * const *ips, size_t count)
 {
     if (stacktrace_xlat_fn)
         stacktrace_xlat_fn(stacktrace_xlat_fn_arg, ips, count);
 }
 
-EXPORT void perf_stacktrace_decoded()
+void perf_stacktrace_decoded()
 {
     printdbg("-------------------------------------------\n");
 
@@ -935,7 +935,7 @@ EXPORT void perf_stacktrace_decoded()
     printdbg("-------------------------------------------\n");
 }
 
-EXPORT uint64_t perf_adj_divisor(int64_t adjustment)
+uint64_t perf_adj_divisor(int64_t adjustment)
 {
     perf_event_divisor += adjustment;
 
@@ -945,24 +945,24 @@ EXPORT uint64_t perf_adj_divisor(int64_t adjustment)
     return perf_event_divisor;
 }
 
-EXPORT uint64_t perf_get_divisor()
+uint64_t perf_get_divisor()
 {
     return perf_event_divisor;
 }
 
-EXPORT bool perf_set_invert(bool invert)
+bool perf_set_invert(bool invert)
 {
     perf_event_invert = invert;
 
     return invert;
 }
 
-EXPORT bool perf_get_invert()
+bool perf_get_invert()
 {
     return perf_event_invert;
 }
 
-EXPORT uint64_t perf_get_all()
+uint64_t perf_get_all()
 {
     return CPU_MSR_PERFEVTSEL_EN |
             CPU_MSR_PERFEVTSEL_OS |
@@ -976,7 +976,7 @@ EXPORT uint64_t perf_get_all()
             CPU_MSR_PERFEVTSEL_EVT_SEL_HI_4_n(perf_event >> 8);
 }
 
-EXPORT uint64_t perf_set_all(uint64_t value)
+uint64_t perf_set_all(uint64_t value)
 {
     perf_event_invert = CPU_MSR_PERFEVTSEL_INV_GET(value);
     perf_unit_mask = CPU_MSR_PERFEVTSEL_UNIT_MASK_GET(value);
@@ -989,13 +989,13 @@ EXPORT uint64_t perf_set_all(uint64_t value)
     return perf_get_all();
 }
 
-EXPORT bool perf_set_edge(bool edge)
+bool perf_set_edge(bool edge)
 {
     perf_event_edge = edge;
     return edge;
 }
 
-EXPORT bool perf_get_edge()
+bool perf_get_edge()
 {
     return perf_event_edge;
 }

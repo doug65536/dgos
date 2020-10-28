@@ -125,7 +125,7 @@ static mouse_file_reg_t *mouse_file_instance()
     return old_mouse_file;
 }
 
-EXPORT void mouse_event(mouse_raw_event_t event)
+void mouse_event(mouse_raw_event_t event)
 {
     MOUSE_TRACE("hdist=%+d, vdist=%+d, buttons=0x%x, wheel=%+d\n",
                 event.hdist, event.vdist, event.buttons, event.wdist);
@@ -133,7 +133,7 @@ EXPORT void mouse_event(mouse_raw_event_t event)
     mouse_file_instance()->add_event(event);
 }
 
-EXPORT void mouse_file_init()
+void mouse_file_init()
 {
     mouse_file_instance();
 }

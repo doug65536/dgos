@@ -397,7 +397,7 @@ private:
 };
 
 // steady_clock ticks in nanoseconds, epoch is datetime at boot
-class steady_clock
+class KERNEL_API steady_clock
 {
 public:
     using duration = nanoseconds;

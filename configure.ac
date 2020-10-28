@@ -1,5 +1,6 @@
 : ${CFLAGS=""}
 : ${CXXFLAGS=""}
+#: ${PREFIX="./dist"}
 
 AC_INIT([dgos], [0.8])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -177,6 +178,12 @@ AS_IF([test x"$LEMON" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find lemon parser generator])])
 AC_SUBST([LEMON])
 
+AC_CHECK_PROGS([WHICH], [which], [NOT_FOUND])
+AS_IF([test x"$WHICH" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find which program])])
+AC_SUBST([WHICH])
+
+# No yacc
 AS_VAR_SET([YACC], [])
 AC_SUBST([YACC])
 
@@ -226,19 +233,20 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++17 fno-fat-lto-objects ggdb3 \
-		fno-integrated-as W Wall Wextra Wpedantic Wdouble-promotion Wformat \
+		std=c++20 fno-fat-lto-objects g3 \
+		fno-integrated-as \
+		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
-		Wstrict-overflow \
-		Wtautological-compare \
+		Wstrict-overflow Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
-		Werror=return-type Werror=array-bounds Werror=format \
-		Werror=parentheses Werror=format-security \
 		Warray-bounds Wformat-overflow \
 		Wno-address-of-packed-member \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
+		Werror=return-type Werror=array-bounds Werror=format \
+		Werror=parentheses Werror=format-security \
+		Werror=attributes Werror=overflow Werror=suggest-override \
 		mtls-direct-seg-refs fconserve-stack \
 		Wno-unused-parameter \
 		fno-plt \
@@ -248,6 +256,9 @@ do
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
 		[], [])
 done
+
+#unusably broken, causes ICE: fanalyzer
+
 AC_SUBST([COMPILER_FLAGS])
 #fno-eliminate-unused-debug-types
 #fno-eliminate-unused-debug-symbols
@@ -642,9 +653,7 @@ do
 done
 AC_SUBST([REGPARM_FLAGS])
 
-AS_IF([test x"$NO_FORCE_LIBGCC_GXX" == x""],
-	[AS_VAR_SET([LIBGCC_CXX], [x86_64-elf-g++])],
-	[AS_VAR_SET([LIBGCC_CXX], [$CXX])])
+AS_VAR_SET([LIBGCC_CXX], [$CXX])
 
 AC_MSG_NOTICE([Using libgcc parameters: $REGPARM_FLAGS $BOOTLOADER_FLAGS])
 LIBGCC_ELF32=$($LIBGCC_CXX $REGPARM_FLAGS $ELF32_FLAGS -print-libgcc-file-name)

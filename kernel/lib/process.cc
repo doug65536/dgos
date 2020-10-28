@@ -472,7 +472,7 @@ void *process_t::create_tls()
     // The space for the uintptr_t is for the pointer to itself at TLS offset 0
     size_t tls_vsize = PAGE_SIZE + sizeof(uintptr_t) + tls_msize + PAGE_SIZE;
 
-    void *tls = mmap(nullptr, tls_vsize, PROT_NONE, MAP_USER);
+    void *tls = mmap(nullptr, tls_vsize, PROT_NONE, MAP_USER | MAP_POPULATE);
 
     if (tls == MAP_FAILED)
         return nullptr;
@@ -561,6 +561,18 @@ int process_t::is_joinable(int tid)
     return !user_threads[index].detached;
 }
 
+size_t process_t::sum_str_lengths(ext::vector<ext::string> const &strs)
+{
+    size_t sz = 0;
+
+    for (size_t i = 0; i < strs.size(); ++i) {
+        size_t len = strs[i].length() + 1;
+        sz += len;
+    }
+
+    return sz;
+}
+
 // Returns when program exits
 intptr_t process_t::run()
 {
@@ -599,14 +611,15 @@ intptr_t process_t::run()
         return int(errno_t(int(read_size)));
     }
 
-    intptr_t first_exec;
-
     use64 = (hdr.e_machine == EM_AMD64);
 
     // Switch to user address space
     mmu_context = mm_new_process(this, use64);
+
     if (unlikely(!mmu_context))
         return -int(errno_t::ENOMEM);
+
+    intptr_t first_exec;
 
     if (use64)
         first_exec = load_elf_with_policy<Elf64_Policy>(fd);
@@ -617,6 +630,8 @@ intptr_t process_t::run()
         return first_exec;
 
     char const *path_ptr = path.c_str();
+
+    // Filename begins after last slash
     char const *filename = strrchr(path_ptr, '/');
     filename = filename ? filename + 1 : path_ptr;
 
@@ -666,61 +681,78 @@ intptr_t process_t::run()
 
     // Initialize the stack according to the ELF ABI
     //
-    // lowest address
+    // highest address
     // +---------------------------+--------------------------+
-    // | argc                      | sizeof(uintptr_t)        |
-    // | argv[]                    | sizeof(uintptr_t)*argc   |
+    // | strings/structs for above | variable sized           |
+    // | zeroes                    | auxv_t filled with zeros |
+    // | auxv[]                    | sizeof(auxv_t)*auxc      |
     // | nullptr                   | sizeof(uintptr_t)        |
     // | envp[]                    | sizeof(uintptr_t)*envc   |
     // | nullptr                   | sizeof(uintptr_t)        |
-    // | auxv[]                    | sizeof(auxv_t)*auxc      |
-    // | zeroes                    | auxv_t filled with zeros |
-    // | strings/structs for above | variable sized           |
+    // | argv[]                    | sizeof(uintptr_t)*argc   |
+    // | argc                      | sizeof(uintptr_t)        |
     // +---------------------------+--------------------------+
-    // highest address
+    // lowest address
 
     // Calculate size of variable sized area
-    size_t info_sz;
 
     // Populate the stack
     void *stack_ptr = stack + stack_size;
 
+    char *env_end = (char*)stack_ptr;
+
     // Calculate the total size of environment string text
-    info_sz = 0;
-    for (size_t i = 0; i < env.size(); ++i) {
-        size_t len = env[i].length() + 1;
-        info_sz += len;
-    }
+    size_t env_sz = sum_str_lengths(env);
 
     // Calculate where the environment string text starts
-    stack_ptr = (char*)stack_ptr - info_sz;
+    stack_ptr = (char*)stack_ptr - env_sz;
     char *env_ptr = (char*)stack_ptr;
 
     // Calculate the total size of argument string text
-    info_sz = 0;
-    for (size_t i = 0; i < argv.size(); ++i) {
-        size_t len = argv[i].length() + 1;
-        info_sz += len;
-    }
+    size_t arg_sz = sum_str_lengths(argv);
 
     // Calculate where the argument string text starts
-    stack_ptr = (char*)stack_ptr - info_sz;
+    stack_ptr = (char*)stack_ptr - arg_sz;
     char *arg_ptr = (char*)stack_ptr;
 
-    // Align the stack pointer
-    stack_ptr = (void*)(uintptr_t(stack_ptr) & -sizeof(void*));
+    // Realign
+    stack_ptr = (char*)(uintptr_t(stack_ptr) & -16);
+
+    auxv_t auxents[] = {
+        { auxv_t::AT_ENTRY, (void*)hdr.e_entry },
+        { auxv_t::AT_PAGESZ, PAGESIZE },
+        { auxv_t::AT_PHENT, hdr.e_phentsize },
+        { auxv_t::AT_EXECFD, fd.release() },
+        { auxv_t::AT_UID, 0L },
+        { auxv_t::AT_EUID, 0L },
+        { auxv_t::AT_GID, 0L },
+        { auxv_t::AT_EGID, 0L },
+        { auxv_t::AT_NULL, 0L }
+    };
+
+    stack_ptr = (char*)stack_ptr - sizeof(auxents);
+    auxv_t *aux_ptr = (auxv_t*)stack_ptr;
+
+    if (!unlikely(mm_copy_user(aux_ptr, auxents, sizeof(auxents))))
+        return -1;
 
     // Calculate where the pointers to the environment strings start
-    stack_ptr = (char**)env_ptr - (env.size() + 1);
+    stack_ptr = (char**)stack_ptr - (env.size() + 1);
     char **envp_ptr = (char**)stack_ptr;
 
     // Copy the environment strings and populate environment string pointers
     for (size_t i = 0; i < env.size(); ++i) {
         size_t len = env[i].length() + 1;
+
         // Copy the string
-        memcpy(env_ptr, env[i].c_str(), len);
+        if (unlikely(!mm_copy_user(env_ptr, env[i].c_str(), len)))
+            return -1;
+
         // Write the pointer to the string
-        envp_ptr[i] = env_ptr;
+        if (unlikely(mm_copy_user(&envp_ptr[i], &env_ptr,
+                                  sizeof(env_ptr))))
+            return -1;
+
         // Advance string output pointer
         env_ptr += len;
     }
@@ -732,10 +764,16 @@ intptr_t process_t::run()
     // Copy the argument strings and populate argument string pointers
     for (size_t i = 0; i < env.size(); ++i) {
         size_t len = argv[i].length() + 1;
+
         // Copy the string
-        memcpy(arg_ptr, argv[i].c_str(), len);
+        if (unlikely(mm_copy_user(arg_ptr, argv[i].c_str(), len)))
+            return -1;
+
         // Write the pointer to the string
-        argp_ptr[i] = arg_ptr;
+        if (unlikely(mm_copy_user(&argp_ptr[i], arg_ptr,
+                                  sizeof(arg_ptr))))
+            return -1;
+
         // Advance string output pointer
         arg_ptr += len;
     }
@@ -750,32 +788,6 @@ intptr_t process_t::run()
     int argc = argv.size();
     if (unlikely(!mm_copy_user(stack_ptr, &argc, sizeof(argc))))
         return -1;
-
-    ext::vector<auxv_t> auxent;
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_ENTRY, (void*)hdr.e_entry })))
-        panic_oom();
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_PAGESZ, PAGESIZE })))
-        panic_oom();
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_PHENT, hdr.e_phentsize })))
-        panic_oom();
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_EXECFD, fd.release() })))
-        panic_oom();
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_UID, 0L })))
-        panic_oom();
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_EUID, 0L })))
-        panic_oom();
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_GID, 0L })))
-        panic_oom();
-
-    if (unlikely(!auxent.push_back({ auxv_t::AT_EGID, 0L })))
-        panic_oom();
 
     processes_scoped_lock lock(processes_lock);
 

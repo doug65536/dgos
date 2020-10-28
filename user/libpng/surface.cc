@@ -5,6 +5,17 @@
 #include <new>
 #include "../../user/include/utf.h"
 
+vga_console_ring_t::bit8_to_pixels_ptr vga_console_ring_t::bit8_to_pixels;
+
+vga_console_ring_t::bit8_to_pixels_transparent_ptr 
+    vga_console_ring_t::bit8_to_pixels_transparent;
+
+__attribute__((__constructor__))
+static void vga_console_ring_constructor()
+{
+    vga_console_ring_t::resolver();
+}
+
 // The screen is decomposed into a series of boxes that
 // correspond to offscreen surface areas
 // Adding a box to the screen completely removes the areas that are
@@ -16,12 +27,12 @@
 /// |              |              |              |              |
 /// | +-----+      | +----------+ |      +-----+ |    +----+    |
 /// | |a   b|      | |a        b| |      |a   b| |    |a  b|    |
-/// | |   + |---+  | |  +    +  | |  +---| +   | | +--|    |--+ |
-/// | |c   d|m n|  | |c        d| |  |i j|c   d| | |ij|    |mn| | clip top
+/// | |  I+ |---+  | |  + I  +  | |  +---| +I  | | +--|    |--+ |
+/// | |c   d|m n|  | |c        d| |  |i j|c   d| | |ij| I  |mn| | clip top
 /// | +-----+o p|  | +----------+ |  |k l+-----+ | |  |    |  | |
 /// |     |q   r|  |    |q  r|    |  |q   r|     | |  |c  d|  | |
-/// |     |     |  |    |    |    |  |     |     | |kl+----+op| |
-/// |     |s   t|  |    |s  t|    |  |s   t|     | |q        r| |
+/// |     |  E  |  |    | E  |    |  |  E  |     | |kl+----+op| |
+/// |     |s   t|  |    |s  t|    |  |s   t|     | |q   E    r| |
 /// |     +-----+  |    +----+    |  +-----+     | |s        t| |
 /// |             3|             2|             3| +----------+4|
 /// +--------------+--------------+--------------+--------------+
@@ -30,39 +41,39 @@
 /// | |a   b|      | |a        b| |      |a   b| |    |a  b|    |
 /// | |   + |---+  | |  +    +  | |  +---|  +  | | +--|    |--+ |
 /// | |     |m n|  | |          | |  |i j|     | | |ij|    |mn| |
-/// | |     |   |  | |          | |  |   |     | | |  |    |  | | span entire
-/// | |     |o p|  | |          | |  |k l|     | | |  |    |  | |
+/// | |  I  | E |  | |    I     | |  | E |  I  | | |  | I  |  | | span entire
+/// | |     |o p|  | |          | |  |k l|     | | | E|    |E | |
 /// | |   + |---+  | |  +    +  | |  +---|  +  | | |  |    |  | |
 /// | |c   d|      | |c        d| |      |c   d| | |kl|    |op| |
 /// | +-----+      | +----------+ |      +-----+ | +--|c  d|--+ |
-/// |             2|             1|             2|    +----+   3|
+/// |             2| best case   1|             2|    +----+   3|
 /// +--------------+--------------+--------------+--------------+
 /// |              |              |              |              |
 /// |    +------+  |    +----+    | +-------+    | +----------+ |
 /// |    |e    f|  |    |e  f|    | |e     f|    | |e        f| |
-/// |    |      |  |    |    |    | |       |    | |          | |
+/// |    |  E   |  |    | E  |    | |   E   |    | |    E     | |
 /// |    |g    h|  |    |g  h|    | |g     h|    | |g        h| |
 /// | +-----+m n|  | +----------+ | |i   j+----+ | |ij+----+mn| | clip bottom
 /// | |a   b|   |  | |a        b| | |k   l|a  b| | |kl|a  b|op| |
-/// | |     |o p|  | |  +    +  | | +-----| +  | | +--|    |--+ |
+/// | |  I  |o p|  | |  + I  +  | | +-----| +I | | +--| I  |--+ |
 /// | |c + d|---+  | |c        d| |       |c  d| |    |c  d|    |
 /// | +-----+      | +----------+ |       +----+ |    +----+    |
 /// |             3|             2|             3|             4|
 /// +--------------+--------------+--------------+--------------+
 /// |    +------+  |   +------+   |    +-----+   | +----------+ |
 /// |    |e    f|  |   |e    f|   |    |e   f|   | |e        f| |
-/// |    |g    h|  |   |g    h|   |    |g   h|   | |g        h| |
+/// |    |g    h|  |   |g E  h|   |    |g   h|   | |g        h| |
 /// | +-----+m n|  | +----------+ |    |i j+---+ | |ij+----+mn| |
 /// | |a   b|   |  | |a        b| |    |   |a b| | |  |a  b|  | |
-/// | |     |   |  | |          | |    |   |   | | |  |    |  | | within
+/// | |  I  | E |  | |    I     | |    | E | I | | |E | I  |  | | within
 /// | |c   d|   |  | |c        d| |    |   |c d| | |  |c  d|  | |
 /// | +-----+o p|  | +----------+ |    |k l+---+ | |kl+----+op| |
-/// |    |q    r|  |   |q    r|   |    |q   r|   | |q        r| |
+/// |    |q    r|  |   |q E  r|   |    |q   r|   | |q        r| |
 /// |    |s    t|  |   |s    t|   |    |s   t|   | |s        t| |
-/// |    +------+ 4|   +------+  3|    +-----+  4| +----------+5|
+/// |    +------+  |   +------+   |    +-----+   | +----------+ |
+/// |             4|             3|             4| worst case  5|
 /// +--------------+--------------+--------------+--------------+
-///                                                     ^
-///                                             most general case
+///
 /// I is the incoming rectangle abcd
 /// E is the existing rectangle
 ///   (efgh (top), ijkl (left), mnop (right), qrst (bottom))
@@ -309,7 +320,7 @@ void surface_free(surface_t *pp)
     free(pp);
 }
 
-size_t font_glyph_index(size_t codepoint)
+static size_t font_glyph_index(size_t codepoint)
 {
     if (likely(font_replacement &&
                codepoint >= font_ascii_min &&
@@ -334,7 +345,7 @@ size_t font_glyph_index(size_t codepoint)
     return st;
 }
 
-bitmap_glyph_t const *font_get_glyph(char32_t codepoint)
+static bitmap_glyph_t const *font_get_glyph(char32_t codepoint)
 {
     size_t i = font_glyph_index(codepoint);
 
@@ -345,7 +356,7 @@ bitmap_glyph_t const *font_get_glyph(char32_t codepoint)
               : &font_glyphs[font_ascii_lookup[' ' - font_ascii_min]];
 }
 
-void font_init()
+static void font_init()
 {
     font_glyph_count = (uintptr_t(_binary_u_vga16_raw_end) -
                    uintptr_t(_binary_u_vga16_raw_start)) /
@@ -413,6 +424,41 @@ void vga_console_ring_t::new_line(uint32_t color)
     clear_row(exposed_row, color);
 }
 
+void vga_console_ring_t::resolver()
+{
+    bit8_to_pixels_resolve();
+    bit8_to_pixels_transparent_resolve();
+}
+
+//void vga_console_ring_t::render(fb_info_t *fb, int dx, int dy, int dw, int dh)
+//{
+//    // The scroll offset may cause us to need to simultaneously
+//    // show a bit of the bottom, and a bit of the top of the surface
+
+//    comp_area_t top_area;
+//    comp_area_t bot_area;
+
+//    // Fill simple values
+//    top_area.sx = dx;
+//    top_area.sy = dy;
+//    top_area.ex = dx + dw;
+
+//    bot_area.sx = dx;
+//    bot_area.ex = dx + dw;
+//    bot_area.ey = dy + dh;
+
+//    //bot_area.sy = dy;
+
+//    // Row index of row at top of viewport
+//    uint32_t first_visible = wrap_row(oldest_row + scroll_top);
+
+//    // Row index of row at bottom of viewport
+////    uint32_t last_visible = wrap_row(first_visible + )
+
+////    // If the oldest row
+////    if (wrap_row_signed(oldest_row + scroll_top)
+//}
+
 void vga_console_ring_t::clear_row(uint32_t row, uint32_t color)
 {
     assert(row < ring_h);
@@ -424,12 +470,42 @@ void vga_console_ring_t::clear_row(uint32_t row, uint32_t color)
     fill(sx, sy, ex, ey, color);
 }
 
-#ifdef __x86_64__
-#include <xmmintrin.h>
+#if defined(__x86_64__) || defined(__i386__)
+#include <immintrin.h>
 #endif
 
-void vga_console_ring_t::bit8_to_pixels(uint32_t *out, uint8_t bitmap,
-                                        uint32_t bg, uint32_t fg)
+void vga_console_ring_t::bit8_to_pixels_generic(
+        uint32_t * restrict out, uint8_t bitmap,
+        uint32_t bg, uint32_t fg)
+{
+    out[0] = bitmap & 0x80 ? fg : bg;
+    out[1] = bitmap & 0x40 ? fg : bg;
+    out[2] = bitmap & 0x20 ? fg : bg;
+    out[3] = bitmap & 0x10 ? fg : bg;
+    out[4] = bitmap & 0x08 ? fg : bg;
+    out[5] = bitmap & 0x04 ? fg : bg;
+    out[6] = bitmap & 0x02 ? fg : bg;
+    out[7] = bitmap & 0x01 ? fg : bg;    
+}
+
+void vga_console_ring_t::bit8_to_pixels_transparent_generic(
+        uint32_t * restrict out, uint8_t bitmap,
+        uint32_t fg)
+{
+    out[0] = bitmap & 0x80 ? fg : out[0];
+    out[1] = bitmap & 0x40 ? fg : out[1];
+    out[2] = bitmap & 0x20 ? fg : out[2];
+    out[3] = bitmap & 0x10 ? fg : out[3];
+    out[4] = bitmap & 0x08 ? fg : out[4];
+    out[5] = bitmap & 0x04 ? fg : out[5];
+    out[6] = bitmap & 0x02 ? fg : out[6];
+    out[7] = bitmap & 0x01 ? fg : out[7];
+}
+
+__attribute__((__target__("sse2")))
+void vga_console_ring_t::bit8_to_pixels_sse(
+        uint32_t * restrict out, uint8_t bitmap,
+        uint32_t bg, uint32_t fg)
 {
 #ifdef __x86_64__
     __m128i map = _mm_set1_epi32(bitmap);
@@ -463,6 +539,110 @@ void vga_console_ring_t::bit8_to_pixels(uint32_t *out, uint8_t bitmap,
     out[6] = bitmap & 0x02 ? fg : bg;
     out[7] = bitmap & 0x01 ? fg : bg;
 #endif
+}
+
+__attribute__((__target__("avx2")))
+void vga_console_ring_t::bit8_to_pixels_avx2(
+        uint32_t * restrict out, uint8_t bitmap, uint32_t fg, uint32_t bg)
+{
+    // Load bitmap into all lanes
+    __m256i map = _mm256_set1_epi32(bitmap);
+    
+    // Generate mask that checks one bit in each lane
+    __m256i mask = _mm256_set_epi32(0x80, 0x40, 0x20, 0x10, 
+                                    0x08, 0x04, 0x02, 0x01);
+    
+    // Make a value that is not zero if the bit is set for this lane
+    mask = _mm256_and_si256(mask, map);
+
+    // Make a mask that is all ones if the bitmap bit is set for this lane
+    mask = _mm256_cmpeq_epi32(mask, _mm256_setzero_si256());
+
+    // Set foreground color in all lanes
+    __m256i fgs = _mm256_set1_epi32(fg);
+
+    // Set background color in all lanes
+    __m256i bgs = _mm256_set1_epi32(bg);
+
+    // Select either background or foreground depending on whether
+    // the bitmap bit for this lane was set
+    mask = _mm256_or_si256(_mm256_and_si256(bgs, mask),
+                          _mm256_andnot_si256(fgs, mask));
+    
+    // Store 8 pixels
+    _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(out), mask);
+}
+
+__attribute__((__target__("sse2")))
+void vga_console_ring_t::bit8_to_pixels_transparent_sse(
+        uint32_t * restrict out, uint8_t bitmap, uint32_t fg)
+{
+    // Load existing pixels for transparency merge
+    __m128i lobg = _mm_loadu_si128(reinterpret_cast<__m128i_u*>(out));
+    __m128i hibg = _mm_loadu_si128(reinterpret_cast<__m128i_u*>(out + 4));
+
+    // Load bitmap into all lanes
+    __m128i map = _mm_set1_epi32(bitmap);
+    
+    // Generate mask that checks one bit in each lane
+    __m128i lomask = _mm_set_epi32(0x8, 0x4, 0x2, 0x1);
+    __m128i himask = _mm_slli_epi32(lomask, 4);
+    
+    // Make a value that is not zero if the bit is set for this lane
+    lomask = _mm_and_si128(lomask, map);
+    himask = _mm_and_si128(himask, map);
+
+    // Make a mask that is all ones if the bitmap bit is set for this lane
+    __m128i zero = _mm_setzero_si128();
+    lomask = _mm_cmpeq_epi32(lomask, zero);
+    himask = _mm_cmpeq_epi32(himask, zero);
+
+    // Set foreground color in all lanes
+    __m128i fgs = _mm_set1_epi32(fg);
+
+    // Select either background or foreground depending on whether
+    // the bitmap bit for this lane was set
+    lomask = _mm_or_si128(_mm_and_si128(lobg, lomask),
+                          _mm_andnot_si128(fgs, lomask));
+    // Store low pixels
+    _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out), lomask);
+    
+    himask = _mm_or_si128(_mm_and_si128(hibg, himask),
+                          _mm_andnot_si128(fgs, himask));
+    _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out + 4), himask);    
+}
+
+__attribute__((__target__("avx2")))
+void vga_console_ring_t::bit8_to_pixels_transparent_avx2(
+        uint32_t * restrict out, uint8_t bitmap, uint32_t fg)
+{
+    // Load existing pixels for transparency merge
+    __m256i bg = _mm256_loadu_si256(reinterpret_cast<__m256i_u*>(out));
+
+    // Load bitmap into all lanes
+    __m256i map = _mm256_set1_epi32(bitmap);
+    
+    // Generate mask that checks one bit in each lane
+    __m256i mask = _mm256_set_epi32(0x80, 0x40, 0x20, 0x10, 
+                                      0x08, 0x04, 0x02, 0x01);
+    
+    // Make a value that is not zero if the bit is set for this lane
+    mask = _mm256_and_si256(mask, map);
+
+    // Make a mask that is all ones if the bitmap bit is set for this lane
+    __m256i zero = _mm256_setzero_si256();
+    mask = _mm256_cmpeq_epi32(mask, zero);
+
+    // Set foreground color in all lanes
+    __m256i fgs = _mm256_set1_epi32(fg);
+
+    // Select either background or foreground depending on whether
+    // the bitmap bit for this lane was set
+    mask = _mm256_or_si256(_mm256_and_si256(bg, mask),
+                          _mm256_andnot_si256(fgs, mask));
+
+    // Store 8 pixels
+    _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(out), mask);
 }
 
 void vga_console_ring_t::write(const char *data, size_t size,
@@ -540,3 +720,15 @@ void surface_t::fill(uint32_t sx, uint32_t sy,
             out[x] = color;
     }
 }
+
+//1 (adds 0 rect) 1 case 6.25%
+//2 (adds 1 rect) 4 case 25%
+//3 (adds 2 rect) 6 case 37.5%
+//4 (adds 3 rect) 4 case 25%
+//5 (adds 4 rect) 1 case 6.25%
+//
+// (adds 2 rect) 37.5%
+// (adds 1 rect) 25%
+// (adds 3 rect) 25%
+// (adds 0 rect) 6.25%
+// (adds 4 rect) 6.25%
