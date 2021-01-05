@@ -22,6 +22,9 @@ jobs:
       shell: bash
 
     - uses: actions/checkout@v2
+    
+    - name: dependencies
+      run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86 cpu-checker
 
     - name: Cache
       uses: actions/cache@v2.1.1
@@ -34,15 +37,12 @@ jobs:
         # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
         #restore-keys: # optional
 
-    - name: dependencies
-      run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86 cpu-checker
-
     - name: toolchain and/or bootstrap
       run: mkdir -p cibuild && cd cibuild && ../bootstrap
-      #if: steps.cache.outputs.cache-hit != 'true'
+      # bootstrap runs whether or not we got cached toolchain - it skips as necessary
 
     - name: disks
-      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && (. ./set_toolchain_path ; make disks -j$(nproc))
+      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc))
 
     - uses: actions/upload-artifact@v2
       with:

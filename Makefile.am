@@ -11,20 +11,20 @@ noinst_PROGRAMS =
 DUMPDIR = dump
 
 STARTUP_FILE_NAMES = crt0 crti crtn crt0pc80 crt0pc64 crt0pc32
-STARTUP_FILE_NAMES_32 = crt032 crti32 crtn32 crt0pc8032 crt0pc6432 crt0pc3232
+STARTUP_FILE_NAMES_32 = $(patsubst %,%32,$(STARTUP_FILE_NAMES))
 
 STDLIB_FILE_NAMES = c g m stdc++
-STDLIB_FILE_NAMES_32 = c32 g32 m32 stdc++32
+STDLIB_FILE_NAMES_32 = $(patsubst %,%32,$(STDLIB_FILE_NAMES))
 
 USRLIB_FILE_NAMES =  png z
-USRLIB_FILE_NAMES_32 = png32
+USRLIB_FILE_NAMES_32 = $(patsubst %,%32,$(USRLIB_FILE_NAMES))
 
 STARTUP_FILES_INSTALLED = \
 	$(patsubst %,sysroot/lib/%.o,\
 	$(STARTUP_FILE_NAMES))
 
 STARTUP_FILES_INSTALLED_32 = \
-	$(patsubst %32,sysroot/lib/32/%.o,\
+	$(patsubst %32,sysroot/lib32/%.o,\
 	$(STARTUP_FILE_NAMES_32))
 
 STDLIB_STATIC_FILES_INSTALLED = \
@@ -32,15 +32,15 @@ STDLIB_STATIC_FILES_INSTALLED = \
 	$(STDLIB_FILE_NAMES))
 
 STDLIB_STATIC_FILES_INSTALLED_32 = \
-	$(patsubst %32,sysroot/lib/32/lib%.a,\
+	$(patsubst %32,sysroot/lib32/lib%.a,\
 	$(STDLIB_FILE_NAMES_32))
 
 USRLIB_STATIC_FILES_INSTALLED = \
 	$(patsubst %,sysroot/lib/lib%.a,\
-	$(USRLIB_FILE_NAMES))
+		$(USRLIB_FILE_NAMES))
 
 USRLIB_STATIC_FILES_INSTALLED_32 = \
-	$(patsubst %32,sysroot/lib/32/lib%.a,\
+	$(patsubst %32,sysroot/lib32/lib%.a,\
 	$(USRLIB_FILE_NAMES_32))
 
 if userspace_so
@@ -49,7 +49,7 @@ STDLIB_SHARED_FILES_INSTALLED = \
 	$(STDLIB_FILE_NAMES))
 
 STDLIB_SHARED_FILES_INSTALLED_32 = \
-	$(patsubst %32,sysroot/lib/32/%.so,\
+	$(patsubst %32,sysroot/lib32/lib%.so,\
 	$(STDLIB_FILE_NAMES_32))
 endif
 
@@ -144,7 +144,7 @@ mbr_elf_LDADD = \
 # mbr-bin
 
 mbr-bin: mbr-elf
-	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+	$(OBJCOPY) -O binary --only-section=.mbrtext "$<" "$@"
 
 # boot1-elf
 
@@ -183,6 +183,7 @@ boot1_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/boot/boot1.ld \
+	-Wl,-Map,boot1.map \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -static -DS02 \
 	$(NOSTDLIB_FLAGS)
@@ -196,7 +197,7 @@ boot1_elf_LDADD = \
 # boot1-bin
 
 boot1-bin: boot1-elf
-	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+	$(OBJCOPY) -O binary --only-section=.boot1text "$<" "$@"
 
 # libbootsect.a
 
@@ -371,7 +372,10 @@ bootfat_elf_LDADD = \
 # bootfat-bin
 
 bootfat-bin: bootfat-elf
-	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+	$(OBJCOPY) -O binary \
+		--only-section=.bootfattext16 \
+		--only-section=.bootfatunusedlolo \
+		--only-section=.bootfattext "$<" "$@"
 
 # bootiso-elf
 
@@ -405,6 +409,7 @@ bootiso_elf_LDFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
+	-Wl,-Map,bootiso-elf.map \
 	$(LINKER_SEL) -static -DS06 \
 	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS) \
@@ -420,8 +425,12 @@ bootiso_elf_LDADD = \
 # bootiso-bin
 
 bootiso-bin: bootiso-elf
-	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+	$(OBJCOPY) -O binary \
+		"$<" "$@"
 
+#@--only-section=.head
+#@--only-section=.bootisotext16
+#@--only-section=.bootisotext
 # bootpxe-bios
 
 bin_PROGRAMS += bootpxe-bios-elf
@@ -468,8 +477,10 @@ bootpxe-bios.map: bootpxe-bios-elf
 
 # bootpxe-bios-bin
 
-bootpxe-bios-bin: bootpxe-bios-elf
-	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+# extract binary image, strip debug
+bootpxe-bios-bin: bootpxe-bios-elf Makefile.am
+	$(OBJCOPY) -O binary -g \
+		"$<" "$@"
 
 # efi
 
@@ -1126,19 +1137,32 @@ EXTRA_kernel_asan_DEPENDENCIES = \
 # ----------------------------------------------------------------------------
 # parse-trace
 
-WHICH_CXX = $(shell $(WHICH) $(CXX))
-$(info cxx: $(WHICH_CXX))
-CXX_DIR = $(dir $(WHICH_CXX))
-TOOLCHAIN_DIR = $(abspath $(CXX_DIR)/..)
-$(info cxx dir: $(CXX_DIR))
-$(info toolchain dir: $(TOOLCHAIN_DIR))
+#WHICH_CXX = $(shell $(WHICH) $(CXX))
+#CXX_DIR = $(dir $(WHICH_CXX))
+#TOOLCHAIN_DIR = $(abspath $(CXX_DIR)/..)
+#
+##$(info cxx: $(WHICH_CXX))
+##$(info cxx dir: $(CXX_DIR))
+##$(info toolchain dir: $(TOOLCHAIN_DIR))
+#
+## Autodetect toolchain include dir from stdlib location
+#
+#TOOLCHAIN_INCLUDE_PATH_STDLIB_H = \
+#	$(shell $(FIND) $(TOOLCHAIN_DIR) -type f -name stdlib.h)
+#TOOLCHAIN_LIB_PATH_LDSCRIPTS = \
+#	$(shell $(FIND) $(TOOLCHAIN_DIR) -type d -name ldscripts)
+#
+#TOOLCHAIN_INCLUDE_PATH = $(dir $(TOOLCHAIN_INCLUDE_PATH_STDLIB_H))
+#
+#TOOLCHAIN_LIB_PATH = $(dir $(TOOLCHAIN_LIB_PATH_LDSCRIPTS))
+#
+##$(info detected toolchain install stdlib at $(TOOLCHAIN_INCLUDE_PATH_STDLIB_H))
+##$(info detected toolchain lib ldscripts at $(TOOLCHAIN_LIB_PATH_LDSCRIPTS))
+#$(info detected toolchain install include path $(TOOLCHAIN_INCLUDE_PATH))
+#$(info detected toolchain install lib path $(TOOLCHAIN_LIB_PATH))
 
-# Autodetect toolchain include dir from stdlib location
-TOOLCHAIN_INCLUDE_PATH_STDLIB_H = \
-	$(shell $(FIND) $(TOOLCHAIN_DIR) -type f -name stdlib.h)
-$(info detected toolchain install stdlib at $(TOOLCHAIN_INCLUDE_PATH_STDLIB_H))
-TOOLCHAIN_INCLUDE_PATH = $(dir $(TOOLCHAIN_INCLUDE_PATH_STDLIB_H))
-$(info detected toolchain install include path $(TOOLCHAIN_INCLUDE_PATH))
+# Bring in TOOLCHAIN_INCLUDE_PATH, TOOLCHAIN_LIB_PATH from bootstrap
+include $(top_builddir)/toolchain_config.mk
 
 trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 	$(CXX_FOR_BUILD) -ggdb3 -o "$@" \
@@ -1182,15 +1206,42 @@ endef
 
 STDLIB_INCLUDE_SRC = $(patsubst ./%,%,$(shell \
 	cd $(abs_top_srcdir)/libc/include && $(FIND) -type f -name "*.h"))
-	
+
 USRLIB_INCLUDE_SRC = $(patsubst ./%,%,$(shell \
 		cd $(abs_top_srcdir)/user/include && $(FIND) -type f -name "*.h"))
-		
+
 $(foreach include_file,$(STDLIB_INCLUDE_SRC), \
 	$(eval $(call deploy_toolchain_include,$(include_file),libc)))
 
 $(foreach include_file,$(USRLIB_INCLUDE_SRC), \
 	$(eval $(call deploy_toolchain_include,$(include_file),user)))
+
+define deploy_toolchain_lib=
+
+$$(TOOLCHAIN_LIB_PATH)$(1).a: $(1).a
+	mkdir -p $$(@D)
+	$$(CP) $$< $$@
+
+sysroot/lib/$(1).a: $(1).a
+	mkdir -p $$(@D)
+	$$(CP) $$< $$@
+
+$$(TOOLCHAIN_LIB_PATH)32/$(1).a: $(1)32.a
+	mkdir -p $$(@D)
+	$$(CP) $$< $$@
+
+sysroot/lib32/$(1).a: $(1)32.a
+	mkdir -p $$(@D)
+	$$(CP) $$< $$@
+
+all: $$(TOOLCHAIN_LIB_PATH)$(1).a sysroot/lib/$(1).a \
+	$$(TOOLCHAIN_LIB_PATH)32/$(1).a sysroot/lib32/$(1).a
+
+endef
+
+$(foreach lib,$(USRLIB_FILE_NAMES), \
+	$(eval $(call deploy_toolchain_lib,lib$(lib))) \
+)
 
 # ----------------------------------------------------------------------------
 # crt0
@@ -1212,7 +1263,7 @@ USRLIB_INCLUDES_DEPLOYED = \
 sysroot/lib/:
 	$(MKDIR) -p "$@"
 
-sysroot/lib/32/:
+sysroot/lib32/:
 	$(MKDIR) -p "$@"
 
 define compilestartup =
@@ -1232,7 +1283,7 @@ sysroot/lib/$(1): \
 			-o "$$@" \
 			-c "$$<"
 
-sysroot/lib/32/$(1): \
+sysroot/lib32/$(1): \
 		$(2) \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
 		$(STDLIB_INCLUDES_DEPLOYED) \
@@ -1284,7 +1335,7 @@ define deploy_stdlib=
 sysroot/lib/lib$(1).a: lib$(1).a
 	$$(MKDIR) -p $$(@D) && "$$(CP)" -T "$$<" "$$@"
 
-sysroot/lib/32/lib$(1).a: lib$(1)32.a
+sysroot/lib32/lib$(1).a: lib$(1)32.a
 	$$(MKDIR) -p $$(@D) && "$$(CP)" -T "$$<" "$$@"
 
 endef
@@ -1293,9 +1344,9 @@ $(foreach name,$(STDLIB_FILE_NAMES), \
 	$(eval $(call deploy_stdlib,$(name))) \
 )
 
-$(foreach name,$(USRLIB_FILE_NAMES), \
-	$(eval $(call deploy_stdlib,$(name))) \
-)
+#$(foreach name,$(USRLIB_FILE_NAMES), \
+#	$(eval $(call deploy_stdlib,$(name))) \
+#)
 
 define deploy_stdlib_header=
 sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
@@ -2346,6 +2397,7 @@ clean-local:
 	$(RM) -f "fatpart.img"
 	$(RM) -f "isodisk.iso"
 	$(RM) -f "initrd"
+	$(RM) -f "initrd-light"
 
 	$(RM) -f "boot1-bin"
 	$(RM) -f "dgos-kernel-asan"
@@ -2432,6 +2484,7 @@ MODULES_STAGED_HD = \
 MODULE_CPIO_PATHS = $(patsubst %,boot/%,$(MODULE_FILENAMES)) \
 	$(generate_symbols_outputs)
 
+MODULE_CPIO_LIGHT_PATHS = $(patsubst %,boot/%,$(MODULE_FILENAMES))
 
 define stage_file_to=
 
@@ -2529,7 +2582,7 @@ $(foreach name,$(STAGED_SYMS_CPIO_PATHS), \
 	$(eval $(call stage_file,$(name))) \
 )
 
-all-kernel: $(KERNEL_NAMES) $(MODULE_LIST) initrd
+all-kernel: $(KERNEL_NAMES) $(MODULE_LIST) initrd initrd-light
 
 .PHONY: all-kernel
 
@@ -2541,12 +2594,23 @@ CPIO_PATHS = \
 	$(STAGED_SYMS_CPIO_PATHS) \
 	$(SBIN_PATHS)
 
+CPIO_LIGHT_PATHS = \
+	$(MODULE_CPIO_PATHS) \
+	$(STAGED_SYMS_CPIO_PATHS) \
+	$(SBIN_PATHS)
+
 initrd: $(patsubst %,stage/%,$(CPIO_PATHS))
 	(cd stage && $(CPIO) -L -o --device-independent -H bin \
 		< <($(patsubst %,printf "\%s\n" "%";,$(CPIO_PATHS))) \
 		> "$(@D)/../$(@F)")
 
+initrd-light: $(patsubst %,stage/%,$(CPIO_LIGHT_PATHS))
+	(cd stage && $(CPIO) -L -o --device-independent -H bin \
+		< <($(patsubst %,printf "\%s\n" "%";,$(CPIO_LIGHT_PATHS))) \
+		> "$(@D)/../$(@F)")
+
 $(eval $(call stage_file,initrd,/boot))
+$(eval $(call stage_file,initrd-light,/boot))
 
 # ----------------------------------------------------------------------------
 # QEMU launcher
@@ -2642,7 +2706,8 @@ QEMU_SERIAL = \
 	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
 	-device isa-serial,chardev=qemu-serial-socket,iobase=0x3e8,irq=5,id=com3
 
-QEMU_SOUND = -soundhw es1370
+#QEMU_SOUND = -device es1370
+QEMU_SOUND =
 
 QEMU_DEBUG = -no-shutdown -no-reboot -d unimp,guest_errors
 QEMU_TEST = -no-reboot -d unimp,guest_errors
@@ -2652,6 +2717,7 @@ QEMU_COMMON = \
 	$(QEMU_FLAGS) \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
+	$(QEMU_DEBUG) \
 	$(QEMU_MONITOR) \
 	$(QEMU_NET) \
 	$(QEMU_SOUND) \
@@ -2707,7 +2773,7 @@ QEMU_HDCTL_DEV_none =
 QEMU_HDCTL_DEV_ahci = \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv
 
-QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42
+QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,cmb_size_mb=4
 
 QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=bootif.0,drive=bootdrv
@@ -2987,8 +3053,10 @@ $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 debug-$(1)-$(2)-bochs-$(3): $$(QEMU_IMAGE_$(1)) \
 		$$(generate_symbols_outputs) \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
-		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
+		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands \
+		$$(QEMU_IMAGE_iso)
 	echo Using $$(QEMU_IMAGE_$(1))
+	$(MKDIR) -p dump
 	$$(BOCHS) \
 		-f $$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
 		-rc $$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands \
@@ -3075,9 +3143,17 @@ run-bios-iso: run-up-bios-hd-iso-ahci-vga-tcg
 
 .PHONY: run-bios-iso
 
-debug-bios-iso: run-up-bios-hd-iso-ahci-vga-tcg
+debug-bios-iso: debug-up-bios-hd-iso-ahci-vga-tcg
 
 .PHONY: debug-bios-iso
+
+debug-bios-pxe: debug-up-bios-pxe-hyb-nvme-vga-tcg
+
+.PHONY: debug-bios-pxe
+
+run-bios-pxe: run-up-bios-pxe-hyb-nvme-vga-tcg
+
+.PHONY: run-bios-pxe
 
 debug-iso: run-up-efi-hd-iso-ahci-vga-tcg
 

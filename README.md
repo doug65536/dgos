@@ -136,21 +136,17 @@ a `toolchain` directory, and a `build` directory in the current directory.
 You need the following packages:
 `lemon` `mtools` `genisoimage` `qemu-system-x86`
 
-### Toolchain
-
-Starting from the storage location (which contains dgos, build, toolchain)
-
-    cd toolchain
-    ../dgos/toolchain/build-crossgcc.bash -o toolchain_build -p toolchain_install
-
-    export PATH="$PWD/toolchain_install/bin:$PATH"
-    cd ..
-
-### Bootstrap
+### Bootstrap (build toolchain if necessary and run configure)
 
     cd build
     ../dgos/bootstrap --enable-lto --enable-optimize
     make disks -j$(nproc)
+
+### Toolchain path
+
+If you run into errors, you may need to run `. ./set_toolchain_path`
+(or `source set_toolchain_path`) to enable configure to pick up the toolchain.
+It will modify the PATH environment variable to include the toolchain.
 
 ### Debugging
 
