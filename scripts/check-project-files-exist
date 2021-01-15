@@ -1,5 +1,10 @@
 #!/bin/bash
 
+dir=.
+if [[ -n $1 ]]; then
+	dir=$1
+fi
+
 while read f; do
 	echo ---- $f
 	while read s; do
@@ -7,4 +12,4 @@ while read f; do
 			echo ${f%/*}/$s
 		fi
 	done < $f
-done < <(find -type f -name '*.files')
+done < <(find "$dir" -type f -name '*.files')

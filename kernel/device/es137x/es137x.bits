@@ -1,13 +1,14 @@
 -- ES1370_CONTROL=0x00 R/W: Interrupt/Chip select control register
 31 ADC_STOP disable capture buffer transfers
 30 XCTL1 general purpose output bit
+29 OPEN Dummy bit
 28:16 PCLKDIV clock divide ratio for DAC2
-15 MSFMTSEL MPEG serial data format; 0 = SONY, 1 = I2S
-14 SBB clock source for DAC - 0 = clock generator; 1 = MPEG clocks
+15 MSFMTSEL MPEG serial data format; 0=SONY, 1=I2S
+14 SBB clock source for DAC - 0=clock generator; 1=MPEG clocks
 13:12 WTSRSEL fixed frequency clock for DAC1
 11 DAC_SYNC DAC's are synchronous
 10 CCB_INTE CCB voice interrupts enable
-9 M_CB capture clock source; 0 = ADC; 1 = MPEG
+9 M_CB capture clock source; 0=ADC; 1=MPEG
 8 XCTL0 generap purpose output bit
 7 BREQ memory bus request enable
 6 DAC1EN DAC1 playback channel enable
@@ -25,6 +26,7 @@
 
 -- ES1370_STATUS=0x04
 31 INTR Interrupt is pending
+30:11 ZERO Always zero
 10 CSTAT CODEC is busy or register write in progress
 9 CBUSY CODEC is busy
 8 CWRIP CODEC register write in progress
@@ -39,33 +41,38 @@
 
 -- ES1370_UARTSTATUS=0x09 R/O: UART status register
 7 RX_INT Rx interrupt occurred
+6:3 ZERO Always zero
 2 TX_INT Tx interrupt occurred
 1 TX_RDY Tx ready
 0 RX_RDY Rx ready
 
-#define ES_REG_UART_CONTROL 0x09	/* W/O: UART control register */
+-- ES1370_UART_CONTROL=0x09 W/O: UART control register
 7 RX_INTE Rx interrupt enable
 6:5 TX_INTE Tx interrupt enable
+4:2 UNDEFINED Undefined value
 1:0 CTRL Control
 
 -- ES1370_UARTTEST=0x0A
+7:1 UNDEFINED Undefined
 0 TEST Test mode enabled
 
 -- ES1370_MEMPAGE=0x0C
+31:4 UNDEFINED Undefined
 3:0 PAGE page select
 
--- ES1370_PAGE_DAC=0x0c
--- ES1370_PAGE_ADC=0x0d
--- ES1370_PAGE_UART=0x0e
--- ES1370_PAGE_UART1=0x0f
+-- ES1370_MEMPAGE_PAGE_DAC=0x0c
+-- ES1370_MEMPAGE_PAGE_ADC=0x0d
+-- ES1370_MEMPAGE_PAGE_UART=0x0e
+-- ES1370_MEMPAGE_PAGE_UART1=0x0f
 
 -- ES1370_CODEC=0x10 W/O: Codec write register address
-#define ES_REG_1370_CODEC 0x10	/*
-15:8 ADDR
-7:0 DATA
+31:16 UNDEFINED Undefined
+15:8 ADDR Codec register select
+7:0 DATA Selected register data
 
 -- ES1370_SERIAL=0x20 R/W: Serial interface control register
-21:19 END_INC binary offset value to increment / loop end */
+31:22 ZERO Always zero
+21:19 END_INC binary offset value to increment / loop end
 18:16 ST_INC binary offset value to increment / start
 15 ADC_LOOP_SEL 0=loop, 1=stop
 14 PB1_LOOP_SEL 0=loop, 1=stop
@@ -84,47 +91,33 @@
 1 PB1_BITS 0=8-bit, 1=16-bit
 0 PB1_CHAN 0=mono, 1=stereo
 
--- ES1370_PB1FC=0x24
-#define ES_REG_DAC1_COUNT 0x24	/* R/W: DAC1 sample count register */
-
--- ES1370_PB2FC=0x28
-#define ES_REG_DAC2_COUNT 0x28	/* R/W: DAC2 sample count register */
-
--- ES1370_RECFC=0x2C
-#define ES_REG_ADC_COUNT  0x2c	/* R/W: ADC sample count register */
+-- ES1370_DAC1_COUNT=0x24 R/W: DAC1 sample count register
 31:16 CURR_COUNT
-15:0 COUNT
+15:0 LAST
 
--- ES1370_PGC_PB1ADDR=0x30
-#define ES_REG_DAC1_FRAME 0x30	/* R/W: PAGE 0x0c; DAC1 frame address */
+-- ES1370_DAC2_COUNT=0x28 R/W: DAC2 sample count register
+31:16 CURR_COUNT
+15:0 LAST
 
--- ES1370_PGC_PB1DEF=0x34
-#define ES_REG_DAC1_SIZE  0x34	/* R/W: PAGE 0x0c; DAC1 frame size */
+-- ES1370_ADC_COUNT=0x2C R/W: ADC sample count register
+31:16 CURR_COUNT
+15:0 LAST
 
--- ES1370_PGC_PB2ADDR=0x38
-#define ES_REG_DAC2_FRAME 0x38	/* R/W: PAGE 0x0c; DAC2 frame address */
+-- ES1370_DAC1_FRAME=0x30 R/W: PAGE 0x0c; DAC1 frame address
+31:0 ADDR DAC1 source address
 
--- ES1370_PGC_PB2DEF=0x3C
-#define ES_REG_DAC2_SIZE  0x3c	/* R/W: PAGE 0x0c; DAC2 frame size */
+-- ES1370_DAC1_SIZE=0x34 R/W: PAGE 0x0c; DAC1 frame size
+31:16 CURR_COUNT
+15:0 LAST
 
--- ES1370_PGD_RECADDR=0x30
-#define ES_REG_ADC_FRAME  0x30	/* R/W: PAGE 0x0d; ADC frame address */
+-- ES1370_DAC2_FRAME=0x38 R/W: PAGE 0x0c; DAC2 frame address
+31:0 ADDR DAC2 source address
 
--- ES1370_PGD_RECDEF=0x34
-#define ES_REG_ADC_SIZE	  0x34	/* R/W: PAGE 0x0d; ADC frame size */
-#define   ES_REG_FCURR_COUNTO(o) (((o)&0xffff)<<16)
-#define   ES_REG_FCURR_COUNTM    (0xffff<<16)
-#define   ES_REG_FCURR_COUNTI(i) (((i)>>14)&0x3fffc)
-#define   ES_REG_FSIZEO(o)	 (((o)&0xffff)<<0)
-#define   ES_REG_FSIZEM		 (0xffff<<0)
-#define   ES_REG_FSIZEI(i)	 (((i)>>0)&0xffff)
+-- ES1370_DAC2_SIZE=0x3c R/W: PAGE 0x0c; DAC2 frame size
+31:16 CURR_COUNT
+15:0 LAST
 
 -- ES1370_PGE_UARTDATA=0x30
-#define ES_REG_UART_FIFO  0x30	/* R/W: PAGE 0x0e; UART FIFO register */
-#define   ES_REG_UF_VALID	 (1<<8)
-#define   ES_REG_UF_BYTEO(o)	 (((o)&0xff)<<0)
-#define   ES_REG_UF_BYTEM	 (0xff<<0)
-#define   ES_REG_UF_BYTEI(i)	 (((i)>>0)&0xff)
 
 -- ES1370_PGE_PHANTOM_ADDR=0x38
 #define ES_REG_PHANTOM_FRAME 0x38 /* R/W: PAGE 0x0d: phantom frame address */
@@ -142,3 +135,5 @@
 -- ES1370_SMPREG_INT_REGS=0x01
 -- ES1370_SMPREG_ACCUM_FRAC=0x02
 -- ES1370_SMPREG_VFREQ_FRAC=0x03
+
+-- ES1370_REG__END=0x40

@@ -1,6 +1,6 @@
 #pragma once
 #include "types.h"
-#include "vesainfo.h"
+#include "modeinfo.h"
 
 #include "vector.h"
 #include "cxxstring.h"

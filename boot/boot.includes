@@ -1,5 +1,7 @@
 .
 utils
 include
+bios
+efi
 ../user/libutf
 

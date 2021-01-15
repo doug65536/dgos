@@ -6,6 +6,8 @@
 #	lemon $<
 #
 
+ARCH = x86_64
+
 noinst_PROGRAMS =
 
 DUMPDIR = dump
@@ -104,6 +106,7 @@ mbr_elf_SOURCES = \
 
 mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	-I$(top_srcdir)/boot \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
@@ -119,6 +122,7 @@ mbr_elf_CFLAGS = \
 
 mbr_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	-I$(top_srcdir)/boot \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)  \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -152,11 +156,12 @@ bin_PROGRAMS += boot1-elf
 generate_symbols_list += boot1-elf
 
 boot1_elf_SOURCES = \
-	boot/boot1.S \
-	boot/boot1.ld
+	boot/x86_bios/boot1.S \
+	boot/x86_bios/boot1.ld
 
 boot1_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	-I$(top_srcdir)/boot \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
@@ -170,6 +175,7 @@ boot1_elf_CFLAGS = $(boot1_elf_CXXFLAGS)
 
 boot1_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	-I$(top_srcdir)/boot \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -182,14 +188,14 @@ boot1_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
 	$(REGPARM_FLAGS) \
 	$(ELF32_FLAGS) \
-	-Wl,-T,$(top_srcdir)/boot/boot1.ld \
+	-Wl,-T,$(top_srcdir)/boot/x86_bios/boot1.ld \
 	-Wl,-Map,boot1.map \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -static -DS02 \
 	$(NOSTDLIB_FLAGS)
 
 EXTRA_boot1_elf_DEPENDENCIES = \
-	$(top_srcdir)/boot/boot1.ld
+	$(top_srcdir)/boot/x86_bios/boot1.ld
 
 boot1_elf_LDADD = \
 	$(LIBGCC_ELF32)
@@ -205,24 +211,35 @@ noinst_LIBRARIES += libbootsect.a
 
 libbootsect_a_SOURCES = \
 	boot/bootcommon.S \
-	boot/bioscall.S \
+	boot/x86_bios/bioscall.S \
+	boot/x86_bios/halt_bios.cc \
+	boot/x86_bios/cpu_bios.cc \
+	boot/x86_bios/screen_bios.cc \
+	boot/x86_bios/cpu64_bios.S \
+	boot/x86_bios/physmem_bios.cc \
+	boot/x86_bios/modelist_bios.cc \
+	boot/x86_bios/tui_bios.cc \
+	boot/x86_bios/boottable_bios.cc \
+	boot/fs/fat32.cc \
+	boot/fs/iso9660.cc \
+	boot/fs/iso9660.h \
+	boot/fs/fat32.h \
+	boot/x86_bios/diskio.h \
+	boot/x86_bios/diskio.cc \
+	boot/x86/exception.S \
+	boot/x86/cpu.cc \
+	boot/x86/cpuid.cc \
+	boot/x86/mtrr.cc \
+	boot/x86/mtrr.h \
+	boot/x86/qemu_x86.cc \
+	boot/x86/gdt.S \
+	boot/x86/cpu.h \
 	boot/retpoline.S \
-	boot/diskio.cc \
 	boot/ctors.cc \
 	boot/assert.cc \
-	boot/halt_bios.cc \
-	boot/gdt.S \
-	boot/cpu_bios.cc \
-	boot/bootinfo.S \
 	boot/array_list.cc \
 	boot/screen.cc \
-	boot/screen_bios.cc \
 	boot/fs.cc \
-	boot/fat32.cc \
-	boot/iso9660.cc \
-	boot/cpu.cc \
-	boot/cpuid.cc \
-	boot/cpu64_bios.S \
 	boot/malloc.cc \
 	boot/string.cc \
 	boot/string_char16.cc \
@@ -232,45 +249,34 @@ libbootsect_a_SOURCES = \
 	boot/physmap.cc \
 	boot/progressbar.cc \
 	boot/messagebar.cc \
-	boot/physmem_bios.cc \
-	boot/vesa.cc \
-	boot/vesa_bios.cc \
+	boot/modelist.cc \
 	boot/debug.cc \
-	boot/part.s \
-	boot/exception.s \
+	boot/mbrpart.S \
 	boot/likely.h \
-	boot/part.h \
-	boot/vesainfo.h \
+	boot/mbrpart.h \
+	boot/modeinfo.h \
 	boot/progressbar.h \
 	boot/messagebar.h \
 	boot/paging.h \
 	boot/rand.h \
 	boot/types.h \
-	boot/iso9660.h \
 	boot/debug.h \
-	boot/cpu.h \
 	boot/elf64.h \
-	boot/exception.h \
 	boot/elf64decl.h \
 	boot/mpentry.h \
 	boot/screen.h \
-	boot/fat32.h \
 	boot/string.h \
 	boot/physmem.h \
-	boot/diskio.h \
 	boot/malloc.h \
 	boot/fs.h \
 	boot/vesa.h \
 	boot/tui.h \
 	boot/tui.cc \
-	boot/tui_bios.cc \
 	boot/bootmenu.cc \
 	boot/include/boottable.h \
 	boot/include/boottable_decl.h \
 	boot/boottable.cc \
-	boot/boottable_bios.cc \
 	boot/log2.h \
-	boot/qemu.cc \
 	boot/qemu.h \
 	user/libutf/utf.cc
 
@@ -281,6 +287,7 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
+	-I$(top_srcdir)/boot \
 	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(BOOTLOADER_COMMON_FLAGS) \
@@ -306,6 +313,7 @@ libbootsect_a_CFLAGS =
 
 libbootsect_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
+	-I$(top_srcdir)/boot \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -320,8 +328,8 @@ libbootsect_a_CCASFLAGS = \
 # boot code
 
 BOOT_SOURCES_SHARED = \
-	boot/malloc_bios.cc \
-	boot/mpentry_bios.S
+	boot/x86_bios/malloc_bios.cc \
+	boot/x86_bios/mpentry_bios.S
 
 # bootfat-elf
 
@@ -329,7 +337,7 @@ bin_PROGRAMS += bootfat-elf
 generate_symbols_list += bootfat-elf
 
 bootfat_elf_SOURCES = \
-	boot/bootfat.S \
+	boot/x86_bios/bootfat.S \
 	$(BOOT_SOURCES_SHARED)
 
 bootfat_elf_CXXFLAGS = \
@@ -346,6 +354,7 @@ bootfat_elf_CXXFLAGS = \
 
 bootfat_elf_CCASFLAGS = \
 	-DFROMCCASFLAGS \
+	-I$(top_srcdir)/boot \
 	$(bootfat_elf_CXXFLAGS)
 
 # -N to turn off section alignment and make all sections rwx
@@ -357,13 +366,13 @@ bootfat_elf_LDFLAGS = \
 	$(LINKER_DEBUG) \
 	-Wl,--no-dynamic-linker \
 	-Wl,-Map,bootfat.map \
-	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
+	-Wl,-T,$(top_srcdir)/boot/x86_bios/bootfat.ld \
 	-Wl,-N \
 	$(LINKER_SEL) -static -DS05 \
 	$(NOSTDLIB_FLAGS)
 
 EXTRA_bootfat_elf_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootfat.ld
+	$(top_srcdir)/boot/x86_bios/bootfat.ld
 
 bootfat_elf_LDADD = \
 	libbootsect.a \
@@ -383,7 +392,7 @@ bin_PROGRAMS += bootiso-elf
 generate_symbols_list += bootiso-elf
 
 bootiso_elf_SOURCES = \
-	boot/bootiso.S \
+	boot/x86_bios/bootiso.S \
 	$(BOOT_SOURCES_SHARED)
 
 bootiso_elf_CXXFLAGS = \
@@ -391,6 +400,7 @@ bootiso_elf_CXXFLAGS = \
 
 bootiso_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	-I$(top_srcdir)/boot \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
@@ -408,15 +418,16 @@ bootiso_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
+	-Wl,-T,$(top_srcdir)/boot/x86_bios/bootiso.ld \
 	-Wl,-Map,bootiso-elf.map \
+	-Wl,--no-dynamic-linker \
 	$(LINKER_SEL) -static -DS06 \
 	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
 EXTRA_bootiso_elf_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootiso.ld
+	$(top_srcdir)/boot/x86_bios/bootiso.ld
 
 bootiso_elf_LDADD = \
 	libbootsect.a \
@@ -425,7 +436,7 @@ bootiso_elf_LDADD = \
 # bootiso-bin
 
 bootiso-bin: bootiso-elf
-	$(OBJCOPY) -O binary \
+	$(OBJCOPY) -O binary -S \
 		"$<" "$@"
 
 #@--only-section=.head
@@ -437,15 +448,15 @@ bin_PROGRAMS += bootpxe-bios-elf
 generate_symbols_list += bootpxe-bios-elf
 
 bootpxe_bios_elf_SOURCES = \
-	boot/bootpxe-bios.ld \
-	boot/mpentry_bios.S \
-	boot/pxe-bios.S \
-	boot/pxe.h \
-	boot/pxemain.cc \
-	boot/pxemain.h \
-	boot/pxemain_bios.cc \
-	boot/pxemain_bios.h \
-	boot/malloc_bios.cc
+	boot/x86_bios/bootpxe-bios.ld \
+	boot/x86_bios/mpentry_bios.S \
+	boot/x86_bios/bootpxe.S \
+	boot/x86_bios/pxe.h \
+	boot/x86_bios/pxemain.cc \
+	boot/x86_bios/pxemain.h \
+	boot/x86_bios/pxemain_bios.cc \
+	boot/x86_bios/pxemain_bios.h \
+	boot/x86_bios/malloc_bios.cc
 
 bootpxe_bios_elf_CXXFLAGS = \
 	$(bootiso_elf_CXXFLAGS)
@@ -460,7 +471,7 @@ bootpxe_bios_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
+	-Wl,-T,$(top_srcdir)/boot/x86_bios/bootpxe-bios.ld \
 	-Wl,-Map,bootpxe-bios.map \
 	$(LINKER_SEL) -static -DS07 \
 	$(NOSTDLIB_FLAGS) \
@@ -471,7 +482,7 @@ bootpxe_bios_elf_LDADD = \
 	$(LIBGCC_ELF32)
 
 EXTRA_bootpxe_bios_elf_DEPENDENCIES = \
-	boot/bootpxe-bios.ld
+	boot/x86_bios/bootpxe-bios.ld
 
 bootpxe-bios.map: bootpxe-bios-elf
 
@@ -512,44 +523,44 @@ bin_PROGRAMS += bootefi-amd64
 generate_symbols_list += bootefi-amd64
 
 bootefi_amd64_SOURCES = \
-	boot/bootentry_efi.S \
-	boot/bootefi.cc \
+	boot/efi/bootentry_efi.S \
+	boot/efi/bootefi.cc \
+	boot/efi/cpu_efi.cc \
+	boot/efi/physmem_efi.cc \
+	boot/efi/cpu64_efi.S \
+	boot/efi/halt_efi.cc \
+	boot/efi/screen_efi.cc \
+	boot/efi/malloc_efi.cc \
+	boot/efi/mpentry_efi.S \
+	boot/efi/tui_efi.cc \
+	boot/efi/modelist_efi.cc \
+	boot/efi/boottable_efi.cc \
 	boot/ctors.cc \
 	boot/fs.cc \
-	boot/cpu_efi.cc \
 	boot/retpoline.S \
 	boot/physmap.cc \
-	boot/physmem_efi.cc \
-	boot/cpu.cc \
-	boot/cpuid.cc \
-	boot/cpu64_efi.S \
+	boot/x86/cpu.cc \
+	boot/x86/cpuid.cc \
 	boot/debug.cc \
 	boot/assert.cc \
 	boot/string.cc \
 	boot/string_char16.cc \
-	boot/halt_efi.cc \
 	boot/screen.cc \
-	boot/screen_efi.cc \
 	boot/malloc.cc \
-	boot/malloc_efi.cc \
 	boot/rand.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
-	boot/mpentry_efi.S \
 	boot/progressbar.cc \
 	boot/progressbar.h \
 	boot/messagebar.cc \
 	boot/messagebar.h \
 	boot/bootmenu.cc \
 	boot/tui.cc \
-	boot/tui_efi.cc \
 	boot/include/boottable.h \
 	boot/include/boottable_decl.h \
-	boot/vesa.cc \
-	boot/vesa_efi.cc \
+	boot/modelist.cc \
 	boot/boottable.cc \
-	boot/boottable_efi.cc \
-	boot/qemu.cc \
+	boot/x86/qemu_x86.cc \
 	boot/qemu.h \
 	user/libutf/utf.cc
 
@@ -582,7 +593,7 @@ bootefi_amd64_LDFLAGS = \
 	$(PE64_FLAGS) \
 	$(LIBGCC_PE64) \
 	-g \
-	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
+	-Wl,-T,$(top_srcdir)/boot/efi/bootefi.ld \
 	-Wl,-Map,bootefi-amd64.map \
 	$(NOSTDLIB_FLAGS)
 
@@ -593,7 +604,7 @@ bootefi_amd64_LDFLAGS = \
 	-g \
 	-Wl,-N \
 	-Wl,-m,i386pe \
-	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
+	-Wl,-T,$(top_srcdir)/boot/efi/bootefi.ld \
 	-Wl,--subsystem,10 \
 	-Wl,-Map,bootefi-i386.map
 
@@ -604,7 +615,7 @@ bootefi_amd64_LDADD = \
    $(LIBGCC_PE32)
 
 EXTRA_bootefi_amd64_DEPENDENCIES = \
-    $(top_srcdir)/boot/bootefi.ld
+    $(top_srcdir)/boot/efi/bootefi.ld
 
 bootx64.efi: bootefi-amd64
 	$(OBJCOPY) \
@@ -2940,7 +2951,7 @@ show-srcdir:
 
 .PHONY: show-kernel-exports
 
-check-module-imports: all-kernel
+check-module-imports: all-kernel $(MODULE_LIST)
 	"$(top_srcdir)/module_checkimports.bash" $(MODULE_LIST) | $(CXXFILT)
 
 .PHONY: check-module-imports

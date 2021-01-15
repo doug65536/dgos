@@ -321,7 +321,7 @@ do
 done
 
 AS_VAR_SET([DEBUG_INFO_FLAGS], [])
-for flag in g gcolumn-info
+for flag in ggdb gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([DEBUG_INFO_FLAGS], [" -$flag"])],

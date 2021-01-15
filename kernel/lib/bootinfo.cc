@@ -17,11 +17,15 @@ _constructor(ctor_asan_init) static void bootinfo_init()
 
 static void bootinfo_remap(void*)
 {
+    assert((bool)*kernel_params);
+
     kernel_params = (kernel_params_t*)mmap(
                 kernel_params, sizeof(*kernel_params),
                 PROT_READ | PROT_WRITE, MAP_PHYSICAL);
     if (unlikely(kernel_params == MAP_FAILED))
         panic_oom();
+
+    assert((bool)*kernel_params);
 
     vbe_selected_mode_t *mode = kernel_params->vbe_selected_mode;
 
@@ -37,6 +41,8 @@ uintptr_t bootinfo_parameter(bootparam_t param)
 
     if (uintptr_t(data) < 0x1000)
         data = (kernel_params_t*)(zero_page + (uintptr_t)data);
+
+    assert((bool)*data);
 
     switch (param) {
     case bootparam_t::ap_entry_point:

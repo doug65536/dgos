@@ -4,25 +4,61 @@
 // PIC_ICW1
 #define PIC_ICW1                         0
 
+
+// Vector address (MCS-80/85 mode only)
 #define PIC_ICW1_VECADDR_MCS80_BIT       5
+
+// Must be 1
 #define PIC_ICW1_MBS_BIT                 4
+
+// 1=level triggered, 0=edge triggered
 #define PIC_ICW1_LTIM_BIT                3
+
+// Call address interval (1=4, 0=8)
 #define PIC_ICW1_ADI_BIT                 2
+
+// 1=single, 0=cascade
 #define PIC_ICW1_SNGL_BIT                1
+
+// 1=ICW4 needed, 0=not needed
 #define PIC_ICW1_IC4_BIT                 0
 
+
+// Vector address (MCS-80/85 mode only)
 #define PIC_ICW1_VECADDR_MCS80_BITS      3
+
+// Must be 1
 #define PIC_ICW1_MBS_BITS                1
+
+// 1=level triggered, 0=edge triggered
 #define PIC_ICW1_LTIM_BITS               1
+
+// Call address interval (1=4, 0=8)
 #define PIC_ICW1_ADI_BITS                1
+
+// 1=single, 0=cascade
 #define PIC_ICW1_SNGL_BITS               1
+
+// 1=ICW4 needed, 0=not needed
 #define PIC_ICW1_IC4_BITS                1
+
+// Vector address (MCS-80/85 mode only)
 #define PIC_ICW1_VECADDR_MCS80_MASK \
     ((1U << PIC_ICW1_VECADDR_MCS80_BITS)-1)
+
+// Must be 1
 #define PIC_ICW1_MBS_MASK                ((1U << PIC_ICW1_MBS_BITS)-1)
+
+// 1=level triggered, 0=edge triggered
 #define PIC_ICW1_LTIM_MASK               ((1U << PIC_ICW1_LTIM_BITS)-1)
+
+// Call address interval (1=4, 0=8)
 #define PIC_ICW1_ADI_MASK                ((1U << PIC_ICW1_ADI_BITS)-1)
+
+// 1=single, 0=cascade
 #define PIC_ICW1_SNGL_MASK               ((1U << PIC_ICW1_SNGL_BITS)-1)
+
+// 1=ICW4 needed, 0=not needed
 #define PIC_ICW1_IC4_MASK                ((1U << PIC_ICW1_IC4_BITS)-1)
 
 // Vector address (MCS-80/85 mode only)
@@ -49,55 +85,103 @@
 #define PIC_ICW1_IC4 \
     (PIC_ICW1_IC4_MASK << PIC_ICW1_IC4_BIT)
 
+
+// Vector address (MCS-80/85 mode only)
 #define PIC_ICW1_VECADDR_MCS80_n(n)      ((n) << PIC_ICW1_VECADDR_MCS80_BIT)
+
+// Must be 1
 #define PIC_ICW1_MBS_n(n)                ((n) << PIC_ICW1_MBS_BIT)
+
+// 1=level triggered, 0=edge triggered
 #define PIC_ICW1_LTIM_n(n)               ((n) << PIC_ICW1_LTIM_BIT)
+
+// Call address interval (1=4, 0=8)
 #define PIC_ICW1_ADI_n(n)                ((n) << PIC_ICW1_ADI_BIT)
+
+// 1=single, 0=cascade
 #define PIC_ICW1_SNGL_n(n)               ((n) << PIC_ICW1_SNGL_BIT)
+
+// 1=ICW4 needed, 0=not needed
 #define PIC_ICW1_IC4_n(n)                ((n) << PIC_ICW1_IC4_BIT)
 
+
+// Vector address (MCS-80/85 mode only)
 #define PIC_ICW1_VECADDR_MCS80_GET(n) \
     (((n) >> PIC_ICW1_VECADDR_MCS80_BIT) & PIC_ICW1_VECADDR_MCS80_MASK)
+
+// Must be 1
 #define PIC_ICW1_MBS_GET(n) \
     (((n) >> PIC_ICW1_MBS_BIT) & PIC_ICW1_MBS_MASK)
+
+// 1=level triggered, 0=edge triggered
 #define PIC_ICW1_LTIM_GET(n) \
     (((n) >> PIC_ICW1_LTIM_BIT) & PIC_ICW1_LTIM_MASK)
+
+// Call address interval (1=4, 0=8)
 #define PIC_ICW1_ADI_GET(n) \
     (((n) >> PIC_ICW1_ADI_BIT) & PIC_ICW1_ADI_MASK)
+
+// 1=single, 0=cascade
 #define PIC_ICW1_SNGL_GET(n) \
     (((n) >> PIC_ICW1_SNGL_BIT) & PIC_ICW1_SNGL_MASK)
+
+// 1=ICW4 needed, 0=not needed
 #define PIC_ICW1_IC4_GET(n) \
     (((n) >> PIC_ICW1_IC4_BIT) & PIC_ICW1_IC4_MASK)
 
+
+// Vector address (MCS-80/85 mode only)
 #define PIC_ICW1_VECADDR_MCS80_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW1_VECADDR_MCS80) | PIC_ICW1_VECADDR_MCS80_n((n)))
+
+// Must be 1
 #define PIC_ICW1_MBS_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW1_MBS) | PIC_ICW1_MBS_n((n)))
+
+// 1=level triggered, 0=edge triggered
 #define PIC_ICW1_LTIM_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW1_LTIM) | PIC_ICW1_LTIM_n((n)))
+
+// Call address interval (1=4, 0=8)
 #define PIC_ICW1_ADI_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW1_ADI) | PIC_ICW1_ADI_n((n)))
+
+// 1=single, 0=cascade
 #define PIC_ICW1_SNGL_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW1_SNGL) | PIC_ICW1_SNGL_n((n)))
+
+// 1=ICW4 needed, 0=not needed
 #define PIC_ICW1_IC4_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW1_IC4) | PIC_ICW1_IC4_n((n)))
 
 // PIC_ICW2
 #define PIC_ICW2                  1
 
+
+// Bit 7:3 of vector base
 #define PIC_ICW2_VECTOR_BIT       3
 
+
+// Bit 7:3 of vector base
 #define PIC_ICW2_VECTOR_BITS      5
+
+// Bit 7:3 of vector base
 #define PIC_ICW2_VECTOR_MASK      ((1U << PIC_ICW2_VECTOR_BITS)-1)
 
 // Bit 7:3 of vector base
 #define PIC_ICW2_VECTOR           (PIC_ICW2_VECTOR_MASK << PIC_ICW2_VECTOR_BIT)
 
+
+// Bit 7:3 of vector base
 #define PIC_ICW2_VECTOR_n(n)      ((n) << PIC_ICW2_VECTOR_BIT)
 
+
+// Bit 7:3 of vector base
 #define PIC_ICW2_VECTOR_GET(n) \
     (((n) >> PIC_ICW2_VECTOR_BIT) & PIC_ICW2_VECTOR_MASK)
 
+
+// Bit 7:3 of vector base
 #define PIC_ICW2_VECTOR_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW2_VECTOR) | PIC_ICW2_VECTOR_n((n)))
 
@@ -105,30 +189,78 @@
 // PIC_ICW3_M: On master device
 #define PIC_ICW3_M              1
 
+
+// Slave on input 7
 #define PIC_ICW3_M_S7_BIT       7
+
+// Slave on input 6
 #define PIC_ICW3_M_S6_BIT       6
+
+// Slave on input 5
 #define PIC_ICW3_M_S5_BIT       5
+
+// Slave on input 4
 #define PIC_ICW3_M_S4_BIT       4
+
+// Slave on input 3
 #define PIC_ICW3_M_S3_BIT       3
+
+// Slave on input 2
 #define PIC_ICW3_M_S2_BIT       2
+
+// Slave on input 1
 #define PIC_ICW3_M_S1_BIT       1
+
+// Slave on input 0
 #define PIC_ICW3_M_S0_BIT       0
 
+
+// Slave on input 7
 #define PIC_ICW3_M_S7_BITS      1
+
+// Slave on input 6
 #define PIC_ICW3_M_S6_BITS      1
+
+// Slave on input 5
 #define PIC_ICW3_M_S5_BITS      1
+
+// Slave on input 4
 #define PIC_ICW3_M_S4_BITS      1
+
+// Slave on input 3
 #define PIC_ICW3_M_S3_BITS      1
+
+// Slave on input 2
 #define PIC_ICW3_M_S2_BITS      1
+
+// Slave on input 1
 #define PIC_ICW3_M_S1_BITS      1
+
+// Slave on input 0
 #define PIC_ICW3_M_S0_BITS      1
+
+// Slave on input 7
 #define PIC_ICW3_M_S7_MASK      ((1U << PIC_ICW3_M_S7_BITS)-1)
+
+// Slave on input 6
 #define PIC_ICW3_M_S6_MASK      ((1U << PIC_ICW3_M_S6_BITS)-1)
+
+// Slave on input 5
 #define PIC_ICW3_M_S5_MASK      ((1U << PIC_ICW3_M_S5_BITS)-1)
+
+// Slave on input 4
 #define PIC_ICW3_M_S4_MASK      ((1U << PIC_ICW3_M_S4_BITS)-1)
+
+// Slave on input 3
 #define PIC_ICW3_M_S3_MASK      ((1U << PIC_ICW3_M_S3_BITS)-1)
+
+// Slave on input 2
 #define PIC_ICW3_M_S2_MASK      ((1U << PIC_ICW3_M_S2_BITS)-1)
+
+// Slave on input 1
 #define PIC_ICW3_M_S1_MASK      ((1U << PIC_ICW3_M_S1_BITS)-1)
+
+// Slave on input 0
 #define PIC_ICW3_M_S0_MASK      ((1U << PIC_ICW3_M_S0_BITS)-1)
 
 // Slave on input 7
@@ -155,46 +287,94 @@
 // Slave on input 0
 #define PIC_ICW3_M_S0           (PIC_ICW3_M_S0_MASK << PIC_ICW3_M_S0_BIT)
 
+
+// Slave on input 7
 #define PIC_ICW3_M_S7_n(n)      ((n) << PIC_ICW3_M_S7_BIT)
+
+// Slave on input 6
 #define PIC_ICW3_M_S6_n(n)      ((n) << PIC_ICW3_M_S6_BIT)
+
+// Slave on input 5
 #define PIC_ICW3_M_S5_n(n)      ((n) << PIC_ICW3_M_S5_BIT)
+
+// Slave on input 4
 #define PIC_ICW3_M_S4_n(n)      ((n) << PIC_ICW3_M_S4_BIT)
+
+// Slave on input 3
 #define PIC_ICW3_M_S3_n(n)      ((n) << PIC_ICW3_M_S3_BIT)
+
+// Slave on input 2
 #define PIC_ICW3_M_S2_n(n)      ((n) << PIC_ICW3_M_S2_BIT)
+
+// Slave on input 1
 #define PIC_ICW3_M_S1_n(n)      ((n) << PIC_ICW3_M_S1_BIT)
+
+// Slave on input 0
 #define PIC_ICW3_M_S0_n(n)      ((n) << PIC_ICW3_M_S0_BIT)
 
+
+// Slave on input 7
 #define PIC_ICW3_M_S7_GET(n) \
     (((n) >> PIC_ICW3_M_S7_BIT) & PIC_ICW3_M_S7_MASK)
+
+// Slave on input 6
 #define PIC_ICW3_M_S6_GET(n) \
     (((n) >> PIC_ICW3_M_S6_BIT) & PIC_ICW3_M_S6_MASK)
+
+// Slave on input 5
 #define PIC_ICW3_M_S5_GET(n) \
     (((n) >> PIC_ICW3_M_S5_BIT) & PIC_ICW3_M_S5_MASK)
+
+// Slave on input 4
 #define PIC_ICW3_M_S4_GET(n) \
     (((n) >> PIC_ICW3_M_S4_BIT) & PIC_ICW3_M_S4_MASK)
+
+// Slave on input 3
 #define PIC_ICW3_M_S3_GET(n) \
     (((n) >> PIC_ICW3_M_S3_BIT) & PIC_ICW3_M_S3_MASK)
+
+// Slave on input 2
 #define PIC_ICW3_M_S2_GET(n) \
     (((n) >> PIC_ICW3_M_S2_BIT) & PIC_ICW3_M_S2_MASK)
+
+// Slave on input 1
 #define PIC_ICW3_M_S1_GET(n) \
     (((n) >> PIC_ICW3_M_S1_BIT) & PIC_ICW3_M_S1_MASK)
+
+// Slave on input 0
 #define PIC_ICW3_M_S0_GET(n) \
     (((n) >> PIC_ICW3_M_S0_BIT) & PIC_ICW3_M_S0_MASK)
 
+
+// Slave on input 7
 #define PIC_ICW3_M_S7_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S7) | PIC_ICW3_M_S7_n((n)))
+
+// Slave on input 6
 #define PIC_ICW3_M_S6_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S6) | PIC_ICW3_M_S6_n((n)))
+
+// Slave on input 5
 #define PIC_ICW3_M_S5_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S5) | PIC_ICW3_M_S5_n((n)))
+
+// Slave on input 4
 #define PIC_ICW3_M_S4_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S4) | PIC_ICW3_M_S4_n((n)))
+
+// Slave on input 3
 #define PIC_ICW3_M_S3_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S3) | PIC_ICW3_M_S3_n((n)))
+
+// Slave on input 2
 #define PIC_ICW3_M_S2_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S2) | PIC_ICW3_M_S2_n((n)))
+
+// Slave on input 1
 #define PIC_ICW3_M_S1_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S1) | PIC_ICW3_M_S1_n((n)))
+
+// Slave on input 0
 #define PIC_ICW3_M_S0_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_M_S0) | PIC_ICW3_M_S0_n((n)))
 
@@ -202,40 +382,82 @@
 // PIC_ICW3_S: On slave device
 #define PIC_ICW3_S              1
 
+
+// Slave ID (equal to master input)
 #define PIC_ICW3_S_ID_BIT       0
 
+
+// Slave ID (equal to master input)
 #define PIC_ICW3_S_ID_BITS      3
+
+// Slave ID (equal to master input)
 #define PIC_ICW3_S_ID_MASK      ((1U << PIC_ICW3_S_ID_BITS)-1)
 
 // Slave ID (equal to master input)
 #define PIC_ICW3_S_ID           (PIC_ICW3_S_ID_MASK << PIC_ICW3_S_ID_BIT)
 
+
+// Slave ID (equal to master input)
 #define PIC_ICW3_S_ID_n(n)      ((n) << PIC_ICW3_S_ID_BIT)
 
+
+// Slave ID (equal to master input)
 #define PIC_ICW3_S_ID_GET(n) \
     (((n) >> PIC_ICW3_S_ID_BIT) & PIC_ICW3_S_ID_MASK)
 
+
+// Slave ID (equal to master input)
 #define PIC_ICW3_S_ID_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW3_S_ID) | PIC_ICW3_S_ID_n((n)))
 
 // PIC_ICW4
 #define PIC_ICW4                1
 
+
+// Special fully nested mode
 #define PIC_ICW4_SFNM_BIT       4
+
+// 1=buffered, 0=non-buffered
 #define PIC_ICW4_BUF_BIT        3
+
+// 1=buffered master, 0=buffered slave
 #define PIC_ICW4_MS_BIT         2
+
+// Auto EOI
 #define PIC_ICW4_AEOI_BIT       1
+
+// 1=8086/8088 mode, 0=MCS-80/85 mode
 #define PIC_ICW4_8086_BIT       0
 
+
+// Special fully nested mode
 #define PIC_ICW4_SFNM_BITS      1
+
+// 1=buffered, 0=non-buffered
 #define PIC_ICW4_BUF_BITS       1
+
+// 1=buffered master, 0=buffered slave
 #define PIC_ICW4_MS_BITS        1
+
+// Auto EOI
 #define PIC_ICW4_AEOI_BITS      1
+
+// 1=8086/8088 mode, 0=MCS-80/85 mode
 #define PIC_ICW4_8086_BITS      1
+
+// Special fully nested mode
 #define PIC_ICW4_SFNM_MASK      ((1U << PIC_ICW4_SFNM_BITS)-1)
+
+// 1=buffered, 0=non-buffered
 #define PIC_ICW4_BUF_MASK       ((1U << PIC_ICW4_BUF_BITS)-1)
+
+// 1=buffered master, 0=buffered slave
 #define PIC_ICW4_MS_MASK        ((1U << PIC_ICW4_MS_BITS)-1)
+
+// Auto EOI
 #define PIC_ICW4_AEOI_MASK      ((1U << PIC_ICW4_AEOI_BITS)-1)
+
+// 1=8086/8088 mode, 0=MCS-80/85 mode
 #define PIC_ICW4_8086_MASK      ((1U << PIC_ICW4_8086_BITS)-1)
 
 // Special fully nested mode
@@ -253,59 +475,137 @@
 // 1=8086/8088 mode, 0=MCS-80/85 mode
 #define PIC_ICW4_8086           (PIC_ICW4_8086_MASK << PIC_ICW4_8086_BIT)
 
+
+// Special fully nested mode
 #define PIC_ICW4_SFNM_n(n)      ((n) << PIC_ICW4_SFNM_BIT)
+
+// 1=buffered, 0=non-buffered
 #define PIC_ICW4_BUF_n(n)       ((n) << PIC_ICW4_BUF_BIT)
+
+// 1=buffered master, 0=buffered slave
 #define PIC_ICW4_MS_n(n)        ((n) << PIC_ICW4_MS_BIT)
+
+// Auto EOI
 #define PIC_ICW4_AEOI_n(n)      ((n) << PIC_ICW4_AEOI_BIT)
+
+// 1=8086/8088 mode, 0=MCS-80/85 mode
 #define PIC_ICW4_8086_n(n)      ((n) << PIC_ICW4_8086_BIT)
 
+
+// Special fully nested mode
 #define PIC_ICW4_SFNM_GET(n) \
     (((n) >> PIC_ICW4_SFNM_BIT) & PIC_ICW4_SFNM_MASK)
+
+// 1=buffered, 0=non-buffered
 #define PIC_ICW4_BUF_GET(n)     (((n) >> PIC_ICW4_BUF_BIT) & PIC_ICW4_BUF_MASK)
+
+// 1=buffered master, 0=buffered slave
 #define PIC_ICW4_MS_GET(n)      (((n) >> PIC_ICW4_MS_BIT) & PIC_ICW4_MS_MASK)
+
+// Auto EOI
 #define PIC_ICW4_AEOI_GET(n) \
     (((n) >> PIC_ICW4_AEOI_BIT) & PIC_ICW4_AEOI_MASK)
+
+// 1=8086/8088 mode, 0=MCS-80/85 mode
 #define PIC_ICW4_8086_GET(n) \
     (((n) >> PIC_ICW4_8086_BIT) & PIC_ICW4_8086_MASK)
 
+
+// Special fully nested mode
 #define PIC_ICW4_SFNM_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW4_SFNM) | PIC_ICW4_SFNM_n((n)))
+
+// 1=buffered, 0=non-buffered
 #define PIC_ICW4_BUF_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW4_BUF) | PIC_ICW4_BUF_n((n)))
+
+// 1=buffered master, 0=buffered slave
 #define PIC_ICW4_MS_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW4_MS) | PIC_ICW4_MS_n((n)))
+
+// Auto EOI
 #define PIC_ICW4_AEOI_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW4_AEOI) | PIC_ICW4_AEOI_n((n)))
+
+// 1=8086/8088 mode, 0=MCS-80/85 mode
 #define PIC_ICW4_8086_SET(r,n) \
     ((r) = ((r) & ~PIC_ICW4_8086) | PIC_ICW4_8086_n((n)))
 
 // PIC_OCW1
 #define PIC_OCW1              1
 
+
+// Mask input 7
 #define PIC_OCW1_M7_BIT       7
+
+// Mask input 6
 #define PIC_OCW1_M6_BIT       6
+
+// Mask input 5
 #define PIC_OCW1_M5_BIT       5
+
+// Mask input 4
 #define PIC_OCW1_M4_BIT       4
+
+// Mask input 3
 #define PIC_OCW1_M3_BIT       3
+
+// Mask input 2
 #define PIC_OCW1_M2_BIT       2
+
+// Mask input 1
 #define PIC_OCW1_M1_BIT       1
+
+// Mask input 0
 #define PIC_OCW1_M0_BIT       0
 
+
+// Mask input 7
 #define PIC_OCW1_M7_BITS      1
+
+// Mask input 6
 #define PIC_OCW1_M6_BITS      1
+
+// Mask input 5
 #define PIC_OCW1_M5_BITS      1
+
+// Mask input 4
 #define PIC_OCW1_M4_BITS      1
+
+// Mask input 3
 #define PIC_OCW1_M3_BITS      1
+
+// Mask input 2
 #define PIC_OCW1_M2_BITS      1
+
+// Mask input 1
 #define PIC_OCW1_M1_BITS      1
+
+// Mask input 0
 #define PIC_OCW1_M0_BITS      1
+
+// Mask input 7
 #define PIC_OCW1_M7_MASK      ((1U << PIC_OCW1_M7_BITS)-1)
+
+// Mask input 6
 #define PIC_OCW1_M6_MASK      ((1U << PIC_OCW1_M6_BITS)-1)
+
+// Mask input 5
 #define PIC_OCW1_M5_MASK      ((1U << PIC_OCW1_M5_BITS)-1)
+
+// Mask input 4
 #define PIC_OCW1_M4_MASK      ((1U << PIC_OCW1_M4_BITS)-1)
+
+// Mask input 3
 #define PIC_OCW1_M3_MASK      ((1U << PIC_OCW1_M3_BITS)-1)
+
+// Mask input 2
 #define PIC_OCW1_M2_MASK      ((1U << PIC_OCW1_M2_BITS)-1)
+
+// Mask input 1
 #define PIC_OCW1_M1_MASK      ((1U << PIC_OCW1_M1_BITS)-1)
+
+// Mask input 0
 #define PIC_OCW1_M0_MASK      ((1U << PIC_OCW1_M0_BITS)-1)
 
 // Mask input 7
@@ -332,44 +632,98 @@
 // Mask input 0
 #define PIC_OCW1_M0           (PIC_OCW1_M0_MASK << PIC_OCW1_M0_BIT)
 
+
+// Mask input 7
 #define PIC_OCW1_M7_n(n)      ((n) << PIC_OCW1_M7_BIT)
+
+// Mask input 6
 #define PIC_OCW1_M6_n(n)      ((n) << PIC_OCW1_M6_BIT)
+
+// Mask input 5
 #define PIC_OCW1_M5_n(n)      ((n) << PIC_OCW1_M5_BIT)
+
+// Mask input 4
 #define PIC_OCW1_M4_n(n)      ((n) << PIC_OCW1_M4_BIT)
+
+// Mask input 3
 #define PIC_OCW1_M3_n(n)      ((n) << PIC_OCW1_M3_BIT)
+
+// Mask input 2
 #define PIC_OCW1_M2_n(n)      ((n) << PIC_OCW1_M2_BIT)
+
+// Mask input 1
 #define PIC_OCW1_M1_n(n)      ((n) << PIC_OCW1_M1_BIT)
+
+// Mask input 0
 #define PIC_OCW1_M0_n(n)      ((n) << PIC_OCW1_M0_BIT)
 
+
+// Mask input 7
 #define PIC_OCW1_M7_GET(n)    (((n) >> PIC_OCW1_M7_BIT) & PIC_OCW1_M7_MASK)
+
+// Mask input 6
 #define PIC_OCW1_M6_GET(n)    (((n) >> PIC_OCW1_M6_BIT) & PIC_OCW1_M6_MASK)
+
+// Mask input 5
 #define PIC_OCW1_M5_GET(n)    (((n) >> PIC_OCW1_M5_BIT) & PIC_OCW1_M5_MASK)
+
+// Mask input 4
 #define PIC_OCW1_M4_GET(n)    (((n) >> PIC_OCW1_M4_BIT) & PIC_OCW1_M4_MASK)
+
+// Mask input 3
 #define PIC_OCW1_M3_GET(n)    (((n) >> PIC_OCW1_M3_BIT) & PIC_OCW1_M3_MASK)
+
+// Mask input 2
 #define PIC_OCW1_M2_GET(n)    (((n) >> PIC_OCW1_M2_BIT) & PIC_OCW1_M2_MASK)
+
+// Mask input 1
 #define PIC_OCW1_M1_GET(n)    (((n) >> PIC_OCW1_M1_BIT) & PIC_OCW1_M1_MASK)
+
+// Mask input 0
 #define PIC_OCW1_M0_GET(n)    (((n) >> PIC_OCW1_M0_BIT) & PIC_OCW1_M0_MASK)
 
+
+// Mask input 7
 #define PIC_OCW1_M7_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M7) | PIC_OCW1_M7_n((n)))
+
+// Mask input 6
 #define PIC_OCW1_M6_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M6) | PIC_OCW1_M6_n((n)))
+
+// Mask input 5
 #define PIC_OCW1_M5_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M5) | PIC_OCW1_M5_n((n)))
+
+// Mask input 4
 #define PIC_OCW1_M4_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M4) | PIC_OCW1_M4_n((n)))
+
+// Mask input 3
 #define PIC_OCW1_M3_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M3) | PIC_OCW1_M3_n((n)))
+
+// Mask input 2
 #define PIC_OCW1_M2_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M2) | PIC_OCW1_M2_n((n)))
+
+// Mask input 1
 #define PIC_OCW1_M1_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M1) | PIC_OCW1_M1_n((n)))
+
+// Mask input 0
 #define PIC_OCW1_M0_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M0) | PIC_OCW1_M0_n((n)))
 
 // PIC_OCW2
 #define PIC_OCW2               0
 
 #define PIC_OCW2_EOI_BIT       5
+
+// 00=OCW2, 01=OCW3
 #define PIC_OCW2_OP_BIT        3
 #define PIC_OCW2_IR_BIT        0
 
 #define PIC_OCW2_EOI_BITS      3
+
+// 00=OCW2, 01=OCW3
 #define PIC_OCW2_OP_BITS       2
 #define PIC_OCW2_IR_BITS       3
 #define PIC_OCW2_EOI_MASK      ((1U << PIC_OCW2_EOI_BITS)-1)
+
+// 00=OCW2, 01=OCW3
 #define PIC_OCW2_OP_MASK       ((1U << PIC_OCW2_OP_BITS)-1)
 #define PIC_OCW2_IR_MASK       ((1U << PIC_OCW2_IR_BITS)-1)
 #define PIC_OCW2_EOI           (PIC_OCW2_EOI_MASK << PIC_OCW2_EOI_BIT)
@@ -379,15 +733,21 @@
 #define PIC_OCW2_IR            (PIC_OCW2_IR_MASK << PIC_OCW2_IR_BIT)
 
 #define PIC_OCW2_EOI_n(n)      ((n) << PIC_OCW2_EOI_BIT)
+
+// 00=OCW2, 01=OCW3
 #define PIC_OCW2_OP_n(n)       ((n) << PIC_OCW2_OP_BIT)
 #define PIC_OCW2_IR_n(n)       ((n) << PIC_OCW2_IR_BIT)
 
 #define PIC_OCW2_EOI_GET(n)    (((n) >> PIC_OCW2_EOI_BIT) & PIC_OCW2_EOI_MASK)
+
+// 00=OCW2, 01=OCW3
 #define PIC_OCW2_OP_GET(n)     (((n) >> PIC_OCW2_OP_BIT) & PIC_OCW2_OP_MASK)
 #define PIC_OCW2_IR_GET(n)     (((n) >> PIC_OCW2_IR_BIT) & PIC_OCW2_IR_MASK)
 
 #define PIC_OCW2_EOI_SET(r,n) \
     ((r) = ((r) & ~PIC_OCW2_EOI) | PIC_OCW2_EOI_n((n)))
+
+// 00=OCW2, 01=OCW3
 #define PIC_OCW2_OP_SET(r,n) \
     ((r) = ((r) & ~PIC_OCW2_OP) | PIC_OCW2_OP_n((n)))
 #define PIC_OCW2_IR_SET(r,n) \
@@ -428,21 +788,51 @@
 // PIC_OCW3
 #define PIC_OCW3               0
 
+
+// Special mask mode, 10=reset, 11=set
 #define PIC_OCW3_SMM_BIT       5
+
+// Must be 1
 #define PIC_OCW3_SET_BIT       3
+
+// 1=poll command, 0=no poll command
 #define PIC_OCW3_P_BIT         2
+
+// Read register
 #define PIC_OCW3_RR_BIT        1
+
+// 0=read IR, 1=read IS
 #define PIC_OCW3_RIS_BIT       0
 
+
+// Special mask mode, 10=reset, 11=set
 #define PIC_OCW3_SMM_BITS      2
+
+// Must be 1
 #define PIC_OCW3_SET_BITS      1
+
+// 1=poll command, 0=no poll command
 #define PIC_OCW3_P_BITS        1
+
+// Read register
 #define PIC_OCW3_RR_BITS       1
+
+// 0=read IR, 1=read IS
 #define PIC_OCW3_RIS_BITS      1
+
+// Special mask mode, 10=reset, 11=set
 #define PIC_OCW3_SMM_MASK      ((1U << PIC_OCW3_SMM_BITS)-1)
+
+// Must be 1
 #define PIC_OCW3_SET_MASK      ((1U << PIC_OCW3_SET_BITS)-1)
+
+// 1=poll command, 0=no poll command
 #define PIC_OCW3_P_MASK        ((1U << PIC_OCW3_P_BITS)-1)
+
+// Read register
 #define PIC_OCW3_RR_MASK       ((1U << PIC_OCW3_RR_BITS)-1)
+
+// 0=read IR, 1=read IS
 #define PIC_OCW3_RIS_MASK      ((1U << PIC_OCW3_RIS_BITS)-1)
 
 // Special mask mode, 10=reset, 11=set
@@ -460,25 +850,55 @@
 // 0=read IR, 1=read IS
 #define PIC_OCW3_RIS           (PIC_OCW3_RIS_MASK << PIC_OCW3_RIS_BIT)
 
+
+// Special mask mode, 10=reset, 11=set
 #define PIC_OCW3_SMM_n(n)      ((n) << PIC_OCW3_SMM_BIT)
+
+// Must be 1
 #define PIC_OCW3_SET_n(n)      ((n) << PIC_OCW3_SET_BIT)
+
+// 1=poll command, 0=no poll command
 #define PIC_OCW3_P_n(n)        ((n) << PIC_OCW3_P_BIT)
+
+// Read register
 #define PIC_OCW3_RR_n(n)       ((n) << PIC_OCW3_RR_BIT)
+
+// 0=read IR, 1=read IS
 #define PIC_OCW3_RIS_n(n)      ((n) << PIC_OCW3_RIS_BIT)
 
+
+// Special mask mode, 10=reset, 11=set
 #define PIC_OCW3_SMM_GET(n)    (((n) >> PIC_OCW3_SMM_BIT) & PIC_OCW3_SMM_MASK)
+
+// Must be 1
 #define PIC_OCW3_SET_GET(n)    (((n) >> PIC_OCW3_SET_BIT) & PIC_OCW3_SET_MASK)
+
+// 1=poll command, 0=no poll command
 #define PIC_OCW3_P_GET(n)      (((n) >> PIC_OCW3_P_BIT) & PIC_OCW3_P_MASK)
+
+// Read register
 #define PIC_OCW3_RR_GET(n)     (((n) >> PIC_OCW3_RR_BIT) & PIC_OCW3_RR_MASK)
+
+// 0=read IR, 1=read IS
 #define PIC_OCW3_RIS_GET(n)    (((n) >> PIC_OCW3_RIS_BIT) & PIC_OCW3_RIS_MASK)
 
+
+// Special mask mode, 10=reset, 11=set
 #define PIC_OCW3_SMM_SET(r,n) \
     ((r) = ((r) & ~PIC_OCW3_SMM) | PIC_OCW3_SMM_n((n)))
+
+// Must be 1
 #define PIC_OCW3_SET_SET(r,n) \
     ((r) = ((r) & ~PIC_OCW3_SET) | PIC_OCW3_SET_n((n)))
+
+// 1=poll command, 0=no poll command
 #define PIC_OCW3_P_SET(r,n)    ((r) = ((r) & ~PIC_OCW3_P) | PIC_OCW3_P_n((n)))
+
+// Read register
 #define PIC_OCW3_RR_SET(r,n) \
     ((r) = ((r) & ~PIC_OCW3_RR) | PIC_OCW3_RR_n((n)))
+
+// 0=read IR, 1=read IS
 #define PIC_OCW3_RIS_SET(r,n) \
     ((r) = ((r) & ~PIC_OCW3_RIS) | PIC_OCW3_RIS_n((n)))
 

@@ -1,6 +1,7 @@
 #include "keyb8042.h"
 #include "keyboard.h"
 #include "mouse.h"
+#include "errno.h"
 
 #include "irq.h"
 #include "cpu/ioport.h"
@@ -9,6 +10,8 @@
 #include "time.h"
 #include "string.h"
 #include "likely.h"
+
+__BEGIN_ANONYMOUS
 
 // Read/write
 #define KEYB_DATA   0x60
@@ -99,25 +102,18 @@
 #endif
 #define KEYB8042_MSG(...) printk("keyb8042: " __VA_ARGS__)
 
-static keyb8042_layout_t *keyb8042_layout = &keyb8042_layout_us;
+struct keyb8042_t : public keybd_dev_t {
+public:
+    void init();
 
-// Lookup table of keyboard layouts
-static keyb8042_layout_t *keyb8042_layouts[] = {
-    &keyb8042_layout_us,
-    nullptr
-};
+private:
+    enum keyb8042_key_state_t {
+        NORMAL,
+        IN_E0,
+        IN_E1_1,
+        IN_E1_2
+    };
 
-static char const keyb8042_passthru_lookup[] =
-        " \b\n";
-
-enum keyb8042_key_state_t {
-    NORMAL,
-    IN_E0,
-    IN_E1_1,
-    IN_E1_2
-};
-
-static struct keyb8042_data_t {
     // Keyboard state (to handle multi-byte scancodes)
     keyb8042_key_state_t state;
 
@@ -128,10 +124,49 @@ static struct keyb8042_data_t {
     size_t mouse_button_count;
     uint8_t mouse_packet[5];
 
+    keyb8042_layout_t *layout = &keyb8042_layout_us;
     keybd_fsa_t fsa;
-} keyb8042;
 
-static void keyb8042_keyboard_handler(void)
+    // keybd_dev_t interface
+    // Lookup table of keyboard layouts
+    static keyb8042_layout_t *layouts[];
+
+    static char const passthru_lookup[];
+
+    int set_layout_name(const char *name) override final;
+    int get_modifiers() override final;
+    int set_indicators(int indicators) override final;
+
+    void keyboard_handler();
+    void process_mouse_packet(const uint8_t *packet);
+    void mouse_handler();
+    static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
+    int send_command(uint8_t command);
+    int read_data();
+    int write_data(uint8_t data);
+    int ctrl_command(bool has_response, int cmd, int data = -1);
+    int retry_keyb_command(uint8_t command, int data = -1);
+    int retry_mouse_command(uint8_t command);
+    int magic_sequence(uint8_t expected_id, size_t seq_length...);
+};
+
+keyb8042_t keyb8042;
+
+keyb8042_layout_t *keyb8042_t::layouts[] = {
+    &keyb8042_layout_us,
+    nullptr
+};
+
+char const keyb8042_t::passthru_lookup[] =
+        " \b\n";
+
+int keyb8042_t::set_indicators(int indicators)
+{
+    // FIXME:
+    return -int(errno_t::ENOTSUP);
+}
+
+void keyb8042_t::keyboard_handler(void)
 {
     uint8_t scancode = 0;
 
@@ -153,34 +188,34 @@ static void keyb8042_keyboard_handler(void)
             break;
         }
         scancode &= 0x7F;
-        vk = keyb8042_layout->scancode[scancode];
+        vk = layout->scancode[scancode];
         break;
 
     case IN_E0:
         scancode &= 0x7F;
-        vk = keyb8042_layout->scancode_0xE0[scancode];
+        vk = layout->scancode_0xE0[scancode];
         keyb8042.state = NORMAL;
         break;
 
     case IN_E1_1:
-        keyb8042.state = IN_E1_2;
+        state = IN_E1_2;
         return;
 
     case IN_E1_2:
-        keyb8042.state = NORMAL;
+        state = NORMAL;
         vk = KEYB_VK_PAUSE;
         break;
 
     default:
-        keyb8042.state = NORMAL;
+        state = NORMAL;
         return;
     }
 
     if (vk != 0)
-        keyb8042.fsa.deliver_vk(vk * sign);
+        fsa.deliver_vk(keybd_id, vk * sign);
 }
 
-static void keyb8042_process_mouse_packet(uint8_t const *packet)
+void keyb8042_t::process_mouse_packet(uint8_t const *packet)
 {
     mouse_raw_event_t event;
     event.timestamp = time_ns();
@@ -224,7 +259,7 @@ static void keyb8042_process_mouse_packet(uint8_t const *packet)
     mouse_event(event);
 }
 
-static void keyb8042_mouse_handler(void)
+void keyb8042_t::mouse_handler(void)
 {
     uint8_t data = inb(KEYB_DATA);
 
@@ -235,33 +270,33 @@ static void keyb8042_mouse_handler(void)
     // with the mouse
 
     uint64_t now = time_ns();
-    if (keyb8042.last_mouse_packet_time + 500000000 < now)
-        keyb8042.mouse_packet_level = 0;
-    keyb8042.last_mouse_packet_time = now;
+    if (last_mouse_packet_time + 500000000 < now)
+        mouse_packet_level = 0;
+    last_mouse_packet_time = now;
 
     if (keyb8042.mouse_packet_size > 0)
-        keyb8042.mouse_packet[keyb8042.mouse_packet_level++] = data;
+        mouse_packet[keyb8042.mouse_packet_level++] = data;
 
     if (keyb8042.mouse_packet_size &&
             keyb8042.mouse_packet_level ==
             keyb8042.mouse_packet_size) {
-        keyb8042_process_mouse_packet(keyb8042.mouse_packet);
-        keyb8042.mouse_packet_level = 0;
+        process_mouse_packet(keyb8042.mouse_packet);
+        mouse_packet_level = 0;
     }
 }
 
-static isr_context_t *keyb8042_handler(int irq, isr_context_t *ctx)
+isr_context_t *keyb8042_t::irq_handler(int irq, isr_context_t *ctx)
 {
     if (irq == KEYB_KEY_IRQ)
-        keyb8042_keyboard_handler();
+        keyb8042.keyboard_handler();
     else if (irq == KEYB_MOUSE_IRQ)
-        keyb8042_mouse_handler();
+        keyb8042.mouse_handler();
 
     return ctx;
 }
 
 // Prints error message and returns -1 on timeout
-static int keyb8042_send_command(uint8_t command)
+int keyb8042_t::send_command(uint8_t command)
 {
     uint32_t max_tries = 100000;
     while ((inb(KEYB_STATUS) & KEYB_STAT_WRNOTOK) != 0 &&
@@ -275,7 +310,7 @@ static int keyb8042_send_command(uint8_t command)
 }
 
 // Prints error message and returns -1 on timeout
-static int keyb8042_read_data(void)
+int keyb8042_t::read_data(void)
 {
     uint32_t max_tries = 100000;
     while ((inb(KEYB_STATUS) & KEYB_STAT_RDOK) == 0 &&
@@ -289,7 +324,7 @@ static int keyb8042_read_data(void)
 }
 
 // Prints error message and returns -1 on timeout
-static int keyb8042_write_data(uint8_t data)
+int keyb8042_t::write_data(uint8_t data)
 {
     uint32_t max_tries = 100000;
     while ((inb(KEYB_STATUS) & KEYB_STAT_WRNOTOK) != 0 &&
@@ -304,37 +339,37 @@ static int keyb8042_write_data(uint8_t data)
     return max_tries > 0 ? 0 : -1;
 }
 
-static int keyb8042_ctrl_command(bool has_response, int cmd, int data = -1)
+int keyb8042_t::ctrl_command(bool has_response, int cmd, int data)
 {
-    if (unlikely(keyb8042_send_command(cmd) < 0))
+    if (unlikely(send_command(cmd) < 0))
         return -1;
 
     if (data != -1) {
-        if (keyb8042_write_data(data) < 0)
+        if (write_data(data) < 0)
             return -1;
     }
 
     if (has_response)
-        return keyb8042_read_data();
+        return read_data();
 
     return 0;
 }
 
-static int keyb8042_retry_keyb_command(uint8_t command, int data = -1)
+int keyb8042_t::retry_keyb_command(uint8_t command, int data)
 {
     int last_data;
 
     int max_tries = 4;
     do {
-        if (keyb8042_write_data(command) < 0)
+        if (write_data(command) < 0)
             return -1;
 
         if (data != -1) {
-            if (keyb8042_write_data(data) < 0)
+            if (write_data(data) < 0)
                 return -1;
         }
 
-        last_data = keyb8042_read_data();
+        last_data = read_data();
 
         if (likely(last_data == KEYB_REPLY_ACK)) {
             // Success
@@ -355,19 +390,19 @@ static int keyb8042_retry_keyb_command(uint8_t command, int data = -1)
     return -1;
 }
 
-static int keyb8042_retry_mouse_command(uint8_t command)
+int keyb8042_t::retry_mouse_command(uint8_t command)
 {
     int last_data;
 
     int max_tries = 4;
     do {
-        if (keyb8042_send_command(KEYB_CMD_MOUSECMD) < 0)
+        if (send_command(KEYB_CMD_MOUSECMD) < 0)
             return -1;
 
-        if (keyb8042_write_data(command) < 0)
+        if (write_data(command) < 0)
             return -1;
 
-        last_data = keyb8042_read_data();
+        last_data = read_data();
 
         if (last_data == PS2MOUSE_REPLY_ACK)
             break;
@@ -378,23 +413,23 @@ static int keyb8042_retry_mouse_command(uint8_t command)
     return max_tries != 0 ? last_data : -1;
 }
 
-static int keyb8042_magic_sequence(uint8_t expected_id, size_t seq_length, ...)
+int keyb8042_t::magic_sequence(uint8_t expected_id, size_t seq_length, ...)
 {
     // Send magic sequence
     va_list ap;
     va_start(ap, seq_length);
     for (size_t i = 0; i < seq_length; ++i) {
         uint8_t command = (uint8_t)va_arg(ap, unsigned);
-        if (keyb8042_retry_mouse_command(command) < 0)
+        if (retry_mouse_command(command) < 0)
             return -1;
     }
     va_end(ap);
 
     // Read ID
-    if (keyb8042_retry_mouse_command(PS2MOUSE_READ_ID) < 0)
+    if (retry_mouse_command(PS2MOUSE_READ_ID) < 0)
         return -1;
 
-    int id = keyb8042_read_data();
+    int id = read_data();
 
     if (id != expected_id)
         return 0;
@@ -403,14 +438,14 @@ static int keyb8042_magic_sequence(uint8_t expected_id, size_t seq_length, ...)
     return 1;
 }
 
-static int keyb8042_set_layout_name(char const *name)
+int keyb8042_t::set_layout_name(char const *name)
 {
-    for (keyb8042_layout_t **layout = keyb8042_layouts;
-         *layout; ++layout) {
-        keyb8042_layout_t *this_layout = *layout;
+    for (keyb8042_layout_t **layout_srch = keyb8042.layouts;
+         *layout_srch; ++layout_srch) {
+        keyb8042_layout_t *this_layout = *layout_srch;
 
         if (!strcmp(this_layout->name, name)) {
-            keyb8042_layout = this_layout;
+            layout = this_layout;
             return 1;
         }
     }
@@ -419,12 +454,12 @@ static int keyb8042_set_layout_name(char const *name)
     return 0;
 }
 
-static int keyb8042_get_modifiers()
+int keyb8042_t::get_modifiers()
 {
     return keyb8042.fsa.get_modifiers();
 }
 
-void keyb8042_init(void)
+void keyb8042_t::init(void)
 {
     // FIXME: perform USB handoff before initializing
 
@@ -432,8 +467,8 @@ void keyb8042_init(void)
 
     // Disable both ports
     KEYB8042_TRACE("Disabling keyboard controller ports\n");
-    keyb8042_send_command(KEYB_CMD_DISABLE_PORT1);
-    keyb8042_send_command(KEYB_CMD_DISABLE_PORT2);
+    send_command(KEYB_CMD_DISABLE_PORT1);
+    send_command(KEYB_CMD_DISABLE_PORT2);
 
     // Flush incoming byte, if any
     KEYB8042_TRACE("Flushing keyboard output buffer\n");
@@ -441,7 +476,7 @@ void keyb8042_init(void)
 
     // Read config
     KEYB8042_TRACE("Reading keyboard controller config\n");
-    int config = keyb8042_ctrl_command(true, KEYB_CMD_RDCONFIG);
+    int config = ctrl_command(true, KEYB_CMD_RDCONFIG);
     if (unlikely(config < 0)) {
         KEYB8042_MSG("Failed to read controller config\n");
         return;
@@ -456,23 +491,23 @@ void keyb8042_init(void)
 
     // Write config
     KEYB8042_TRACE("Writing keyboard controller config = %#02x\n", config);
-    if (unlikely(keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)) {
+    if (unlikely(send_command(KEYB_CMD_WRCONFIG) < 0)) {
         KEYB8042_MSG("Failed to send write config command\n");
         return;
     }
-    if (unlikely(keyb8042_write_data(config) < 0)) {
+    if (unlikely(write_data(config) < 0)) {
         KEYB8042_MSG("Failed to send write config data\n");
         return;
     }
 
     // Detect second channel
-    if (unlikely(keyb8042_send_command(KEYB_CMD_ENABLE_PORT2) < 0)) {
+    if (unlikely(send_command(KEYB_CMD_ENABLE_PORT2) < 0)) {
         KEYB8042_MSG("Failed to send enable port 2 command\n");
         return;
     }
 
     // Readback config
-    int detect_config = keyb8042_ctrl_command(true, KEYB_CMD_RDCONFIG);
+    int detect_config = ctrl_command(true, KEYB_CMD_RDCONFIG);
     if (unlikely(detect_config < 0)) {
         KEYB8042_MSG("Failed to read controller config detecting port 2\n");
         return;
@@ -484,7 +519,7 @@ void keyb8042_init(void)
     int ctl_test_result;
     int port1_test_result;
 
-    ctl_test_result = keyb8042_ctrl_command(true, KEYB_CMD_CTLTEST);
+    ctl_test_result = ctrl_command(true, KEYB_CMD_CTLTEST);
     if (unlikely(ctl_test_result < 0)) {
         KEYB8042_MSG("Failed to start controller test\n");
         return;
@@ -494,7 +529,7 @@ void keyb8042_init(void)
         KEYB8042_MSG("Keyboard controller self test failed! result=%#02x\n",
                      ctl_test_result);
 
-    port1_test_result = keyb8042_ctrl_command(true, KEYB_CMD_TEST_PORT1);
+    port1_test_result = ctrl_command(true, KEYB_CMD_TEST_PORT1);
     if (unlikely(port1_test_result < 0)) {
         KEYB8042_MSG("Failed to send test port 1 command\n");
         return;
@@ -508,7 +543,7 @@ void keyb8042_init(void)
 
     if (port2_exists) {
         int port2_test_result;
-        port2_test_result = keyb8042_ctrl_command(true, KEYB_CMD_TEST_PORT2);
+        port2_test_result = ctrl_command(true, KEYB_CMD_TEST_PORT2);
         if (port2_test_result < 0) {
             KEYB8042_MSG("Failed to start port 2 test");
             return;
@@ -523,25 +558,25 @@ void keyb8042_init(void)
 
     // Reset
     KEYB8042_TRACE("Resetting keyboard\n");
-    if (unlikely(keyb8042_retry_keyb_command(KEYB_CMD_RESET) < 0)) {
+    if (unlikely(retry_keyb_command(KEYB_CMD_RESET) < 0)) {
         KEYB8042_MSG("Failed to send keyboard reset command\n");
         return;
     }
 
     // Read reset result
-    port1_test_result = keyb8042_read_data();
-    if (port1_test_result != KEYB_REPLY_RESETOK) {
+    port1_test_result = read_data();
+    if (unlikely(port1_test_result != KEYB_REPLY_RESETOK)) {
         KEYB8042_TRACE("Keyboard reset failed, data=%#x\n", port1_test_result);
         return;
     }
 
     KEYB8042_TRACE("Enabling keyboard port\n");
-    if (keyb8042_send_command(KEYB_CMD_ENABLE_PORT1) < 0)
+    if (send_command(KEYB_CMD_ENABLE_PORT1) < 0)
         return;
 
     if (port2_exists) {
         KEYB8042_TRACE("Enabling mouse port\n");
-        if (keyb8042_send_command(KEYB_CMD_ENABLE_PORT2) < 0)
+        if (send_command(KEYB_CMD_ENABLE_PORT2) < 0)
             return;
     }
 
@@ -555,43 +590,43 @@ void keyb8042_init(void)
     }
 
     KEYB8042_TRACE("Writing keyboard controller config = %#02x\n", config);
-    if (keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)
+    if (send_command(KEYB_CMD_WRCONFIG) < 0)
         return;
-    if (keyb8042_write_data(config) < 0)
+    if (write_data(config) < 0)
         return;
 
     // Choose scanset 1
-    if (keyb8042_retry_keyb_command(KEYB_CMD_SET_SCANSET, 1) < 0) {
+    if (retry_keyb_command(KEYB_CMD_SET_SCANSET, 1) < 0) {
         KEYB8042_MSG("Failed to send set-scanset keyboard command\n");
         return;
     }
 
-    if (keyb8042_retry_keyb_command(KEYB_CMD_ENABLE_SCAN) < 0) {
+    if (retry_keyb_command(KEYB_CMD_ENABLE_SCAN) < 0) {
         KEYB8042_MSG("Failed to enable keyboard scanning\n");
         return;
     }
 
     // Reset mouse
     KEYB8042_TRACE("Resetting mouse\n");
-    if (keyb8042_retry_mouse_command(PS2MOUSE_RESET) < 0)
+    if (retry_mouse_command(PS2MOUSE_RESET) < 0)
         return;
     KEYB8042_TRACE("Reading reset ok\n");
-    if (keyb8042_read_data() != KEYB_REPLY_RESETOK)
+    if (unlikely(read_data() != KEYB_REPLY_RESETOK))
         KEYB8042_MSG("Mouse did not acknowledge\n");
     KEYB8042_TRACE("Reading reset result\n");
-    if (keyb8042_read_data() != 0x00)
+    if (read_data() != 0x00)
         KEYB8042_MSG("Mouse did not acknowledge\n");
 
     // Set mouse resolution
     KEYB8042_TRACE("Setting mouse resolution\n");
-    if (keyb8042_retry_mouse_command(PS2MOUSE_SETRES) < 0)
+    if (retry_mouse_command(PS2MOUSE_SETRES) < 0)
         return;
-    if (keyb8042_retry_mouse_command(PS2MOUSE_RES_1CPMM) < 0)
+    if (retry_mouse_command(PS2MOUSE_RES_1CPMM) < 0)
         return;
 
     // Enable mouse stream mode
     KEYB8042_TRACE("Setting mouse to stream mode\n");
-    if (keyb8042_retry_mouse_command(PS2MOUSE_ENABLE) < 0)
+    if (retry_mouse_command(PS2MOUSE_ENABLE) < 0)
         return;
 
     keyb8042.mouse_packet_size = 3;
@@ -599,14 +634,14 @@ void keyb8042_init(void)
 
     // Attempt to detect better mouse
 
-    if (keyb8042_magic_sequence(
+    if (magic_sequence(
                 0x04, 6, 0xF3, 0xC8, 0xF3, 0xC8, 0xF3, 0x50) > 0) {
         // Attempt to detect 5 button mouse with wheel
         // (Intellimouse Explorer compatible)
         printk("Detected 5 button mouse with wheel\n");
         keyb8042.mouse_button_count = 5;
         keyb8042.mouse_packet_size = 4;
-    } else if (keyb8042_magic_sequence(
+    } else if (magic_sequence(
                    0x03, 6, 0xF3, 0xC8, 0xF3, 0x64, 0xF3, 0x50) > 0) {
         // Attempt to detect 3 button mouse with wheel
         // (Intellimouse compatible)
@@ -617,26 +652,32 @@ void keyb8042_init(void)
 
     // Set mouse sampling rate
     KEYB8042_TRACE("Setting mouse sampling rate\n");
-    if (keyb8042_retry_mouse_command(PS2MOUSE_SETSAMPLERATE) < 0)
+    if (retry_mouse_command(PS2MOUSE_SETSAMPLERATE) < 0)
         return;
-    if (keyb8042_retry_mouse_command(100) < 0)
+    if (retry_mouse_command(100) < 0)
         return;
 
     printk("Keyboard/mouse initialization complete\n");
 
+    keybd_add(this);
 
-    irq_hook(1, keyb8042_handler, "keyb8042");
+    irq_hook(1, irq_handler, "keyb8042");
     irq_setmask(1, 1);
 
     if (port2_exists) {
         printk("Mouse enabled\n");
         mouse_file_init();
-        irq_hook(12, keyb8042_handler, "keyb8042_mouse");
+        irq_hook(12, irq_handler, "keyb8042_mouse");
         irq_setmask(12, 1);
     }
 
-    keybd_get_modifiers = keyb8042_get_modifiers;
-    keybd_set_layout_name = keyb8042_set_layout_name;
-
     printk("Keyboard enabled\n");
 }
+
+int module_main(int argc, char const * const * argv)
+{
+    keyb8042.init();
+    return 0;
+}
+
+__END_ANONYMOUS

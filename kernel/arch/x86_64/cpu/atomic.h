@@ -4,7 +4,7 @@
 //
 // Some other concurrent code helpers
 
-static _always_inline void atomic_barrier(void)
+static _always_inline void compiler_barrier(void)
 {
     __asm__ __volatile__ ("" ::: "memory");
 }
@@ -12,12 +12,14 @@ static _always_inline void atomic_barrier(void)
 // Technically not atomic but needed in cmpxchg loops
 static _always_inline _no_instrument void pause()
 {
+#if defined(__i386__) || defined(__x86_64__)
     __builtin_ia32_pause();
+#endif
 }
 
 #define atomic_fence() __atomic_thread_fence(__ATOMIC_SEQ_CST)
-#define atomic_lfence() __atomic_thread_fence(__ATOMIC_ACQUIRE)
-#define atomic_sfence() __atomic_thread_fence(__ATOMIC_RELEASE)
+#define atomic_acquire_fence() __atomic_thread_fence(__ATOMIC_ACQUIRE)
+#define atomic_release_fence() __atomic_thread_fence(__ATOMIC_RELEASE)
 
 #define atomic_add(value, rhs) \
     __atomic_add_fetch((value), (rhs), __ATOMIC_SEQ_CST)
@@ -121,7 +123,7 @@ static _always_inline _no_instrument void pause()
 // Returns n if replacement occurred, otherwise
 // returns latest value (which is > n)
 #define atomic_max(value_ptr, n) __extension__ ({\
-    atomic_barrier(); \
+    compiler_barrier(); \
     __typeof__(value_ptr) _value_ptr = (value_ptr); \
     __typeof__(n) _n = (n); \
     \
@@ -151,7 +153,7 @@ static _always_inline _no_instrument void pause()
 
 #ifdef __cplusplus
 
-namespace std {
+__BEGIN_NAMESPACE_EXT
 
 template<typename T>
 struct atomic;
@@ -438,6 +440,6 @@ using atomic_ptrdiff_t = atomic<ptrdiff_t>;
 using atomic_intmax_t = atomic<intmax_t>;
 using atomic_uintmax_t = atomic<uintmax_t>;
 
-}
+__END_NAMESPACE_EXT
 
 #endif

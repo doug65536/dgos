@@ -1,6 +1,6 @@
 #include "bootmenu.h"
 #include "bootloader.h"
-#include "vesa.h"
+#include "modelist.h"
 #include "paging.h"
 #include "malloc.h"
 #include "qemu.h"
@@ -212,8 +212,9 @@ static void apply_bootmenu_fw_cfg(
     char name[48];
     char value[16];
     constexpr tui_str_t prefix{TSTR "opt/com.doug16k.dgos.bootmenu."};
-    size_t prefix_len = tchar_to_utf8(name, sizeof(name),
-                                      prefix.str, prefix.len);
+    size_pair_t prefix_sizes = tchar_to_utf8(name, sizeof(name),
+                                             prefix.str, prefix.len);
+    size_t prefix_len = prefix_sizes.output_produced;
     size_t prefix_remain = sizeof(name) - prefix_len;
 
     PRINT("applying bootmenu fw_cfg");

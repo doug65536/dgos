@@ -23,7 +23,7 @@ static size_t heap_count;
 void malloc_startup(void*)
 {
     // Create a heap
-    heap_t *default_heap = heap_create();
+    heap_t *default_heap = heap_create(512);
 
     // Allocate an array for per-cpu heap pointers using the BSP heap
     default_heaps = (heap_t**)heap_alloc(
@@ -55,7 +55,7 @@ static void malloc_startup_smp(void*)
 
     for (size_t i = 1; i < new_heap_count; ++i)
     {
-        new_default_heaps[i] = heap_create();
+        new_default_heaps[i] = heap_create(512);
 
         if (unlikely(!new_default_heaps[i]))
             panic_oom();

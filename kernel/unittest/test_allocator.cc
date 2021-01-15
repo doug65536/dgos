@@ -7,7 +7,6 @@ __BEGIN_ANONYMOUS
 
 // Top level address space
 
-
 class block_data_t : public refcounted<block_data_t> {
 public:
     virtual ~block_data_t() = 0;

@@ -10,5 +10,3 @@ struct keyb8042_layout_t {
 
 // Layouts
 KERNEL_API extern keyb8042_layout_t keyb8042_layout_us;
-
-void keyb8042_init(void);

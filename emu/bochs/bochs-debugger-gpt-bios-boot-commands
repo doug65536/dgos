@@ -1,8 +1,8 @@
 u switch-mode
-ldsym global "sym/mbr-elf.sym"
 ldsym global "sym/boot1-elf.sym"
+ldsym global "sym/bootfat-elf.sym"
 
 lb 0x7c00
-lb relocated_mbr_entry
-lb relocated_boot1_entry
+lb mbr_relocated_entry
+lb boot1_relocated_entry
 c

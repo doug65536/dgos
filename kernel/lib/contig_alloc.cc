@@ -163,7 +163,10 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
                  ", size=%#" PRIx64 "\n", addr, size);
 #endif
     } else {
+        assert((size & PAGE_MASK) == 0);
         addr = atomic_xadd(linear_base_ptr, size);
+
+        assert((addr & PAGE_MASK) == 0);
 
 #if DEBUG_ADDR_EARLY
         printdbg("Took early address space @ %#" PRIx64
@@ -558,9 +561,6 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     assert(free_addr_by_addr.size() == free_addr_by_size.size());
 
 #if DEBUG_ADDR_ALLOC
-    if (addr == 0xfffffd0052257000 && size==0x40000)
-        dump_locked(lock, "after bug");
-
     //dump("Addr map by addr (after free)");
     validate_locked(lock);
 #endif

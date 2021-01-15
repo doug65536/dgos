@@ -1348,3 +1348,22 @@ KERNEL_API void arch_ungraceful_stop()
 {
     cpu_triple_fault();
 }
+
+void arch_cache_clean(void *vaddr, size_t size)
+{
+    if (!cpuid_has_clflush())
+        return;
+
+    for (size = (size + 63) & 63; size; (vaddr = (char*)vaddr + 64), size -= 64)
+        cpu_clflush(vaddr);
+}
+
+void arch_cache_invalidate(void *vaddr, size_t size)
+{
+
+}
+
+void arch_cache_clean_invalidate(void *vaddr, size_t size)
+{
+
+}

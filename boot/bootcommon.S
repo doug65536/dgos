@@ -1,7 +1,8 @@
-#include "gdt_sel.h"
+#include "x86/gdt_sel.h"
 
-.section .early, "wx", @progbits
 .code16
+
+.section .lowtext, "ax", @progbits
 
 // Return address in bx
 .global early_init
@@ -12,10 +13,10 @@ early_init:
 
     call detect_ancient_cpu
 
-    call clear_bss
-
     // It is at least a 486 with CPUID instruction if it made it to here
     // without freezing with unsupported CPU message
+
+    calll clear_bss
 
     // 32 bit instructions are okay if detect_ancient_cpu returned...
 
@@ -91,7 +92,7 @@ boot:
     movl %eax,%cr0
 
     movw $ GDT_SEL_PM_DATA32,%dx
-    ljmp $ GDT_SEL_PM_CODE32,$ pmode_entry
+    ljmpw $ GDT_SEL_PM_CODE32,$ pmode_entry
 
     .cfi_endproc
 
@@ -140,18 +141,21 @@ pmode_entry:
     movl %esi,%edx
     call *%edi
 
+    // Usually won't reach here...
+
     call cpu_a20_exitpm
 
     mov %ebp,%esp
 
     // Jump to 16 bit protected mode and load segments
-    ljmp $ GDT_SEL_PM_CODE16,$ 0f
+    ljmpw $ GDT_SEL_PM_CODE16,$ 0f
 .code16
 0:  movw $ GDT_SEL_PM_DATA16,%dx
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
     movw %dx,%gs
+    movw $ GDT_SEL_PM_STAC16,%dx
     movw %dx,%ss
 
     // Turn off protected mode
@@ -160,13 +164,16 @@ pmode_entry:
     movl %eax,%cr0
 
     // Jump to real mode
-    ljmp $ 0,$ 0f
+    ljmpw $ 0,$ 0f
 0:  xorw %dx,%dx
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
     movw %dx,%gs
+    movl $ 0x20000,%edx
     movw %dx,%ss
+    movl %ss,%edx
+    andl $ 0xFFFF,%esp
 
     popl %esi
     popl %edi
@@ -181,50 +188,51 @@ pmode_entry:
 .global detect_ancient_cpu
 detect_ancient_cpu:
     // An 8086 has flags 15:12 permanently set
-    mov $ 0x0FFF,%cx
-    xor %dx,%dx
-    call change_flags
-    test $ 0xF000,%ax
+    movw $ 0x0FFF,%cx
+    xorw %dx,%dx
+    callw change_flags
+    testw $ 0xF000,%ax
     jnz detected_8086
 
     // An 80286 has flags 15:12 permanently clear in real mode
-    or $ -1,%cx
-    mov $ 0xF000,%dx
-    call change_flags
-    test $ 0xF000,%ax
+    orw $ -1,%cx
+    movw $ 0xF000,%dx
+    callw change_flags
+    testw $ 0xF000,%ax
     jz detected_80286
 
     // It is safe to use 32 bit instructions now...
 
     // An 80386 has eflags 18 (AC) permanently clear
-    or $ -1,%ecx
-    mov $ 1 << 18,%edx
-    call change_eflags
-    test $ 1 << 18,%eax
+    orl $ -1,%ecx
+    movl $ 1 << 18,%edx
+    callw change_eflags
+    testl $ 1 << 18,%eax
     jz detected_80386
 
     //
     // An early 80486 has eflags 21 (ID) stuck
 
     // Isolate bit 21 and save it
-    and $ 1 << 21,%eax
+    andl $ 1 << 21,%eax
     push %eax
 
     // Clear nothing, set nothing
-    or $ -1,%ecx
-    xor %edx,%edx
+    orl $ -1,%ecx
+    xorl %edx,%edx
 
     // Clear it if it was set
-    xor %eax,%ecx
+    xorl %eax,%ecx
 
     // Set it if it was clear
-    xor $ 1 << 21,%eax
-    or %eax,%edx
+    xorl $ 1 << 21,%eax
+    orl %eax,%edx
 
-    call change_eflags
-    pop %ecx
-    cmp %ecx,%eax
+    callw change_eflags
+    popl %ecx
+    cmpl %ecx,%eax
     jz detected_old_486
+    // CPUID instruction will work
 
     // Make sure the FPU exists
     // Initialized status word will have exceptions masked (1-bits)
@@ -234,17 +242,17 @@ detect_ancient_cpu:
     fnstsw %ax
     testw %ax,%ax
     jnz detected_486sx
+    // FPU exists
 
-    // CPUID instruction will work
     ret
 
-.pushsection .lowdata
+.pushsection .lowdata, "w", @progbits
 str_prefix:	.asciz "An "
 str_8086:	.asciz "8086"
 str_80286:	.asciz "80286"
 str_80386:	.asciz "80386"
 str_80486:	.asciz "early 80486"
-str_80486sx:.asciz "80486sx"
+str_80486sx:.asciz "80486-SX"
 str_suffix:	.asciz " cannot run this operating system"
 .popsection
 
@@ -347,7 +355,7 @@ idt_init:
     xor %ecx,%ecx
 
     // Fetch function pointer from table
-0:  movl %es:(%esi,%ecx,4),%eax
+0:  movzwl %es:(%esi,%ecx,2),%eax
 
     // offset 15:0
     movw %ax,(%edi,%ecx,8)
@@ -395,7 +403,7 @@ idt_init:
 // Returns true if a20 is on
 .global cpu_a20_check
 cpu_a20_check:
-    push %es
+    pushl %es
 
     // Setup es for wraparound
     orl $ -1,%eax
@@ -414,7 +422,7 @@ cpu_a20_check:
     cmpb %al,%es:cpu_a20_chk + 0x10
     sete %al
 
-    pop %es
+    popl %es
     ret
 
 .code32
@@ -433,7 +441,7 @@ cpu_a20_wait:
     decb %al
     cmpb %al,cpu_a20_chk + 0x100000
     sete %al
-    cmp %al,%dl
+    cmpb %al,%dl
 
     // Statically predict equal
     jne 1f
@@ -441,28 +449,33 @@ cpu_a20_wait:
 1:  jmp 0b
 .code16
 
-.section .early, "wx", @progbits
+.section .lowtext, "ax", @progbits
 
 .global clear_bss
 clear_bss:
-    push %edi
-    push %ecx
-    push %eax
+    pushl %edi
+    pushl %ecx
+    pushl %eax
+
     movl $ ___bss_st,%edi
     movl $ ___bss_en,%ecx
     subl %edi,%ecx
+
     // Translate flat edi to es:di
-    mov %edi,%eax
-    shr $ 4,%eax
-    mov %ax,%es
-    and $ 0xF,%di
-    xor %ax,%ax
+    movl %edi,%eax
+    shrl $ 4,%eax
+    movw %ax,%es
+    xorl %eax,%eax
+    andl $ 0xF,%edi
+
     cld
     rep stosb
-    mov %ax,%es
-    pop %eax
-    pop %ecx
-    pop %edi
+
+    movw %ax,%es
+
+    popl %eax
+    popl %ecx
+    popl %edi
     ret
 
 .code32
@@ -471,13 +484,22 @@ clear_bss:
 __cxa_atexit:
     ret
 
-.section .early
-cpu_a20_chk: .space 1
+.section .lowdata, "w", @progbits
+cpu_a20_chk:
+    .space 1
 
-.section .early, "wx", @progbits
+.section .lowtext, "ax", @progbits
 
+.balign 4
 .global __dso_handle
 .hidden __dso_handle
 __dso_handle:
     // 32 bit pointer to itself
     .int __dso_handle
+
+.section .unreloc, ""
+.global ___unrelocated
+___unrelocated:
+    .skip 512
+___unrelocated_end:
+

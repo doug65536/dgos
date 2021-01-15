@@ -99,7 +99,7 @@ __BEGIN_DECLS
 #define MAP_NONBLOCK        0
 
 /// Allocate address space only
-void *mm_alloc_space(size_t size);
+KERNEL_API void *mm_alloc_space(size_t size);
 
 /// Map a range of address space
 /// __addr, hint, map memory as near as possible to that address,
@@ -256,6 +256,10 @@ KERNEL_API size_t mphysranges(mmphysrange_t *ranges,
                               void const *addr, size_t size,
                               size_t max_size);
 
+// Iterate through the ranges and add up the size
+KERNEL_API size_t mphysranges_total(mmphysrange_t *ranges,
+                                    size_t ranges_count);
+
 // Ensure no range crosses the specified boundary
 // For example, pass 16 in log2_boundary to modify
 // the region list to never cross a 64KB boundary
@@ -375,8 +379,8 @@ KERNEL_API void *mmap_register_device(void *context,
                                       void *addr = nullptr);
 
 // Allocate/free contiguous physical memory
-uintptr_t mm_alloc_contiguous(size_t size);
-void mm_free_contiguous(uintptr_t addr, size_t size);
+KERNEL_API uintptr_t mm_alloc_contiguous(size_t size);
+KERNEL_API void mm_free_contiguous(uintptr_t addr, size_t size);
 
 // Allocate/free memory hole (for I/O devices)
 KERNEL_API uintptr_t mm_alloc_hole(size_t size);

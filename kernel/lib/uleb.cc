@@ -1,7 +1,7 @@
 #include "uleb.h"
 #include "printk.h"
 
-uintptr_t decode_uleb128(const uint8_t *&in)
+uintptr_t decode_uleb128(uint8_t const *&in)
 {
     uintptr_t result = 0;
     uint8_t shift = 0;
@@ -15,7 +15,7 @@ uintptr_t decode_uleb128(const uint8_t *&in)
     return result;
 }
 
-intptr_t decode_sleb128(const uint8_t *&in)
+intptr_t decode_sleb128(uint8_t const *&in)
 {
     intptr_t result = 0;
     uint8_t shift = 0;
@@ -32,7 +32,7 @@ intptr_t decode_sleb128(const uint8_t *&in)
     return result;
 }
 
-uint64_t read_enc_val(const uint8_t *&input, uint8_t encoding)
+uint64_t read_enc_val(uint8_t const *&input, uint8_t encoding)
 {
     switch (encoding & 0xF) {
     case DW_EH_PE_omit:

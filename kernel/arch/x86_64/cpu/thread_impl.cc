@@ -342,8 +342,8 @@ struct alignas(256) cpu_info_t {
     };
 
     resume_ent_t resume_ring[4];
-    std::atomic_uint8_t resume_head;
-    std::atomic_uint8_t resume_tail;
+    ext::atomic_uint8_t resume_head;
+    ext::atomic_uint8_t resume_tail;
     bool should_reschedule;
     uint8_t reserved5[5];
     ext::irq_spinlock resume_lock;
@@ -1008,15 +1008,12 @@ void thread_init(int ap)
         // BSP stack (grows down)
         thread->stack = kernel_stack + kernel_stack_size;
         thread->stack_size = kernel_stack_size;
-//        thread->stack = thread_allocate_stack(
-//                    0, kernel_stack_size, "idle", 0xFE);
 
         thread->xsave_stack = nullptr;
         thread->xsave_ptr = nullptr;
         thread->cpu_affinity = thread_cpu_mask_t(0);
         thread->name = "Idle(BSP)";
-        atomic_barrier();
-        thread->state = THREAD_IS_RUNNING;
+        atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
 
         size_t cpu_nr = run_cpu[thread->thread_id];
 
@@ -1049,7 +1046,6 @@ void thread_init(int ap)
 
         cpu->goto_thread = thread;
 
-        atomic_barrier();
         thread_yield();
         __builtin_unreachable();
     }
@@ -1740,6 +1736,8 @@ uintptr_t thread_sleep_release(
 
     thread->wake_time = timeout_time;
 
+    assert(thread->state == THREAD_IS_RUNNING);
+
     thread_state_t old_state;
     old_state = atomic_cmpxchg(&thread->state,
                                THREAD_IS_RUNNING, THREAD_IS_SLEEPING_BUSY);
@@ -2389,7 +2387,7 @@ void thread_panic_other_cpus()
 //}
 //
 //static inline int
-//__gthread_setspecific(__gthread_key_t __key, const void *__v)
+//__gthread_setspecific(__gthread_key_t __key, void const *__v)
 //{
 //  return 0;
 //}

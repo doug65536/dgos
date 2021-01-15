@@ -1016,33 +1016,38 @@ bool gdbstub_t::parse_memop(uintptr_t& addr, size_t& size, char const *&input)
 
 gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
 {
-    uintptr_t memop_addr;
-    uint64_t saved_cr3;
-    size_t memop_size;
-    size_t volatile memop_index = 0;
-    uint8_t const *memop_ptr;
-    isr_context_t const *ctx;
+    // Keep in a structure so it isn't manipulating
+    // local variables after setjmp
+    struct s {
+        uintptr_t memop_addr;
+        uint64_t saved_cr3;
+        size_t memop_size;
+        size_t memop_index = 0;
+        uint8_t const *memop_ptr;
+        isr_context_t const *ctx;
+    } state;
 
-    if (!parse_memop(memop_addr, memop_size, input))
+    if (unlikely(!parse_memop(state.memop_addr, state.memop_size, input)))
         return reply("E02");
 
-    memop_ptr = (uint8_t *)memop_addr;
+    state.memop_ptr = (uint8_t *)state.memop_addr;
 
-    ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
-    saved_cr3 = cpu_page_directory_get();
+    state.ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
+    state.saved_cr3 = cpu_page_directory_get();
 
     try_catch([&] {
-        cpu_page_directory_set(ctx->gpr.cr3);
+        cpu_page_directory_set(state.ctx->gpr.cr3);
         cpu_tlb_flush();
         try_catch([&] {
-            for (memop_index = 0; memop_index < memop_size; ++memop_index) {
-                size_t index = memop_index;
+            for (state.memop_index = 0; state.memop_index < state.memop_size;
+                 ++state.memop_index) {
+                size_t index = state.memop_index;
 
-                uint8_t const& mem_value = memop_ptr[index];
+                uint8_t const& mem_value = state.memop_ptr[index];
 
                 // Read the old byte if a software breakpoint is placed there
                 int bp_byte = gdb_cpu_ctrl_t::breakpoint_get_byte(
-                            &mem_value, ctx->gpr.cr3);
+                            &mem_value, state.ctx->gpr.cr3);
 
                 // Read memory or use saved value from software breakpoint
                 if (bp_byte < 0)
@@ -1057,11 +1062,11 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
         // catch
     });
 
-    cpu_page_directory_set(saved_cr3);
+    cpu_page_directory_set(state.saved_cr3);
     cpu_tlb_flush();
 
-    if (memop_index)
-        return reply(tx_buf, memop_index * 2);
+    if (likely(state.memop_index))
+        return reply(tx_buf, state.memop_index * 2);
 
     return reply("E14");
 }

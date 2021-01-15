@@ -602,8 +602,8 @@
 // Page fault was instruction fetch
 #define CTX_ERRCODE_PF_SGX      (1<<CTX_ERRCODE_PF_SGX_BIT)
 
-#define GDT_SEL_PM_CODE16       0x08
-#define GDT_SEL_PM_DATA16       0x10
+#define GDT_SEL_PM_DATA16       0x08
+#define GDT_SEL_PM_CODE16       0x10
 #define GDT_SEL_PM_CODE32       0x18
 #define GDT_SEL_PM_DATA32       0x20
 

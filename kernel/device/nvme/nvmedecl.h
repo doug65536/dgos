@@ -92,6 +92,56 @@ struct nvme_cmd_hdr_t {
 
 C_ASSERT(sizeof(nvme_cmd_hdr_t) == 40);
 
+struct nvme_dataset_range_t;
+struct nvme_host_mem_desc_t;
+
+// NVM command structure with command factories
+struct nvme_cmd_t {
+    nvme_cmd_hdr_t hdr;
+
+    // cmd dwords 10 thru 15
+    uint32_t cmd_dword_10[6];
+
+    // 5.11 Identify command
+    static nvme_cmd_t create_identify(uint64_t physaddr, uint8_t cns, uint8_t nsid);
+
+    // Create a command that creates a submission queue
+    static nvme_cmd_t create_sub_queue(
+            void *addr, uint32_t size,
+            uint16_t sqid, uint16_t cqid, uint8_t prio);
+
+    // Create a command that creates a completion queue
+    static nvme_cmd_t create_cmp_queue(
+            void *addr, uint32_t size,
+            uint16_t cqid, uint16_t intr);
+
+    // Create a command that reads storage
+    static nvme_cmd_t create_read(
+            uint64_t lba, uint32_t count, uint8_t ns);
+
+    // Create a command that writes storage
+    static nvme_cmd_t create_write(
+            uint64_t lba, uint32_t count, uint8_t ns, bool fua);
+
+    // Create a command that does a trim
+    static nvme_cmd_t create_trim(uint64_t lba, uint32_t count,
+                                  nvme_dataset_range_t &range, uint8_t ns);
+
+    // Create a flush command
+    static nvme_cmd_t create_flush(uint8_t ns);
+
+    // Create a command that sets the completion and submission queue counts
+    static nvme_cmd_t create_setfeatures_numq(uint16_t ncqr, uint16_t nsqr);
+
+    // Create a command that configures the host memory buffer
+    static nvme_cmd_t create_setfeatures_hmb(
+            nvme_host_mem_desc_t const *desc_list, size_t desc_count,
+            uint32_t hsize_pages, bool mem_en, bool mem_return);
+};
+
+C_ASSERT(sizeof(nvme_cmd_t) == 64);
+C_ASSERT(offsetof(nvme_cmd_t, cmd_dword_10) == 40);
+
 // Command submission queue admin opcodes
 enum struct nvme_admin_cmd_opcode_t : uint8_t {
     delete_sq = 0x00,
@@ -126,50 +176,9 @@ enum struct nvme_cmd_opcode_t : uint8_t {
 };
 
 enum struct nvme_feat_id_t : uint8_t {
+    host_mem_buf = 0xd,
     num_queues = 0x07
 };
-
-// NVM command structure with command factories
-struct nvme_cmd_t {
-    nvme_cmd_hdr_t hdr;
-
-    // cmd dwords 10 thru 15
-    uint32_t cmd_dword_10[6];
-
-    // 5.11 Identify command
-    static nvme_cmd_t create_identify(
-            void *addr, uint8_t cns, uint8_t nsid);
-
-    // Create a command that creates a submission queue
-    static nvme_cmd_t create_sub_queue(
-            void *addr, uint32_t size,
-            uint16_t sqid, uint16_t cqid, uint8_t prio);
-
-    // Create a command that creates a completion queue
-    static nvme_cmd_t create_cmp_queue(
-            void *addr, uint32_t size,
-            uint16_t cqid, uint16_t intr);
-
-    // Create a command that reads storage
-    static nvme_cmd_t create_read(
-            uint64_t lba, uint32_t count, uint8_t ns);
-
-    // Create a command that writes storage
-    static nvme_cmd_t create_write(
-            uint64_t lba, uint32_t count, uint8_t ns, bool fua);
-
-    // Create a command that does a trim
-    static nvme_cmd_t create_trim(uint64_t lba, uint32_t count, uint8_t ns);
-
-    // Create a flush command
-    static nvme_cmd_t create_flush(uint8_t ns);
-
-    // Create a command that sets the completion and submission queue counts
-    static nvme_cmd_t create_setfeatures(uint16_t ncqr, uint16_t nsqr);
-};
-
-C_ASSERT(sizeof(nvme_cmd_t) == 64);
-C_ASSERT(offsetof(nvme_cmd_t, cmd_dword_10) == 40);
 
 // 4.6 Completion queue entry
 struct nvme_cmp_t {
@@ -479,3 +488,11 @@ struct nvme_dataset_range_t {
     uint32_t lba_count;
     uint64_t starting_lba;
 };
+
+//
+struct nvme_host_mem_desc_t {
+    uint64_t physaddr;
+    uint32_t page_count;
+    uint32_t reserved;
+};
+

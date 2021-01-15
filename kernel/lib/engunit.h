@@ -10,7 +10,7 @@ public:
 
     static constexpr size_t const unit_base = 6;
 
-    engineering_t(T value, int log_unit = 0, bool binary = false)
+    constexpr engineering_t(T value, int log_unit = 0, bool binary = false)
     {
         if (!binary)
             set_value(value, log_unit, 1000);
@@ -18,12 +18,12 @@ public:
             set_value(value, log_unit, 1024);
     }
 
-    ~engineering_t()
+    constexpr ~engineering_t()
     {
         //printdbg("engineering_t destructed\n");
     }
 
-    void set_value(T value, int logN_unit = 0, int base = 1000)
+    constexpr void set_value(T value, int logN_unit = 0, int base = 1000)
     {
 //        printdbg("value=%zx, logN_unit=%d, base=%d\n",
 //                 uintptr_t(value), logN_unit, base);
@@ -130,12 +130,12 @@ public:
         }
     }
 
-    char const *ptr() const
+    constexpr char const *ptr() const
     {
         return out;
     }
 
-    operator char const *() const
+    constexpr operator char const *() const
     {
         return ptr();
     }

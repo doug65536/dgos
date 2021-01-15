@@ -209,8 +209,9 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 1, 0, 1, 0, 0, 0)
 
 // Foreign data (16 bit)
-#define GDT_MAKE_DATASEG16(ring) \
-    GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
+#define GDT_MAKE_DATASEG16(ring, base) \
+    GDT_MAKE_CODEDATA_DESCRIPTOR(base, \
+        0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
 // Task State Segment (64-bit)
 struct alignas(sizeof(uint32_t)) tss_t {

@@ -1204,6 +1204,7 @@ public:
         , __current_size(0)
         , __cmp(__rhs.__cmp)
     {
+        // FIXME: This is O(n log n) when it could be O(n)
         for (__item_type const& __item : __rhs)
             insert(__item);
     }
@@ -2705,8 +2706,6 @@ using set = __basic_tree<_K, void, _C, _A>;
 template<typename _K, typename _V,
          typename _C = less<void>, typename _A = allocator<pair<_K const, _V>>>
 using map = __basic_tree<_K, _V, _C, _A>;
-
-//template<typename
 
 using fast_tree_alloc_t = ext::bump_allocator<void, ext::page_allocator<char>>;
 

@@ -751,8 +751,8 @@ EXPORT format_flag_info_t extern const ide_flags_error[];
 // A 48-bit, 16-bit pair of bit endian lba and count, respectively
 // Used by trim to specify LBA:COUNT ranges
 struct acs_lba_range_t {
-    static constexpr const uint64_t max_lba = (UINT64_C(1) << 48) - 1;
-    static constexpr const size_t max_cnt = (size_t(1) << 16) - 1;
+    static constexpr uint64_t const max_lba = (UINT64_C(1) << 48) - 1;
+    static constexpr size_t const max_cnt = (size_t(1) << 16) - 1;
 
     uint16_t parts[4];
 

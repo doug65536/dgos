@@ -29,19 +29,37 @@
 // IPv4_TOS
 
 #define IPv4_TOS_PREC_BIT       0
+
+// Low delay
 #define IPv4_TOS_D_BIT          3
+
+// High throughput
 #define IPv4_TOS_T_BIT          4
+
+// High reliability
 #define IPv4_TOS_R_BIT          5
 #define IPv4_TOS_RSVD_BIT       6
 
 #define IPv4_TOS_PREC_BITS      3
+
+// Low delay
 #define IPv4_TOS_D_BITS         1
+
+// High throughput
 #define IPv4_TOS_T_BITS         1
+
+// High reliability
 #define IPv4_TOS_R_BITS         1
 #define IPv4_TOS_RSVD_BITS      2
 #define IPv4_TOS_PREC_MASK      ((1U << IPv4_TOS_PREC_BITS)-1)
+
+// Low delay
 #define IPv4_TOS_D_MASK         ((1U << IPv4_TOS_D_BITS)-1)
+
+// High throughput
 #define IPv4_TOS_T_MASK         ((1U << IPv4_TOS_T_BITS)-1)
+
+// High reliability
 #define IPv4_TOS_R_MASK         ((1U << IPv4_TOS_R_BITS)-1)
 #define IPv4_TOS_RSVD_MASK      ((1U << IPv4_TOS_RSVD_BITS)-1)
 #define IPv4_TOS_PREC           (IPv4_TOS_PREC_MASK << IPv4_TOS_PREC_BIT)
@@ -57,23 +75,41 @@
 #define IPv4_TOS_RSVD           (IPv4_TOS_RSVD_MASK << IPv4_TOS_RSVD_BIT)
 
 #define IPv4_TOS_PREC_n(n)      ((n) << IPv4_TOS_PREC_BIT)
+
+// Low delay
 #define IPv4_TOS_D_n(n)         ((n) << IPv4_TOS_D_BIT)
+
+// High throughput
 #define IPv4_TOS_T_n(n)         ((n) << IPv4_TOS_T_BIT)
+
+// High reliability
 #define IPv4_TOS_R_n(n)         ((n) << IPv4_TOS_R_BIT)
 #define IPv4_TOS_RSVD_n(n)      ((n) << IPv4_TOS_RSVD_BIT)
 
 #define IPv4_TOS_PREC_GET(n) \
     (((n) >> IPv4_TOS_PREC_BIT) & IPv4_TOS_PREC_MASK)
+
+// Low delay
 #define IPv4_TOS_D_GET(n)       (((n) >> IPv4_TOS_D_BIT) & IPv4_TOS_D_MASK)
+
+// High throughput
 #define IPv4_TOS_T_GET(n)       (((n) >> IPv4_TOS_T_BIT) & IPv4_TOS_T_MASK)
+
+// High reliability
 #define IPv4_TOS_R_GET(n)       (((n) >> IPv4_TOS_R_BIT) & IPv4_TOS_R_MASK)
 #define IPv4_TOS_RSVD_GET(n) \
     (((n) >> IPv4_TOS_RSVD_BIT) & IPv4_TOS_RSVD_MASK)
 
 #define IPv4_TOS_PREC_SET(r,n) \
     ((r) = ((r) & ~IPv4_TOS_PREC) | IPv4_TOS_PREC_n((n)))
+
+// Low delay
 #define IPv4_TOS_D_SET(r,n)     ((r) = ((r) & ~IPv4_TOS_D) | IPv4_TOS_D_n((n)))
+
+// High throughput
 #define IPv4_TOS_T_SET(r,n)     ((r) = ((r) & ~IPv4_TOS_T) | IPv4_TOS_T_n((n)))
+
+// High reliability
 #define IPv4_TOS_R_SET(r,n)     ((r) = ((r) & ~IPv4_TOS_R) | IPv4_TOS_R_n((n)))
 #define IPv4_TOS_RSVD_SET(r,n) \
     ((r) = ((r) & ~IPv4_TOS_RSVD) | IPv4_TOS_RSVD_n((n)))

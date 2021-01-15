@@ -36,6 +36,51 @@ static uint64_t physmap_check_freespace()
     return total;
 }
 
+static char const *physmap_types[] = {
+    "<zero?>",
+    "NORMAL",
+    "UNUSABLE",
+    "RECLAIMABLE",
+    "NVS",
+    "BAD",
+
+    // Custom types
+    "ALLOCATED",
+    "BOOTLOADER"
+};
+
+ATTRIBUTE_FORMAT(1, 0)
+void vphysmap_dump(tchar const *format, va_list ap)
+{
+    vprint_line(0x7, format, ap);
+    for (size_t i = 0; i < physalloc_count; ++i) {
+        physmem_range_t &ent = physalloc_ranges[i];
+        PRINT("[%zu] base=%" PRIx64
+              ", end=%" PRIx64
+              ", size=%" PRIx64
+              ", type=%s",
+              i, ent.base, ent.base + ent.size, ent.size,
+              ent.type < countof(physmap_types)
+              ? physmap_types[ent.type] : "<invalid>");
+    }
+    PRINT("State"
+          ": 1st_20=%" PRIu32
+          ", p64=%" PRIu32
+          "?",
+          physalloc_20bit_1st, physalloc_64bit_st);
+
+    PRINT("---");
+}
+
+ATTRIBUTE_FORMAT(1, 2)
+void physmap_dump(tchar const *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vphysmap_dump(format, ap);
+    va_end(ap);
+}
+
 static bool physmap_init()
 {
     if (unlikely(!get_ram_regions()))
@@ -49,11 +94,13 @@ static bool physmap_init()
         if (ranges[i].type != PHYSMEM_TYPE_NORMAL)
             continue;
 
-        if (physmap_top < ranges[i].base + ranges[i].size)
-            physmap_top = ranges[i].base + ranges[i].size;
+        auto end = ranges[i].base + ranges[i].size;
+
+        if (physmap_top < end)
+            physmap_top = end;
     }
 
-    return true;
+//    return true;
 
     // Perform fixups
     bool did_something;
@@ -68,6 +115,7 @@ static bool physmap_init()
         if (count && ranges[0].valid)
             top = ranges[0].base + ranges[0].size;
 
+        // Find the top of all valid ranges
         for (size_t i = 1; i < count; ++i) {
             if (unlikely(!ranges[i].valid))
                 continue;
@@ -198,6 +246,10 @@ static bool physmap_init()
             }
         }
     } while (did_something);
+
+#if DEBUG_PHYSMAP
+    physmap_dump(TSTR "After fixup");
+#endif
 
     return true;
 }
@@ -379,53 +431,49 @@ int physmap_insert(physmem_range_t const& entry)
     return physmap_insert_at(index, entry);
 }
 
-#if DEBUG_PHYSMAP
-static char const *physmap_types[] = {
-    "<zero?>",
-    "NORMAL",
-    "UNUSABLE",
-    "RECLAIMABLE",
-    "NVS",
-    "BAD",
+__BEGIN_ANONYMOUS
 
-    // Custom types
-    "ALLOCATED",
-    "BOOTLOADER"
+class physmap_precedence
+{
+public:
+    // Higher number has more precedence
+    static unsigned precedence_from_type(uint8_t type)
+    {
+        return type < sizeof(instance.precedence)
+                ? instance.precedence[type]
+                  : instance.precedence[PHYSMEM_TYPE_BAD];
+    }
+private:
+    uint8_t precedence[5];
+
+    constexpr physmap_precedence()
+    {
+        lookup[PHYSMEM_TYPE_BAD] = 5;
+        lookup[PHYSMEM_TYPE_UNUSABLE] = 4;
+        lookup[PHYSMEM_TYPE_NVS] = 3;
+        lookup[PHYSMEM_TYPE_RECLAIMABLE] = 2;
+        lookup[PHYSMEM_TYPE_NORMAL] = 1;
+    }
+
+    uint8_t lookup[5];
+
+    static physmap_precedence instance;
 };
 
-ATTRIBUTE_FORMAT(1, 0)
-static void vphysmap_dump(tchar const *format, va_list ap)
-{
-    vprint_line(0x7, format, ap);
-    for (size_t i = 0; i < physalloc_count; ++i) {
-        physmem_range_t &ent = physalloc_ranges[i];
-        PRINT("[%zu] base=%" PRIx64
-              ", end=%" PRIx64
-              ", size=%" PRIx64
-              ", type=%s",
-              i, ent.base, ent.base + ent.size, ent.size,
-              ent.type < countof(physmap_types)
-              ? physmap_types[ent.type] : "<invalid>");
-    }
-    PRINT("State"
-          ": 1st_20=%" PRIu32
-          ", p64=%" PRIu32
-          "?",
-          physalloc_20bit_1st, physalloc_64bit_st);
+physmap_precedence physmap_precedence::instance;
 
-    PRINT("---");
+__END_ANONYMOUS
+
+static int physmap_precedence_from_type(unsigned type)
+{
+    return physmap_precedence::precedence_from_type(type);
 }
 
-ATTRIBUTE_FORMAT(1, 2)
-static void physmap_dump(tchar const *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    vphysmap_dump(format, ap);
-    va_end(ap);
-}
-#endif
-
+// size of block,
+// virtual address it will be placed at,
+// insist true to only accept block whose size is the full amount,
+// keep looking if insisting and current block is not large enough
+// insist false if you can trivially handle getting less than you wanted
 phys_alloc_t alloc_phys(uint64_t size, uint64_t for_addr, bool insist)
 {
     uint64_t space_before = physmap_check_freespace();
@@ -559,7 +607,7 @@ phys_alloc_t alloc_phys(uint64_t size, uint64_t for_addr, bool insist)
     assert(result.base >= 0x100000);
     assert(result.base < INT64_C(0x100000000));
 
-    //physmap_validate();
+    physmap_validate();
 
     if (unwanted.size)
         free_phys(unwanted, i);

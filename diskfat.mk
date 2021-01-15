@@ -142,6 +142,8 @@ mbrdisk.img: \
 			seek="$$(( $(MBR_PART_LBA) ))" \
 			conv=notrunc
 
+HYB_PART_LBA = $(MBR_PART_LBA)
+
 hybdisk.img: \
 		fatpart.img \
 		mbr-bin \
@@ -155,7 +157,7 @@ hybdisk.img: \
 		&& \
 		printf "Creating MBR partition table\n" \
 		&& \
-		printf 'label: gpt\n2048,,U,*' | $(SFDISK) "$@" \
+		printf 'label: gpt\n$(HYB_PART_LBA),,U,*' | $(SFDISK) "$@" \
 		&& \
 		printf "Copying boot code into MBR\n" \
 		&& \
@@ -187,8 +189,10 @@ hybdisk.img: \
 			if="$<" \
 			of="$@" \
 			bs=$(SECTOR_SZ) \
-			seek=2048 \
+			seek=$(HYB_PART_LBA) \
 			conv=notrunc
+
+GPT_PART_LBA=$(MBR_PART_LBA)
 
 gptdisk.img: \
 		fatpart.img \
@@ -203,7 +207,7 @@ gptdisk.img: \
 		&& \
 		printf "Creating GPT partition table\n" \
 		&& \
-		"$(SGDISK)" -Z -n 1:2048:0 -t 1:ef00 -A 1:set:2 "$@" \
+		"$(SGDISK)" -Z -n 1:$(GPT_PART_LBA):0 -t 1:ef00 -A 1:set:2 "$@" \
 		&& \
 		printf "Copying boot code into MBR\n" \
 		&& \
@@ -231,7 +235,7 @@ gptdisk.img: \
 			if="$<" \
 			of="$@" \
 			bs=$(SECTOR_SZ) \
-			seek=2048 \
+			seek=$(MBR_PART_LBA) \
 			conv=notrunc
 
 mbrdisk.qcow: mbrdisk.img

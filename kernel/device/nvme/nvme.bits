@@ -11,6 +11,8 @@
 16 CQR Contiguous queues required
 15:0 MQES Maximum queue entries supported
 
+-- NVME_CAP_AMS_WRRWU=1
+
 -- NVME_VS Version
 31:16 MJR Major version number
 15:8 MNR Minor version number
@@ -196,6 +198,23 @@
 
 31:16 NCQR Number of completion queues requested
 15:0 NSQR Number of submission queues requested
+
+-- NVME_CMD_SETFEAT_HMB_CDW11
+
+1 MR Memory return  1=returning previous HMB from before reset/sleep
+2 EHM Enable host memory
+
+-- NVME_CMD_SETFEAT_HMB_CDW12
+31:0 HSIZE Size of host memory buffer, in pages
+
+-- NVME_CMD_SETFEAT_HMB_CDW13
+31:0 HMDLLA Host memory descriptor list lower address
+
+-- NVME_CMD_SETFEAT_HMB_CDW14
+31:0 HMDLUA Host memory descriptor list upper address
+
+-- NVME_CMD_SETFEAT_HMB_CDW15
+31:0 HMDLEC Host memory descriptor list entry count
 
 -- NVME_CMP_SETFEAT_NQ_DW0 Set features number of queues completion dword 0
 

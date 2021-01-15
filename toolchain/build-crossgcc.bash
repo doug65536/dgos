@@ -12,6 +12,7 @@ prefixdir=
 logfile=
 cleanbuild=
 extractonly=
+enablepatch=
 parallel="-j$(which nproc >/dev/null && nproc || echo 1)"
 
 function log() {
@@ -50,7 +51,7 @@ function download_file() {
 	if [[ $url = "" ]] || [[ $dest = "" ]]; then
 		err 'Missing argument to download_file' || exit
 	fi
-	
+
 	local dest_file="$dest/$filename"
 
 	if ! [[ -f $dest_file ]]; then
@@ -99,7 +100,9 @@ function extract_tool() {
 	if ! [[ -d "$name" ]]; then
 		tar xf "$input" || exit
 
-		if [[ -f "$patchname" ]]; then
+		if [[ -n $extractonly ]] && [[ -z $enablepatch ]]; then
+			printf "Skipping patch because extract only mode\n"
+		elif [[ -f "$patchname" ]]; then
 			log echo Applying patch "$patchname"
 			cd "$name" || exit
 			patch -p1 < "$patchname" || exit
@@ -117,7 +120,7 @@ function extract_tool() {
 				if [[ -z $reconf_dir ]]; then
 					continue
 				fi
-				
+
 				printf "key=%s\n" "$key"
 				printf "Automake dir: %s\n" "$reconf_dir"
 
@@ -126,7 +129,7 @@ function extract_tool() {
 					(cd "$reconf_dir" && pwd && automake) || exit
 				fi
 			done
-			
+
 #			printf "Waiting for %u jobs\n" "$reconf_jobs"
 #			for ((i=0; i < reconf_jobs; ++i)); do
 #				wait -n || exit
@@ -139,25 +142,25 @@ function extract_tool() {
 				if [[ $i -ge $reconfs_end ]]; then
 					break
 				fi
-				
+
 				local key="$config""_""$i"
 				local reconf_dir="${reconfs[$key]}"
 
 				if [[ -z $reconf_dir ]]; then
 					continue
 				fi
-				
+
 				printf "key=%s\n" "$key"
 				printf "Reconf dir: %s\n" "$reconf_dir"
 
 				if [[ -d $reconf_dir ]]; then
 					(( ++reconf_jobs ))
-					
+
 					printf "Reconfiguring in %s\n" "$reconf_dir"
 					(cd "$reconf_dir" && pwd && autoreconf -f) || exit
 				fi
 			done
-			
+
 #			printf "Waiting for %u jobs\n" "$reconf_jobs"
 #			for ((i=0; i < reconf_jobs; ++i)); do
 #				wait -n || exit
@@ -196,7 +199,7 @@ function make_tool() {
 	if ! [[ -f "Makefile" ]]; then
 		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:6}" || exit
 	fi
-	
+
 	# Add -O to synchronize output
 	log make "$parallel" "$target" || exit
 	popd || exit
@@ -234,7 +237,7 @@ function help() {
 }
 
 # Parse arguments
-while getopts a:m:j:o:cxp:qh? arg
+while getopts a:m:j:o:cxXp:qh? arg
 do
 	case $arg in
 		a ) arches="$OPTARG" ;;
@@ -245,6 +248,7 @@ do
 		c ) cleanbuild=1 ;;
 		q ) quiet=1 ;;
 		x ) extractonly=1 ;;
+		X ) extractonly=1 && enablepatch=1 ;;
 		h ) help ;;
 		? ) help ;;
 		* ) echo "unrecognized option '$arg'" ; exit 1 ;;

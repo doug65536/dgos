@@ -2,14 +2,14 @@
 #include "assert.h"
 #include "screen.h"
 #include "string.h"
-#include "diskio.h"
+//#include "diskio.h"
 #include "rand.h"
 #include "farptr.h"
 #include "likely.h"
 #include "ctors.h"
 #include "halt.h"
 
-#define HEAP_DEBUG 1
+#define HEAP_DEBUG 0
 
 #define MALLOC_DEBUG 0
 #if MALLOC_DEBUG
@@ -18,7 +18,7 @@
 #define MALLOC_TRACE(...) ((void)0)
 #endif
 
-#define MALLOC_CHECKS 1
+#define MALLOC_CHECKS 0
 #if MALLOC_CHECKS
 #define MALLOC_CHECK() malloc_validate_or_panic()
 #else

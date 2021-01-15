@@ -1,7 +1,6 @@
 #include "screen.h"
 #include <stdarg.h>
 #include "debug.h"
-#include "bioscall.h"
 #include "malloc.h"
 #include "likely.h"
 
@@ -20,7 +19,9 @@ static void buffer_char(tchar *buf, tchar **pptr, tchar c, void *arg)
         *(*pptr) = 0;
 
         print_at(info[0], info[1], info[2], len, buf);
-        //debug_out(buf, len);
+        debug_out(buf, len);
+        char nl = '\n';
+        debug_out(&nl, 1);
         *pptr = buf;
     }
     if (likely(c >= 32))
@@ -185,7 +186,6 @@ void formatter(tchar const *format, va_list ap,
 void vprint_line_at(int x, int y, int attr, tchar const *format, va_list ap)
 {
     int const pos[] = { x, y, attr };
-
     formatter(format, ap, buffer_char, (void*)pos, debug_out_writer, nullptr);
 }
 

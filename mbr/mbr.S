@@ -2,11 +2,13 @@
 
 #include "../boot/ptbl.h"
 #include "../boot/gpt.h"
-#include "../boot/dap.h"
+#include "../boot/x86_bios/dap.h"
 
-// Code is linked at 0x600, but initially loaded at 0x7c00
-// Helper to adjust symbols to where they are before relocating to 0x600
-#define UNRELOCATED(n) (0x7c00-0x600)+n
+// Code is linked at 0x500, but initially loaded at 0x7c00
+// Helper to adjust symbols to where they are before relocating to 0x500
+#define RELOC_OFS   0x0500
+#define LOAD_OFS    0x7C00
+#define UNRELOCATED(n) (n+LOAD_OFS-RELOC_OFS)
 
 // BIOS calls this code with:
 //  DL = boot drive
@@ -14,16 +16,16 @@
 //
 // If the OS fails to boot, it should invoke INT 0x18
 
-.text
+.section .mbrtext, "ax", @progbits
 
 // ----------------------------------------------------------------------
-.globl entry
-entry:
+.global mbr_entry
+mbr_entry:
     // Loads cs with 0 if the MBR jumped to 0x7c0:0 instead of 0:0x7c00
     // Jump over
-    ljmp $ 0,$ UNRELOCATED(entry_start)
+    ljmpw $ 0,$ UNRELOCATED(.Lload_cs)
 
-entry_start:
+.Lload_cs:
     // Incoming registers:
     //  DL = drive
 
@@ -42,61 +44,67 @@ entry_start:
     // Initialize stack to second 64KB
     // Could do this: lss UNRELOCATED(init_stack),%sp
     // but I want code running this early to be 8088 compatible
-    movw UNRELOCATED(init_stack+2),%ss
-    movw UNRELOCATED(init_stack),%sp
+    movw UNRELOCATED(mbr_init_stack+2),%ss
+    movw UNRELOCATED(mbr_init_stack),%sp
 
-    // Relocate to 0x600
-    movw $ 0x7c00,%si
-    movw $ 0x0600,%di
+    // Relocate to 0x500
+    movw $ LOAD_OFS,%si
+    movw $ RELOC_OFS,%di
     movw $ 256,%cx
     cld
     rep movsw
-    ljmpw $ 0,$ relocated_mbr_entry
-relocated_mbr_entry:
+    ljmpw $ 0,$ mbr_relocated_entry
+mbr_relocated_entry:
 
     // Search for first bootable partition
-    movw $ partition_table,%bx
+    movw $ mbr_partition_table,%bx
     movw $ 4,%cx
 
-0:  cmpb $ 0xEE,ptbl_ent_sysid(%bx)
-    je found_gpt
+.Lentry_loop:
+    cmpb $ 0xEE,ptbl_ent_sysid(%bx)
+    je mbr_found_gpt
 
     cmpb $ 0x80,ptbl_ent_bootflag(%bx)
-    je boot_partition
+    jne mbr_bad_signature
 
-bad_signature:
-    addw $ ptbl_ent_length,%bx
-    decw %cx
-    jnz 0b
-    jmp no_active_partition
-
-boot_partition:
+mbr_boot_partition:
     movw ptbl_ent_stsec(%bx),%ax
     movw ptbl_ent_stsec+2(%bx),%cx
-    movw $ 1,dap+dap_block_count
-    call disk_io_with_lba
-    cmpw $ 0xaa55,0x7dfe
-    je 0x7c00
-    jmp bad_signature
+    movw $ 1,mbr_dap+dap_block_count
+    call mbr_disk_io_with_lba
 
-found_gpt:
-    movw %bx,ptbl_ent_ptr
-    movw $ 2,dap+dap_lba
-    andw $ 0,dap+dap_lba+2
+    cmpw $ 0xaa55,0x7dfe
+    jne mbr_bad_signature
+
+    // Pass pointer to booted partition table entry
+    mov %bx,%si
+    // dl never changed yet
+    jmp 0x7c00
+
+mbr_bad_signature:
+    addw $ ptbl_ent_length,%bx
+    decw %cx
+    jnz .Lentry_loop
+    jmp mbr_no_active_partition
+
+mbr_found_gpt:
+    movw %bx,mbr_ptbl_ent_ptr
+    movw $ 2,mbr_dap+dap_lba
+    andw $ 0,mbr_dap+dap_lba+2
 
 .Lanother_gpt:
-    movw $ 1,dap+dap_block_count
-    call disk_io
+    movw $ 1,mbr_dap+dap_block_count
+    call mbr_disk_io
 
     // Look for bootable flag
     testb $ gpt_lba2_part_attr_bios,0x7c00+gpt_lba2_part_attr
-    jnz boot_gpt
+    jnz mbr_boot_gpt
 
-    addw $ 1,dap+dap_lba
-    adcw $ 0,dap+dap_lba+2
+    addw $ 1,mbr_dap+dap_lba
+    adcw $ 0,mbr_dap+dap_lba+2
     jmp .Lanother_gpt
 
-boot_gpt:
+mbr_boot_gpt:
     // Calculate 32 bit sector count (2TB limit)
     movw 0x7c00+gpt_lba2_part_lba_en,%ax
     movw 0x7c00+gpt_lba2_part_lba_en+2,%cx
@@ -111,7 +119,7 @@ boot_gpt:
     movw 0x7c00+gpt_lba2_part_lba_st+2,%cx
     movw %ax,ptbl_ent_stsec(%bx)
     movw %cx,ptbl_ent_stsec+2(%bx)
-    jmp boot_partition
+    jmp mbr_boot_partition
 
 .Lpart_no_good:
     addb $ 1,dap_lba(%si)
@@ -120,48 +128,48 @@ boot_gpt:
 
 //.space 220
 
-disk_io_with_lba:
-    movw %ax,dap+dap_lba
-    movw %cx,dap+dap_lba+2
+mbr_disk_io_with_lba:
+    movw %ax,mbr_dap+dap_lba
+    movw %cx,mbr_dap+dap_lba+2
     // fall through
-disk_io:
-    movw $ dap,%si
+mbr_disk_io:
+    movw $ mbr_dap,%si
     movw $ 0x4200,%ax
     int $ 0x13
-    jc disk_error
+    jc mbr_disk_error
     ret
 
-disk_error:
+mbr_disk_error:
     movw $ 'd'+0xF00,%ax
-    jmp fail_message
+    jmp mbr_fail_message
 
-bad_bootsector:
+mbr_bad_bootsector:
     movw $ 'b'+0xF00,%ax
-    jmp fail_message
+    jmp mbr_fail_message
 
-no_active_partition:
+mbr_no_active_partition:
     movw $ 'p'+0xF00,%ax
 
-fail_message:
+mbr_fail_message:
     // Put one character and attribute in text mode video memory
     // at the top left corner of the screen
     pushw $ 0xb800
     popw %ds
     movw %ax,0
 
-give_up:
+mbr_give_up:
     int $ 0x18
-    jmp give_up
+    jmp mbr_give_up
 
 
 // ----------------------------------------------------------------------
 // Data
-.section .data
-init_stack:
+.section .mbrdata, "aw", @progbits
+mbr_init_stack:
     .hword 0x1000
     .hword 0x0000
 
-dap:
+mbr_dap:
     .byte dap_length
     .byte 0
     .hword 1
@@ -169,7 +177,7 @@ dap:
     .hword 0x0000
     .quad 0
 
-ptbl_ent_ptr:
+mbr_ptbl_ent_ptr:
     .hword 0
 
 // ----------------------------------------------------------------------
@@ -205,7 +213,7 @@ ptbl_ent_ptr:
     .int 0
 .endm
 
-partition_table:
+mbr_partition_table:
     // partition_table_entry 1,128,(1 << (24-9)),0x0C
     partition_table_entry_unused
     partition_table_entry_unused

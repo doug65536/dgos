@@ -1,6 +1,11 @@
 #!/bin/bash
 
-${XXX%/*}
+dir=.
+if [[ -n $1 ]]; then
+        dir=$1
+fi
+
+#${XXX%/*}
 
 while read project_file; do
 	PROJDIR="${project_file%/*}"
@@ -37,4 +42,4 @@ while read project_file; do
 			fi
 		fi
 	done
-done < <(find -type f -name '*.files')
+done < <(find "$dir" -type f -name '*.files')

@@ -16,6 +16,8 @@ PCI_DRIVER(
 #include "cpu/ioport.h"
 #include "es137x.bits.h"
 
+__BEGIN_ANONYMOUS
+
 // Startup:
 /// Enable bus mastering
 /// Reset by writing 0x20 to status register 0x4
@@ -36,12 +38,45 @@ PCI_DRIVER(
 /// to acknowledge IRQ
 ///
 ///
+/// Internal memory is organized into 4 64 byte blocks
+/// 0: dac1 samples
+/// 1: dac2 samples
+/// 2: adc samples
+/// 3: dac1/2 frame info, adc frame info, uart fifo, uart fifo
 
 struct es1370_t {
     unsigned base;
 
     bool init(pci_dev_iterator_t const& pci_iter);
 
+    pci_bar_accessor_t accessor;
+    static constexpr pci_bar_register_t reg_control{
+        ES1370_CONTROL, sizeof(uint32_t)
+    };
+    static constexpr pci_bar_register_t reg_status{
+        ES1370_STATUS, sizeof(uint32_t)
+    };
+    static constexpr pci_bar_register_t reg_uartdata{
+        ES1370_UARTDATA, sizeof(uint8_t)
+    };
+    static constexpr pci_bar_register_t reg_uartstatus{
+        ES1370_UARTSTATUS, sizeof(uint8_t)
+    };
+    static constexpr pci_bar_register_t reg_uartcontrol{
+        ES1370_UART_CONTROL, sizeof(uint8_t)
+    };
+    static constexpr pci_bar_register_t reg_uarttest{
+        ES1370_UARTTEST, sizeof(uint8_t)
+    };
+    static constexpr pci_bar_register_t reg_mempage{
+        ES1370_MEMPAGE, sizeof(uint32_t)
+    };
+    static constexpr pci_bar_register_t reg_codec{
+        ES1370_CODEC, sizeof(uint32_t)
+    };
+    static constexpr pci_bar_register_t reg_serial{
+        ES1370_SERIAL, sizeof(uint32_t)
+    };
 };
 
 static es1370_t es1370_instances[4];
@@ -83,14 +118,14 @@ bool es1370_t::init(const pci_dev_iterator_t &pci_iter)
 {
     pci_adj_control_bits(pci_iter, PCI_CMD_IOSE | PCI_CMD_BME, PCI_CMD_MSE);
 
-    uint64_t bar = pci_iter.config.get_bar(0);
+    accessor = pci_bar_accessor_t(pci_iter, 0, ES1370_REG__END);
 
-    base = bar & -4;
-
-    outd(base + ES1370_CONTROL,
+    accessor.wr_32(reg_control,
          ES1370_CONTROL_ADC_STOP |
          ES1370_CONTROL_WTSRSEL_n(ES1370_CONTROL_WTSRSEL_44K) |
          ES1370_CONTROL_CDC_EN);
 
     return true;
 }
+
+__END_ANONYMOUS

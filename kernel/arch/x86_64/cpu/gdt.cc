@@ -23,16 +23,16 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     // 0x00
     GDT_MAKE_EMPTY(),
 
-    // 0x8, 0x10
+    // 16 bit data, code, stack: 0x8, 0x10, 0x18
+    GDT_MAKE_DATASEG16(0, 0),
     GDT_MAKE_CODESEG16(0),
-    GDT_MAKE_DATASEG16(0),
+    GDT_MAKE_DATASEG16(0, 0x20000),
 
-    // 0x18, 0x20
+    // 32 bit code, data: 0x20, 0x28
     GDT_MAKE_CODESEG32(0),
     GDT_MAKE_DATASEG(0),
 
-    // 0x28, 0x30, 0x38
-    GDT_MAKE_EMPTY(),
+    // 0x30, 0x38
     GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY(),
 

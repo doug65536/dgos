@@ -8,15 +8,23 @@ isodisk.iso: \
 	$(top_srcdir)/populate_iso.bash $(top_srcdir)
 	size=$$(wc -c < bootiso-bin) \
 		&& \
-		blocks=$$(( ( (size + 2047) / 2048) * 4 )) \
+		sectorsize=2048 \
 		&& \
-		if ((blocks > 8)); then blocks=8; fi \
+		loadbase=0x1000 \
+		&& \
+		loadend=0x8000 \
+		&& \
+		loadsz=$$(( loadend - loadbase )) \
+		&& \
+		blocks=$$(( (size + sectorsize - 1) / sectorsize)) \
+		&& \
+		if (( blocks > loadsz / sectorsize )); \
+			then blocks=$$(( loadsz / sectorsize )); \
+		fi \
 		&& \
 		size=$$(wc -c < fatpart.img ) \
 		&& \
-		fatblocks=$$(( ( (size + 2047) / 2048) * 4 )) \
-		&& \
-		pxebootfile="boot/bootiso-bin" \
+		bootfile="boot/bootiso-bin" \
 		&& \
 		efibootfile="EFI/boot/fatpart.img" \
 		&& \
@@ -26,7 +34,7 @@ isodisk.iso: \
 		$(MKISOFS) -input-charset utf8 \
 			-o "$@" \
 			-eltorito-alt-boot \
-			-b "$$pxebootfile" \
+			-b "$$bootfile" \
 			-iso-level 2 \
 			-no-emul-boot \
 			-boot-load-size "$$blocks" \

@@ -263,7 +263,7 @@ protected:
                usb_msc_op_t op, iocp_t *iocp);
 
     int flush() override final;
-    int trim();
+    int trim(uint64_t lba, size_t blk_size);
 
     usb_msc_if_t *if_;
     uint64_t max_lba;
@@ -483,9 +483,11 @@ int usb_msc_dev_t::flush()
     return 0;
 }
 
-int usb_msc_dev_t::trim()
+int usb_msc_dev_t::trim(uint64_t lba, size_t blk_size)
 {
-    return -int(errno_t::ENOSYS);
+    // Create a sequence of writes of all zeros that share one iocp...
+    // ...if someone ever called that, that is
+    return int(errno_t::ENOTSUP);
 }
 
 static usb_msc_classdrv_t usb_mass_storage;

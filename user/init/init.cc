@@ -94,7 +94,8 @@ static void *stress_fs(void *)
     // Create this many files
     size_t iters = 10000;
 
-    // Keep the number of files that exist less than or equal to this many
+    // Tehh the test to keep the number of files that exist
+    // less than or equal to this many
     size_t depth = 400;
 
     int mds = mkdir("stress", 0755);
@@ -626,6 +627,7 @@ void test_xmm_lo_ctx()
 
         ill_mode = lo_xmm;
 
+        // Raise a SIGILL and expect that to change the xmm registers
         __asm__ __volatile__ (
             "ud2"
             : "+x" (xmm0)
@@ -881,7 +883,6 @@ int test_signal()
 int main(int argc, char **argv, char **envp)
 {
     printf("init started\n");
-
 
     // fixme: check ACPI
     load_module("boot/keyb8042.km");

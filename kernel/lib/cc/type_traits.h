@@ -262,6 +262,52 @@ struct remove_reference<_T&&>
     using type = _T;
 };
 
+template<typename T>
+struct remove_extent
+{
+    using type = T;
+};
+
+template<typename T>
+struct remove_extent<T[]> {
+    using type = T;
+};
+
+template<typename T, size_t N>
+struct remove_extent<T[N]> {
+    using type = T;
+};
+
+template<typename T>
+struct remove_all_extents {
+    using type = T;
+};
+
+template<typename T>
+struct remove_all_extents<T[]> {
+    using type = typename remove_all_extents<T>::type;
+};
+
+template<typename T, size_t N>
+struct remove_all_extents<T[N]> {
+    using type = typename remove_all_extents<T>::type;
+};
+
+template<typename T>
+struct rank : public ext::integral_constant<size_t, 0>
+{
+};
+
+template<typename T>
+struct rank<T[]> : public integral_constant<size_t, rank<T>::value + 1>
+{
+};
+
+template<typename T, size_t N>
+struct rank<T[N]> : public integral_constant<size_t, rank<T>::value + 1>
+{
+};
+
 __END_NAMESPACE_STD
 __BEGIN_NAMESPACE_EXT
 

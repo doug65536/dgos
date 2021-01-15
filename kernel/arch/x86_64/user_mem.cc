@@ -16,7 +16,7 @@ extern "C" int nofault_compare_exchange_32(
 
 extern "C" ptrdiff_t nofault_offsetof(char const *s, int value, size_t size);
 
-bool mm_copy_user(void *dst, const void *src, size_t size)
+bool mm_copy_user(void *dst, void const *src, size_t size)
 {
     if (src)
         return nofault_memcpy(dst, src, size) >= 0;

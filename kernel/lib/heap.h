@@ -5,14 +5,15 @@
 // and filling allocated memory with 0xf0
 #define HEAP_DEBUG  1
 
-struct heap_t;
+struct heap_t {
+};
 
 // Fast heap
 
 uint32_t heap_get_heap_id(heap_t *heap);
 uint32_t heap_get_block_heap_id(void *block);
 
-heap_t *heap_create(void);
+heap_t *heap_create(size_t initial_reserve);
 void heap_destroy(heap_t *heap);
 
 _malloc _assume_aligned(16) _alloc_size(2, 3)

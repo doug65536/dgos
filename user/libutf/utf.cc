@@ -1,4 +1,5 @@
 #include "utf.h"
+#include "assert.h"
 
 #if defined(__DGOS_KERNEL__) || defined(__DGOS_BOOTLOADER__)
 #include "likely.h"
@@ -325,11 +326,12 @@ size_t utf16_count(char16_t const *in)
     return count;
 }
 
-size_t utf16_to_utf8(char *output, size_t output_sz,
-                     char16_t const *input, size_t input_sz)
+size_pair_t utf16_to_utf8(char *output, size_t output_sz,
+                          char16_t const *input, size_t input_sz)
 {
     char *output_end = output + output_sz;
     //char16_t const *input_end = input + input_sz;
+    char16_t const *input_start = input;
     char *output_start = output;
 
     for (size_t i = 0; i < input_sz; ++i) {
@@ -340,19 +342,34 @@ size_t utf16_to_utf8(char *output, size_t output_sz,
         output += ucs4_to_utf8(output, codepoint);
     }
 
-    return output - output_start;
+    assert(output >= output_start);
+    assert(input >= input_start);
+
+    return {
+        size_t(output - output_start),
+        size_t(input - input_start)
+    };
 }
 
-size_t tchar_to_utf8(char *output, size_t output_sz,
+size_pair_t tchar_to_utf8(char *output, size_t output_sz,
                      char const *input, size_t input_sz)
 {
     size_t sz = input_sz < output_sz ? input_sz : output_sz;
+
+    // Avoid splitting in the middle of a multibyte character
+    while (input_sz > sz && ((input[sz] & 0xC0) == 0x80))
+        --sz;
+
     strncpy(output, input, sz);
-    return sz;
+
+    return {
+        sz,
+        sz
+    };
 }
 
-size_t tchar_to_utf8(char *output, size_t output_sz,
-                     char16_t const *input, size_t input_sz)
+size_pair_t tchar_to_utf8(char *output, size_t output_sz,
+                          char16_t const *input, size_t input_sz)
 {
     return utf16_to_utf8(output, output_sz, input, input_sz);
 }

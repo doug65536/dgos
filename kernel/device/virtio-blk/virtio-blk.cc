@@ -308,6 +308,7 @@ int virtio_blk_if_t::per_queue_t::io(request_t *request)
 
     request->io_iocp.reset(&virtio_blk_if_t::io_completion,
                            uintptr_t(request));
+
     req_queue->enqueue_avail(desc_chain.data(), range_count + 2,
                              &request->io_iocp);
 
@@ -333,7 +334,7 @@ bool virtio_blk_if_t::init(pci_dev_iterator_t const &pci_iter)
     per_queue = new (ext::nothrow) per_queue_t[queue_count]();
 
     for (size_t i = 0; i < queue_count; ++i) {
-        if (!per_queue[i].init(this, &queues[i]))
+        if (unlikely(!per_queue[i].init(this, &queues[i])))
             return false;
     }
 

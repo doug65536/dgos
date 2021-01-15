@@ -23,7 +23,7 @@
 //   20:12 Page table     (4KB regions)   (PTE)
 //   11:0  Offset (bytes)
 
-#define DEBUG_PAGING	0
+#define DEBUG_PAGING	1
 #if DEBUG_PAGING
 #define PAGING_TRACE(...) PRINT("paging: " __VA_ARGS__)
 #else
@@ -50,6 +50,7 @@ static pte_t *allocate_page_table()
     // malloc_aligned(PAGE_SIZE, PAGE_SIZE);
     assert(page != nullptr);
     clear_page_table(page);
+    PAGING_TRACE("New page table at paddr %" PRIx64 "\n", alloc.base);
     return page;
 }
 
@@ -86,7 +87,8 @@ static pte_t *paging_find_pte(addr64_t linear_addr,
             // Allocate a page table on first use
             next_segment = (pte_t)allocate_page_table();
 
-            pte = next_segment | (PTE_PRESENT | PTE_WRITABLE | PTE_USER);
+            pte = next_segment | (PTE_PRESENT | PTE_WRITABLE |
+                                  ((intptr_t)linear_addr < 0 ? 0 : PTE_USER));
             ref[slot] = pte;
         }
 
@@ -122,6 +124,15 @@ void paging_map_range(
         uint64_t length,
         uint64_t pte_flags)
 {
+    assert(!(linear_base & PAGE_MASK));
+
+    PAGING_TRACE("mapping"
+        " len=%" PRIx64
+        " linear_base=%" PRIx64
+        " flags=%" PRIx64
+        "\n",
+        length, linear_base, pte_flags);
+
     size_t misalignment = linear_base & PAGE_MASK;
     linear_base -= misalignment;
     length += misalignment;
@@ -134,12 +145,15 @@ void paging_map_range(
     // Scan the region to calculate memory allocation size
     uint64_t needed = 0;
     for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE, ++pte) {
-        // Calculate pte pointer at start and at 2MB boundaries
-        if (!pte || ((addr & -(1<<21)) == addr))
+        // Calculate pte pointer at start and at 2MB boundaries (~=0.2% of time)
+        if (unlikely(!pte || ((addr & -(1<<21)) == addr))) {
             pte = paging_find_pte(addr, 12, true);
 
-        if (!(*pte & PTE_PRESENT))
-            needed += PAGE_SIZE;
+            if (unlikely(!pte))
+                PANIC_OOM();
+        }
+
+        needed += PAGE_SIZE & -!(*pte & PTE_PRESENT);
     }
 
     pte = nullptr;
@@ -150,8 +164,12 @@ void paging_map_range(
     // Rescan the region and assign pages to uncommitted page table entries
     for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE, ++pte) {
         // Calculate pte pointer at start and at 2MB boundaries
-        if (unlikely(!pte || ((addr & -(1<<21)) == addr)))
+        if (unlikely(!pte || ((addr & -(1<<21)) == addr))) {
             pte = paging_find_pte(addr, 12, false);
+
+            if (unlikely(!pte))
+                PANIC_OOM();
+        }
 
         if (unlikely((*pte & PTE_PRESENT)))
             continue;
@@ -327,6 +345,14 @@ void paging_map_physical_impl(uint64_t phys_addr, uint64_t linear_base,
 void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
                          uint64_t length, uint64_t pte_flags)
 {
+    PAGING_TRACE("mapping physical"
+        " len=%" PRIx64
+        " linear_base=%" PRIx64
+        " phys_addr=%" PRIx64
+        " flags=%" PRIx64
+        "\n",
+        length, linear_base, phys_addr, pte_flags);
+
     if (unlikely(low_bits(phys_addr, 12) != low_bits(linear_base, 12)))
     {
         assert_msg(false,
@@ -562,8 +588,8 @@ _constructor(ctor_paging) static void paging_init()
 
     clear_page_table(root_page_dir);
 
-    // Identity map first 64KB
-    paging_map_physical(0, 0, 0x10000, PTE_PRESENT |
+    // Identity map first 192KB (128KB code plus 64KB bootloader stack)
+    paging_map_physical(0, 0, 0x30000, PTE_PRESENT |
                         PTE_WRITABLE | PTE_EX_PHYSICAL);
 }
 
@@ -595,6 +621,13 @@ uint64_t paging_physaddr_of(uint64_t linear_addr)
 bool paging_access_virtual_memory(uint64_t vaddr, void *data, size_t data_sz,
                                   int is_read)
 {
+    PAGING_TRACE("Accessing virtual memory"
+        " len=%zu"
+        " vaddr=%" PRIx64
+        " is_read=%d"
+        "\n",
+        data_sz, vaddr, is_read);
+
     // Handle spanning pages and multi-page transfers
     while (data_sz) {
         uintptr_t spot_physaddr = paging_physaddr_of(vaddr);
@@ -610,9 +643,9 @@ bool paging_access_virtual_memory(uint64_t vaddr, void *data, size_t data_sz,
                 ? spot_space
                 : data_sz;
 
-        memcpy(is_read ? data : (void*)spot_physaddr, 
+        memcpy(is_read ? data : (void*)spot_physaddr,
             is_read ? (void*)spot_physaddr : data, spot_space);
-        
+
         vaddr += spot_space;
         data = (char*)data + spot_space;
         data_sz -= spot_space;

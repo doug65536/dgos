@@ -1,5 +1,5 @@
 #include "assert.h"
-#include "vesainfo.h"
+#include "modeinfo.h"
 #include "export.h"
 #if 0
 #include "framebuffer.h"

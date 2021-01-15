@@ -892,6 +892,26 @@ static _always_inline bool cpu_irq_is_enabled()
     return cpu_eflags_get() & CPU_EFLAGS_IF;
 }
 
+static _always_inline void cpu_clzero(void *addr)
+{
+    __asm__ __volatile__ (
+        "clzero %[operand]"
+        :
+        : [operand] "m" (*(char*)addr)
+        : "memory"
+    );
+}
+
+static _always_inline void cpu_clflush(void *addr)
+{
+    __asm__ __volatile__ (
+        "clflush %[operand]"
+        :
+        : [operand] "m" (*(char*)addr)
+        : "memory"
+    );
+}
+
 _hot
 static _always_inline uint64_t cpu_rdtsc()
 {

@@ -117,27 +117,27 @@ isr_context_t *pic8259_dispatcher(
 
     int irq = intr - INTR_PIC1_IRQ_BASE;
 
+    assume(irq >= 0 && irq < 16);
+
     int is_slave = (irq >= 8);
 
-    if (irq < 16) {
-        uint8_t isr;
+    uint8_t isr;
 
-        // IRQ 7 or 15
-        int spurious_irq = (is_slave << 3) + 7;
+    // IRQ 7 or 15
+    int spurious_irq = (is_slave << 3) + 7;
 
-        if (irq == spurious_irq) {
-            isr = pic8259_get_ISR(is_slave);
+    if (unlikely(irq == spurious_irq)) {
+        isr = pic8259_get_ISR(is_slave);
 
-            if ((isr & (1 << 7)) == 0) {
-                // Spurious IRQ!
+        if ((isr & (1 << 7)) == 0) {
+            // Spurious IRQ!
 
-                // Still need to ack master on
-                // spurious slave IRQ
-                if (irq >= 8)
-                    pic8259_eoi(0);
+            // Still need to ack master on
+            // spurious slave IRQ
+            if (irq >= 8)
+                pic8259_eoi(0);
 
-                return ctx;
-            }
+            return ctx;
         }
     }
 

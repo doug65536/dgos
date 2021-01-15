@@ -30,6 +30,8 @@ PCI_DRIVER_BY_CLASS(
 #define IDE_TRACE(...) ((void)0)
 #endif
 
+__BEGIN_ANONYMOUS
+
 enum struct io_op_t {
     read,
     write,
@@ -1295,3 +1297,5 @@ long ide_dev_t::info(storage_dev_info_t key)
 }
 
 static ide_if_factory_t ide_if_factory;
+
+__END_ANONYMOUS

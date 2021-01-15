@@ -35,6 +35,8 @@ PCI_DRIVER_BY_CLASS(
 #define USBXHCI_TRACE(...) (void)0
 #endif
 
+__BEGIN_ANONYMOUS
+
 //
 // 5.3 Host Controller Capability Registers
 
@@ -1825,7 +1827,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     usbxhci_portreg_t *pr = (usbxhci_portreg_t*)(mmio_op->ports + port);
 
     // Get speed of port
-    uint8_t speed = USBXHCI_PORTSC_SPD_GET(pr->portsc);
+    uint8_t speed = USBXHCI_PORTSC_SPD_GET(mm_rd(pr->portsc));
 
     assert(speed == (speed & USBXHCI_SLOTCTX_RSMHC_SPEED_MASK));
     assert(route == (route & USBXHCI_SLOTCTX_RSMHC_ROUTE_MASK));
@@ -2707,3 +2709,5 @@ usbxhci_slot_data_t::usbxhci_slot_data_t()
     , is_multi_tt(false)
 {
 }
+
+__END_ANONYMOUS

@@ -2,8 +2,9 @@
 #include "assert.h"
 #include "cpu/atomic.h"
 #include "utility.h"
+#include "cpu/atomic.h"
 
-template<typename T>
+template<typename T, typename C = ext::atomic_int>
 class refcounted;
 
 template<typename T>
@@ -137,18 +138,18 @@ private:
     T* ptr;
 };
 
-template<typename T>
+template<typename T, typename C>
 class refcounted {
 public:
     _always_inline
     void addref()
     {
-        atomic_inc(&refcount);
+        ++refcount;
     }
 
     void releaseref()
     {
-        if (atomic_dec(&refcount) == 0)
+        if (--refcount == 0)
             destroy();
     }
 
@@ -171,5 +172,5 @@ protected:
     }
 
 private:
-    int mutable refcount;
+    C refcount;
 };

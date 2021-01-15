@@ -2,6 +2,7 @@
 #include <sys/syscall.h>
 #include <sys/syscall_num.h>
 #include <sys/types.h>
+#include <sys/likely.h>
 #include <errno.h>
 
 int linkat(int targetdirfd, char const *target,
@@ -10,7 +11,7 @@ int linkat(int targetdirfd, char const *target,
     long status = syscall5(targetdirfd, uintptr_t(target), linkdirfd,
                            uintptr_t(link), flags, SYS_linkat);
 
-    if (status >= 0)
+    if (likely(status >= 0))
         return status;
 
     errno = -status;

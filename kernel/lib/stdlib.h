@@ -7,7 +7,7 @@
 #endif
 
 #ifndef PAGE_SIZE
-#define PAGE_SIZE   4096UL
+#define PAGE_SIZE   4096L
 #endif
 
 #define _MALLOC_OVERHEAD    16

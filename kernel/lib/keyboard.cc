@@ -3,6 +3,7 @@
 #include "printk.h"
 #include "memory.h"
 #include "chrono.h"
+#include "vector.h"
 
 #include "fs/devfs.h"
 
@@ -28,8 +29,8 @@ struct keyboard_buffer_t {
 static keyboard_buffer_t keybd_buffer;
 
 // Drivers plug implementation into these
-int (*keybd_get_modifiers)(void);
-int (*keybd_set_layout_name)(char const *name);
+//int (*keybd_get_modifiers)(void);
+//int (*keybd_set_layout_name)(char const *name);
 
 // The order here must match the order of KEYB_VK_NUMPAD_* enum
 char const keybd_fsa_t::numpad_ascii[] =
@@ -197,7 +198,8 @@ int keybd_event(keyboard_event_t event)
                 keybd_special_text(event.vk), event.vk);
 
     size_t next_head = keybd_queue_next(keybd_buffer.head);
-    if (next_head == keybd_buffer.tail) {
+
+    if (unlikely(next_head == keybd_buffer.tail)) {
         // Buffer is full
         KEYBD_TRACE("Event dropped, keyboard input queue full\n");
         return 0;
@@ -221,7 +223,7 @@ keyboard_event_t keybd_waitevent(
 
     keyboard_buffer_t::scoped_lock buffer_lock(keybd_buffer.lock);
 
-    while (keybd_buffer.head == keybd_buffer.tail) {
+    while (unlikely(keybd_buffer.head == keybd_buffer.tail)) {
         if (keybd_buffer.not_empty.wait_until(buffer_lock, timeout_time) ==
                 ext::cv_status::timeout)
             return event;
@@ -264,7 +266,7 @@ keybd_fsa_t::keybd_fsa_t()
 {
 }
 
-void keybd_fsa_t::deliver_vk(int vk)
+void keybd_fsa_t::deliver_vk(size_t keybd_id, int vk)
 {
     int is_keyup = vk < 0;
 
@@ -345,6 +347,8 @@ void keybd_fsa_t::deliver_vk(int vk)
     event.timestamp = time_ns();
 
     event.flags = get_modifiers();
+
+    event.keybd_id = keybd_id;
 
     if (vk || codepoint) {
         event.codepoint = is_keyup ? -codepoint : codepoint;
@@ -439,7 +443,12 @@ public:
     }
 };
 
-__END_ANONYMOUS
+using keybd_dev_list_t = ext::vector<keybd_dev_t*>;
+using keybd_lock_type_t = ext::mutex;
+using keybd_scoped_lock = ext::unique_lock<keybd_lock_type_t>;
+static keybd_lock_type_t keyboards_lock;
+static ext::vector<keybd_dev_t*> keyboards;
+static size_t keybd_next_id;
 
 static void keybd_register(void*)
 {
@@ -448,3 +457,49 @@ static void keybd_register(void*)
 
 REGISTER_CALLOUT(keybd_register, nullptr,
                  callout_type_t::devfs_ready, "000");
+
+static keybd_dev_list_t::const_iterator keybd_find_dev_locked(
+        keybd_dev_t const *keybd_dev, keybd_scoped_lock &lock)
+{
+    return ext::find(keyboards.cbegin(), keyboards.cend(), keybd_dev);
+}
+
+__END_ANONYMOUS
+
+int keybd_add(keybd_dev_t *keybd_dev)
+{
+    keybd_scoped_lock lock(keyboards_lock);
+
+    keybd_dev_list_t::const_iterator it =
+            keybd_find_dev_locked(keybd_dev, lock);
+
+    if (unlikely(it != keyboards.cend()))
+        return -int(errno_t::EEXIST);
+
+    keyboards.emplace_back(keybd_dev);
+
+    size_t id = keyboards.size();
+
+    // Assign an id, and verify it is not in use. If so, try again
+    do {
+        keybd_dev->keybd_id = keybd_next_id++;
+    } while (unlikely(keybd_find_dev_locked(keybd_dev, lock) !=
+                      keyboards.cend()));
+
+    return id;
+}
+
+bool keybd_remove(keybd_dev_t *keybd_dev)
+{
+    keybd_scoped_lock lock(keyboards_lock);
+
+    keybd_dev_list_t::const_iterator it =
+            keybd_find_dev_locked(keybd_dev, lock);
+
+    if (unlikely(it == keyboards.end()))
+        return false;
+
+    keyboards.erase(it);
+
+    return true;
+}

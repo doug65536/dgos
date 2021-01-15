@@ -120,7 +120,8 @@ struct iso9660_fs_t final : public fs_base_ro_t {
     iso9660_dir_ent_t *lookup_dirent(char const *pathname);
 
     static int mm_fault_handler(void *dev, void *addr,
-            uint64_t offset, uint64_t length, bool read, bool flush);
+                                uint64_t offset, uint64_t length,
+                                bool read, bool flush);
     int mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
                          bool read, bool flush);
 
@@ -145,9 +146,7 @@ struct iso9660_fs_t final : public fs_base_ro_t {
     int (*name_convert)(void *encoded_buf,
                         char const *utf8);
     size_t (*name_len)(void *encoded_buf, size_t limit);
-    int (*lookup_path_cmp)(void const *v,
-                           void const *k,
-                           void *s);
+    int (*lookup_path_cmp)(void const *v, void const *k, void *s);
     int (*name_compare)(void const *name, size_t name_len,
                         char const *find, size_t find_len);
     char *(*name_copy)(char *out, void *in, size_t len);
@@ -318,8 +317,8 @@ uint32_t iso9660_fs_t::walk_pt(
          pt_rec < pt_end;
          ++i,
          pt_rec = (iso9660_pt_rec_t*)((char*)pt_rec +
-                          ((offsetof(iso9660_pt_rec_t, name) +
-                          pt_rec->di_len + 1) & -2))) {
+                                      ((offsetof(iso9660_pt_rec_t, name) +
+                                        pt_rec->di_len + 1) & -2))) {
         if (cb)
             cb(i, pt_rec, p);
     }
@@ -363,19 +362,19 @@ int iso9660_fs_t::name_compare_ascii(
                     ? *chk
                     : ' ';
 
-//            printdbg("utf8: compare %c (0x%02x) %c (0x%02x)\n",
-//                     !key_codepoint
-//                     ? '0'
-//                     : key_codepoint >= ' ' && key_codepoint < 126
-//                     ? key_codepoint
-//                     : '.',
-//                     key_codepoint,
-//                     !chk_codepoint
-//                     ? '0'
-//                     : chk_codepoint >= ' ' && chk_codepoint < 126
-//                     ? chk_codepoint
-//                     : '.',
-//                     chk_codepoint);
+            //printdbg("utf8: compare %c (0x%02x) %c (0x%02x)\n",
+            //         !key_codepoint
+            //         ? '0'
+            //         : key_codepoint >= ' ' && key_codepoint < 126
+            //         ? key_codepoint
+            //         : '.',
+            //         key_codepoint,
+            //         !chk_codepoint
+            //         ? '0'
+            //         : chk_codepoint >= ' ' && chk_codepoint < 126
+            //         ? chk_codepoint
+            //         : '.',
+            //         chk_codepoint);
 
             cmp = chk_codepoint - key_codepoint;
 
@@ -411,19 +410,19 @@ int iso9660_fs_t::name_compare_utf16be(
                 ? utf16be_to_ucs4(chk, &chk)
                 : 0;
 
-//        printdbg("utf16be: compare %c (0x%02x) %c (0x%02x)\n",
-//                 !key_codepoint
-//                 ? '0'
-//                 : key_codepoint >= ' ' && key_codepoint < 126
-//                 ? key_codepoint
-//                 : '.',
-//                 key_codepoint,
-//                 !chk_codepoint
-//                 ? '0'
-//                 : chk_codepoint >= ' ' && chk_codepoint < 126
-//                 ? chk_codepoint
-//                 : '.',
-//                 chk_codepoint);
+        //printdbg("utf16be: compare %c (0x%02x) %c (0x%02x)\n",
+        //         !key_codepoint
+        //         ? '0'
+        //         : key_codepoint >= ' ' && key_codepoint < 126
+        //         ? key_codepoint
+        //         : '.',
+        //         key_codepoint,
+        //         !chk_codepoint
+        //         ? '0'
+        //         : chk_codepoint >= ' ' && chk_codepoint < 126
+        //         ? chk_codepoint
+        //         : '.',
+        //         chk_codepoint);
 
         cmp = key_codepoint - chk_codepoint;
     }
@@ -442,7 +441,7 @@ int iso9660_fs_t::lookup_path_cmp_ascii(
         return key->parent - rec->parent_dn;
 
     size_t name_len = (rec->di_len - offsetof(
-                iso9660_pt_rec_t, name));
+                           iso9660_pt_rec_t, name));
 
     return name_compare_ascii(
                 rec->name, name_len,
@@ -638,8 +637,8 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
 
     for (uint32_t ofs = 0; ofs < 4; ++ofs) {
         // Read logical block 16
-        int err = drive->read_blocks(&pvd,
-                    1 << block_shift,
+        int err = drive->read_blocks(
+                    &pvd, 1 << block_shift,
                     (16 + ofs) << block_shift);
 
         if (err < 0)
@@ -660,7 +659,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
     if (best_ofs == 0) {
         // We didn't find Joliet PVD, reread first one
         int err = drive->read_blocks(&pvd, 1 << block_shift,
-                           16 << block_shift);
+                                     16 << block_shift);
 
         if (err < 0)
             return false;
@@ -932,9 +931,9 @@ int iso9660_fs_t::release(fs_file_info_t *fi)
 // Read/write files
 
 ssize_t iso9660_fs_t::read(fs_file_info_t *fi,
-                            char *buf,
-                            size_t size,
-                            off_t offset)
+                           char *buf,
+                           size_t size,
+                           off_t offset)
 {
     file_handle_t *file = (file_handle_t *)fi;
 
@@ -962,7 +961,7 @@ ssize_t iso9660_fs_t::read(fs_file_info_t *fi,
 // Query open file
 
 int iso9660_fs_t::fstat(fs_file_info_t *fi,
-                         fs_stat_t *st)
+                        fs_stat_t *st)
 {
     file_handle_t *file = (file_handle_t *)fi;
 
@@ -1019,9 +1018,7 @@ int iso9660_fs_t::statfs(fs_statvfs_t* stbuf)
 //
 // lock/unlock file
 
-int iso9660_fs_t::lock(fs_file_info_t *fi,
-                        int cmd,
-                        fs_flock_t* locks)
+int iso9660_fs_t::lock(fs_file_info_t *fi, int cmd, fs_flock_t* locks)
 {
     (void)fi;
     (void)cmd;
@@ -1075,10 +1072,10 @@ int iso9660_fs_t::listxattrat(
 // ioctl API
 
 int iso9660_fs_t::ioctl(fs_file_info_t *fi,
-                         int cmd,
-                         void* arg,
-                         unsigned int flags,
-                         void* data)
+                        int cmd,
+                        void* arg,
+                        unsigned int flags,
+                        void* data)
 {
     (void)cmd;
     (void)arg;
@@ -1092,8 +1089,8 @@ int iso9660_fs_t::ioctl(fs_file_info_t *fi,
 //
 
 int iso9660_fs_t::poll(fs_file_info_t *fi,
-                        fs_pollhandle_t* ph,
-                        unsigned* reventsp)
+                       fs_pollhandle_t* ph,
+                       unsigned* reventsp)
 {
     (void)fi;
     (void)ph;

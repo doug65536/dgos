@@ -5,70 +5,187 @@
 // ES1370_CONTROL: R/W: Interrupt/Chip select control register
 #define ES1370_CONTROL                    0x00
 
+
+// disable capture buffer transfers
 #define ES1370_CONTROL_ADC_STOP_BIT       31
+
+// general purpose output bit
 #define ES1370_CONTROL_XCTL1_BIT          30
+
+// Dummy bit
+#define ES1370_CONTROL_OPEN_BIT           29
+
+// clock divide ratio for DAC2
 #define ES1370_CONTROL_PCLKDIV_BIT        16
+
+// MPEG serial data format; 0=SONY, 1=I2S
 #define ES1370_CONTROL_MSFMTSEL_BIT       15
+
+// clock source for DAC - 0=clock generator; 1=MPEG clocks
 #define ES1370_CONTROL_SBB_BIT            14
+
+// fixed frequency clock for DAC1
 #define ES1370_CONTROL_WTSRSEL_BIT        12
+
+// DAC's are synchronous
 #define ES1370_CONTROL_DAC_SYNC_BIT       11
+
+// CCB voice interrupts enable
 #define ES1370_CONTROL_CCB_INTE_BIT       10
+
+// capture clock source; 0=ADC; 1=MPEG
 #define ES1370_CONTROL_M_CB_BIT           9
+
+// generap purpose output bit
 #define ES1370_CONTROL_XCTL0_BIT          8
+
+// memory bus request enable
 #define ES1370_CONTROL_BREQ_BIT           7
+
+// DAC1 playback channel enable
 #define ES1370_CONTROL_DAC1EN_BIT         6
+
+// DAC2 playback channel enable
 #define ES1370_CONTROL_DAC2EN_BIT         5
+
+// ADC capture channel enable
 #define ES1370_CONTROL_ADCEN_BIT          4
+
+// UART enable
 #define ES1370_CONTROL_UARTEN_BIT         3
+
+// Joystick module enable
 #define ES1370_CONTROL_JOYEN_BIT          2
+
+// Codec interface enable
 #define ES1370_CONTROL_CDC_EN_BIT         1
+
+// PCI serr signal disable
 #define ES1370_CONTROL_SERR_DIS_BIT       0
 
+
+// disable capture buffer transfers
 #define ES1370_CONTROL_ADC_STOP_BITS      1
+
+// general purpose output bit
 #define ES1370_CONTROL_XCTL1_BITS         1
+
+// Dummy bit
+#define ES1370_CONTROL_OPEN_BITS          1
+
+// clock divide ratio for DAC2
 #define ES1370_CONTROL_PCLKDIV_BITS       13
+
+// MPEG serial data format; 0=SONY, 1=I2S
 #define ES1370_CONTROL_MSFMTSEL_BITS      1
+
+// clock source for DAC - 0=clock generator; 1=MPEG clocks
 #define ES1370_CONTROL_SBB_BITS           1
+
+// fixed frequency clock for DAC1
 #define ES1370_CONTROL_WTSRSEL_BITS       2
+
+// DAC's are synchronous
 #define ES1370_CONTROL_DAC_SYNC_BITS      1
+
+// CCB voice interrupts enable
 #define ES1370_CONTROL_CCB_INTE_BITS      1
+
+// capture clock source; 0=ADC; 1=MPEG
 #define ES1370_CONTROL_M_CB_BITS          1
+
+// generap purpose output bit
 #define ES1370_CONTROL_XCTL0_BITS         1
+
+// memory bus request enable
 #define ES1370_CONTROL_BREQ_BITS          1
+
+// DAC1 playback channel enable
 #define ES1370_CONTROL_DAC1EN_BITS        1
+
+// DAC2 playback channel enable
 #define ES1370_CONTROL_DAC2EN_BITS        1
+
+// ADC capture channel enable
 #define ES1370_CONTROL_ADCEN_BITS         1
+
+// UART enable
 #define ES1370_CONTROL_UARTEN_BITS        1
+
+// Joystick module enable
 #define ES1370_CONTROL_JOYEN_BITS         1
+
+// Codec interface enable
 #define ES1370_CONTROL_CDC_EN_BITS        1
+
+// PCI serr signal disable
 #define ES1370_CONTROL_SERR_DIS_BITS      1
+
+// disable capture buffer transfers
 #define ES1370_CONTROL_ADC_STOP_MASK \
     ((1U << ES1370_CONTROL_ADC_STOP_BITS)-1)
+
+// general purpose output bit
 #define ES1370_CONTROL_XCTL1_MASK         ((1U << ES1370_CONTROL_XCTL1_BITS)-1)
+
+// Dummy bit
+#define ES1370_CONTROL_OPEN_MASK          ((1U << ES1370_CONTROL_OPEN_BITS)-1)
+
+// clock divide ratio for DAC2
 #define ES1370_CONTROL_PCLKDIV_MASK \
     ((1U << ES1370_CONTROL_PCLKDIV_BITS)-1)
+
+// MPEG serial data format; 0=SONY, 1=I2S
 #define ES1370_CONTROL_MSFMTSEL_MASK \
     ((1U << ES1370_CONTROL_MSFMTSEL_BITS)-1)
+
+// clock source for DAC - 0=clock generator; 1=MPEG clocks
 #define ES1370_CONTROL_SBB_MASK           ((1U << ES1370_CONTROL_SBB_BITS)-1)
+
+// fixed frequency clock for DAC1
 #define ES1370_CONTROL_WTSRSEL_MASK \
     ((1U << ES1370_CONTROL_WTSRSEL_BITS)-1)
+
+// DAC's are synchronous
 #define ES1370_CONTROL_DAC_SYNC_MASK \
     ((1U << ES1370_CONTROL_DAC_SYNC_BITS)-1)
+
+// CCB voice interrupts enable
 #define ES1370_CONTROL_CCB_INTE_MASK \
     ((1U << ES1370_CONTROL_CCB_INTE_BITS)-1)
+
+// capture clock source; 0=ADC; 1=MPEG
 #define ES1370_CONTROL_M_CB_MASK          ((1U << ES1370_CONTROL_M_CB_BITS)-1)
+
+// generap purpose output bit
 #define ES1370_CONTROL_XCTL0_MASK         ((1U << ES1370_CONTROL_XCTL0_BITS)-1)
+
+// memory bus request enable
 #define ES1370_CONTROL_BREQ_MASK          ((1U << ES1370_CONTROL_BREQ_BITS)-1)
+
+// DAC1 playback channel enable
 #define ES1370_CONTROL_DAC1EN_MASK \
     ((1U << ES1370_CONTROL_DAC1EN_BITS)-1)
+
+// DAC2 playback channel enable
 #define ES1370_CONTROL_DAC2EN_MASK \
     ((1U << ES1370_CONTROL_DAC2EN_BITS)-1)
+
+// ADC capture channel enable
 #define ES1370_CONTROL_ADCEN_MASK         ((1U << ES1370_CONTROL_ADCEN_BITS)-1)
+
+// UART enable
 #define ES1370_CONTROL_UARTEN_MASK \
     ((1U << ES1370_CONTROL_UARTEN_BITS)-1)
+
+// Joystick module enable
 #define ES1370_CONTROL_JOYEN_MASK         ((1U << ES1370_CONTROL_JOYEN_BITS)-1)
+
+// Codec interface enable
 #define ES1370_CONTROL_CDC_EN_MASK \
     ((1U << ES1370_CONTROL_CDC_EN_BITS)-1)
+
+// PCI serr signal disable
 #define ES1370_CONTROL_SERR_DIS_MASK \
     ((1U << ES1370_CONTROL_SERR_DIS_BITS)-1)
 
@@ -80,15 +197,19 @@
 #define ES1370_CONTROL_XCTL1 \
     (ES1370_CONTROL_XCTL1_MASK << ES1370_CONTROL_XCTL1_BIT)
 
+// Dummy bit
+#define ES1370_CONTROL_OPEN \
+    (ES1370_CONTROL_OPEN_MASK << ES1370_CONTROL_OPEN_BIT)
+
 // clock divide ratio for DAC2
 #define ES1370_CONTROL_PCLKDIV \
     (ES1370_CONTROL_PCLKDIV_MASK << ES1370_CONTROL_PCLKDIV_BIT)
 
-// MPEG serial data format; 0 = SONY, 1 = I2S
+// MPEG serial data format; 0=SONY, 1=I2S
 #define ES1370_CONTROL_MSFMTSEL \
     (ES1370_CONTROL_MSFMTSEL_MASK << ES1370_CONTROL_MSFMTSEL_BIT)
 
-// clock source for DAC - 0 = clock generator; 1 = MPEG clocks
+// clock source for DAC - 0=clock generator; 1=MPEG clocks
 #define ES1370_CONTROL_SBB \
     (ES1370_CONTROL_SBB_MASK << ES1370_CONTROL_SBB_BIT)
 
@@ -104,7 +225,7 @@
 #define ES1370_CONTROL_CCB_INTE \
     (ES1370_CONTROL_CCB_INTE_MASK << ES1370_CONTROL_CCB_INTE_BIT)
 
-// capture clock source; 0 = ADC; 1 = MPEG
+// capture clock source; 0=ADC; 1=MPEG
 #define ES1370_CONTROL_M_CB \
     (ES1370_CONTROL_M_CB_MASK << ES1370_CONTROL_M_CB_BIT)
 
@@ -144,96 +265,215 @@
 #define ES1370_CONTROL_SERR_DIS \
     (ES1370_CONTROL_SERR_DIS_MASK << ES1370_CONTROL_SERR_DIS_BIT)
 
+
+// disable capture buffer transfers
 #define ES1370_CONTROL_ADC_STOP_n(n)      ((n) << ES1370_CONTROL_ADC_STOP_BIT)
+
+// general purpose output bit
 #define ES1370_CONTROL_XCTL1_n(n)         ((n) << ES1370_CONTROL_XCTL1_BIT)
+
+// Dummy bit
+#define ES1370_CONTROL_OPEN_n(n)          ((n) << ES1370_CONTROL_OPEN_BIT)
+
+// clock divide ratio for DAC2
 #define ES1370_CONTROL_PCLKDIV_n(n)       ((n) << ES1370_CONTROL_PCLKDIV_BIT)
+
+// MPEG serial data format; 0=SONY, 1=I2S
 #define ES1370_CONTROL_MSFMTSEL_n(n)      ((n) << ES1370_CONTROL_MSFMTSEL_BIT)
+
+// clock source for DAC - 0=clock generator; 1=MPEG clocks
 #define ES1370_CONTROL_SBB_n(n)           ((n) << ES1370_CONTROL_SBB_BIT)
+
+// fixed frequency clock for DAC1
 #define ES1370_CONTROL_WTSRSEL_n(n)       ((n) << ES1370_CONTROL_WTSRSEL_BIT)
+
+// DAC's are synchronous
 #define ES1370_CONTROL_DAC_SYNC_n(n)      ((n) << ES1370_CONTROL_DAC_SYNC_BIT)
+
+// CCB voice interrupts enable
 #define ES1370_CONTROL_CCB_INTE_n(n)      ((n) << ES1370_CONTROL_CCB_INTE_BIT)
+
+// capture clock source; 0=ADC; 1=MPEG
 #define ES1370_CONTROL_M_CB_n(n)          ((n) << ES1370_CONTROL_M_CB_BIT)
+
+// generap purpose output bit
 #define ES1370_CONTROL_XCTL0_n(n)         ((n) << ES1370_CONTROL_XCTL0_BIT)
+
+// memory bus request enable
 #define ES1370_CONTROL_BREQ_n(n)          ((n) << ES1370_CONTROL_BREQ_BIT)
+
+// DAC1 playback channel enable
 #define ES1370_CONTROL_DAC1EN_n(n)        ((n) << ES1370_CONTROL_DAC1EN_BIT)
+
+// DAC2 playback channel enable
 #define ES1370_CONTROL_DAC2EN_n(n)        ((n) << ES1370_CONTROL_DAC2EN_BIT)
+
+// ADC capture channel enable
 #define ES1370_CONTROL_ADCEN_n(n)         ((n) << ES1370_CONTROL_ADCEN_BIT)
+
+// UART enable
 #define ES1370_CONTROL_UARTEN_n(n)        ((n) << ES1370_CONTROL_UARTEN_BIT)
+
+// Joystick module enable
 #define ES1370_CONTROL_JOYEN_n(n)         ((n) << ES1370_CONTROL_JOYEN_BIT)
+
+// Codec interface enable
 #define ES1370_CONTROL_CDC_EN_n(n)        ((n) << ES1370_CONTROL_CDC_EN_BIT)
+
+// PCI serr signal disable
 #define ES1370_CONTROL_SERR_DIS_n(n)      ((n) << ES1370_CONTROL_SERR_DIS_BIT)
 
+
+// disable capture buffer transfers
 #define ES1370_CONTROL_ADC_STOP_GET(n) \
     (((n) >> ES1370_CONTROL_ADC_STOP_BIT) & ES1370_CONTROL_ADC_STOP_MASK)
+
+// general purpose output bit
 #define ES1370_CONTROL_XCTL1_GET(n) \
     (((n) >> ES1370_CONTROL_XCTL1_BIT) & ES1370_CONTROL_XCTL1_MASK)
+
+// Dummy bit
+#define ES1370_CONTROL_OPEN_GET(n) \
+    (((n) >> ES1370_CONTROL_OPEN_BIT) & ES1370_CONTROL_OPEN_MASK)
+
+// clock divide ratio for DAC2
 #define ES1370_CONTROL_PCLKDIV_GET(n) \
     (((n) >> ES1370_CONTROL_PCLKDIV_BIT) & ES1370_CONTROL_PCLKDIV_MASK)
+
+// MPEG serial data format; 0=SONY, 1=I2S
 #define ES1370_CONTROL_MSFMTSEL_GET(n) \
     (((n) >> ES1370_CONTROL_MSFMTSEL_BIT) & ES1370_CONTROL_MSFMTSEL_MASK)
+
+// clock source for DAC - 0=clock generator; 1=MPEG clocks
 #define ES1370_CONTROL_SBB_GET(n) \
     (((n) >> ES1370_CONTROL_SBB_BIT) & ES1370_CONTROL_SBB_MASK)
+
+// fixed frequency clock for DAC1
 #define ES1370_CONTROL_WTSRSEL_GET(n) \
     (((n) >> ES1370_CONTROL_WTSRSEL_BIT) & ES1370_CONTROL_WTSRSEL_MASK)
+
+// DAC's are synchronous
 #define ES1370_CONTROL_DAC_SYNC_GET(n) \
     (((n) >> ES1370_CONTROL_DAC_SYNC_BIT) & ES1370_CONTROL_DAC_SYNC_MASK)
+
+// CCB voice interrupts enable
 #define ES1370_CONTROL_CCB_INTE_GET(n) \
     (((n) >> ES1370_CONTROL_CCB_INTE_BIT) & ES1370_CONTROL_CCB_INTE_MASK)
+
+// capture clock source; 0=ADC; 1=MPEG
 #define ES1370_CONTROL_M_CB_GET(n) \
     (((n) >> ES1370_CONTROL_M_CB_BIT) & ES1370_CONTROL_M_CB_MASK)
+
+// generap purpose output bit
 #define ES1370_CONTROL_XCTL0_GET(n) \
     (((n) >> ES1370_CONTROL_XCTL0_BIT) & ES1370_CONTROL_XCTL0_MASK)
+
+// memory bus request enable
 #define ES1370_CONTROL_BREQ_GET(n) \
     (((n) >> ES1370_CONTROL_BREQ_BIT) & ES1370_CONTROL_BREQ_MASK)
+
+// DAC1 playback channel enable
 #define ES1370_CONTROL_DAC1EN_GET(n) \
     (((n) >> ES1370_CONTROL_DAC1EN_BIT) & ES1370_CONTROL_DAC1EN_MASK)
+
+// DAC2 playback channel enable
 #define ES1370_CONTROL_DAC2EN_GET(n) \
     (((n) >> ES1370_CONTROL_DAC2EN_BIT) & ES1370_CONTROL_DAC2EN_MASK)
+
+// ADC capture channel enable
 #define ES1370_CONTROL_ADCEN_GET(n) \
     (((n) >> ES1370_CONTROL_ADCEN_BIT) & ES1370_CONTROL_ADCEN_MASK)
+
+// UART enable
 #define ES1370_CONTROL_UARTEN_GET(n) \
     (((n) >> ES1370_CONTROL_UARTEN_BIT) & ES1370_CONTROL_UARTEN_MASK)
+
+// Joystick module enable
 #define ES1370_CONTROL_JOYEN_GET(n) \
     (((n) >> ES1370_CONTROL_JOYEN_BIT) & ES1370_CONTROL_JOYEN_MASK)
+
+// Codec interface enable
 #define ES1370_CONTROL_CDC_EN_GET(n) \
     (((n) >> ES1370_CONTROL_CDC_EN_BIT) & ES1370_CONTROL_CDC_EN_MASK)
+
+// PCI serr signal disable
 #define ES1370_CONTROL_SERR_DIS_GET(n) \
     (((n) >> ES1370_CONTROL_SERR_DIS_BIT) & ES1370_CONTROL_SERR_DIS_MASK)
 
+
+// disable capture buffer transfers
 #define ES1370_CONTROL_ADC_STOP_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_ADC_STOP) | ES1370_CONTROL_ADC_STOP_n((n)))
+
+// general purpose output bit
 #define ES1370_CONTROL_XCTL1_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_XCTL1) | ES1370_CONTROL_XCTL1_n((n)))
+
+// Dummy bit
+#define ES1370_CONTROL_OPEN_SET(r,n) \
+    ((r) = ((r) & ~ES1370_CONTROL_OPEN) | ES1370_CONTROL_OPEN_n((n)))
+
+// clock divide ratio for DAC2
 #define ES1370_CONTROL_PCLKDIV_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_PCLKDIV) | ES1370_CONTROL_PCLKDIV_n((n)))
+
+// MPEG serial data format; 0=SONY, 1=I2S
 #define ES1370_CONTROL_MSFMTSEL_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_MSFMTSEL) | ES1370_CONTROL_MSFMTSEL_n((n)))
+
+// clock source for DAC - 0=clock generator; 1=MPEG clocks
 #define ES1370_CONTROL_SBB_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_SBB) | ES1370_CONTROL_SBB_n((n)))
+
+// fixed frequency clock for DAC1
 #define ES1370_CONTROL_WTSRSEL_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_WTSRSEL) | ES1370_CONTROL_WTSRSEL_n((n)))
+
+// DAC's are synchronous
 #define ES1370_CONTROL_DAC_SYNC_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_DAC_SYNC) | ES1370_CONTROL_DAC_SYNC_n((n)))
+
+// CCB voice interrupts enable
 #define ES1370_CONTROL_CCB_INTE_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_CCB_INTE) | ES1370_CONTROL_CCB_INTE_n((n)))
+
+// capture clock source; 0=ADC; 1=MPEG
 #define ES1370_CONTROL_M_CB_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_M_CB) | ES1370_CONTROL_M_CB_n((n)))
+
+// generap purpose output bit
 #define ES1370_CONTROL_XCTL0_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_XCTL0) | ES1370_CONTROL_XCTL0_n((n)))
+
+// memory bus request enable
 #define ES1370_CONTROL_BREQ_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_BREQ) | ES1370_CONTROL_BREQ_n((n)))
+
+// DAC1 playback channel enable
 #define ES1370_CONTROL_DAC1EN_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_DAC1EN) | ES1370_CONTROL_DAC1EN_n((n)))
+
+// DAC2 playback channel enable
 #define ES1370_CONTROL_DAC2EN_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_DAC2EN) | ES1370_CONTROL_DAC2EN_n((n)))
+
+// ADC capture channel enable
 #define ES1370_CONTROL_ADCEN_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_ADCEN) | ES1370_CONTROL_ADCEN_n((n)))
+
+// UART enable
 #define ES1370_CONTROL_UARTEN_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_UARTEN) | ES1370_CONTROL_UARTEN_n((n)))
+
+// Joystick module enable
 #define ES1370_CONTROL_JOYEN_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_JOYEN) | ES1370_CONTROL_JOYEN_n((n)))
+
+// Codec interface enable
 #define ES1370_CONTROL_CDC_EN_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_CDC_EN) | ES1370_CONTROL_CDC_EN_n((n)))
+
+// PCI serr signal disable
 #define ES1370_CONTROL_SERR_DIS_SET(r,n) \
     ((r) = ((r) & ~ES1370_CONTROL_SERR_DIS) | ES1370_CONTROL_SERR_DIS_n((n)))
 
@@ -252,44 +492,117 @@
 // ES1370_STATUS
 #define ES1370_STATUS                    0x04
 
+
+// Interrupt is pending
 #define ES1370_STATUS_INTR_BIT           31
+
+// Always zero
+#define ES1370_STATUS_ZERO_BIT           11
+
+// CODEC is busy or register write in progress
 #define ES1370_STATUS_CSTAT_BIT          10
+
+// CODEC is busy
 #define ES1370_STATUS_CBUSY_BIT          9
+
+// CODEC register write in progress
 #define ES1370_STATUS_CWRIP_BIT          8
+
+// voice code from CCB module
 #define ES1370_STATUS_VC_BIT             5
+
+// CCB interrupt pending
 #define ES1370_STATUS_CCB_INT_BIT        4
+
+// UART interrupt pending
 #define ES1370_STATUS_UART_INT_BIT       3
+
+// DAC1 channel interrupt pending
 #define ES1370_STATUS_DAC1_INT_BIT       2
+
+// DAC2 channel interrupt pending
 #define ES1370_STATUS_DAC2_INT_BIT       1
+
+// ADC channel interrupt pending
 #define ES1370_STATUS_ADC_INT_BIT        0
 
+
+// Interrupt is pending
 #define ES1370_STATUS_INTR_BITS          1
+
+// Always zero
+#define ES1370_STATUS_ZERO_BITS          20
+
+// CODEC is busy or register write in progress
 #define ES1370_STATUS_CSTAT_BITS         1
+
+// CODEC is busy
 #define ES1370_STATUS_CBUSY_BITS         1
+
+// CODEC register write in progress
 #define ES1370_STATUS_CWRIP_BITS         1
+
+// voice code from CCB module
 #define ES1370_STATUS_VC_BITS            2
+
+// CCB interrupt pending
 #define ES1370_STATUS_CCB_INT_BITS       1
+
+// UART interrupt pending
 #define ES1370_STATUS_UART_INT_BITS      1
+
+// DAC1 channel interrupt pending
 #define ES1370_STATUS_DAC1_INT_BITS      1
+
+// DAC2 channel interrupt pending
 #define ES1370_STATUS_DAC2_INT_BITS      1
+
+// ADC channel interrupt pending
 #define ES1370_STATUS_ADC_INT_BITS       1
+
+// Interrupt is pending
 #define ES1370_STATUS_INTR_MASK          ((1U << ES1370_STATUS_INTR_BITS)-1)
+
+// Always zero
+#define ES1370_STATUS_ZERO_MASK          ((1U << ES1370_STATUS_ZERO_BITS)-1)
+
+// CODEC is busy or register write in progress
 #define ES1370_STATUS_CSTAT_MASK         ((1U << ES1370_STATUS_CSTAT_BITS)-1)
+
+// CODEC is busy
 #define ES1370_STATUS_CBUSY_MASK         ((1U << ES1370_STATUS_CBUSY_BITS)-1)
+
+// CODEC register write in progress
 #define ES1370_STATUS_CWRIP_MASK         ((1U << ES1370_STATUS_CWRIP_BITS)-1)
+
+// voice code from CCB module
 #define ES1370_STATUS_VC_MASK            ((1U << ES1370_STATUS_VC_BITS)-1)
+
+// CCB interrupt pending
 #define ES1370_STATUS_CCB_INT_MASK       ((1U << ES1370_STATUS_CCB_INT_BITS)-1)
+
+// UART interrupt pending
 #define ES1370_STATUS_UART_INT_MASK \
     ((1U << ES1370_STATUS_UART_INT_BITS)-1)
+
+// DAC1 channel interrupt pending
 #define ES1370_STATUS_DAC1_INT_MASK \
     ((1U << ES1370_STATUS_DAC1_INT_BITS)-1)
+
+// DAC2 channel interrupt pending
 #define ES1370_STATUS_DAC2_INT_MASK \
     ((1U << ES1370_STATUS_DAC2_INT_BITS)-1)
+
+// ADC channel interrupt pending
 #define ES1370_STATUS_ADC_INT_MASK       ((1U << ES1370_STATUS_ADC_INT_BITS)-1)
 
 // Interrupt is pending
 #define ES1370_STATUS_INTR \
     (ES1370_STATUS_INTR_MASK << ES1370_STATUS_INTR_BIT)
+
+// Always zero
+#define ES1370_STATUS_ZERO \
+    (ES1370_STATUS_ZERO_MASK << ES1370_STATUS_ZERO_BIT)
 
 // CODEC is busy or register write in progress
 #define ES1370_STATUS_CSTAT \
@@ -327,56 +640,127 @@
 #define ES1370_STATUS_ADC_INT \
     (ES1370_STATUS_ADC_INT_MASK << ES1370_STATUS_ADC_INT_BIT)
 
+
+// Interrupt is pending
 #define ES1370_STATUS_INTR_n(n)          ((n) << ES1370_STATUS_INTR_BIT)
+
+// Always zero
+#define ES1370_STATUS_ZERO_n(n)          ((n) << ES1370_STATUS_ZERO_BIT)
+
+// CODEC is busy or register write in progress
 #define ES1370_STATUS_CSTAT_n(n)         ((n) << ES1370_STATUS_CSTAT_BIT)
+
+// CODEC is busy
 #define ES1370_STATUS_CBUSY_n(n)         ((n) << ES1370_STATUS_CBUSY_BIT)
+
+// CODEC register write in progress
 #define ES1370_STATUS_CWRIP_n(n)         ((n) << ES1370_STATUS_CWRIP_BIT)
+
+// voice code from CCB module
 #define ES1370_STATUS_VC_n(n)            ((n) << ES1370_STATUS_VC_BIT)
+
+// CCB interrupt pending
 #define ES1370_STATUS_CCB_INT_n(n)       ((n) << ES1370_STATUS_CCB_INT_BIT)
+
+// UART interrupt pending
 #define ES1370_STATUS_UART_INT_n(n)      ((n) << ES1370_STATUS_UART_INT_BIT)
+
+// DAC1 channel interrupt pending
 #define ES1370_STATUS_DAC1_INT_n(n)      ((n) << ES1370_STATUS_DAC1_INT_BIT)
+
+// DAC2 channel interrupt pending
 #define ES1370_STATUS_DAC2_INT_n(n)      ((n) << ES1370_STATUS_DAC2_INT_BIT)
+
+// ADC channel interrupt pending
 #define ES1370_STATUS_ADC_INT_n(n)       ((n) << ES1370_STATUS_ADC_INT_BIT)
 
+
+// Interrupt is pending
 #define ES1370_STATUS_INTR_GET(n) \
     (((n) >> ES1370_STATUS_INTR_BIT) & ES1370_STATUS_INTR_MASK)
+
+// Always zero
+#define ES1370_STATUS_ZERO_GET(n) \
+    (((n) >> ES1370_STATUS_ZERO_BIT) & ES1370_STATUS_ZERO_MASK)
+
+// CODEC is busy or register write in progress
 #define ES1370_STATUS_CSTAT_GET(n) \
     (((n) >> ES1370_STATUS_CSTAT_BIT) & ES1370_STATUS_CSTAT_MASK)
+
+// CODEC is busy
 #define ES1370_STATUS_CBUSY_GET(n) \
     (((n) >> ES1370_STATUS_CBUSY_BIT) & ES1370_STATUS_CBUSY_MASK)
+
+// CODEC register write in progress
 #define ES1370_STATUS_CWRIP_GET(n) \
     (((n) >> ES1370_STATUS_CWRIP_BIT) & ES1370_STATUS_CWRIP_MASK)
+
+// voice code from CCB module
 #define ES1370_STATUS_VC_GET(n) \
     (((n) >> ES1370_STATUS_VC_BIT) & ES1370_STATUS_VC_MASK)
+
+// CCB interrupt pending
 #define ES1370_STATUS_CCB_INT_GET(n) \
     (((n) >> ES1370_STATUS_CCB_INT_BIT) & ES1370_STATUS_CCB_INT_MASK)
+
+// UART interrupt pending
 #define ES1370_STATUS_UART_INT_GET(n) \
     (((n) >> ES1370_STATUS_UART_INT_BIT) & ES1370_STATUS_UART_INT_MASK)
+
+// DAC1 channel interrupt pending
 #define ES1370_STATUS_DAC1_INT_GET(n) \
     (((n) >> ES1370_STATUS_DAC1_INT_BIT) & ES1370_STATUS_DAC1_INT_MASK)
+
+// DAC2 channel interrupt pending
 #define ES1370_STATUS_DAC2_INT_GET(n) \
     (((n) >> ES1370_STATUS_DAC2_INT_BIT) & ES1370_STATUS_DAC2_INT_MASK)
+
+// ADC channel interrupt pending
 #define ES1370_STATUS_ADC_INT_GET(n) \
     (((n) >> ES1370_STATUS_ADC_INT_BIT) & ES1370_STATUS_ADC_INT_MASK)
 
+
+// Interrupt is pending
 #define ES1370_STATUS_INTR_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_INTR) | ES1370_STATUS_INTR_n((n)))
+
+// Always zero
+#define ES1370_STATUS_ZERO_SET(r,n) \
+    ((r) = ((r) & ~ES1370_STATUS_ZERO) | ES1370_STATUS_ZERO_n((n)))
+
+// CODEC is busy or register write in progress
 #define ES1370_STATUS_CSTAT_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_CSTAT) | ES1370_STATUS_CSTAT_n((n)))
+
+// CODEC is busy
 #define ES1370_STATUS_CBUSY_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_CBUSY) | ES1370_STATUS_CBUSY_n((n)))
+
+// CODEC register write in progress
 #define ES1370_STATUS_CWRIP_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_CWRIP) | ES1370_STATUS_CWRIP_n((n)))
+
+// voice code from CCB module
 #define ES1370_STATUS_VC_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_VC) | ES1370_STATUS_VC_n((n)))
+
+// CCB interrupt pending
 #define ES1370_STATUS_CCB_INT_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_CCB_INT) | ES1370_STATUS_CCB_INT_n((n)))
+
+// UART interrupt pending
 #define ES1370_STATUS_UART_INT_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_UART_INT) | ES1370_STATUS_UART_INT_n((n)))
+
+// DAC1 channel interrupt pending
 #define ES1370_STATUS_DAC1_INT_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_DAC1_INT) | ES1370_STATUS_DAC1_INT_n((n)))
+
+// DAC2 channel interrupt pending
 #define ES1370_STATUS_DAC2_INT_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_DAC2_INT) | ES1370_STATUS_DAC2_INT_n((n)))
+
+// ADC channel interrupt pending
 #define ES1370_STATUS_ADC_INT_SET(r,n) \
     ((r) = ((r) & ~ES1370_STATUS_ADC_INT) | ES1370_STATUS_ADC_INT_n((n)))
 
@@ -385,41 +769,67 @@
 
 //
 // ES1370_UARTSTATUS: R/O: UART status register
-#define ES1370_UARTSTATUS                   0x09
+#define ES1370_UARTSTATUS                  0x09
 
-#define ES1370_UARTSTATUS_RX_INT_BIT        7
-#define ES1370_UARTSTATUS_TX_INT_BIT        2
-#define ES1370_UARTSTATUS_TX_RDY_BIT        1
-#define ES1370_UARTSTATUS_RX_RDY_BIT        0
-#define ES1370_UARTSTATUS_RX_INTE_BIT       7
-#define ES1370_UARTSTATUS_TX_INTE_BIT       5
-#define ES1370_UARTSTATUS_CTRL_BIT          0
 
-#define ES1370_UARTSTATUS_RX_INT_BITS       1
-#define ES1370_UARTSTATUS_TX_INT_BITS       1
-#define ES1370_UARTSTATUS_TX_RDY_BITS       1
-#define ES1370_UARTSTATUS_RX_RDY_BITS       1
-#define ES1370_UARTSTATUS_RX_INTE_BITS      1
-#define ES1370_UARTSTATUS_TX_INTE_BITS      2
-#define ES1370_UARTSTATUS_CTRL_BITS         2
+// Rx interrupt occurred
+#define ES1370_UARTSTATUS_RX_INT_BIT       7
+
+// Always zero
+#define ES1370_UARTSTATUS_ZERO_BIT         3
+
+// Tx interrupt occurred
+#define ES1370_UARTSTATUS_TX_INT_BIT       2
+
+// Tx ready
+#define ES1370_UARTSTATUS_TX_RDY_BIT       1
+
+// Rx ready
+#define ES1370_UARTSTATUS_RX_RDY_BIT       0
+
+
+// Rx interrupt occurred
+#define ES1370_UARTSTATUS_RX_INT_BITS      1
+
+// Always zero
+#define ES1370_UARTSTATUS_ZERO_BITS        4
+
+// Tx interrupt occurred
+#define ES1370_UARTSTATUS_TX_INT_BITS      1
+
+// Tx ready
+#define ES1370_UARTSTATUS_TX_RDY_BITS      1
+
+// Rx ready
+#define ES1370_UARTSTATUS_RX_RDY_BITS      1
+
+// Rx interrupt occurred
 #define ES1370_UARTSTATUS_RX_INT_MASK \
     ((1U << ES1370_UARTSTATUS_RX_INT_BITS)-1)
+
+// Always zero
+#define ES1370_UARTSTATUS_ZERO_MASK \
+    ((1U << ES1370_UARTSTATUS_ZERO_BITS)-1)
+
+// Tx interrupt occurred
 #define ES1370_UARTSTATUS_TX_INT_MASK \
     ((1U << ES1370_UARTSTATUS_TX_INT_BITS)-1)
+
+// Tx ready
 #define ES1370_UARTSTATUS_TX_RDY_MASK \
     ((1U << ES1370_UARTSTATUS_TX_RDY_BITS)-1)
+
+// Rx ready
 #define ES1370_UARTSTATUS_RX_RDY_MASK \
     ((1U << ES1370_UARTSTATUS_RX_RDY_BITS)-1)
-#define ES1370_UARTSTATUS_RX_INTE_MASK \
-    ((1U << ES1370_UARTSTATUS_RX_INTE_BITS)-1)
-#define ES1370_UARTSTATUS_TX_INTE_MASK \
-    ((1U << ES1370_UARTSTATUS_TX_INTE_BITS)-1)
-#define ES1370_UARTSTATUS_CTRL_MASK \
-    ((1U << ES1370_UARTSTATUS_CTRL_BITS)-1)
 
 // Rx interrupt occurred
 #define ES1370_UARTSTATUS_RX_INT \
     (ES1370_UARTSTATUS_RX_INT_MASK << ES1370_UARTSTATUS_RX_INT_BIT)
+
+// Always zero
+#define ES1370_UARTSTATUS_ZERO \
+    (ES1370_UARTSTATUS_ZERO_MASK << ES1370_UARTSTATUS_ZERO_BIT)
 
 // Tx interrupt occurred
 #define ES1370_UARTSTATUS_TX_INT \
@@ -433,140 +843,389 @@
 #define ES1370_UARTSTATUS_RX_RDY \
     (ES1370_UARTSTATUS_RX_RDY_MASK << ES1370_UARTSTATUS_RX_RDY_BIT)
 
-// Rx interrupt enable
-#define ES1370_UARTSTATUS_RX_INTE \
-    (ES1370_UARTSTATUS_RX_INTE_MASK << ES1370_UARTSTATUS_RX_INTE_BIT)
 
-// Tx interrupt enable
-#define ES1370_UARTSTATUS_TX_INTE \
-    (ES1370_UARTSTATUS_TX_INTE_MASK << ES1370_UARTSTATUS_TX_INTE_BIT)
-
-// Control
-#define ES1370_UARTSTATUS_CTRL \
-    (ES1370_UARTSTATUS_CTRL_MASK << ES1370_UARTSTATUS_CTRL_BIT)
-
+// Rx interrupt occurred
 #define ES1370_UARTSTATUS_RX_INT_n(n) \
     ((n) << ES1370_UARTSTATUS_RX_INT_BIT)
+
+// Always zero
+#define ES1370_UARTSTATUS_ZERO_n(n)        ((n) << ES1370_UARTSTATUS_ZERO_BIT)
+
+// Tx interrupt occurred
 #define ES1370_UARTSTATUS_TX_INT_n(n) \
     ((n) << ES1370_UARTSTATUS_TX_INT_BIT)
+
+// Tx ready
 #define ES1370_UARTSTATUS_TX_RDY_n(n) \
     ((n) << ES1370_UARTSTATUS_TX_RDY_BIT)
+
+// Rx ready
 #define ES1370_UARTSTATUS_RX_RDY_n(n) \
     ((n) << ES1370_UARTSTATUS_RX_RDY_BIT)
-#define ES1370_UARTSTATUS_RX_INTE_n(n) \
-    ((n) << ES1370_UARTSTATUS_RX_INTE_BIT)
-#define ES1370_UARTSTATUS_TX_INTE_n(n) \
-    ((n) << ES1370_UARTSTATUS_TX_INTE_BIT)
-#define ES1370_UARTSTATUS_CTRL_n(n)         ((n) << ES1370_UARTSTATUS_CTRL_BIT)
 
+
+// Rx interrupt occurred
 #define ES1370_UARTSTATUS_RX_INT_GET(n) \
     (((n) >> ES1370_UARTSTATUS_RX_INT_BIT) & ES1370_UARTSTATUS_RX_INT_MASK)
+
+// Always zero
+#define ES1370_UARTSTATUS_ZERO_GET(n) \
+    (((n) >> ES1370_UARTSTATUS_ZERO_BIT) & ES1370_UARTSTATUS_ZERO_MASK)
+
+// Tx interrupt occurred
 #define ES1370_UARTSTATUS_TX_INT_GET(n) \
     (((n) >> ES1370_UARTSTATUS_TX_INT_BIT) & ES1370_UARTSTATUS_TX_INT_MASK)
+
+// Tx ready
 #define ES1370_UARTSTATUS_TX_RDY_GET(n) \
     (((n) >> ES1370_UARTSTATUS_TX_RDY_BIT) & ES1370_UARTSTATUS_TX_RDY_MASK)
+
+// Rx ready
 #define ES1370_UARTSTATUS_RX_RDY_GET(n) \
     (((n) >> ES1370_UARTSTATUS_RX_RDY_BIT) & ES1370_UARTSTATUS_RX_RDY_MASK)
-#define ES1370_UARTSTATUS_RX_INTE_GET(n) \
-    (((n) >> ES1370_UARTSTATUS_RX_INTE_BIT) & ES1370_UARTSTATUS_RX_INTE_MASK)
-#define ES1370_UARTSTATUS_TX_INTE_GET(n) \
-    (((n) >> ES1370_UARTSTATUS_TX_INTE_BIT) & ES1370_UARTSTATUS_TX_INTE_MASK)
-#define ES1370_UARTSTATUS_CTRL_GET(n) \
-    (((n) >> ES1370_UARTSTATUS_CTRL_BIT) & ES1370_UARTSTATUS_CTRL_MASK)
 
+
+// Rx interrupt occurred
 #define ES1370_UARTSTATUS_RX_INT_SET(r,n) \
     ((r) = ((r) & ~ES1370_UARTSTATUS_RX_INT) | ES1370_UARTSTATUS_RX_INT_n((n)))
+
+// Always zero
+#define ES1370_UARTSTATUS_ZERO_SET(r,n) \
+    ((r) = ((r) & ~ES1370_UARTSTATUS_ZERO) | ES1370_UARTSTATUS_ZERO_n((n)))
+
+// Tx interrupt occurred
 #define ES1370_UARTSTATUS_TX_INT_SET(r,n) \
     ((r) = ((r) & ~ES1370_UARTSTATUS_TX_INT) | ES1370_UARTSTATUS_TX_INT_n((n)))
+
+// Tx ready
 #define ES1370_UARTSTATUS_TX_RDY_SET(r,n) \
     ((r) = ((r) & ~ES1370_UARTSTATUS_TX_RDY) | ES1370_UARTSTATUS_TX_RDY_n((n)))
+
+// Rx ready
 #define ES1370_UARTSTATUS_RX_RDY_SET(r,n) \
     ((r) = ((r) & ~ES1370_UARTSTATUS_RX_RDY) | ES1370_UARTSTATUS_RX_RDY_n((n)))
-#define ES1370_UARTSTATUS_RX_INTE_SET(r,n)  ((r) \
-    = ((r) & ~ES1370_UARTSTATUS_RX_INTE) | ES1370_UARTSTATUS_RX_INTE_n((n)))
-#define ES1370_UARTSTATUS_TX_INTE_SET(r,n)  ((r) \
-    = ((r) & ~ES1370_UARTSTATUS_TX_INTE) | ES1370_UARTSTATUS_TX_INTE_n((n)))
-#define ES1370_UARTSTATUS_CTRL_SET(r,n) \
-    ((r) = ((r) & ~ES1370_UARTSTATUS_CTRL) | ES1370_UARTSTATUS_CTRL_n((n)))
+
+//
+// ES1370_UART_CONTROL: W/O: UART control register
+#define ES1370_UART_CONTROL                     0x09
+
+
+// Rx interrupt enable
+#define ES1370_UART_CONTROL_RX_INTE_BIT         7
+
+// Tx interrupt enable
+#define ES1370_UART_CONTROL_TX_INTE_BIT         5
+
+// Undefined value
+#define ES1370_UART_CONTROL_UNDEFINED_BIT       2
+
+// Control
+#define ES1370_UART_CONTROL_CTRL_BIT            0
+
+
+// Rx interrupt enable
+#define ES1370_UART_CONTROL_RX_INTE_BITS        1
+
+// Tx interrupt enable
+#define ES1370_UART_CONTROL_TX_INTE_BITS        2
+
+// Undefined value
+#define ES1370_UART_CONTROL_UNDEFINED_BITS      3
+
+// Control
+#define ES1370_UART_CONTROL_CTRL_BITS           2
+
+// Rx interrupt enable
+#define ES1370_UART_CONTROL_RX_INTE_MASK \
+    ((1U << ES1370_UART_CONTROL_RX_INTE_BITS)-1)
+
+// Tx interrupt enable
+#define ES1370_UART_CONTROL_TX_INTE_MASK \
+    ((1U << ES1370_UART_CONTROL_TX_INTE_BITS)-1)
+
+// Undefined value
+#define ES1370_UART_CONTROL_UNDEFINED_MASK \
+    ((1U << ES1370_UART_CONTROL_UNDEFINED_BITS)-1)
+
+// Control
+#define ES1370_UART_CONTROL_CTRL_MASK \
+    ((1U << ES1370_UART_CONTROL_CTRL_BITS)-1)
+
+// Rx interrupt enable
+#define ES1370_UART_CONTROL_RX_INTE \
+    (ES1370_UART_CONTROL_RX_INTE_MASK << ES1370_UART_CONTROL_RX_INTE_BIT)
+
+// Tx interrupt enable
+#define ES1370_UART_CONTROL_TX_INTE \
+    (ES1370_UART_CONTROL_TX_INTE_MASK << ES1370_UART_CONTROL_TX_INTE_BIT)
+
+// Undefined value
+#define ES1370_UART_CONTROL_UNDEFINED \
+    (ES1370_UART_CONTROL_UNDEFINED_MASK << ES1370_UART_CONTROL_UNDEFINED_BIT)
+
+// Control
+#define ES1370_UART_CONTROL_CTRL \
+    (ES1370_UART_CONTROL_CTRL_MASK << ES1370_UART_CONTROL_CTRL_BIT)
+
+
+// Rx interrupt enable
+#define ES1370_UART_CONTROL_RX_INTE_n(n) \
+    ((n) << ES1370_UART_CONTROL_RX_INTE_BIT)
+
+// Tx interrupt enable
+#define ES1370_UART_CONTROL_TX_INTE_n(n) \
+    ((n) << ES1370_UART_CONTROL_TX_INTE_BIT)
+
+// Undefined value
+#define ES1370_UART_CONTROL_UNDEFINED_n(n) \
+    ((n) << ES1370_UART_CONTROL_UNDEFINED_BIT)
+
+// Control
+#define ES1370_UART_CONTROL_CTRL_n(n) \
+    ((n) << ES1370_UART_CONTROL_CTRL_BIT)
+
+
+// Rx interrupt enable
+#define ES1370_UART_CONTROL_RX_INTE_GET(n)      (((n) \
+    >> ES1370_UART_CONTROL_RX_INTE_BIT) & ES1370_UART_CONTROL_RX_INTE_MASK)
+
+// Tx interrupt enable
+#define ES1370_UART_CONTROL_TX_INTE_GET(n)      (((n) \
+    >> ES1370_UART_CONTROL_TX_INTE_BIT) & ES1370_UART_CONTROL_TX_INTE_MASK)
+
+// Undefined value
+#define ES1370_UART_CONTROL_UNDEFINED_GET(n)    (((n) \
+    >> ES1370_UART_CONTROL_UNDEFINED_BIT) & ES1370_UART_CONTROL_UNDEFINED_MASK)
+
+// Control
+#define ES1370_UART_CONTROL_CTRL_GET(n) \
+    (((n) >> ES1370_UART_CONTROL_CTRL_BIT) & ES1370_UART_CONTROL_CTRL_MASK)
+
+
+// Rx interrupt enable
+#define ES1370_UART_CONTROL_RX_INTE_SET(r,n)    ((r) = \
+    ((r) & ~ES1370_UART_CONTROL_RX_INTE) | ES1370_UART_CONTROL_RX_INTE_n((n)))
+
+// Tx interrupt enable
+#define ES1370_UART_CONTROL_TX_INTE_SET(r,n)    ((r) = \
+    ((r) & ~ES1370_UART_CONTROL_TX_INTE) | ES1370_UART_CONTROL_TX_INTE_n((n)))
+
+// Undefined value
+#define ES1370_UART_CONTROL_UNDEFINED_SET(r,n)  ((r) = ((r) \
+    & ~ES1370_UART_CONTROL_UNDEFINED) | ES1370_UART_CONTROL_UNDEFINED_n((n)))
+
+// Control
+#define ES1370_UART_CONTROL_CTRL_SET(r,n) \
+    ((r) = ((r) & ~ES1370_UART_CONTROL_CTRL) | ES1370_UART_CONTROL_CTRL_n((n)))
 
 // ES1370_UARTTEST
-#define ES1370_UARTTEST                0x0A
+#define ES1370_UARTTEST                     0x0A
 
-#define ES1370_UARTTEST_TEST_BIT       0
 
-#define ES1370_UARTTEST_TEST_BITS      1
-#define ES1370_UARTTEST_TEST_MASK      ((1U << ES1370_UARTTEST_TEST_BITS)-1)
+// Undefined
+#define ES1370_UARTTEST_UNDEFINED_BIT       1
+
+// Test mode enabled
+#define ES1370_UARTTEST_TEST_BIT            0
+
+
+// Undefined
+#define ES1370_UARTTEST_UNDEFINED_BITS      7
+
+// Test mode enabled
+#define ES1370_UARTTEST_TEST_BITS           1
+
+// Undefined
+#define ES1370_UARTTEST_UNDEFINED_MASK \
+    ((1U << ES1370_UARTTEST_UNDEFINED_BITS)-1)
+
+// Test mode enabled
+#define ES1370_UARTTEST_TEST_MASK \
+    ((1U << ES1370_UARTTEST_TEST_BITS)-1)
+
+// Undefined
+#define ES1370_UARTTEST_UNDEFINED \
+    (ES1370_UARTTEST_UNDEFINED_MASK << ES1370_UARTTEST_UNDEFINED_BIT)
 
 // Test mode enabled
 #define ES1370_UARTTEST_TEST \
     (ES1370_UARTTEST_TEST_MASK << ES1370_UARTTEST_TEST_BIT)
 
-#define ES1370_UARTTEST_TEST_n(n)      ((n) << ES1370_UARTTEST_TEST_BIT)
 
+// Undefined
+#define ES1370_UARTTEST_UNDEFINED_n(n) \
+    ((n) << ES1370_UARTTEST_UNDEFINED_BIT)
+
+// Test mode enabled
+#define ES1370_UARTTEST_TEST_n(n)           ((n) << ES1370_UARTTEST_TEST_BIT)
+
+
+// Undefined
+#define ES1370_UARTTEST_UNDEFINED_GET(n) \
+    (((n) >> ES1370_UARTTEST_UNDEFINED_BIT) & ES1370_UARTTEST_UNDEFINED_MASK)
+
+// Test mode enabled
 #define ES1370_UARTTEST_TEST_GET(n) \
     (((n) >> ES1370_UARTTEST_TEST_BIT) & ES1370_UARTTEST_TEST_MASK)
 
+
+// Undefined
+#define ES1370_UARTTEST_UNDEFINED_SET(r,n)  ((r) \
+    = ((r) & ~ES1370_UARTTEST_UNDEFINED) | ES1370_UARTTEST_UNDEFINED_n((n)))
+
+// Test mode enabled
 #define ES1370_UARTTEST_TEST_SET(r,n) \
     ((r) = ((r) & ~ES1370_UARTTEST_TEST) | ES1370_UARTTEST_TEST_n((n)))
 
 // ES1370_MEMPAGE
-#define ES1370_MEMPAGE                0x0C
+#define ES1370_MEMPAGE                     0x0C
 
-#define ES1370_MEMPAGE_PAGE_BIT       0
 
-#define ES1370_MEMPAGE_PAGE_BITS      4
-#define ES1370_MEMPAGE_PAGE_MASK      ((1U << ES1370_MEMPAGE_PAGE_BITS)-1)
+// Undefined
+#define ES1370_MEMPAGE_UNDEFINED_BIT       4
+
+// page select
+#define ES1370_MEMPAGE_PAGE_BIT            0
+
+
+// Undefined
+#define ES1370_MEMPAGE_UNDEFINED_BITS      28
+
+// page select
+#define ES1370_MEMPAGE_PAGE_BITS           4
+
+// Undefined
+#define ES1370_MEMPAGE_UNDEFINED_MASK \
+    ((1U << ES1370_MEMPAGE_UNDEFINED_BITS)-1)
+
+// page select
+#define ES1370_MEMPAGE_PAGE_MASK           ((1U << ES1370_MEMPAGE_PAGE_BITS)-1)
+
+// Undefined
+#define ES1370_MEMPAGE_UNDEFINED \
+    (ES1370_MEMPAGE_UNDEFINED_MASK << ES1370_MEMPAGE_UNDEFINED_BIT)
 
 // page select
 #define ES1370_MEMPAGE_PAGE \
     (ES1370_MEMPAGE_PAGE_MASK << ES1370_MEMPAGE_PAGE_BIT)
 
-#define ES1370_MEMPAGE_PAGE_n(n)      ((n) << ES1370_MEMPAGE_PAGE_BIT)
 
+// Undefined
+#define ES1370_MEMPAGE_UNDEFINED_n(n) \
+    ((n) << ES1370_MEMPAGE_UNDEFINED_BIT)
+
+// page select
+#define ES1370_MEMPAGE_PAGE_n(n)           ((n) << ES1370_MEMPAGE_PAGE_BIT)
+
+
+// Undefined
+#define ES1370_MEMPAGE_UNDEFINED_GET(n) \
+    (((n) >> ES1370_MEMPAGE_UNDEFINED_BIT) & ES1370_MEMPAGE_UNDEFINED_MASK)
+
+// page select
 #define ES1370_MEMPAGE_PAGE_GET(n) \
     (((n) >> ES1370_MEMPAGE_PAGE_BIT) & ES1370_MEMPAGE_PAGE_MASK)
 
+
+// Undefined
+#define ES1370_MEMPAGE_UNDEFINED_SET(r,n) \
+    ((r) = ((r) & ~ES1370_MEMPAGE_UNDEFINED) | ES1370_MEMPAGE_UNDEFINED_n((n)))
+
+// page select
 #define ES1370_MEMPAGE_PAGE_SET(r,n) \
     ((r) = ((r) & ~ES1370_MEMPAGE_PAGE) | ES1370_MEMPAGE_PAGE_n((n)))
 
-// ES1370_PAGE_DAC
-#define ES1370_PAGE_DAC 0x0c
+// ES1370_MEMPAGE_PAGE_DAC
+#define ES1370_MEMPAGE_PAGE_DAC 0x0c
 
-// ES1370_PAGE_ADC
-#define ES1370_PAGE_ADC 0x0d
+// ES1370_MEMPAGE_PAGE_ADC
+#define ES1370_MEMPAGE_PAGE_ADC 0x0d
 
-// ES1370_PAGE_UART
-#define ES1370_PAGE_UART 0x0e
+// ES1370_MEMPAGE_PAGE_UART
+#define ES1370_MEMPAGE_PAGE_UART 0x0e
 
-// ES1370_PAGE_UART1
-#define ES1370_PAGE_UART1 0x0f
+// ES1370_MEMPAGE_PAGE_UART1
+#define ES1370_MEMPAGE_PAGE_UART1 0x0f
 
 //
 // ES1370_CODEC: W/O: Codec write register address
-#define ES1370_CODEC                0x10
+#define ES1370_CODEC                     0x10
 
-#define ES1370_CODEC_ADDR_BIT       8
-#define ES1370_CODEC_DATA_BIT       0
 
-#define ES1370_CODEC_ADDR_BITS      8
-#define ES1370_CODEC_DATA_BITS      8
-#define ES1370_CODEC_ADDR_MASK      ((1U << ES1370_CODEC_ADDR_BITS)-1)
-#define ES1370_CODEC_DATA_MASK      ((1U << ES1370_CODEC_DATA_BITS)-1)
+// Undefined
+#define ES1370_CODEC_UNDEFINED_BIT       16
+
+// Codec register select
+#define ES1370_CODEC_ADDR_BIT            8
+
+// Selected register data
+#define ES1370_CODEC_DATA_BIT            0
+
+
+// Undefined
+#define ES1370_CODEC_UNDEFINED_BITS      16
+
+// Codec register select
+#define ES1370_CODEC_ADDR_BITS           8
+
+// Selected register data
+#define ES1370_CODEC_DATA_BITS           8
+
+// Undefined
+#define ES1370_CODEC_UNDEFINED_MASK \
+    ((1U << ES1370_CODEC_UNDEFINED_BITS)-1)
+
+// Codec register select
+#define ES1370_CODEC_ADDR_MASK           ((1U << ES1370_CODEC_ADDR_BITS)-1)
+
+// Selected register data
+#define ES1370_CODEC_DATA_MASK           ((1U << ES1370_CODEC_DATA_BITS)-1)
+
+// Undefined
+#define ES1370_CODEC_UNDEFINED \
+    (ES1370_CODEC_UNDEFINED_MASK << ES1370_CODEC_UNDEFINED_BIT)
+
+// Codec register select
 #define ES1370_CODEC_ADDR \
     (ES1370_CODEC_ADDR_MASK << ES1370_CODEC_ADDR_BIT)
+
+// Selected register data
 #define ES1370_CODEC_DATA \
     (ES1370_CODEC_DATA_MASK << ES1370_CODEC_DATA_BIT)
 
-#define ES1370_CODEC_ADDR_n(n)      ((n) << ES1370_CODEC_ADDR_BIT)
-#define ES1370_CODEC_DATA_n(n)      ((n) << ES1370_CODEC_DATA_BIT)
 
+// Undefined
+#define ES1370_CODEC_UNDEFINED_n(n)      ((n) << ES1370_CODEC_UNDEFINED_BIT)
+
+// Codec register select
+#define ES1370_CODEC_ADDR_n(n)           ((n) << ES1370_CODEC_ADDR_BIT)
+
+// Selected register data
+#define ES1370_CODEC_DATA_n(n)           ((n) << ES1370_CODEC_DATA_BIT)
+
+
+// Undefined
+#define ES1370_CODEC_UNDEFINED_GET(n) \
+    (((n) >> ES1370_CODEC_UNDEFINED_BIT) & ES1370_CODEC_UNDEFINED_MASK)
+
+// Codec register select
 #define ES1370_CODEC_ADDR_GET(n) \
     (((n) >> ES1370_CODEC_ADDR_BIT) & ES1370_CODEC_ADDR_MASK)
+
+// Selected register data
 #define ES1370_CODEC_DATA_GET(n) \
     (((n) >> ES1370_CODEC_DATA_BIT) & ES1370_CODEC_DATA_MASK)
 
+
+// Undefined
+#define ES1370_CODEC_UNDEFINED_SET(r,n) \
+    ((r) = ((r) & ~ES1370_CODEC_UNDEFINED) | ES1370_CODEC_UNDEFINED_n((n)))
+
+// Codec register select
 #define ES1370_CODEC_ADDR_SET(r,n) \
     ((r) = ((r) & ~ES1370_CODEC_ADDR) | ES1370_CODEC_ADDR_n((n)))
+
+// Selected register data
 #define ES1370_CODEC_DATA_SET(r,n) \
     ((r) = ((r) & ~ES1370_CODEC_DATA) | ES1370_CODEC_DATA_n((n)))
 
@@ -574,81 +1233,203 @@
 // ES1370_SERIAL: R/W: Serial interface control register
 #define ES1370_SERIAL                        0x20
 
+
+// Always zero
+#define ES1370_SERIAL_ZERO_BIT               22
+
+// binary offset value to increment / loop end
 #define ES1370_SERIAL_END_INC_BIT            19
+
+// binary offset value to increment / start
 #define ES1370_SERIAL_ST_INC_BIT             16
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_ADC_LOOP_SEL_BIT       15
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB1_LOOP_SEL_BIT       14
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB2_LOOP_SEL_BIT       13
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB2_PAUSE_BIT          12
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB1_PAUSE_BIT          11
+
+// ADC interrupt enable
 #define ES1370_SERIAL_ADC_INTE_BIT           10
+
+// DAC2 interrupt enable
 #define ES1370_SERIAL_PB2_INTE_BIT           9
+
+// DAC1 interrupt enable
 #define ES1370_SERIAL_PB1_INTE_BIT           8
+
+// force saple count reload for DAC1
 #define ES1370_SERIAL_SCT_RLD_BIT            7
+
+// stop when: 0=DAC2 play back zeros, 1=play back last sample
 #define ES1370_SERIAL_DAC_SEN_BIT            6
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_ADC_BITS_BIT           5
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_ADC_CHAN_BIT           4
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB2_BITS_BIT           3
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB2_CHAN_BIT           2
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB1_BITS_BIT           1
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB1_CHAN_BIT           0
 
+
+// Always zero
+#define ES1370_SERIAL_ZERO_BITS              10
+
+// binary offset value to increment / loop end
 #define ES1370_SERIAL_END_INC_BITS           3
+
+// binary offset value to increment / start
 #define ES1370_SERIAL_ST_INC_BITS            3
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_ADC_LOOP_SEL_BITS      1
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB1_LOOP_SEL_BITS      1
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB2_LOOP_SEL_BITS      1
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB2_PAUSE_BITS         1
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB1_PAUSE_BITS         1
+
+// ADC interrupt enable
 #define ES1370_SERIAL_ADC_INTE_BITS          1
+
+// DAC2 interrupt enable
 #define ES1370_SERIAL_PB2_INTE_BITS          1
+
+// DAC1 interrupt enable
 #define ES1370_SERIAL_PB1_INTE_BITS          1
+
+// force saple count reload for DAC1
 #define ES1370_SERIAL_SCT_RLD_BITS           1
+
+// stop when: 0=DAC2 play back zeros, 1=play back last sample
 #define ES1370_SERIAL_DAC_SEN_BITS           1
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_ADC_BITS_BITS          1
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_ADC_CHAN_BITS          1
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB2_BITS_BITS          1
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB2_CHAN_BITS          1
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB1_BITS_BITS          1
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB1_CHAN_BITS          1
+
+// Always zero
+#define ES1370_SERIAL_ZERO_MASK \
+    ((1U << ES1370_SERIAL_ZERO_BITS)-1)
+
+// binary offset value to increment / loop end
 #define ES1370_SERIAL_END_INC_MASK \
     ((1U << ES1370_SERIAL_END_INC_BITS)-1)
+
+// binary offset value to increment / start
 #define ES1370_SERIAL_ST_INC_MASK \
     ((1U << ES1370_SERIAL_ST_INC_BITS)-1)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_ADC_LOOP_SEL_MASK \
     ((1U << ES1370_SERIAL_ADC_LOOP_SEL_BITS)-1)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB1_LOOP_SEL_MASK \
     ((1U << ES1370_SERIAL_PB1_LOOP_SEL_BITS)-1)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB2_LOOP_SEL_MASK \
     ((1U << ES1370_SERIAL_PB2_LOOP_SEL_BITS)-1)
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB2_PAUSE_MASK \
     ((1U << ES1370_SERIAL_PB2_PAUSE_BITS)-1)
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB1_PAUSE_MASK \
     ((1U << ES1370_SERIAL_PB1_PAUSE_BITS)-1)
+
+// ADC interrupt enable
 #define ES1370_SERIAL_ADC_INTE_MASK \
     ((1U << ES1370_SERIAL_ADC_INTE_BITS)-1)
+
+// DAC2 interrupt enable
 #define ES1370_SERIAL_PB2_INTE_MASK \
     ((1U << ES1370_SERIAL_PB2_INTE_BITS)-1)
+
+// DAC1 interrupt enable
 #define ES1370_SERIAL_PB1_INTE_MASK \
     ((1U << ES1370_SERIAL_PB1_INTE_BITS)-1)
+
+// force saple count reload for DAC1
 #define ES1370_SERIAL_SCT_RLD_MASK \
     ((1U << ES1370_SERIAL_SCT_RLD_BITS)-1)
+
+// stop when: 0=DAC2 play back zeros, 1=play back last sample
 #define ES1370_SERIAL_DAC_SEN_MASK \
     ((1U << ES1370_SERIAL_DAC_SEN_BITS)-1)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_ADC_BITS_MASK \
     ((1U << ES1370_SERIAL_ADC_BITS_BITS)-1)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_ADC_CHAN_MASK \
     ((1U << ES1370_SERIAL_ADC_CHAN_BITS)-1)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB2_BITS_MASK \
     ((1U << ES1370_SERIAL_PB2_BITS_BITS)-1)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB2_CHAN_MASK \
     ((1U << ES1370_SERIAL_PB2_CHAN_BITS)-1)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB1_BITS_MASK \
     ((1U << ES1370_SERIAL_PB1_BITS_BITS)-1)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB1_CHAN_MASK \
     ((1U << ES1370_SERIAL_PB1_CHAN_BITS)-1)
 
-// binary offset value to increment / loop end */
+// Always zero
+#define ES1370_SERIAL_ZERO \
+    (ES1370_SERIAL_ZERO_MASK << ES1370_SERIAL_ZERO_BIT)
+
+// binary offset value to increment / loop end
 #define ES1370_SERIAL_END_INC \
     (ES1370_SERIAL_END_INC_MASK << ES1370_SERIAL_END_INC_BIT)
 
@@ -720,165 +1501,464 @@
 #define ES1370_SERIAL_PB1_CHAN \
     (ES1370_SERIAL_PB1_CHAN_MASK << ES1370_SERIAL_PB1_CHAN_BIT)
 
+
+// Always zero
+#define ES1370_SERIAL_ZERO_n(n)              ((n) << ES1370_SERIAL_ZERO_BIT)
+
+// binary offset value to increment / loop end
 #define ES1370_SERIAL_END_INC_n(n)           ((n) << ES1370_SERIAL_END_INC_BIT)
+
+// binary offset value to increment / start
 #define ES1370_SERIAL_ST_INC_n(n)            ((n) << ES1370_SERIAL_ST_INC_BIT)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_ADC_LOOP_SEL_n(n) \
     ((n) << ES1370_SERIAL_ADC_LOOP_SEL_BIT)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB1_LOOP_SEL_n(n) \
     ((n) << ES1370_SERIAL_PB1_LOOP_SEL_BIT)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB2_LOOP_SEL_n(n) \
     ((n) << ES1370_SERIAL_PB2_LOOP_SEL_BIT)
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB2_PAUSE_n(n) \
     ((n) << ES1370_SERIAL_PB2_PAUSE_BIT)
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB1_PAUSE_n(n) \
     ((n) << ES1370_SERIAL_PB1_PAUSE_BIT)
+
+// ADC interrupt enable
 #define ES1370_SERIAL_ADC_INTE_n(n) \
     ((n) << ES1370_SERIAL_ADC_INTE_BIT)
+
+// DAC2 interrupt enable
 #define ES1370_SERIAL_PB2_INTE_n(n) \
     ((n) << ES1370_SERIAL_PB2_INTE_BIT)
+
+// DAC1 interrupt enable
 #define ES1370_SERIAL_PB1_INTE_n(n) \
     ((n) << ES1370_SERIAL_PB1_INTE_BIT)
+
+// force saple count reload for DAC1
 #define ES1370_SERIAL_SCT_RLD_n(n)           ((n) << ES1370_SERIAL_SCT_RLD_BIT)
+
+// stop when: 0=DAC2 play back zeros, 1=play back last sample
 #define ES1370_SERIAL_DAC_SEN_n(n)           ((n) << ES1370_SERIAL_DAC_SEN_BIT)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_ADC_BITS_n(n) \
     ((n) << ES1370_SERIAL_ADC_BITS_BIT)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_ADC_CHAN_n(n) \
     ((n) << ES1370_SERIAL_ADC_CHAN_BIT)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB2_BITS_n(n) \
     ((n) << ES1370_SERIAL_PB2_BITS_BIT)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB2_CHAN_n(n) \
     ((n) << ES1370_SERIAL_PB2_CHAN_BIT)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB1_BITS_n(n) \
     ((n) << ES1370_SERIAL_PB1_BITS_BIT)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB1_CHAN_n(n) \
     ((n) << ES1370_SERIAL_PB1_CHAN_BIT)
 
+
+// Always zero
+#define ES1370_SERIAL_ZERO_GET(n) \
+    (((n) >> ES1370_SERIAL_ZERO_BIT) & ES1370_SERIAL_ZERO_MASK)
+
+// binary offset value to increment / loop end
 #define ES1370_SERIAL_END_INC_GET(n) \
     (((n) >> ES1370_SERIAL_END_INC_BIT) & ES1370_SERIAL_END_INC_MASK)
+
+// binary offset value to increment / start
 #define ES1370_SERIAL_ST_INC_GET(n) \
     (((n) >> ES1370_SERIAL_ST_INC_BIT) & ES1370_SERIAL_ST_INC_MASK)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_ADC_LOOP_SEL_GET(n) \
     (((n) >> ES1370_SERIAL_ADC_LOOP_SEL_BIT) & ES1370_SERIAL_ADC_LOOP_SEL_MASK)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB1_LOOP_SEL_GET(n) \
     (((n) >> ES1370_SERIAL_PB1_LOOP_SEL_BIT) & ES1370_SERIAL_PB1_LOOP_SEL_MASK)
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB2_LOOP_SEL_GET(n) \
     (((n) >> ES1370_SERIAL_PB2_LOOP_SEL_BIT) & ES1370_SERIAL_PB2_LOOP_SEL_MASK)
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB2_PAUSE_GET(n) \
     (((n) >> ES1370_SERIAL_PB2_PAUSE_BIT) & ES1370_SERIAL_PB2_PAUSE_MASK)
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB1_PAUSE_GET(n) \
     (((n) >> ES1370_SERIAL_PB1_PAUSE_BIT) & ES1370_SERIAL_PB1_PAUSE_MASK)
+
+// ADC interrupt enable
 #define ES1370_SERIAL_ADC_INTE_GET(n) \
     (((n) >> ES1370_SERIAL_ADC_INTE_BIT) & ES1370_SERIAL_ADC_INTE_MASK)
+
+// DAC2 interrupt enable
 #define ES1370_SERIAL_PB2_INTE_GET(n) \
     (((n) >> ES1370_SERIAL_PB2_INTE_BIT) & ES1370_SERIAL_PB2_INTE_MASK)
+
+// DAC1 interrupt enable
 #define ES1370_SERIAL_PB1_INTE_GET(n) \
     (((n) >> ES1370_SERIAL_PB1_INTE_BIT) & ES1370_SERIAL_PB1_INTE_MASK)
+
+// force saple count reload for DAC1
 #define ES1370_SERIAL_SCT_RLD_GET(n) \
     (((n) >> ES1370_SERIAL_SCT_RLD_BIT) & ES1370_SERIAL_SCT_RLD_MASK)
+
+// stop when: 0=DAC2 play back zeros, 1=play back last sample
 #define ES1370_SERIAL_DAC_SEN_GET(n) \
     (((n) >> ES1370_SERIAL_DAC_SEN_BIT) & ES1370_SERIAL_DAC_SEN_MASK)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_ADC_BITS_GET(n) \
     (((n) >> ES1370_SERIAL_ADC_BITS_BIT) & ES1370_SERIAL_ADC_BITS_MASK)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_ADC_CHAN_GET(n) \
     (((n) >> ES1370_SERIAL_ADC_CHAN_BIT) & ES1370_SERIAL_ADC_CHAN_MASK)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB2_BITS_GET(n) \
     (((n) >> ES1370_SERIAL_PB2_BITS_BIT) & ES1370_SERIAL_PB2_BITS_MASK)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB2_CHAN_GET(n) \
     (((n) >> ES1370_SERIAL_PB2_CHAN_BIT) & ES1370_SERIAL_PB2_CHAN_MASK)
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB1_BITS_GET(n) \
     (((n) >> ES1370_SERIAL_PB1_BITS_BIT) & ES1370_SERIAL_PB1_BITS_MASK)
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB1_CHAN_GET(n) \
     (((n) >> ES1370_SERIAL_PB1_CHAN_BIT) & ES1370_SERIAL_PB1_CHAN_MASK)
 
+
+// Always zero
+#define ES1370_SERIAL_ZERO_SET(r,n) \
+    ((r) = ((r) & ~ES1370_SERIAL_ZERO) | ES1370_SERIAL_ZERO_n((n)))
+
+// binary offset value to increment / loop end
 #define ES1370_SERIAL_END_INC_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_END_INC) | ES1370_SERIAL_END_INC_n((n)))
+
+// binary offset value to increment / start
 #define ES1370_SERIAL_ST_INC_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_ST_INC) | ES1370_SERIAL_ST_INC_n((n)))
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_ADC_LOOP_SEL_SET(r,n)  ((r) \
     = ((r) & ~ES1370_SERIAL_ADC_LOOP_SEL) | ES1370_SERIAL_ADC_LOOP_SEL_n((n)))
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB1_LOOP_SEL_SET(r,n)  ((r) \
     = ((r) & ~ES1370_SERIAL_PB1_LOOP_SEL) | ES1370_SERIAL_PB1_LOOP_SEL_n((n)))
+
+// 0=loop, 1=stop
 #define ES1370_SERIAL_PB2_LOOP_SEL_SET(r,n)  ((r) \
     = ((r) & ~ES1370_SERIAL_PB2_LOOP_SEL) | ES1370_SERIAL_PB2_LOOP_SEL_n((n)))
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB2_PAUSE_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB2_PAUSE) | ES1370_SERIAL_PB2_PAUSE_n((n)))
+
+// 0=play 1=pause
 #define ES1370_SERIAL_PB1_PAUSE_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB1_PAUSE) | ES1370_SERIAL_PB1_PAUSE_n((n)))
+
+// ADC interrupt enable
 #define ES1370_SERIAL_ADC_INTE_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_ADC_INTE) | ES1370_SERIAL_ADC_INTE_n((n)))
+
+// DAC2 interrupt enable
 #define ES1370_SERIAL_PB2_INTE_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB2_INTE) | ES1370_SERIAL_PB2_INTE_n((n)))
+
+// DAC1 interrupt enable
 #define ES1370_SERIAL_PB1_INTE_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB1_INTE) | ES1370_SERIAL_PB1_INTE_n((n)))
+
+// force saple count reload for DAC1
 #define ES1370_SERIAL_SCT_RLD_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_SCT_RLD) | ES1370_SERIAL_SCT_RLD_n((n)))
+
+// stop when: 0=DAC2 play back zeros, 1=play back last sample
 #define ES1370_SERIAL_DAC_SEN_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_DAC_SEN) | ES1370_SERIAL_DAC_SEN_n((n)))
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_ADC_BITS_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_ADC_BITS) | ES1370_SERIAL_ADC_BITS_n((n)))
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_ADC_CHAN_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_ADC_CHAN) | ES1370_SERIAL_ADC_CHAN_n((n)))
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB2_BITS_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB2_BITS) | ES1370_SERIAL_PB2_BITS_n((n)))
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB2_CHAN_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB2_CHAN) | ES1370_SERIAL_PB2_CHAN_n((n)))
+
+// 0=8-bit, 1=16-bit
 #define ES1370_SERIAL_PB1_BITS_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB1_BITS) | ES1370_SERIAL_PB1_BITS_n((n)))
+
+// 0=mono, 1=stereo
 #define ES1370_SERIAL_PB1_CHAN_SET(r,n) \
     ((r) = ((r) & ~ES1370_SERIAL_PB1_CHAN) | ES1370_SERIAL_PB1_CHAN_n((n)))
 
-// ES1370_PB1FC
-#define ES1370_PB1FC 0x24
+//
+// ES1370_DAC1_COUNT: R/W: DAC1 sample count register
+#define ES1370_DAC1_COUNT                      0x24
 
-// ES1370_PB2FC
-#define ES1370_PB2FC 0x28
+#define ES1370_DAC1_COUNT_CURR_COUNT_BIT       16
+#define ES1370_DAC1_COUNT_LAST_BIT             0
 
-// ES1370_RECFC
-#define ES1370_RECFC                      0x2C
+#define ES1370_DAC1_COUNT_CURR_COUNT_BITS      16
+#define ES1370_DAC1_COUNT_LAST_BITS            16
+#define ES1370_DAC1_COUNT_CURR_COUNT_MASK \
+    ((1U << ES1370_DAC1_COUNT_CURR_COUNT_BITS)-1)
+#define ES1370_DAC1_COUNT_LAST_MASK \
+    ((1U << ES1370_DAC1_COUNT_LAST_BITS)-1)
+#define ES1370_DAC1_COUNT_CURR_COUNT \
+    (ES1370_DAC1_COUNT_CURR_COUNT_MASK << ES1370_DAC1_COUNT_CURR_COUNT_BIT)
+#define ES1370_DAC1_COUNT_LAST \
+    (ES1370_DAC1_COUNT_LAST_MASK << ES1370_DAC1_COUNT_LAST_BIT)
 
-#define ES1370_RECFC_CURR_COUNT_BIT       16
-#define ES1370_RECFC_COUNT_BIT            0
+#define ES1370_DAC1_COUNT_CURR_COUNT_n(n) \
+    ((n) << ES1370_DAC1_COUNT_CURR_COUNT_BIT)
+#define ES1370_DAC1_COUNT_LAST_n(n) \
+    ((n) << ES1370_DAC1_COUNT_LAST_BIT)
 
-#define ES1370_RECFC_CURR_COUNT_BITS      16
-#define ES1370_RECFC_COUNT_BITS           16
-#define ES1370_RECFC_CURR_COUNT_MASK \
-    ((1U << ES1370_RECFC_CURR_COUNT_BITS)-1)
-#define ES1370_RECFC_COUNT_MASK           ((1U << ES1370_RECFC_COUNT_BITS)-1)
-#define ES1370_RECFC_CURR_COUNT \
-    (ES1370_RECFC_CURR_COUNT_MASK << ES1370_RECFC_CURR_COUNT_BIT)
-#define ES1370_RECFC_COUNT \
-    (ES1370_RECFC_COUNT_MASK << ES1370_RECFC_COUNT_BIT)
+#define ES1370_DAC1_COUNT_CURR_COUNT_GET(n)    (((n) \
+    >> ES1370_DAC1_COUNT_CURR_COUNT_BIT) & ES1370_DAC1_COUNT_CURR_COUNT_MASK)
+#define ES1370_DAC1_COUNT_LAST_GET(n) \
+    (((n) >> ES1370_DAC1_COUNT_LAST_BIT) & ES1370_DAC1_COUNT_LAST_MASK)
 
-#define ES1370_RECFC_CURR_COUNT_n(n)      ((n) << ES1370_RECFC_CURR_COUNT_BIT)
-#define ES1370_RECFC_COUNT_n(n)           ((n) << ES1370_RECFC_COUNT_BIT)
+#define ES1370_DAC1_COUNT_CURR_COUNT_SET(r,n)  ((r) = ((r) \
+    & ~ES1370_DAC1_COUNT_CURR_COUNT) | ES1370_DAC1_COUNT_CURR_COUNT_n((n)))
+#define ES1370_DAC1_COUNT_LAST_SET(r,n) \
+    ((r) = ((r) & ~ES1370_DAC1_COUNT_LAST) | ES1370_DAC1_COUNT_LAST_n((n)))
 
-#define ES1370_RECFC_CURR_COUNT_GET(n) \
-    (((n) >> ES1370_RECFC_CURR_COUNT_BIT) & ES1370_RECFC_CURR_COUNT_MASK)
-#define ES1370_RECFC_COUNT_GET(n) \
-    (((n) >> ES1370_RECFC_COUNT_BIT) & ES1370_RECFC_COUNT_MASK)
+//
+// ES1370_DAC2_COUNT: R/W: DAC2 sample count register
+#define ES1370_DAC2_COUNT                      0x28
 
-#define ES1370_RECFC_CURR_COUNT_SET(r,n) \
-    ((r) = ((r) & ~ES1370_RECFC_CURR_COUNT) | ES1370_RECFC_CURR_COUNT_n((n)))
-#define ES1370_RECFC_COUNT_SET(r,n) \
-    ((r) = ((r) & ~ES1370_RECFC_COUNT) | ES1370_RECFC_COUNT_n((n)))
+#define ES1370_DAC2_COUNT_CURR_COUNT_BIT       16
+#define ES1370_DAC2_COUNT_LAST_BIT             0
 
-// ES1370_PGC_PB1ADDR
-#define ES1370_PGC_PB1ADDR 0x30
+#define ES1370_DAC2_COUNT_CURR_COUNT_BITS      16
+#define ES1370_DAC2_COUNT_LAST_BITS            16
+#define ES1370_DAC2_COUNT_CURR_COUNT_MASK \
+    ((1U << ES1370_DAC2_COUNT_CURR_COUNT_BITS)-1)
+#define ES1370_DAC2_COUNT_LAST_MASK \
+    ((1U << ES1370_DAC2_COUNT_LAST_BITS)-1)
+#define ES1370_DAC2_COUNT_CURR_COUNT \
+    (ES1370_DAC2_COUNT_CURR_COUNT_MASK << ES1370_DAC2_COUNT_CURR_COUNT_BIT)
+#define ES1370_DAC2_COUNT_LAST \
+    (ES1370_DAC2_COUNT_LAST_MASK << ES1370_DAC2_COUNT_LAST_BIT)
 
-// ES1370_PGC_PB1DEF
-#define ES1370_PGC_PB1DEF 0x34
+#define ES1370_DAC2_COUNT_CURR_COUNT_n(n) \
+    ((n) << ES1370_DAC2_COUNT_CURR_COUNT_BIT)
+#define ES1370_DAC2_COUNT_LAST_n(n) \
+    ((n) << ES1370_DAC2_COUNT_LAST_BIT)
 
-// ES1370_PGC_PB2ADDR
-#define ES1370_PGC_PB2ADDR 0x38
+#define ES1370_DAC2_COUNT_CURR_COUNT_GET(n)    (((n) \
+    >> ES1370_DAC2_COUNT_CURR_COUNT_BIT) & ES1370_DAC2_COUNT_CURR_COUNT_MASK)
+#define ES1370_DAC2_COUNT_LAST_GET(n) \
+    (((n) >> ES1370_DAC2_COUNT_LAST_BIT) & ES1370_DAC2_COUNT_LAST_MASK)
 
-// ES1370_PGC_PB2DEF
-#define ES1370_PGC_PB2DEF 0x3C
+#define ES1370_DAC2_COUNT_CURR_COUNT_SET(r,n)  ((r) = ((r) \
+    & ~ES1370_DAC2_COUNT_CURR_COUNT) | ES1370_DAC2_COUNT_CURR_COUNT_n((n)))
+#define ES1370_DAC2_COUNT_LAST_SET(r,n) \
+    ((r) = ((r) & ~ES1370_DAC2_COUNT_LAST) | ES1370_DAC2_COUNT_LAST_n((n)))
 
-// ES1370_PGD_RECADDR
-#define ES1370_PGD_RECADDR 0x30
+//
+// ES1370_ADC_COUNT: R/W: ADC sample count register
+#define ES1370_ADC_COUNT                      0x2C
 
-// ES1370_PGD_RECDEF
-#define ES1370_PGD_RECDEF 0x34
+#define ES1370_ADC_COUNT_CURR_COUNT_BIT       16
+#define ES1370_ADC_COUNT_LAST_BIT             0
+
+#define ES1370_ADC_COUNT_CURR_COUNT_BITS      16
+#define ES1370_ADC_COUNT_LAST_BITS            16
+#define ES1370_ADC_COUNT_CURR_COUNT_MASK \
+    ((1U << ES1370_ADC_COUNT_CURR_COUNT_BITS)-1)
+#define ES1370_ADC_COUNT_LAST_MASK \
+    ((1U << ES1370_ADC_COUNT_LAST_BITS)-1)
+#define ES1370_ADC_COUNT_CURR_COUNT \
+    (ES1370_ADC_COUNT_CURR_COUNT_MASK << ES1370_ADC_COUNT_CURR_COUNT_BIT)
+#define ES1370_ADC_COUNT_LAST \
+    (ES1370_ADC_COUNT_LAST_MASK << ES1370_ADC_COUNT_LAST_BIT)
+
+#define ES1370_ADC_COUNT_CURR_COUNT_n(n) \
+    ((n) << ES1370_ADC_COUNT_CURR_COUNT_BIT)
+#define ES1370_ADC_COUNT_LAST_n(n) \
+    ((n) << ES1370_ADC_COUNT_LAST_BIT)
+
+#define ES1370_ADC_COUNT_CURR_COUNT_GET(n)    (((n) \
+    >> ES1370_ADC_COUNT_CURR_COUNT_BIT) & ES1370_ADC_COUNT_CURR_COUNT_MASK)
+#define ES1370_ADC_COUNT_LAST_GET(n) \
+    (((n) >> ES1370_ADC_COUNT_LAST_BIT) & ES1370_ADC_COUNT_LAST_MASK)
+
+#define ES1370_ADC_COUNT_CURR_COUNT_SET(r,n)  ((r) = \
+    ((r) & ~ES1370_ADC_COUNT_CURR_COUNT) | ES1370_ADC_COUNT_CURR_COUNT_n((n)))
+#define ES1370_ADC_COUNT_LAST_SET(r,n) \
+    ((r) = ((r) & ~ES1370_ADC_COUNT_LAST) | ES1370_ADC_COUNT_LAST_n((n)))
+
+//
+// ES1370_DAC1_FRAME: R/W: PAGE 0x0c; DAC1 frame address
+#define ES1370_DAC1_FRAME                0x30
+
+
+// DAC1 source address
+#define ES1370_DAC1_FRAME_ADDR_BIT       0
+
+
+// DAC1 source address
+#define ES1370_DAC1_FRAME_ADDR_BITS      32
+
+// DAC1 source address
+#define ES1370_DAC1_FRAME_ADDR_MASK \
+    ((1U << ES1370_DAC1_FRAME_ADDR_BITS)-1)
+
+// DAC1 source address
+#define ES1370_DAC1_FRAME_ADDR \
+    (ES1370_DAC1_FRAME_ADDR_MASK << ES1370_DAC1_FRAME_ADDR_BIT)
+
+
+// DAC1 source address
+#define ES1370_DAC1_FRAME_ADDR_n(n)      ((n) << ES1370_DAC1_FRAME_ADDR_BIT)
+
+
+// DAC1 source address
+#define ES1370_DAC1_FRAME_ADDR_GET(n) \
+    (((n) >> ES1370_DAC1_FRAME_ADDR_BIT) & ES1370_DAC1_FRAME_ADDR_MASK)
+
+
+// DAC1 source address
+#define ES1370_DAC1_FRAME_ADDR_SET(r,n) \
+    ((r) = ((r) & ~ES1370_DAC1_FRAME_ADDR) | ES1370_DAC1_FRAME_ADDR_n((n)))
+
+//
+// ES1370_DAC1_SIZE: R/W: PAGE 0x0c; DAC1 frame size
+#define ES1370_DAC1_SIZE                      0x34
+
+#define ES1370_DAC1_SIZE_CURR_COUNT_BIT       16
+#define ES1370_DAC1_SIZE_LAST_BIT             0
+
+#define ES1370_DAC1_SIZE_CURR_COUNT_BITS      16
+#define ES1370_DAC1_SIZE_LAST_BITS            16
+#define ES1370_DAC1_SIZE_CURR_COUNT_MASK \
+    ((1U << ES1370_DAC1_SIZE_CURR_COUNT_BITS)-1)
+#define ES1370_DAC1_SIZE_LAST_MASK \
+    ((1U << ES1370_DAC1_SIZE_LAST_BITS)-1)
+#define ES1370_DAC1_SIZE_CURR_COUNT \
+    (ES1370_DAC1_SIZE_CURR_COUNT_MASK << ES1370_DAC1_SIZE_CURR_COUNT_BIT)
+#define ES1370_DAC1_SIZE_LAST \
+    (ES1370_DAC1_SIZE_LAST_MASK << ES1370_DAC1_SIZE_LAST_BIT)
+
+#define ES1370_DAC1_SIZE_CURR_COUNT_n(n) \
+    ((n) << ES1370_DAC1_SIZE_CURR_COUNT_BIT)
+#define ES1370_DAC1_SIZE_LAST_n(n) \
+    ((n) << ES1370_DAC1_SIZE_LAST_BIT)
+
+#define ES1370_DAC1_SIZE_CURR_COUNT_GET(n)    (((n) \
+    >> ES1370_DAC1_SIZE_CURR_COUNT_BIT) & ES1370_DAC1_SIZE_CURR_COUNT_MASK)
+#define ES1370_DAC1_SIZE_LAST_GET(n) \
+    (((n) >> ES1370_DAC1_SIZE_LAST_BIT) & ES1370_DAC1_SIZE_LAST_MASK)
+
+#define ES1370_DAC1_SIZE_CURR_COUNT_SET(r,n)  ((r) = \
+    ((r) & ~ES1370_DAC1_SIZE_CURR_COUNT) | ES1370_DAC1_SIZE_CURR_COUNT_n((n)))
+#define ES1370_DAC1_SIZE_LAST_SET(r,n) \
+    ((r) = ((r) & ~ES1370_DAC1_SIZE_LAST) | ES1370_DAC1_SIZE_LAST_n((n)))
+
+//
+// ES1370_DAC2_FRAME: R/W: PAGE 0x0c; DAC2 frame address
+#define ES1370_DAC2_FRAME                0x38
+
+
+// DAC2 source address
+#define ES1370_DAC2_FRAME_ADDR_BIT       0
+
+
+// DAC2 source address
+#define ES1370_DAC2_FRAME_ADDR_BITS      32
+
+// DAC2 source address
+#define ES1370_DAC2_FRAME_ADDR_MASK \
+    ((1U << ES1370_DAC2_FRAME_ADDR_BITS)-1)
+
+// DAC2 source address
+#define ES1370_DAC2_FRAME_ADDR \
+    (ES1370_DAC2_FRAME_ADDR_MASK << ES1370_DAC2_FRAME_ADDR_BIT)
+
+
+// DAC2 source address
+#define ES1370_DAC2_FRAME_ADDR_n(n)      ((n) << ES1370_DAC2_FRAME_ADDR_BIT)
+
+
+// DAC2 source address
+#define ES1370_DAC2_FRAME_ADDR_GET(n) \
+    (((n) >> ES1370_DAC2_FRAME_ADDR_BIT) & ES1370_DAC2_FRAME_ADDR_MASK)
+
+
+// DAC2 source address
+#define ES1370_DAC2_FRAME_ADDR_SET(r,n) \
+    ((r) = ((r) & ~ES1370_DAC2_FRAME_ADDR) | ES1370_DAC2_FRAME_ADDR_n((n)))
+
+//
+// ES1370_DAC2_SIZE: R/W: PAGE 0x0c; DAC2 frame size
+#define ES1370_DAC2_SIZE                      0x3c
+
+#define ES1370_DAC2_SIZE_CURR_COUNT_BIT       16
+#define ES1370_DAC2_SIZE_LAST_BIT             0
+
+#define ES1370_DAC2_SIZE_CURR_COUNT_BITS      16
+#define ES1370_DAC2_SIZE_LAST_BITS            16
+#define ES1370_DAC2_SIZE_CURR_COUNT_MASK \
+    ((1U << ES1370_DAC2_SIZE_CURR_COUNT_BITS)-1)
+#define ES1370_DAC2_SIZE_LAST_MASK \
+    ((1U << ES1370_DAC2_SIZE_LAST_BITS)-1)
+#define ES1370_DAC2_SIZE_CURR_COUNT \
+    (ES1370_DAC2_SIZE_CURR_COUNT_MASK << ES1370_DAC2_SIZE_CURR_COUNT_BIT)
+#define ES1370_DAC2_SIZE_LAST \
+    (ES1370_DAC2_SIZE_LAST_MASK << ES1370_DAC2_SIZE_LAST_BIT)
+
+#define ES1370_DAC2_SIZE_CURR_COUNT_n(n) \
+    ((n) << ES1370_DAC2_SIZE_CURR_COUNT_BIT)
+#define ES1370_DAC2_SIZE_LAST_n(n) \
+    ((n) << ES1370_DAC2_SIZE_LAST_BIT)
+
+#define ES1370_DAC2_SIZE_CURR_COUNT_GET(n)    (((n) \
+    >> ES1370_DAC2_SIZE_CURR_COUNT_BIT) & ES1370_DAC2_SIZE_CURR_COUNT_MASK)
+#define ES1370_DAC2_SIZE_LAST_GET(n) \
+    (((n) >> ES1370_DAC2_SIZE_LAST_BIT) & ES1370_DAC2_SIZE_LAST_MASK)
+
+#define ES1370_DAC2_SIZE_CURR_COUNT_SET(r,n)  ((r) = \
+    ((r) & ~ES1370_DAC2_SIZE_CURR_COUNT) | ES1370_DAC2_SIZE_CURR_COUNT_n((n)))
+#define ES1370_DAC2_SIZE_LAST_SET(r,n) \
+    ((r) = ((r) & ~ES1370_DAC2_SIZE_LAST) | ES1370_DAC2_SIZE_LAST_n((n)))
 
 // ES1370_PGE_UARTDATA
 #define ES1370_PGE_UARTDATA 0x30
@@ -918,4 +1998,7 @@
 
 // ES1370_SMPREG_VFREQ_FRAC
 #define ES1370_SMPREG_VFREQ_FRAC 0x03
+
+// ES1370_REG__END
+#define ES1370_REG__END 0x40
 

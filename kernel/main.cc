@@ -1132,7 +1132,7 @@ struct symbols_t {
         if (unlikely(len < 0))
             return;
 
-        if (!buf.reset(new (ext::nothrow) char[len]))
+        if (unlikely(!buf.reset(new (ext::nothrow) char[len])))
             panic_oom();
 
         if (unlikely(!buf))

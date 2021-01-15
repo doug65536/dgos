@@ -11,6 +11,11 @@ static size_t emergency_ptr = sizeof(emergency_space);
 
 namespace std { void terminate(); }
 
+extern "C" void __cxa_pure_virtual()
+{
+    std::terminate();
+}
+
 /// Effects: Allocates memory to hold the exception to be thrown.
 /// thrown_size is the size of the exception object.
 /// Can allocate additional memory to hold private data.
@@ -286,7 +291,7 @@ char* __cxa_demangle(const char* mangled_name, char* output_buffer,
 
 }
 
-void* __dynamic_cast(const void* __src_ptr,
+void* __dynamic_cast(void const* __src_ptr,
                      const __class_type_info* __src_type,
                      const __class_type_info* __dst_type,
                      ptrdiff_t __src2dst)

@@ -1,7 +1,7 @@
 #pragma once
 #include <stdarg.h>
 #include "types.h"
-#include "bioscall.h"
+//#include "bioscall.h"
 #include "screen_abstract.h"
 
 __BEGIN_DECLS

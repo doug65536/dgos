@@ -97,10 +97,12 @@ public:
     }
 
     // Make the destruct a noop
-    void release()
+    void *release()
     {
+        void *__p = __m;
         __m = nullptr;
         __sz = 0;
+        return __p;
     }
 
     void reset(_T *__new_p = (_T*)MAP_FAILED, size_t __new_sz = 0)

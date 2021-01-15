@@ -1,11 +1,9 @@
 u switch-mode
-#ldsym global "sym/mbr-elf.sym"
-#ldsym global "sym/boot1-elf.sym"
+ldsym global "sym/mbr-elf.sym"
+ldsym global "sym/boot1-elf.sym"
 ldsym global "sym/bootfat-elf.sym"
 
-#lb relocated_mbr_entry
-#lb relocated_boot1_entry
-lb __assert_failed
-lb cpu_debug_break
-lb early_init
-lb long_mode_entry
+lb 0x7c00
+lb relocated_boot1_entry
+lb run_kernel
+c

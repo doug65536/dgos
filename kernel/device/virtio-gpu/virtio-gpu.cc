@@ -10,7 +10,7 @@
 #include "heap.h"
 #include "conio.h"
 #include "framebuffer.h"
-#include "vesainfo.h"
+#include "modeinfo.h"
 #include "threadsync.h"
 
 #define DEBUG_VIRTIO_GPU 1
@@ -118,7 +118,7 @@ private:
     #define VIRTIO_GPU_MAX_SCANOUTS     16
 
     struct virtio_gpu_ctrl_hdr_t {
-        virtio_gpu_ctrl_hdr_t(uint32_t type)
+        explicit virtio_gpu_ctrl_hdr_t(uint32_t type)
             : type(type)
         {
         }
@@ -657,17 +657,18 @@ bool virtio_gpu_dev_t::issue_get_display_info()
     VIRTIO_GPU_TRACE("Issuing get display info...\n");
 
     cmd_queue->sendrecv(&get_display_info, sizeof(get_display_info),
-                        &display_info_resp, sizeof(display_info_resp), &iocp);
+                        &display_info_resp, sizeof(display_info_resp));
 
-    if (!iocp.wait_until(ext::chrono::steady_clock::now() +
-                         ext::chrono::seconds(5))) {
+    if (unlikely(!iocp.wait_until(ext::chrono::steady_clock::now() +
+                                  ext::chrono::seconds(5)))) {
         VIRTIO_GPU_TRACE("...timed out!\n");
         return false;
     }
 
     VIRTIO_GPU_TRACE("...get display info completed\n");
 
-    if (display_info_resp.hdr.type != VIRTIO_GPU_RESP_OK_DISPLAY_INFO)
+    if (unlikely(display_info_resp.hdr.type !=
+                 VIRTIO_GPU_RESP_OK_DISPLAY_INFO))
         return false;
 
     scrn_w = display_info_resp.pmodes[0].r.width;
@@ -734,7 +735,8 @@ bool virtio_gpu_dev_t::issue_resource_unref(uint32_t resource_id)
 
     VIRTIO_GPU_TRACE("Issuing resource unref,,,\n");
 
-    cmd_queue->sendrecv(&unref, sizeof(unref), &resp, sizeof(resp), &iocp);
+    cmd_queue->sendrecv(&unref, sizeof(unref),
+                        &resp, sizeof(resp), &iocp);
     iocp.wait();
 
     VIRTIO_GPU_TRACE("...resource unred completed\n");
@@ -751,7 +753,6 @@ bool virtio_gpu_dev_t::issue_create_render_target(
 {
     virtio_gpu_resource_create_2d_t create_3d{};
     virtio_gpu_ctrl_hdr_t resp(0);
-    blocking_iocp_t iocp;
 
     create_3d.hdr.ctx_id = ctx_id;
     //create_3d.bind = VIRGL_RES_BIND_RENDER_TARGET;
@@ -764,7 +765,7 @@ bool virtio_gpu_dev_t::issue_create_render_target(
     VIRTIO_GPU_TRACE("Issuing create 3d...\n");
 
     cmd_queue->sendrecv(&create_3d, sizeof(create_3d),
-                        &resp, sizeof(resp), &iocp);
+                        &resp, sizeof(resp));
 
     VIRTIO_GPU_TRACE("...create 3d completed\n");
 
@@ -777,7 +778,6 @@ bool virtio_gpu_dev_t::issue_create_render_target(
 bool virtio_gpu_dev_t::issue_attach_backing(
         uint32_t resource_id, void *backbuf, uint32_t backbuf_sz)
 {
-    blocking_iocp_t iocp;
     virtio_gpu_ctrl_hdr_t resp(0);
 
     // Calculate worst case physical range list size
@@ -815,8 +815,7 @@ bool virtio_gpu_dev_t::issue_attach_backing(
     VIRTIO_GPU_TRACE("Issuing attach backing...\n");
 
     cmd_queue->sendrecv(backing_cmd.get(), backing_cmd_sz,
-                        &resp, sizeof(resp), &iocp);
-    iocp.wait();
+                        &resp, sizeof(resp));
 
     VIRTIO_GPU_TRACE("...attach backing complete\n");
 
@@ -829,7 +828,6 @@ bool virtio_gpu_dev_t::issue_attach_backing(
 bool virtio_gpu_dev_t::issue_set_scanout(
         uint32_t scanout_id, uint32_t resource_id)
 {
-    blocking_iocp_t iocp;
     virtio_gpu_ctrl_hdr_t resp(0);
 
     virtio_gpu_set_scanout_t set_scanout{};
@@ -844,8 +842,7 @@ bool virtio_gpu_dev_t::issue_set_scanout(
     VIRTIO_GPU_TRACE("Issuing set scanout...\n");
 
     cmd_queue->sendrecv(&set_scanout, sizeof(set_scanout),
-                        &resp, sizeof(resp), &iocp);
-    iocp.wait();
+                        &resp, sizeof(resp));
 
     VIRTIO_GPU_TRACE("...set scanout completed\n");
 
@@ -860,7 +857,6 @@ bool virtio_gpu_dev_t::issue_transfer_to_host_2d(
 {
     virtio_gpu_transfer_to_host_2d_t xfer{};
     virtio_gpu_ctrl_hdr_t resp(0);
-    blocking_iocp_t iocp;
 
     xfer.r.x = x;
     xfer.r.y = y;
@@ -870,8 +866,7 @@ bool virtio_gpu_dev_t::issue_transfer_to_host_2d(
 
     VIRTIO_GPU_TRACE("Issuing transfer to host 2d...\n");
 
-    cmd_queue->sendrecv(&xfer, sizeof(xfer), &resp, sizeof(resp), &iocp);
-    iocp.wait();
+    cmd_queue->sendrecv(&xfer, sizeof(xfer), &resp, sizeof(resp));
 
     VIRTIO_GPU_TRACE("...transfer to host 2d completed\n");
 

@@ -6,21 +6,19 @@
 #include "screen.h"
 #include "malloc.h"
 #include "paging.h"
-#include "cpu.h"
-#include "diskio.h"
+//#include "cpu.h"
+//#include "diskio.h"
 #include "physmem.h"
 #include "mpentry.h"
 #include "farptr.h"
-#include "vesa.h"
+#include "modelist.h"
 #include "progressbar.h"
 #include "messagebar.h"
 #include "bootloader.h"
 #include "bootmenu.h"
 #include "physmap.h"
 #include "qemu.h"
-
-extern "C" _noreturn
-void enter_kernel(uint64_t entry_point, uint64_t base) _section(".smp.text");
+#include "x86/cpu_x86.h"
 
 // Save the entry point address for later MP processor startup
 uint64_t smp_entry_point _section(".smp.data");
@@ -34,6 +32,9 @@ static int64_t initrd_size;
 extern char ___smp_st[];
 extern char ___smp_en[];
 
+// stack pointers
+extern char ___initial_stack_limit[];
+extern char ___initial_stack[];
 
 elf64_context_t *load_kernel_begin()
 {
@@ -174,192 +175,6 @@ static kernel_params_t *prompt_kernel_param(
     return params;
 }
 
-static _always_inline uint64_t cpu_msr_get(uint32_t msr)
-{
-    uint32_t lo, hi;
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        : "=a" (lo)
-        , "=d" (hi)
-        : "c" (msr)
-    );
-    return ((uint64_t)hi << 32) | lo;
-}
-
-#define IA32_MTRRCAP    0xFE
-
-#define IA32_MTRR_PHYSBASE_n(n) (0x200 + ((n)*2))
-#define IA32_MTRR_PHYSMASK_n(n) (0x201 + ((n)*2))
-#define IA32_MTRR_FIX64K_00000  0x250
-#define IA32_MTRR_FIX16K_80000  0x258
-#define IA32_MTRR_FIX16K_A0000  0x259
-#define IA32_MTRR_FIX4K_C0000   0x268
-#define IA32_MTRR_FIX4K_C8000   0x269
-#define IA32_MTRR_FIX4K_D0000   0x26A
-#define IA32_MTRR_FIX4K_D8000   0x26B
-#define IA32_MTRR_FIX4K_E0000   0x26C
-#define IA32_MTRR_FIX4K_E8000   0x26D
-#define IA32_MTRR_FIX4K_F0000   0x26E
-#define IA32_MTRR_FIX4K_F8000   0x26F
-#define IA32_MTRR_DEF_TYPE      0x2FF
-#define IA32_MTRR_DEF_TYPE_MASK     0x3
-#define IA32_MTRR_DEF_TYPE_FIXED_EN (1<<10)
-#define IA32_MTRR_DEF_TYPE_MTRR_EN  (1<<11)
-__BEGIN_ANONYMOUS
-
-#define IA32_MTRR_MEMTYPE_UC 0
-#define IA32_MTRR_MEMTYPE_WC 1
-#define IA32_MTRR_MEMTYPE_WT 4
-#define IA32_MTRR_MEMTYPE_WP 5
-#define IA32_MTRR_MEMTYPE_WB 6
-
-struct mtrr_info_t {
-    // Fixed MTRRs are packed, 8 memory type (bytes) per MSR
-    // 8 64KB regions, 512KB, 1 MSR
-    // 16 16KB regions, 256KB, 2 MSRs
-    // 64 4KB regions, 256KB, 8 MSRs
-    // Variable MTRRs are two MSRs each, base_en and mask
-    // 8 variable ranges, 16 MSRs
-
-    // 8 64KB, 16 16KB, 64 4KB = 88 memory types in 11 MSRs
-    uint8_t fixed_types[8+16+64] = {};
-
-    uint64_t fixed_bases[16] = {};
-    uint64_t fixed_masks[16] = {};
-
-    uint8_t vcnt = 0;
-    uint8_t def_type = 0;
-    bool enabled_fixed = false;
-    bool enabled_mtrr = false;
-    bool support_wc = false;
-    bool support_smrr = false;
-
-    mtrr_info_t();
-    mtrr_info_t(mtrr_info_t const&) = default;
-    mtrr_info_t &operator=(mtrr_info_t const&) = default;
-    ~mtrr_info_t() = default;
-
-    uint8_t memtype_of(uint64_t addr)
-    {
-        uint64_t byte_index;
-
-        if (addr < 0x100000) {
-            if (addr < 0x80000) {
-                byte_index = addr - 0x80000;
-                byte_index >>= 16;
-            } else if (addr < 0xC0000) {
-                byte_index = addr - 0xA0000;
-                byte_index >>= 14;
-                byte_index += 8;
-            } else {
-                byte_index = addr - 0xC0000;
-                byte_index >>= 12;
-                byte_index += 8 + 16;
-            }
-
-            return fixed_types[byte_index];
-        }
-
-        for (size_t i = 0; i < vcnt; ++i) {
-            bool valid = fixed_masks[i] & (1<<11);
-
-            if (!valid)
-                continue;
-
-            uint64_t mask = fixed_masks[i] & -(1 << 12);
-
-            uint8_t type = fixed_bases[i] & 0xFF;
-            uint64_t base = fixed_bases[i] & -(1 << 12);
-
-            uint64_t mask_base = mask & base;
-            uint64_t mask_target = mask & (addr & -(1 << 12));
-
-            if (mask_base == mask_target)
-                return type;
-        }
-
-        return def_type;
-    }
-};
-
-mtrr_info_t::mtrr_info_t()
-{
-    //
-    // See if MTRR supported at all
-
-    cpuid_t info;
-
-    if (unlikely(!cpuid(&info, 1, 0)))
-        return;
-
-    if (unlikely(!(info.edx & (1 << 12))))
-        return;
-
-    uint64_t reg;
-
-    //
-    // Read MTRR capabilities
-
-    reg = cpu_msr_get(IA32_MTRRCAP);
-
-    vcnt = reg & 0xFF;
-    bool support_fixed = reg & (1 << 8);
-    support_wc = reg & (1 << 10);
-    support_smrr = reg & (1 << 11);
-
-    reg = cpu_msr_get(IA32_MTRR_DEF_TYPE);
-
-    def_type = reg & IA32_MTRR_DEF_TYPE_MASK;
-    enabled_fixed = support_fixed && (reg & IA32_MTRR_DEF_TYPE_FIXED_EN);
-    enabled_mtrr = reg & IA32_MTRR_DEF_TYPE_MTRR_EN;
-
-    if (enabled_fixed) {
-        reg = cpu_msr_get(IA32_MTRR_FIX64K_00000);
-        memcpy(fixed_types + 0 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX16K_80000);
-        memcpy(fixed_types + 1 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX16K_A0000);
-        memcpy(fixed_types + 2 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_C0000);
-        memcpy(fixed_types + 3 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_C8000);
-        memcpy(fixed_types + 4 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_D0000);
-        memcpy(fixed_types + 5 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_D8000);
-        memcpy(fixed_types + 6 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_E0000);
-        memcpy(fixed_types + 7 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_E8000);
-        memcpy(fixed_types + 8 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_F0000);
-        memcpy(fixed_types + 9 * sizeof(reg), &reg, sizeof(reg));
-
-        reg = cpu_msr_get(IA32_MTRR_FIX4K_F8000);
-        memcpy(fixed_types + 10 * sizeof(reg), &reg, sizeof(reg));
-    }
-
-    if (vcnt) {
-        assert(vcnt < 16);
-
-        for (size_t i = 0; i < vcnt; ++i) {
-            fixed_bases[i] = cpu_msr_get(IA32_MTRR_PHYSBASE_n(i));
-            fixed_masks[i] = cpu_msr_get(IA32_MTRR_PHYSMASK_n(i));
-        }
-    }
-}
-
-__END_ANONYMOUS
-
 _noreturn
 static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 {
@@ -373,7 +188,7 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     memcpy(ap_entry_ptr, ___smp_st, smp_sz);
 
     // Identity map the real mode bootloader stack area for long mode entry
-    paging_map_physical(0x20000, 0x20000, 0x10000,
+    paging_map_physical( 0x20000, 0x20000, 0x10000,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
     // Map a page that the kernel can use to manipulate
@@ -407,10 +222,11 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     PRINT("Physical mapping, base=%" PRIx64 ", size=%" PRIx64 "\n",
           physmap_addr, top_addr);
 
-    // Very carefully iterate through only allocated memory and system memory
-    for (size_t i = 0; i < phys_mem_table_size; ++i) {
+//    // Very carefully iterate through only allocated
+//    // memory and system memory (and check for MTRR vs page table UB)
+//    for (size_t i = 0; i < phys_mem_table_size; ++i) {
 
-    }
+//    }
 
     paging_map_physical(0, physmap_addr, top_addr,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
@@ -424,16 +240,18 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     params->phys_mapping = physmap_addr;
     params->phys_mapping_sz = top_addr;
 
-    // This check is done late to make debugging easier
-    // It is impossible to debug 32 bit code on qemu-x86_64 target
-//    if (unlikely(!cpu_has_long_mode()))
-//        PANIC("Need 64-bit CPU");
-
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 
     PRINT("Bootloader entering kernel");
 
-    run_kernel(entry_point, params);
+    physmap_dump(TSTR "Before run kernel");
+
+//    // This check is done late to make debugging easier
+//    // It is impossible to debug 32 bit code on qemu-x86_64 target
+//    if (unlikely(!cpu_has_long_mode()))
+//        PANIC("Need 64-bit CPU");
+
+    run_kernel(&entry_point, params);
 }
 
 void enter_kernel(uint64_t entry_point, uint64_t base)
@@ -442,7 +260,7 @@ void enter_kernel(uint64_t entry_point, uint64_t base)
         smp_entry_point = entry_point;
         enter_kernel_initial(entry_point, base);
     } else {
-        run_kernel(entry_point, nullptr);
+        run_kernel(&entry_point, nullptr);
     }
 }
 
@@ -503,7 +321,8 @@ void load_initrd(int initrd_fd, off_t initrd_filesize, elf64_context_t *ctx)
     alloc_page_factory_t allocator;
 
     paging_map_range(&allocator, initrd_base, initrd_size,
-                     PTE_PRESENT | PTE_ACCESSED | PTE_NX);
+                     PTE_PRESENT | PTE_ACCESSED |
+                     (PTE_NX & -nx_available));
 
     constexpr off_t sz2M = 1 << 21;
     for (off_t blk_end, ofs = 0; ofs < initrd_size; ofs = blk_end) {
@@ -543,7 +362,7 @@ void apply_relocations(int file, Elf64_Ehdr const &file_hdr, Elf64_Shdr *shdrs)
 
     for (size_t i = 0; i < file_hdr.e_shnum; ++i) {
         // If no adjustment, don't bother
-        if (!base_adj)
+        if (unlikely(!base_adj))
             break;
 
         if (shdrs[i].sh_type != SHT_RELA)
@@ -596,7 +415,7 @@ void validate_executable(Elf64_Ehdr file_hdr)
         PANIC("Executable is for an unexpected machine id");
 }
 
-void elf64_run(tchar const *filename)
+elf64_loadaddr_t elf64_load(tchar const *filename)
 {
     cpu_init();
 
@@ -605,10 +424,12 @@ void elf64_run(tchar const *filename)
         pge_page_flags |= PTE_GLOBAL;
 
     uint64_t nx_page_flags = 0;
-    if (likely(cpu_has_no_execute()))
+    if (likely(nx_available))
         nx_page_flags = PTE_NX;
 
-    message_bar_draw(10, 7, 70, TSTR "Getting initrd size");
+    tchar const *initrd_pathname = TSTR "boot/initrd-light";
+
+    message_bar_draw(10, 7, 70, initrd_pathname);
 
     int initrd_fd = boot_open(TSTR "boot/initrd");
 
@@ -617,7 +438,7 @@ void elf64_run(tchar const *filename)
 
     initrd_size = boot_filesize(initrd_fd);
 
-    if (initrd_size < 0)
+    if (unlikely(initrd_size < 0))
         PANIC("Unable to determine initrd size");
 
     boot_close(initrd_fd);
@@ -655,11 +476,11 @@ void elf64_run(tchar const *filename)
                      read_size, file_hdr.e_phoff)))
         PANIC("Could not read program headers");
 
-    elf64_context_t *ctx = load_kernel_begin();
+    elf64_context_t * restrict ctx = load_kernel_begin();
 
     // Calculate the total bytes to be read for I/O progress bar
     for (size_t i = 0; i < file_hdr.e_phnum; ++i) {
-        if ((program_hdrs[i].p_flags & (PF_R | PF_W | PF_X)) != 0) {
+        if (likely((program_hdrs[i].p_flags & (PF_R | PF_W | PF_X)) != 0)) {
             ctx->total_file_bytes += program_hdrs[i].p_filesz;
             ctx->total_mem_bytes += program_hdrs[i].p_memsz;
         }
@@ -708,7 +529,7 @@ void elf64_run(tchar const *filename)
         blk->p_vaddr += base_adj;
 
         // If it is not readable, writable or executable, ignore
-        if ((blk->p_flags & (PF_R | PF_W | PF_X)) != 0) {
+        if (likely((blk->p_flags & (PF_R | PF_W | PF_X)) != 0)) {
             ELF64_TRACE("hdr[%zu]: vaddr=0x%" PRIx64
                         ", filesz=0x%" PRIx64
                         ", memsz=0x%" PRIx64 "\n",
@@ -724,8 +545,7 @@ void elf64_run(tchar const *filename)
             ctx->page_flags |= PTE_PRESENT;
 
             // If not executable, mark as no execute
-            if ((blk->p_flags & PF_X) == 0)
-                ctx->page_flags |= nx_page_flags;
+            ctx->page_flags |= nx_page_flags & -((blk->p_flags & PF_X) == 0);
 
             // Writable
             if ((blk->p_flags & PF_W) != 0)
@@ -746,7 +566,7 @@ void elf64_run(tchar const *filename)
     message_bar_draw(10, 7, 70, TSTR "Loading initrd");
 
     assert(initrd_fd == -1);
-    initrd_fd = boot_open(TSTR "boot/initrd");
+    initrd_fd = boot_open(initrd_pathname);
 
     load_initrd(initrd_fd, initrd_size, ctx);
     boot_close(initrd_fd);
@@ -757,9 +577,9 @@ void elf64_run(tchar const *filename)
 
     ELF64_TRACE("Entering kernel");
 
-    message_bar_draw(10, 7, 70, TSTR "Showing boot menu");
+    return {file_hdr.e_entry + base_adj, new_base};
 
-    enter_kernel(file_hdr.e_entry + base_adj, new_base);
+//    enter_kernel(file_hdr.e_entry + base_adj, new_base);
 }
 
 extern "C" _noreturn
@@ -784,3 +604,14 @@ void __cxa_guard_release(uint64_t *guard_object)
     *guard_object = 1;
 }
 
+void elf64_boot()
+{
+    tchar const *kernel_name = cpu_choose_kernel();
+
+    PRINT("Boot device: %s", boot_name());
+
+    PRINT("loading kernel: %s", kernel_name);
+    elf64_loadaddr_t loadaddr = elf64_load(kernel_name);
+
+    enter_kernel(loadaddr.entry, loadaddr.base);
+}

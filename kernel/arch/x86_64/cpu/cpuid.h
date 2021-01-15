@@ -51,6 +51,7 @@ struct cpuid_cache_t {
     bool has_sysenter   :1;
     bool has_pat        :1;
     bool has_self_snoop :1;
+    bool has_clflush    :1;
     bool has_sse3       :1;
     bool has_mwait      :1;
     bool has_ssse3      :1;
@@ -306,6 +307,12 @@ CPUID_CONST_INLINE bool cpuid_has_pat()
 CPUID_CONST_INLINE bool cpuid_has_self_snoop()
 {
     return cpuid_cache.has_self_snoop;
+}
+
+// Cache line flush
+CPUID_CONST_INLINE bool cpuid_has_clflush()
+{
+    return cpuid_cache.has_clflush;
 }
 
 // 2MB pages

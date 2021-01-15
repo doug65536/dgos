@@ -1059,7 +1059,8 @@ constexpr vector<_T,_Alloc>::__vector_iter<_Dir, _Is_const>::__vector_iter(
     // --------+---------+---------
 
     static_assert(_Is_const || !_RhsIsConst,
-                  "Cannot copy const_(reverse_)iterator to (reverse_)iterator");
+                  "Cannot copy const_(reverse_)iterator"
+                  " to (reverse_)iterator");
 }
 
 template<typename _T, typename _Alloc>
@@ -1097,7 +1098,8 @@ vector<_T,_Alloc>::__vector_iter<_Dir, _Is_const>::operator[](size_type __n)
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
 _T const&
-vector<_T,_Alloc>::__vector_iter<_Dir, _Is_const>::operator[](size_type __n) const
+vector<_T,_Alloc>::__vector_iter<_Dir, _Is_const>::operator[](
+        size_type __n) const
 {
     return __p[__n * _Dir - (_Dir < 0)];
 }

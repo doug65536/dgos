@@ -48,13 +48,13 @@ public:
 
     template<typename T>
     function(T callable)
-        : impl(new (ext::nothrow) Callable<T>(move(callable)))
+        : impl(new (nothrow) Callable<T>(move(callable)))
     {
     }
 
     template<typename _T>
     function(R (_T::*member)(_Args&&...), _T const* instance)
-        : impl(new (ext::nothrow) Callable<_T>(member, instance))
+        : impl(new (nothrow) Callable<_T>(member, instance))
     {
     }
 
@@ -66,13 +66,13 @@ public:
     template<typename ..._A>
     R operator()(_A&& ...args) const
     {
-        return impl->invoke(ext::forward<_A>(args)...);
+        return impl->invoke(forward<_A>(args)...);
     }
 
     template<typename _C>
     function& operator=(_C callable)
     {
-        impl.reset(new (ext::nothrow) Callable<_C>(move(callable)));
+        impl.reset(new (nothrow) Callable<_C>(move(callable)));
         return *this;
     }
 
@@ -104,7 +104,7 @@ private:
 
         CallableBase *copy() const override final
         {
-            return new (ext::nothrow) Callable(storage);
+            return new (nothrow) Callable(storage);
         }
 
         R invoke(_Args&& ...args) const override final

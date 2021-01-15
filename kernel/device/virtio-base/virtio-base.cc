@@ -447,22 +447,34 @@ bool virtio_virtqueue_t::init(
     return true;
 }
 
-virtio_virtqueue_t::desc_t *
-virtio_virtqueue_t::alloc_desc(bool dev_writable)
+bool virtio_virtqueue_t::wait_for_descriptors(
+        size_t count, int64_t timeout_time_ns,
+        scoped_lock& lock)
 {
-    scoped_lock lock(queue_lock);
+    assert(count > 0);
 
-    while (desc_first_free == avail_t(-1)) {
-        VIRTIO_TRACE("Waiting for free descriptor\n");
-        queue_not_full.wait(lock);
+    while (desc_free_count < count) {
+        if (unlikely(queue_not_full.wait_until(lock, timeout_time_ns) ==
+                ext::cv_status::timeout))
+            return false;
     }
-    assert(desc_free_count > 0);
+
+    assert(desc_first_free != -1);
+
+    return true;
+}
+
+virtio_virtqueue_t::desc_t *
+virtio_virtqueue_t::alloc_desc(bool dev_writable, scoped_lock& lock)
+{
+    assert(lock.is_locked());
+
+    if (unlikely(desc_free_count == 0))
+        return nullptr;
 
     --desc_free_count;
     desc_t *desc = desc_tab + desc_first_free;
     desc_first_free = desc->next;
-
-    lock.unlock();
 
     desc->addr = 0;
     desc->len = 0;
@@ -477,16 +489,15 @@ virtio_virtqueue_t::alloc_desc(bool dev_writable)
     return desc;
 }
 
-void virtio_virtqueue_t::alloc_multiple(
-        virtio_virtqueue_t::desc_t **descs, size_t count)
+bool virtio_virtqueue_t::alloc_multiple(
+        desc_t **descs, size_t count,
+        int64_t timeout_time_ns)
 {
     scoped_lock lock(queue_lock);
 
-    while (desc_free_count < count) {
-        VIRTIO_TRACE("Waiting for %zu free descriptors"
-                     ", desc_free_count=%u\n", count, desc_free_count);
-        queue_not_full.wait(lock);
-    }
+    if (unlikely(!wait_for_descriptors(count, timeout_time_ns, lock)))
+        return false;
+
     desc_free_count -= count;
 
     for (size_t i = 0; i < count; ++i) {
@@ -498,17 +509,25 @@ void virtio_virtqueue_t::alloc_multiple(
         desc->flags.raw = 0;
         desc->next = -1;
     }
+
+    return true;
 }
 
 void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
                                        virtio_iocp_t *iocp)
 {
+    scoped_lock lock(queue_lock);
+    return enqueue_avail(desc, count, iocp, lock);
+}
+
+void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
+                                       virtio_iocp_t *iocp,
+                                       scoped_lock& lock)
+{
     size_t mask = ~-(size_t(1) << log2_queue_size);
 
-    scoped_lock lock(queue_lock);
-
     bool skip = false;
-    size_t avail_head = atomic_ld_acq(&avail_hdr->idx);
+    size_t avail_head = avail_hdr->idx;
     size_t chain_start = ~size_t(0);
     for (size_t i = 0; i < count; ++i) {
         if (!skip) {
@@ -522,66 +541,112 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
 
         skip = desc[i]->flags.bits.next;
 
+        // Write an entry to the avail ring telling virtio to
+        // look for a chain starting at chain_start, if this is the end
+        // of a chain (end because next is false)
         if (!skip && chain_start != ~size_t(0))
             avail_ring[avail_head++ & mask] = chain_start;
     }
 
-    // Update used idx
+    // Update used idx (tell virtio the last used event we looked at)
+    // enforce ordering until after prior stores are globally visible
     atomic_st_rel(&avail_ftr->used_event, avail_head - 1);
 
-    // Update idx
+    // Update idx (tell virtio where we would put the next new item)
+    // enforce ordering until after prior store is globally visible
     atomic_st_rel(&avail_hdr->idx, avail_head);
 
+    // If there are items between where we enqueued and what device claims
+    // to have seen, then write the notify MMIO to kick virtio and make
+    // it look at the ring
     if (int16_t((uint16_t)avail_head - (uint16_t)avail_ftr->used_event) > 0)
         notify_accessor.wr_16(notify_reg, queue_idx);
-        //atomic_st_rel(notify_ptr, queue_idx);
+}
+
+void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
+                                  void *rcvd_data, size_t rcvd_size)
+{
+    sendrecv(sent_data, sent_size, rcvd_data, rcvd_size);
+}
+
+bool virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
+                                  void *rcvd_data, size_t rcvd_size,
+                                  int64_t timeout_time_ns)
+{
+    virtio_blocking_iocp_t sync_iocp;
+    bool ok = sendrecv(sent_data, sent_size,
+                       rcvd_data, rcvd_size,
+                       &sync_iocp, timeout_time_ns);
+
+    if (unlikely(!ok))
+        return false;
+
+    return sync_iocp.wait_until(timeout_time_ns);
 }
 
 void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
                                   void *rcvd_data, size_t rcvd_size,
                                   virtio_iocp_t *iocp)
 {
-    mmphysrange_t ranges[16];
-    size_t range_count;
+    sendrecv(sent_data, sent_size, rcvd_data, rcvd_size, iocp);
+}
+
+bool virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
+                                  void *rcvd_data, size_t rcvd_size,
+                                  virtio_iocp_t *iocp,
+                                  uint64_t timeout_time_ns)
+{
+    mmphysrange_t ranges[32];
+    size_t send_range_count = 0;
+    size_t recv_range_count = 0;
 
     desc_t *desc[32];
     size_t out = 0;
 
     if (sent_data && sent_size) {
-        range_count = mphysranges(ranges, countof(ranges),
-                                  sent_data, sent_size,
-                                  ext::numeric_limits<uint32_t>::max());
-
-        for (size_t i = 0; i < range_count; ++i, ++out) {
-            desc[out] = alloc_desc(false);
-            desc[out]->addr = ranges[i].physaddr;
-            desc[out]->len = ranges[i].size;
-
-            if (out > 0) {
-                desc[out - 1]->flags.bits.next = true;
-                desc[out - 1]->next = index_of(desc[out]);
-            }
-        }
+        send_range_count = mphysranges(ranges, countof(ranges),
+                                       sent_data, sent_size,
+                                       ext::numeric_limits<uint32_t>::max());
     }
 
     if (rcvd_data && rcvd_size) {
-        range_count = mphysranges(ranges, countof(ranges),
-                                  rcvd_data, rcvd_size,
-                                  ext::numeric_limits<uint32_t>::max());
+        recv_range_count = mphysranges(ranges + send_range_count,
+                                       countof(ranges) - send_range_count,
+                                       rcvd_data, rcvd_size,
+                                       ext::numeric_limits<uint32_t>::max());
+    }
 
-        for (size_t i = 0; i < range_count; ++i, ++out) {
-            desc[out] = alloc_desc(true);
-            desc[out]->addr = ranges[i].physaddr;
-            desc[out]->len = ranges[i].size;
+    scoped_lock lock(queue_lock);
 
-            if (out > 0) {
-                desc[out - 1]->flags.bits.next = true;
-                desc[out - 1]->next = index_of(desc[out]);
-            }
+    if (unlikely(!wait_for_descriptors(send_range_count + recv_range_count,
+                                       timeout_time_ns, lock)))
+        return false;
+
+    for (size_t i = 0; i < send_range_count; ++i, ++out) {
+        desc[out] = alloc_desc(false, lock);
+        desc[out]->addr = ranges[i].physaddr;
+        desc[out]->len = ranges[i].size;
+
+        if (out > 0) {
+            desc[out - 1]->flags.bits.next = true;
+            desc[out - 1]->next = index_of(desc[out]);
         }
     }
 
-    enqueue_avail(desc, out, iocp);
+    for (size_t i = 0; i < recv_range_count; ++i, ++out) {
+        desc[out] = alloc_desc(true, lock);
+        desc[out]->addr = ranges[send_range_count + i].physaddr;
+        desc[out]->len = ranges[send_range_count + i].size;
+
+        if (out > 0) {
+            desc[out - 1]->flags.bits.next = true;
+            desc[out - 1]->next = index_of(desc[out]);
+        }
+    }
+
+    enqueue_avail(desc, out, iocp, lock);
+
+    return true;
 }
 
 void virtio_virtqueue_t::recycle_used()

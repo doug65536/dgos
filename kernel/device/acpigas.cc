@@ -7,6 +7,8 @@
 #include "cpu/ioport.h"
 #endif
 
+__BEGIN_ANONYMOUS
+
 template<int size>
 class acpi_gas_mask_t : public acpi_gas_accessor_t {
 protected:
@@ -128,6 +130,8 @@ private:
     uint64_t dfo;
 };
 
+__END_ANONYMOUS
+
 acpi_gas_accessor_t *acpi_gas_accessor_t::from_gas(acpi_gas_t const& gas)
 {
     uint64_t addr = gas.addr_lo | (uint64_t(gas.addr_hi) << 32);
@@ -150,8 +154,8 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_gas(acpi_gas_t const& gas)
     }
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_sysmem(uint_fast64_t addr, int size,
-                                                      int bitofs, int bitwidth)
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_sysmem(
+        uint_fast64_t addr, int size, int bitofs, int bitwidth)
 {
     switch (size) {
     case 1: return new (ext::nothrow)
@@ -166,8 +170,8 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_sysmem(uint_fast64_t addr, int si
     }
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_pcicfg(uint_fast32_t addr, int size,
-                                                      int bitofs, int bitwidth)
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_pcicfg(
+        uint_fast32_t addr, int size, int bitofs, int bitwidth)
 {
     switch (size) {
     case 1: return new (ext::nothrow)
@@ -182,7 +186,8 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_pcicfg(uint_fast32_t addr, int si
     }
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_ioport(uint_fast16_t ioport, int size, int bitofs, int bitwidth)
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_ioport(
+        uint_fast16_t ioport, int size, int bitofs, int bitwidth)
 {
 #if defined(__x86_64__) || defined(__i386__)
     switch (size) {
@@ -200,8 +205,8 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_ioport(uint_fast16_t ioport, int 
 #endif
 }
 
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_fixed(uint_fast16_t ioport, int size,
-                                                     int bitofs, int bitwidth)
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_fixed(
+        uint_fast16_t ioport, int size, int bitofs, int bitwidth)
 {
     return from_ioport(ioport, size, bitofs, bitwidth);
 }

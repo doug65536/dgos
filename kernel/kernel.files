@@ -165,8 +165,6 @@ lib/ubsan.h
 lib/uleb.cc
 lib/uleb.h
 lib/user_mem.h
-syscall/sys_exit.cc
-syscall/sys_exit.h
 syscall/sys_fd.cc
 syscall/sys_fd.h
 syscall/sys_limits.h
@@ -188,7 +186,7 @@ syscall/sys_signal.h
 ../bootstrap
 ../gdbhelpers
 ../genregs.py
-../module_checkimports.sh
+../module_checkimports.bash
 arch/x86_64/cfi_helpers.h
 arch/x86_64/cpu/apic.bits
 arch/x86_64/cpu/apic.bits.h
@@ -280,7 +278,6 @@ device/nvme/nvme.h
 device/nvme/nvme.cc
 device/nvme/nvme.bits
 device/pci.cc
-device/pci.bits
 device/ata.h
 device/pci.h
 arch/x86_64/elf64.cc
@@ -455,6 +452,8 @@ lib/work_queue.h
 lib/cc/numeric.h
 lib/desc_alloc.cc
 lib/desc_alloc.h
+lib/timerq.cc
+lib/timerq.h
 arch/x86_64/cpu/segrw.h
 arch/x86_64/cpu/segrw.cc
 ../toolchain/build-crossgcc-versions

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "farptr.h"
-#include "vesainfo.h"
+#include "modeinfo.h"
 #include "physmem_data.h"
 #include "boottable.h"
 #include "assert.h"
@@ -72,7 +72,9 @@ private:
 } _packed;
 
 struct alignas(8) kernel_params_t {
+    static constexpr uint64_t magic_expected = 0xD605CF65600D600D;
     uint64_t size;
+    uint64_t magic = magic_expected;
     ptr64_t<physmem_range_t> phys_mem_table;
     uint64_t phys_mem_table_size;
     ptr64_t<void(*)()> ap_entry;
@@ -102,7 +104,12 @@ struct alignas(8) kernel_params_t {
     uint8_t msi_enable;
     uint8_t msix_enable;
     uint8_t e9_enable;
+
+    explicit constexpr operator bool() const noexcept
+    {
+        return magic == magic_expected;
+    }
 } _packed;
 
 // Ensure that all of the architectures have the same layout
-C_ASSERT(sizeof(kernel_params_t) == 22 * 8);
+C_ASSERT(sizeof(kernel_params_t) == 23 * 8);

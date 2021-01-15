@@ -211,7 +211,6 @@ void mutex_unlock(mutex_t *mutex)
 {
     spinlock_lock(&mutex->lock);
 
-    atomic_barrier();
     assert(mutex->owner == thread_get_id());
 
     // Expect no threads waiting
@@ -385,7 +384,6 @@ void rwlock_ex_unlock(rwlock_t *rwlock)
 {
     spinlock_lock(&rwlock->lock);
 
-    atomic_barrier();
     assert(rwlock->reader_count == -thread_get_id());
 
     if (rwlock->ex_link.next != &rwlock->ex_link) {
@@ -410,7 +408,6 @@ void rwlock_ex_unlock(rwlock_t *rwlock)
     } else {
         // No waiters
         rwlock->reader_count = 0;
-        atomic_barrier();
         spinlock_unlock(&rwlock->lock);
     }
 }
@@ -492,8 +489,6 @@ void rwlock_sh_unlock(rwlock_t *rwlock)
 {
     spinlock_lock(&rwlock->lock);
 
-    atomic_barrier();
-
     assert(rwlock->reader_count > 0);
     --rwlock->reader_count;
 
@@ -508,7 +503,6 @@ void rwlock_sh_unlock(rwlock_t *rwlock)
         thread_resume(waked_thread, 1);
     } else {
         // No waiters
-        atomic_barrier();
         spinlock_unlock(&rwlock->lock);
     }
 }

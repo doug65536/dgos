@@ -358,6 +358,15 @@ define dumptree
 	end
 end
 
+define cdd
+	c
+	monitor x /10i $cs.base+$eip
+end
+
+define ddd
+	monitor x /10i $cs.base+$eip
+end
+
 define sid
 	if $argc == 1
 		si $arg0
@@ -366,4 +375,22 @@ define sid
 	end
 
 	monitor x /10i $cs.base+$eip
+end
+
+define nid
+	if $argc == 1
+		ni $arg0
+	else
+		ni
+	end
+
+	monitor x /10i $cs.base+$eip
+end
+
+define stepirq
+	maintenance packet qqemu.sstep=1
+end
+
+define stepnoirq
+	maintenance packet qqemu.sstep=7
 end

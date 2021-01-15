@@ -3,12 +3,24 @@
 
 // MP_CPU_FLAGS
 
+
+// CPU is enabled
 #define MP_CPU_FLAGS_ENABLED_BIT       0
+
+// 1=bootstrap processor, 0=application processor
 #define MP_CPU_FLAGS_BSP_BIT           1
 
+
+// CPU is enabled
 #define MP_CPU_FLAGS_ENABLED_BITS      1
+
+// 1=bootstrap processor, 0=application processor
 #define MP_CPU_FLAGS_BSP_BITS          1
+
+// CPU is enabled
 #define MP_CPU_FLAGS_ENABLED_MASK      ((1U << MP_CPU_FLAGS_ENABLED_BITS)-1)
+
+// 1=bootstrap processor, 0=application processor
 #define MP_CPU_FLAGS_BSP_MASK          ((1U << MP_CPU_FLAGS_BSP_BITS)-1)
 
 // CPU is enabled
@@ -19,16 +31,28 @@
 #define MP_CPU_FLAGS_BSP \
     (MP_CPU_FLAGS_BSP_MASK << MP_CPU_FLAGS_BSP_BIT)
 
+
+// CPU is enabled
 #define MP_CPU_FLAGS_ENABLED_n(n)      ((n) << MP_CPU_FLAGS_ENABLED_BIT)
+
+// 1=bootstrap processor, 0=application processor
 #define MP_CPU_FLAGS_BSP_n(n)          ((n) << MP_CPU_FLAGS_BSP_BIT)
 
+
+// CPU is enabled
 #define MP_CPU_FLAGS_ENABLED_GET(n) \
     (((n) >> MP_CPU_FLAGS_ENABLED_BIT) & MP_CPU_FLAGS_ENABLED_MASK)
+
+// 1=bootstrap processor, 0=application processor
 #define MP_CPU_FLAGS_BSP_GET(n) \
     (((n) >> MP_CPU_FLAGS_BSP_BIT) & MP_CPU_FLAGS_BSP_MASK)
 
+
+// CPU is enabled
 #define MP_CPU_FLAGS_ENABLED_SET(r,n) \
     ((r) = ((r) & ~MP_CPU_FLAGS_ENABLED) | MP_CPU_FLAGS_ENABLED_n((n)))
+
+// 1=bootstrap processor, 0=application processor
 #define MP_CPU_FLAGS_BSP_SET(r,n) \
     ((r) = ((r) & ~MP_CPU_FLAGS_BSP) | MP_CPU_FLAGS_BSP_n((n)))
 
@@ -210,11 +234,17 @@
 // IOAPIC_VER
 
 #define IOAPIC_VER_VERSION_BIT       0
+
+// The number of I/O redirection entries implemented
 #define IOAPIC_VER_ENTRIES_BIT       16
 
 #define IOAPIC_VER_VERSION_BITS      8
+
+// The number of I/O redirection entries implemented
 #define IOAPIC_VER_ENTRIES_BITS      8
 #define IOAPIC_VER_VERSION_MASK      ((1U << IOAPIC_VER_VERSION_BITS)-1)
+
+// The number of I/O redirection entries implemented
 #define IOAPIC_VER_ENTRIES_MASK      ((1U << IOAPIC_VER_ENTRIES_BITS)-1)
 #define IOAPIC_VER_VERSION \
     (IOAPIC_VER_VERSION_MASK << IOAPIC_VER_VERSION_BIT)
@@ -224,15 +254,21 @@
     (IOAPIC_VER_ENTRIES_MASK << IOAPIC_VER_ENTRIES_BIT)
 
 #define IOAPIC_VER_VERSION_n(n)      ((n) << IOAPIC_VER_VERSION_BIT)
+
+// The number of I/O redirection entries implemented
 #define IOAPIC_VER_ENTRIES_n(n)      ((n) << IOAPIC_VER_ENTRIES_BIT)
 
 #define IOAPIC_VER_VERSION_GET(n) \
     (((n) >> IOAPIC_VER_VERSION_BIT) & IOAPIC_VER_VERSION_MASK)
+
+// The number of I/O redirection entries implemented
 #define IOAPIC_VER_ENTRIES_GET(n) \
     (((n) >> IOAPIC_VER_ENTRIES_BIT) & IOAPIC_VER_ENTRIES_MASK)
 
 #define IOAPIC_VER_VERSION_SET(r,n) \
     ((r) = ((r) & ~IOAPIC_VER_VERSION) | IOAPIC_VER_VERSION_n((n)))
+
+// The number of I/O redirection entries implemented
 #define IOAPIC_VER_ENTRIES_SET(r,n) \
     ((r) = ((r) & ~IOAPIC_VER_ENTRIES) | IOAPIC_VER_ENTRIES_n((n)))
 
@@ -574,33 +610,81 @@
 //
 // APIC_ESR: Error status register
 
+
+// Illegal register address (Core/P4/Xeon/P6 only)
 #define APIC_ESR_ILL_REG_BIT               7
+
+// Received illegal vector
 #define APIC_ESR_RX_ILL_VEC_BIT            6
+
+// Send illegal vector
 #define APIC_ESR_TX_ILL_VEC_BIT            5
+
+// Redirectable IPI (some processors)
 #define APIC_ESR_REDIR_IPI_BIT             4
+
+// Receive accept error (old processors)
 #define APIC_ESR_RX_ACCEPT_ERR_BIT         3
+
+// Send accept error (old processors)
 #define APIC_ESR_TX_ACCEPT_ERR_BIT         2
+
+// Receive checksum error (old processors)
 #define APIC_ESR_RX_CHECKSUM_ERR_BIT       1
+
+// Send checksum error (old processors)
 #define APIC_ESR_TX_CHECKSUM_ERR_BIT       0
 
+
+// Illegal register address (Core/P4/Xeon/P6 only)
 #define APIC_ESR_ILL_REG_BITS              1
+
+// Received illegal vector
 #define APIC_ESR_RX_ILL_VEC_BITS           1
+
+// Send illegal vector
 #define APIC_ESR_TX_ILL_VEC_BITS           1
+
+// Redirectable IPI (some processors)
 #define APIC_ESR_REDIR_IPI_BITS            1
+
+// Receive accept error (old processors)
 #define APIC_ESR_RX_ACCEPT_ERR_BITS        1
+
+// Send accept error (old processors)
 #define APIC_ESR_TX_ACCEPT_ERR_BITS        1
+
+// Receive checksum error (old processors)
 #define APIC_ESR_RX_CHECKSUM_ERR_BITS      1
+
+// Send checksum error (old processors)
 #define APIC_ESR_TX_CHECKSUM_ERR_BITS      1
+
+// Illegal register address (Core/P4/Xeon/P6 only)
 #define APIC_ESR_ILL_REG_MASK              ((1U << APIC_ESR_ILL_REG_BITS)-1)
+
+// Received illegal vector
 #define APIC_ESR_RX_ILL_VEC_MASK           ((1U << APIC_ESR_RX_ILL_VEC_BITS)-1)
+
+// Send illegal vector
 #define APIC_ESR_TX_ILL_VEC_MASK           ((1U << APIC_ESR_TX_ILL_VEC_BITS)-1)
+
+// Redirectable IPI (some processors)
 #define APIC_ESR_REDIR_IPI_MASK            ((1U << APIC_ESR_REDIR_IPI_BITS)-1)
+
+// Receive accept error (old processors)
 #define APIC_ESR_RX_ACCEPT_ERR_MASK \
     ((1U << APIC_ESR_RX_ACCEPT_ERR_BITS)-1)
+
+// Send accept error (old processors)
 #define APIC_ESR_TX_ACCEPT_ERR_MASK \
     ((1U << APIC_ESR_TX_ACCEPT_ERR_BITS)-1)
+
+// Receive checksum error (old processors)
 #define APIC_ESR_RX_CHECKSUM_ERR_MASK \
     ((1U << APIC_ESR_RX_CHECKSUM_ERR_BITS)-1)
+
+// Send checksum error (old processors)
 #define APIC_ESR_TX_CHECKSUM_ERR_MASK \
     ((1U << APIC_ESR_TX_CHECKSUM_ERR_BITS)-1)
 
@@ -636,66 +720,138 @@
 #define APIC_ESR_TX_CHECKSUM_ERR \
     (APIC_ESR_TX_CHECKSUM_ERR_MASK << APIC_ESR_TX_CHECKSUM_ERR_BIT)
 
+
+// Illegal register address (Core/P4/Xeon/P6 only)
 #define APIC_ESR_ILL_REG_n(n)              ((n) << APIC_ESR_ILL_REG_BIT)
+
+// Received illegal vector
 #define APIC_ESR_RX_ILL_VEC_n(n)           ((n) << APIC_ESR_RX_ILL_VEC_BIT)
+
+// Send illegal vector
 #define APIC_ESR_TX_ILL_VEC_n(n)           ((n) << APIC_ESR_TX_ILL_VEC_BIT)
+
+// Redirectable IPI (some processors)
 #define APIC_ESR_REDIR_IPI_n(n)            ((n) << APIC_ESR_REDIR_IPI_BIT)
+
+// Receive accept error (old processors)
 #define APIC_ESR_RX_ACCEPT_ERR_n(n)        ((n) << APIC_ESR_RX_ACCEPT_ERR_BIT)
+
+// Send accept error (old processors)
 #define APIC_ESR_TX_ACCEPT_ERR_n(n)        ((n) << APIC_ESR_TX_ACCEPT_ERR_BIT)
+
+// Receive checksum error (old processors)
 #define APIC_ESR_RX_CHECKSUM_ERR_n(n) \
     ((n) << APIC_ESR_RX_CHECKSUM_ERR_BIT)
+
+// Send checksum error (old processors)
 #define APIC_ESR_TX_CHECKSUM_ERR_n(n) \
     ((n) << APIC_ESR_TX_CHECKSUM_ERR_BIT)
 
+
+// Illegal register address (Core/P4/Xeon/P6 only)
 #define APIC_ESR_ILL_REG_GET(n) \
     (((n) >> APIC_ESR_ILL_REG_BIT) & APIC_ESR_ILL_REG_MASK)
+
+// Received illegal vector
 #define APIC_ESR_RX_ILL_VEC_GET(n) \
     (((n) >> APIC_ESR_RX_ILL_VEC_BIT) & APIC_ESR_RX_ILL_VEC_MASK)
+
+// Send illegal vector
 #define APIC_ESR_TX_ILL_VEC_GET(n) \
     (((n) >> APIC_ESR_TX_ILL_VEC_BIT) & APIC_ESR_TX_ILL_VEC_MASK)
+
+// Redirectable IPI (some processors)
 #define APIC_ESR_REDIR_IPI_GET(n) \
     (((n) >> APIC_ESR_REDIR_IPI_BIT) & APIC_ESR_REDIR_IPI_MASK)
+
+// Receive accept error (old processors)
 #define APIC_ESR_RX_ACCEPT_ERR_GET(n) \
     (((n) >> APIC_ESR_RX_ACCEPT_ERR_BIT) & APIC_ESR_RX_ACCEPT_ERR_MASK)
+
+// Send accept error (old processors)
 #define APIC_ESR_TX_ACCEPT_ERR_GET(n) \
     (((n) >> APIC_ESR_TX_ACCEPT_ERR_BIT) & APIC_ESR_TX_ACCEPT_ERR_MASK)
+
+// Receive checksum error (old processors)
 #define APIC_ESR_RX_CHECKSUM_ERR_GET(n) \
     (((n) >> APIC_ESR_RX_CHECKSUM_ERR_BIT) & APIC_ESR_RX_CHECKSUM_ERR_MASK)
+
+// Send checksum error (old processors)
 #define APIC_ESR_TX_CHECKSUM_ERR_GET(n) \
     (((n) >> APIC_ESR_TX_CHECKSUM_ERR_BIT) & APIC_ESR_TX_CHECKSUM_ERR_MASK)
 
+
+// Illegal register address (Core/P4/Xeon/P6 only)
 #define APIC_ESR_ILL_REG_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_ILL_REG) | APIC_ESR_ILL_REG_n((n)))
+
+// Received illegal vector
 #define APIC_ESR_RX_ILL_VEC_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_RX_ILL_VEC) | APIC_ESR_RX_ILL_VEC_n((n)))
+
+// Send illegal vector
 #define APIC_ESR_TX_ILL_VEC_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_TX_ILL_VEC) | APIC_ESR_TX_ILL_VEC_n((n)))
+
+// Redirectable IPI (some processors)
 #define APIC_ESR_REDIR_IPI_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_REDIR_IPI) | APIC_ESR_REDIR_IPI_n((n)))
+
+// Receive accept error (old processors)
 #define APIC_ESR_RX_ACCEPT_ERR_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_RX_ACCEPT_ERR) | APIC_ESR_RX_ACCEPT_ERR_n((n)))
+
+// Send accept error (old processors)
 #define APIC_ESR_TX_ACCEPT_ERR_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_TX_ACCEPT_ERR) | APIC_ESR_TX_ACCEPT_ERR_n((n)))
+
+// Receive checksum error (old processors)
 #define APIC_ESR_RX_CHECKSUM_ERR_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_RX_CHECKSUM_ERR) | APIC_ESR_RX_CHECKSUM_ERR_n((n)))
+
+// Send checksum error (old processors)
 #define APIC_ESR_TX_CHECKSUM_ERR_SET(r,n) \
     ((r) = ((r) & ~APIC_ESR_TX_CHECKSUM_ERR) | APIC_ESR_TX_CHECKSUM_ERR_n((n)))
 
 //
 // APIC_SIR: Spurious interrupt register
 
+
+// Spurious interrupt vector
 #define APIC_SIR_VECTOR_BIT             0
+
+// 1=enable
 #define APIC_SIR_APIC_ENABLE_BIT        8
+
+// 0=enable focus processor checking
 #define APIC_SIR_NO_FOCUS_CHK_BIT       9
+
+// 0=enable EOI broadcast to IOAPICs
 #define APIC_SIR_NO_EOI_BCAST_BIT       12
 
+
+// Spurious interrupt vector
 #define APIC_SIR_VECTOR_BITS            8
+
+// 1=enable
 #define APIC_SIR_APIC_ENABLE_BITS       1
+
+// 0=enable focus processor checking
 #define APIC_SIR_NO_FOCUS_CHK_BITS      1
+
+// 0=enable EOI broadcast to IOAPICs
 #define APIC_SIR_NO_EOI_BCAST_BITS      1
+
+// Spurious interrupt vector
 #define APIC_SIR_VECTOR_MASK            ((1U << APIC_SIR_VECTOR_BITS)-1)
+
+// 1=enable
 #define APIC_SIR_APIC_ENABLE_MASK       ((1U << APIC_SIR_APIC_ENABLE_BITS)-1)
+
+// 0=enable focus processor checking
 #define APIC_SIR_NO_FOCUS_CHK_MASK      ((1U << APIC_SIR_NO_FOCUS_CHK_BITS)-1)
+
+// 0=enable EOI broadcast to IOAPICs
 #define APIC_SIR_NO_EOI_BCAST_MASK      ((1U << APIC_SIR_NO_EOI_BCAST_BITS)-1)
 
 // Spurious interrupt vector
@@ -714,119 +870,275 @@
 #define APIC_SIR_NO_EOI_BCAST \
     (APIC_SIR_NO_EOI_BCAST_MASK << APIC_SIR_NO_EOI_BCAST_BIT)
 
+
+// Spurious interrupt vector
 #define APIC_SIR_VECTOR_n(n)            ((n) << APIC_SIR_VECTOR_BIT)
+
+// 1=enable
 #define APIC_SIR_APIC_ENABLE_n(n)       ((n) << APIC_SIR_APIC_ENABLE_BIT)
+
+// 0=enable focus processor checking
 #define APIC_SIR_NO_FOCUS_CHK_n(n)      ((n) << APIC_SIR_NO_FOCUS_CHK_BIT)
+
+// 0=enable EOI broadcast to IOAPICs
 #define APIC_SIR_NO_EOI_BCAST_n(n)      ((n) << APIC_SIR_NO_EOI_BCAST_BIT)
 
+
+// Spurious interrupt vector
 #define APIC_SIR_VECTOR_GET(n) \
     (((n) >> APIC_SIR_VECTOR_BIT) & APIC_SIR_VECTOR_MASK)
+
+// 1=enable
 #define APIC_SIR_APIC_ENABLE_GET(n) \
     (((n) >> APIC_SIR_APIC_ENABLE_BIT) & APIC_SIR_APIC_ENABLE_MASK)
+
+// 0=enable focus processor checking
 #define APIC_SIR_NO_FOCUS_CHK_GET(n) \
     (((n) >> APIC_SIR_NO_FOCUS_CHK_BIT) & APIC_SIR_NO_FOCUS_CHK_MASK)
+
+// 0=enable EOI broadcast to IOAPICs
 #define APIC_SIR_NO_EOI_BCAST_GET(n) \
     (((n) >> APIC_SIR_NO_EOI_BCAST_BIT) & APIC_SIR_NO_EOI_BCAST_MASK)
 
+
+// Spurious interrupt vector
 #define APIC_SIR_VECTOR_SET(r,n) \
     ((r) = ((r) & ~APIC_SIR_VECTOR) | APIC_SIR_VECTOR_n((n)))
+
+// 1=enable
 #define APIC_SIR_APIC_ENABLE_SET(r,n) \
     ((r) = ((r) & ~APIC_SIR_APIC_ENABLE) | APIC_SIR_APIC_ENABLE_n((n)))
+
+// 0=enable focus processor checking
 #define APIC_SIR_NO_FOCUS_CHK_SET(r,n) \
     ((r) = ((r) & ~APIC_SIR_NO_FOCUS_CHK) | APIC_SIR_NO_FOCUS_CHK_n((n)))
+
+// 0=enable EOI broadcast to IOAPICs
 #define APIC_SIR_NO_EOI_BCAST_SET(r,n) \
     ((r) = ((r) & ~APIC_SIR_NO_EOI_BCAST) | APIC_SIR_NO_EOI_BCAST_n((n)))
 
 //
 // ACPI_FADT_FFF: FADT Fixed Feature Flags
 
+
+// The WBINVD instruction works correctly
 #define ACPI_FADT_FFF_WBINVD_BIT                      0
+
+// The WBINVD instruction does not invalidate the caches
 #define ACPI_FADT_FFF_WBINVD_FLUSH_BIT                1
+
+// The C1 state is supported on all processors
 #define ACPI_FADT_FFF_PROC_C1_BIT                     2
+
+// The C2 state works with multiple processors
 #define ACPI_FADT_FFF_P_LVL2_MP_BIT                   3
+
+// Power button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_PWR_BUTTON_BIT                  4
+
+// Sleep button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_SLP_BUTTON_BIT                  5
+
+// RTC wake: 0=fixed feature, 1=not fixed feature
 #define ACPI_FADT_FFF_FIX_RTC_BIT                     6
+
+// RTC can wake from S4 state
 #define ACPI_FADT_FFF_RTC_S4_BIT                      7
+
+// Timer width: 0=24 bit, 1=32 bit
 #define ACPI_FADT_FFF_TMR_VAL_EXT_BIT                 8
+
+// Docking capable
 #define ACPI_FADT_FFF_DCK_CAP_BIT                     9
+
+// FADT RESET_REG support: 1=supported
 #define ACPI_FADT_FFF_RESET_REG_SUP_BIT               10
+
+// No internal expansion capabilities
 #define ACPI_FADT_FFF_SEALED_CASE_BIT                 11
+
+// Cannot detect monitor/keyboard devices
 #define ACPI_FADT_FFF_HEADLESS_BIT                    12
+
+// A native instruction must be executed after writing SLP_TYPx
 #define ACPI_FADT_FFF_CPU_SW_SLP_BIT                  13
+
+// Supports PCI express wake PCIEXP_WAKE_STS/_EN
 #define ACPI_FADT_FFF_PCI_EXP_WAK_BIT                 14
+
+// Use platform clock - long confusing explanation in spec
 #define ACPI_FADT_FFF_PLAT_CLOCK_BIT                  15
+
+// System has RTC_STS errata when walking from S4
 #define ACPI_FADT_FFF_S4_RTC_STS_BIT                  16
+
+// Remote power on capable
 #define ACPI_FADT_FFF_REMOTE_ON_CAP_BIT               17
+
+// Force APIC to use cluster destination mode
 #define ACPI_FADT_FFF_FORCE_CLUSTER_BIT               18
+
+// Force xAPIC to use physical destination mode (N/A to APIC)
 #define ACPI_FADT_FFF_FORCE_PHYS_BIT                  19
+
+// ACPI hardware interface is not supported
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT             20
+
+// System power saving in S0 is as good as typical S3
 #define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT       21
 
+
+// The WBINVD instruction works correctly
 #define ACPI_FADT_FFF_WBINVD_BITS                     1
+
+// The WBINVD instruction does not invalidate the caches
 #define ACPI_FADT_FFF_WBINVD_FLUSH_BITS               1
+
+// The C1 state is supported on all processors
 #define ACPI_FADT_FFF_PROC_C1_BITS                    1
+
+// The C2 state works with multiple processors
 #define ACPI_FADT_FFF_P_LVL2_MP_BITS                  1
+
+// Power button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_PWR_BUTTON_BITS                 1
+
+// Sleep button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_SLP_BUTTON_BITS                 1
+
+// RTC wake: 0=fixed feature, 1=not fixed feature
 #define ACPI_FADT_FFF_FIX_RTC_BITS                    1
+
+// RTC can wake from S4 state
 #define ACPI_FADT_FFF_RTC_S4_BITS                     1
+
+// Timer width: 0=24 bit, 1=32 bit
 #define ACPI_FADT_FFF_TMR_VAL_EXT_BITS                1
+
+// Docking capable
 #define ACPI_FADT_FFF_DCK_CAP_BITS                    1
+
+// FADT RESET_REG support: 1=supported
 #define ACPI_FADT_FFF_RESET_REG_SUP_BITS              1
+
+// No internal expansion capabilities
 #define ACPI_FADT_FFF_SEALED_CASE_BITS                1
+
+// Cannot detect monitor/keyboard devices
 #define ACPI_FADT_FFF_HEADLESS_BITS                   1
+
+// A native instruction must be executed after writing SLP_TYPx
 #define ACPI_FADT_FFF_CPU_SW_SLP_BITS                 1
+
+// Supports PCI express wake PCIEXP_WAKE_STS/_EN
 #define ACPI_FADT_FFF_PCI_EXP_WAK_BITS                1
+
+// Use platform clock - long confusing explanation in spec
 #define ACPI_FADT_FFF_PLAT_CLOCK_BITS                 1
+
+// System has RTC_STS errata when walking from S4
 #define ACPI_FADT_FFF_S4_RTC_STS_BITS                 1
+
+// Remote power on capable
 #define ACPI_FADT_FFF_REMOTE_ON_CAP_BITS              1
+
+// Force APIC to use cluster destination mode
 #define ACPI_FADT_FFF_FORCE_CLUSTER_BITS              1
+
+// Force xAPIC to use physical destination mode (N/A to APIC)
 #define ACPI_FADT_FFF_FORCE_PHYS_BITS                 1
+
+// ACPI hardware interface is not supported
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_BITS            1
+
+// System power saving in S0 is as good as typical S3
 #define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BITS      1
+
+// The WBINVD instruction works correctly
 #define ACPI_FADT_FFF_WBINVD_MASK \
     ((1U << ACPI_FADT_FFF_WBINVD_BITS)-1)
+
+// The WBINVD instruction does not invalidate the caches
 #define ACPI_FADT_FFF_WBINVD_FLUSH_MASK \
     ((1U << ACPI_FADT_FFF_WBINVD_FLUSH_BITS)-1)
+
+// The C1 state is supported on all processors
 #define ACPI_FADT_FFF_PROC_C1_MASK \
     ((1U << ACPI_FADT_FFF_PROC_C1_BITS)-1)
+
+// The C2 state works with multiple processors
 #define ACPI_FADT_FFF_P_LVL2_MP_MASK \
     ((1U << ACPI_FADT_FFF_P_LVL2_MP_BITS)-1)
+
+// Power button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_PWR_BUTTON_MASK \
     ((1U << ACPI_FADT_FFF_PWR_BUTTON_BITS)-1)
+
+// Sleep button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_SLP_BUTTON_MASK \
     ((1U << ACPI_FADT_FFF_SLP_BUTTON_BITS)-1)
+
+// RTC wake: 0=fixed feature, 1=not fixed feature
 #define ACPI_FADT_FFF_FIX_RTC_MASK \
     ((1U << ACPI_FADT_FFF_FIX_RTC_BITS)-1)
+
+// RTC can wake from S4 state
 #define ACPI_FADT_FFF_RTC_S4_MASK \
     ((1U << ACPI_FADT_FFF_RTC_S4_BITS)-1)
+
+// Timer width: 0=24 bit, 1=32 bit
 #define ACPI_FADT_FFF_TMR_VAL_EXT_MASK \
     ((1U << ACPI_FADT_FFF_TMR_VAL_EXT_BITS)-1)
+
+// Docking capable
 #define ACPI_FADT_FFF_DCK_CAP_MASK \
     ((1U << ACPI_FADT_FFF_DCK_CAP_BITS)-1)
+
+// FADT RESET_REG support: 1=supported
 #define ACPI_FADT_FFF_RESET_REG_SUP_MASK \
     ((1U << ACPI_FADT_FFF_RESET_REG_SUP_BITS)-1)
+
+// No internal expansion capabilities
 #define ACPI_FADT_FFF_SEALED_CASE_MASK \
     ((1U << ACPI_FADT_FFF_SEALED_CASE_BITS)-1)
+
+// Cannot detect monitor/keyboard devices
 #define ACPI_FADT_FFF_HEADLESS_MASK \
     ((1U << ACPI_FADT_FFF_HEADLESS_BITS)-1)
+
+// A native instruction must be executed after writing SLP_TYPx
 #define ACPI_FADT_FFF_CPU_SW_SLP_MASK \
     ((1U << ACPI_FADT_FFF_CPU_SW_SLP_BITS)-1)
+
+// Supports PCI express wake PCIEXP_WAKE_STS/_EN
 #define ACPI_FADT_FFF_PCI_EXP_WAK_MASK \
     ((1U << ACPI_FADT_FFF_PCI_EXP_WAK_BITS)-1)
+
+// Use platform clock - long confusing explanation in spec
 #define ACPI_FADT_FFF_PLAT_CLOCK_MASK \
     ((1U << ACPI_FADT_FFF_PLAT_CLOCK_BITS)-1)
+
+// System has RTC_STS errata when walking from S4
 #define ACPI_FADT_FFF_S4_RTC_STS_MASK \
     ((1U << ACPI_FADT_FFF_S4_RTC_STS_BITS)-1)
+
+// Remote power on capable
 #define ACPI_FADT_FFF_REMOTE_ON_CAP_MASK \
     ((1U << ACPI_FADT_FFF_REMOTE_ON_CAP_BITS)-1)
+
+// Force APIC to use cluster destination mode
 #define ACPI_FADT_FFF_FORCE_CLUSTER_MASK \
     ((1U << ACPI_FADT_FFF_FORCE_CLUSTER_BITS)-1)
+
+// Force xAPIC to use physical destination mode (N/A to APIC)
 #define ACPI_FADT_FFF_FORCE_PHYS_MASK \
     ((1U << ACPI_FADT_FFF_FORCE_PHYS_BITS)-1)
+
+// ACPI hardware interface is not supported
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_MASK \
     ((1U << ACPI_FADT_FFF_HW_REDUCED_ACPI_BITS)-1)
+
+// System power saving in S0 is as good as typical S3
 #define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_MASK \
     ((1U << ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BITS)-1)
 
@@ -919,148 +1231,286 @@
     (ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_MASK \
     << ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT)
 
+
+// The WBINVD instruction works correctly
 #define ACPI_FADT_FFF_WBINVD_n(n) \
     ((n) << ACPI_FADT_FFF_WBINVD_BIT)
+
+// The WBINVD instruction does not invalidate the caches
 #define ACPI_FADT_FFF_WBINVD_FLUSH_n(n) \
     ((n) << ACPI_FADT_FFF_WBINVD_FLUSH_BIT)
+
+// The C1 state is supported on all processors
 #define ACPI_FADT_FFF_PROC_C1_n(n) \
     ((n) << ACPI_FADT_FFF_PROC_C1_BIT)
+
+// The C2 state works with multiple processors
 #define ACPI_FADT_FFF_P_LVL2_MP_n(n) \
     ((n) << ACPI_FADT_FFF_P_LVL2_MP_BIT)
+
+// Power button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_PWR_BUTTON_n(n) \
     ((n) << ACPI_FADT_FFF_PWR_BUTTON_BIT)
+
+// Sleep button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_SLP_BUTTON_n(n) \
     ((n) << ACPI_FADT_FFF_SLP_BUTTON_BIT)
+
+// RTC wake: 0=fixed feature, 1=not fixed feature
 #define ACPI_FADT_FFF_FIX_RTC_n(n) \
     ((n) << ACPI_FADT_FFF_FIX_RTC_BIT)
+
+// RTC can wake from S4 state
 #define ACPI_FADT_FFF_RTC_S4_n(n) \
     ((n) << ACPI_FADT_FFF_RTC_S4_BIT)
+
+// Timer width: 0=24 bit, 1=32 bit
 #define ACPI_FADT_FFF_TMR_VAL_EXT_n(n) \
     ((n) << ACPI_FADT_FFF_TMR_VAL_EXT_BIT)
+
+// Docking capable
 #define ACPI_FADT_FFF_DCK_CAP_n(n) \
     ((n) << ACPI_FADT_FFF_DCK_CAP_BIT)
+
+// FADT RESET_REG support: 1=supported
 #define ACPI_FADT_FFF_RESET_REG_SUP_n(n) \
     ((n) << ACPI_FADT_FFF_RESET_REG_SUP_BIT)
+
+// No internal expansion capabilities
 #define ACPI_FADT_FFF_SEALED_CASE_n(n) \
     ((n) << ACPI_FADT_FFF_SEALED_CASE_BIT)
+
+// Cannot detect monitor/keyboard devices
 #define ACPI_FADT_FFF_HEADLESS_n(n) \
     ((n) << ACPI_FADT_FFF_HEADLESS_BIT)
+
+// A native instruction must be executed after writing SLP_TYPx
 #define ACPI_FADT_FFF_CPU_SW_SLP_n(n) \
     ((n) << ACPI_FADT_FFF_CPU_SW_SLP_BIT)
+
+// Supports PCI express wake PCIEXP_WAKE_STS/_EN
 #define ACPI_FADT_FFF_PCI_EXP_WAK_n(n) \
     ((n) << ACPI_FADT_FFF_PCI_EXP_WAK_BIT)
+
+// Use platform clock - long confusing explanation in spec
 #define ACPI_FADT_FFF_PLAT_CLOCK_n(n) \
     ((n) << ACPI_FADT_FFF_PLAT_CLOCK_BIT)
+
+// System has RTC_STS errata when walking from S4
 #define ACPI_FADT_FFF_S4_RTC_STS_n(n) \
     ((n) << ACPI_FADT_FFF_S4_RTC_STS_BIT)
+
+// Remote power on capable
 #define ACPI_FADT_FFF_REMOTE_ON_CAP_n(n) \
     ((n) << ACPI_FADT_FFF_REMOTE_ON_CAP_BIT)
+
+// Force APIC to use cluster destination mode
 #define ACPI_FADT_FFF_FORCE_CLUSTER_n(n) \
     ((n) << ACPI_FADT_FFF_FORCE_CLUSTER_BIT)
+
+// Force xAPIC to use physical destination mode (N/A to APIC)
 #define ACPI_FADT_FFF_FORCE_PHYS_n(n) \
     ((n) << ACPI_FADT_FFF_FORCE_PHYS_BIT)
+
+// ACPI hardware interface is not supported
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_n(n) \
     ((n) << ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT)
+
+// System power saving in S0 is as good as typical S3
 #define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_n(n) \
     ((n) << ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT)
 
+
+// The WBINVD instruction works correctly
 #define ACPI_FADT_FFF_WBINVD_GET(n) \
     (((n) >> ACPI_FADT_FFF_WBINVD_BIT) & ACPI_FADT_FFF_WBINVD_MASK)
+
+// The WBINVD instruction does not invalidate the caches
 #define ACPI_FADT_FFF_WBINVD_FLUSH_GET(n) \
     (((n) >> ACPI_FADT_FFF_WBINVD_FLUSH_BIT) & ACPI_FADT_FFF_WBINVD_FLUSH_MASK)
+
+// The C1 state is supported on all processors
 #define ACPI_FADT_FFF_PROC_C1_GET(n) \
     (((n) >> ACPI_FADT_FFF_PROC_C1_BIT) & ACPI_FADT_FFF_PROC_C1_MASK)
+
+// The C2 state works with multiple processors
 #define ACPI_FADT_FFF_P_LVL2_MP_GET(n) \
     (((n) >> ACPI_FADT_FFF_P_LVL2_MP_BIT) & ACPI_FADT_FFF_P_LVL2_MP_MASK)
+
+// Power button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_PWR_BUTTON_GET(n) \
     (((n) >> ACPI_FADT_FFF_PWR_BUTTON_BIT) & ACPI_FADT_FFF_PWR_BUTTON_MASK)
+
+// Sleep button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_SLP_BUTTON_GET(n) \
     (((n) >> ACPI_FADT_FFF_SLP_BUTTON_BIT) & ACPI_FADT_FFF_SLP_BUTTON_MASK)
+
+// RTC wake: 0=fixed feature, 1=not fixed feature
 #define ACPI_FADT_FFF_FIX_RTC_GET(n) \
     (((n) >> ACPI_FADT_FFF_FIX_RTC_BIT) & ACPI_FADT_FFF_FIX_RTC_MASK)
+
+// RTC can wake from S4 state
 #define ACPI_FADT_FFF_RTC_S4_GET(n) \
     (((n) >> ACPI_FADT_FFF_RTC_S4_BIT) & ACPI_FADT_FFF_RTC_S4_MASK)
+
+// Timer width: 0=24 bit, 1=32 bit
 #define ACPI_FADT_FFF_TMR_VAL_EXT_GET(n) \
     (((n) >> ACPI_FADT_FFF_TMR_VAL_EXT_BIT) & ACPI_FADT_FFF_TMR_VAL_EXT_MASK)
+
+// Docking capable
 #define ACPI_FADT_FFF_DCK_CAP_GET(n) \
     (((n) >> ACPI_FADT_FFF_DCK_CAP_BIT) & ACPI_FADT_FFF_DCK_CAP_MASK)
+
+// FADT RESET_REG support: 1=supported
 #define ACPI_FADT_FFF_RESET_REG_SUP_GET(n)            (((n) \
     >> ACPI_FADT_FFF_RESET_REG_SUP_BIT) & ACPI_FADT_FFF_RESET_REG_SUP_MASK)
+
+// No internal expansion capabilities
 #define ACPI_FADT_FFF_SEALED_CASE_GET(n) \
     (((n) >> ACPI_FADT_FFF_SEALED_CASE_BIT) & ACPI_FADT_FFF_SEALED_CASE_MASK)
+
+// Cannot detect monitor/keyboard devices
 #define ACPI_FADT_FFF_HEADLESS_GET(n) \
     (((n) >> ACPI_FADT_FFF_HEADLESS_BIT) & ACPI_FADT_FFF_HEADLESS_MASK)
+
+// A native instruction must be executed after writing SLP_TYPx
 #define ACPI_FADT_FFF_CPU_SW_SLP_GET(n) \
     (((n) >> ACPI_FADT_FFF_CPU_SW_SLP_BIT) & ACPI_FADT_FFF_CPU_SW_SLP_MASK)
+
+// Supports PCI express wake PCIEXP_WAKE_STS/_EN
 #define ACPI_FADT_FFF_PCI_EXP_WAK_GET(n) \
     (((n) >> ACPI_FADT_FFF_PCI_EXP_WAK_BIT) & ACPI_FADT_FFF_PCI_EXP_WAK_MASK)
+
+// Use platform clock - long confusing explanation in spec
 #define ACPI_FADT_FFF_PLAT_CLOCK_GET(n) \
     (((n) >> ACPI_FADT_FFF_PLAT_CLOCK_BIT) & ACPI_FADT_FFF_PLAT_CLOCK_MASK)
+
+// System has RTC_STS errata when walking from S4
 #define ACPI_FADT_FFF_S4_RTC_STS_GET(n) \
     (((n) >> ACPI_FADT_FFF_S4_RTC_STS_BIT) & ACPI_FADT_FFF_S4_RTC_STS_MASK)
+
+// Remote power on capable
 #define ACPI_FADT_FFF_REMOTE_ON_CAP_GET(n)            (((n) \
     >> ACPI_FADT_FFF_REMOTE_ON_CAP_BIT) & ACPI_FADT_FFF_REMOTE_ON_CAP_MASK)
+
+// Force APIC to use cluster destination mode
 #define ACPI_FADT_FFF_FORCE_CLUSTER_GET(n)            (((n) \
     >> ACPI_FADT_FFF_FORCE_CLUSTER_BIT) & ACPI_FADT_FFF_FORCE_CLUSTER_MASK)
+
+// Force xAPIC to use physical destination mode (N/A to APIC)
 #define ACPI_FADT_FFF_FORCE_PHYS_GET(n) \
     (((n) >> ACPI_FADT_FFF_FORCE_PHYS_BIT) & ACPI_FADT_FFF_FORCE_PHYS_MASK)
+
+// ACPI hardware interface is not supported
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_GET(n)          (((n) \
     >> ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT) & ACPI_FADT_FFF_HW_REDUCED_ACPI_MASK)
+
+// System power saving in S0 is as good as typical S3
 #define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_GET(n) \
     (((n) >> ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT) \
     & ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_MASK)
 
+
+// The WBINVD instruction works correctly
 #define ACPI_FADT_FFF_WBINVD_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_WBINVD) | ACPI_FADT_FFF_WBINVD_n((n)))
+
+// The WBINVD instruction does not invalidate the caches
 #define ACPI_FADT_FFF_WBINVD_FLUSH_SET(r,n)           ((r) \
     = ((r) & ~ACPI_FADT_FFF_WBINVD_FLUSH) | ACPI_FADT_FFF_WBINVD_FLUSH_n((n)))
+
+// The C1 state is supported on all processors
 #define ACPI_FADT_FFF_PROC_C1_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_PROC_C1) | ACPI_FADT_FFF_PROC_C1_n((n)))
+
+// The C2 state works with multiple processors
 #define ACPI_FADT_FFF_P_LVL2_MP_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_P_LVL2_MP) | ACPI_FADT_FFF_P_LVL2_MP_n((n)))
+
+// Power button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_PWR_BUTTON_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_PWR_BUTTON) | ACPI_FADT_FFF_PWR_BUTTON_n((n)))
+
+// Sleep button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_SLP_BUTTON_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_SLP_BUTTON) | ACPI_FADT_FFF_SLP_BUTTON_n((n)))
+
+// RTC wake: 0=fixed feature, 1=not fixed feature
 #define ACPI_FADT_FFF_FIX_RTC_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_FIX_RTC) | ACPI_FADT_FFF_FIX_RTC_n((n)))
+
+// RTC can wake from S4 state
 #define ACPI_FADT_FFF_RTC_S4_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_RTC_S4) | ACPI_FADT_FFF_RTC_S4_n((n)))
+
+// Timer width: 0=24 bit, 1=32 bit
 #define ACPI_FADT_FFF_TMR_VAL_EXT_SET(r,n)            ((r) \
     = ((r) & ~ACPI_FADT_FFF_TMR_VAL_EXT) | ACPI_FADT_FFF_TMR_VAL_EXT_n((n)))
+
+// Docking capable
 #define ACPI_FADT_FFF_DCK_CAP_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_DCK_CAP) | ACPI_FADT_FFF_DCK_CAP_n((n)))
+
+// FADT RESET_REG support: 1=supported
 #define ACPI_FADT_FFF_RESET_REG_SUP_SET(r,n)          ((r) = \
     ((r) & ~ACPI_FADT_FFF_RESET_REG_SUP) | ACPI_FADT_FFF_RESET_REG_SUP_n((n)))
+
+// No internal expansion capabilities
 #define ACPI_FADT_FFF_SEALED_CASE_SET(r,n)            ((r) \
     = ((r) & ~ACPI_FADT_FFF_SEALED_CASE) | ACPI_FADT_FFF_SEALED_CASE_n((n)))
+
+// Cannot detect monitor/keyboard devices
 #define ACPI_FADT_FFF_HEADLESS_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_HEADLESS) | ACPI_FADT_FFF_HEADLESS_n((n)))
+
+// A native instruction must be executed after writing SLP_TYPx
 #define ACPI_FADT_FFF_CPU_SW_SLP_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_CPU_SW_SLP) | ACPI_FADT_FFF_CPU_SW_SLP_n((n)))
+
+// Supports PCI express wake PCIEXP_WAKE_STS/_EN
 #define ACPI_FADT_FFF_PCI_EXP_WAK_SET(r,n)            ((r) \
     = ((r) & ~ACPI_FADT_FFF_PCI_EXP_WAK) | ACPI_FADT_FFF_PCI_EXP_WAK_n((n)))
+
+// Use platform clock - long confusing explanation in spec
 #define ACPI_FADT_FFF_PLAT_CLOCK_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_PLAT_CLOCK) | ACPI_FADT_FFF_PLAT_CLOCK_n((n)))
+
+// System has RTC_STS errata when walking from S4
 #define ACPI_FADT_FFF_S4_RTC_STS_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_S4_RTC_STS) | ACPI_FADT_FFF_S4_RTC_STS_n((n)))
+
+// Remote power on capable
 #define ACPI_FADT_FFF_REMOTE_ON_CAP_SET(r,n)          ((r) = \
     ((r) & ~ACPI_FADT_FFF_REMOTE_ON_CAP) | ACPI_FADT_FFF_REMOTE_ON_CAP_n((n)))
+
+// Force APIC to use cluster destination mode
 #define ACPI_FADT_FFF_FORCE_CLUSTER_SET(r,n)          ((r) = \
     ((r) & ~ACPI_FADT_FFF_FORCE_CLUSTER) | ACPI_FADT_FFF_FORCE_CLUSTER_n((n)))
+
+// Force xAPIC to use physical destination mode (N/A to APIC)
 #define ACPI_FADT_FFF_FORCE_PHYS_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_FORCE_PHYS) | ACPI_FADT_FFF_FORCE_PHYS_n((n)))
+
+// ACPI hardware interface is not supported
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_SET(r,n)        ((r) = ((r) \
     & ~ACPI_FADT_FFF_HW_REDUCED_ACPI) | ACPI_FADT_FFF_HW_REDUCED_ACPI_n((n)))
+
+// System power saving in S0 is as good as typical S3
 #define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT) \
     | ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_n((n)))
 
 // ACPI_MADT_FLAGS
 
+
+// Dual 8259 PIC present
 #define ACPI_MADT_FLAGS_HAVE_PIC_BIT       0
 
+
+// Dual 8259 PIC present
 #define ACPI_MADT_FLAGS_HAVE_PIC_BITS      1
+
+// Dual 8259 PIC present
 #define ACPI_MADT_FLAGS_HAVE_PIC_MASK \
     ((1U << ACPI_MADT_FLAGS_HAVE_PIC_BITS)-1)
 
@@ -1068,38 +1518,68 @@
 #define ACPI_MADT_FLAGS_HAVE_PIC \
     (ACPI_MADT_FLAGS_HAVE_PIC_MASK << ACPI_MADT_FLAGS_HAVE_PIC_BIT)
 
+
+// Dual 8259 PIC present
 #define ACPI_MADT_FLAGS_HAVE_PIC_n(n) \
     ((n) << ACPI_MADT_FLAGS_HAVE_PIC_BIT)
 
+
+// Dual 8259 PIC present
 #define ACPI_MADT_FLAGS_HAVE_PIC_GET(n) \
     (((n) >> ACPI_MADT_FLAGS_HAVE_PIC_BIT) & ACPI_MADT_FLAGS_HAVE_PIC_MASK)
 
+
+// Dual 8259 PIC present
 #define ACPI_MADT_FLAGS_HAVE_PIC_SET(r,n) \
     ((r) = ((r) & ~ACPI_MADT_FLAGS_HAVE_PIC) | ACPI_MADT_FLAGS_HAVE_PIC_n((n)))
 
 // ACPI_HPET_BLKID
 
 #define ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_BIT       32
+
+// PCI vendor ID
 #define ACPI_HPET_BLKID_PCI_VEN_BIT                  16
+
+// LegacyReplacement IRQ routing capable
 #define ACPI_HPET_BLKID_LEGACY_CAP_BIT               15
+
+// 64-bit counters
 #define ACPI_HPET_BLKID_COUNTER_SZ_BIT               13
+
+// Number of comparators in 1st block
 #define ACPI_HPET_BLKID_NUM_TIM_CMP_BIT              8
 #define ACPI_HPET_BLKID_REV_ID_BIT                   0
 
 #define ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_BITS      32
+
+// PCI vendor ID
 #define ACPI_HPET_BLKID_PCI_VEN_BITS                 16
+
+// LegacyReplacement IRQ routing capable
 #define ACPI_HPET_BLKID_LEGACY_CAP_BITS              1
+
+// 64-bit counters
 #define ACPI_HPET_BLKID_COUNTER_SZ_BITS              1
+
+// Number of comparators in 1st block
 #define ACPI_HPET_BLKID_NUM_TIM_CMP_BITS             5
 #define ACPI_HPET_BLKID_REV_ID_BITS                  8
 #define ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_MASK \
     ((1UL << ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_BITS)-1)
+
+// PCI vendor ID
 #define ACPI_HPET_BLKID_PCI_VEN_MASK \
     ((1UL << ACPI_HPET_BLKID_PCI_VEN_BITS)-1)
+
+// LegacyReplacement IRQ routing capable
 #define ACPI_HPET_BLKID_LEGACY_CAP_MASK \
     ((1UL << ACPI_HPET_BLKID_LEGACY_CAP_BITS)-1)
+
+// 64-bit counters
 #define ACPI_HPET_BLKID_COUNTER_SZ_MASK \
     ((1UL << ACPI_HPET_BLKID_COUNTER_SZ_BITS)-1)
+
+// Number of comparators in 1st block
 #define ACPI_HPET_BLKID_NUM_TIM_CMP_MASK \
     ((1UL << ACPI_HPET_BLKID_NUM_TIM_CMP_BITS)-1)
 #define ACPI_HPET_BLKID_REV_ID_MASK \
@@ -1128,12 +1608,20 @@
 
 #define ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_n(n) \
     (uint64_t(n) << ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_BIT)
+
+// PCI vendor ID
 #define ACPI_HPET_BLKID_PCI_VEN_n(n) \
     (uint64_t(n) << ACPI_HPET_BLKID_PCI_VEN_BIT)
+
+// LegacyReplacement IRQ routing capable
 #define ACPI_HPET_BLKID_LEGACY_CAP_n(n) \
     (uint64_t(n) << ACPI_HPET_BLKID_LEGACY_CAP_BIT)
+
+// 64-bit counters
 #define ACPI_HPET_BLKID_COUNTER_SZ_n(n) \
     (uint64_t(n) << ACPI_HPET_BLKID_COUNTER_SZ_BIT)
+
+// Number of comparators in 1st block
 #define ACPI_HPET_BLKID_NUM_TIM_CMP_n(n) \
     (uint64_t(n) << ACPI_HPET_BLKID_NUM_TIM_CMP_BIT)
 #define ACPI_HPET_BLKID_REV_ID_n(n) \
@@ -1142,12 +1630,20 @@
 #define ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_GET(n) \
     (((n) >> ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_BIT) \
     & ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_MASK)
+
+// PCI vendor ID
 #define ACPI_HPET_BLKID_PCI_VEN_GET(n) \
     (((n) >> ACPI_HPET_BLKID_PCI_VEN_BIT) & ACPI_HPET_BLKID_PCI_VEN_MASK)
+
+// LegacyReplacement IRQ routing capable
 #define ACPI_HPET_BLKID_LEGACY_CAP_GET(n) \
     (((n) >> ACPI_HPET_BLKID_LEGACY_CAP_BIT) & ACPI_HPET_BLKID_LEGACY_CAP_MASK)
+
+// 64-bit counters
 #define ACPI_HPET_BLKID_COUNTER_SZ_GET(n) \
     (((n) >> ACPI_HPET_BLKID_COUNTER_SZ_BIT) & ACPI_HPET_BLKID_COUNTER_SZ_MASK)
+
+// Number of comparators in 1st block
 #define ACPI_HPET_BLKID_NUM_TIM_CMP_GET(n)           (((n) \
     >> ACPI_HPET_BLKID_NUM_TIM_CMP_BIT) & ACPI_HPET_BLKID_NUM_TIM_CMP_MASK)
 #define ACPI_HPET_BLKID_REV_ID_GET(n) \
@@ -1156,12 +1652,20 @@
 #define ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_SET(r,n) \
     ((r) = ((r) & ~ACPI_HPET_BLKID_COUNTER_CLK_PERIOD) \
     | ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_n((n)))
+
+// PCI vendor ID
 #define ACPI_HPET_BLKID_PCI_VEN_SET(r,n) \
     ((r) = ((r) & ~ACPI_HPET_BLKID_PCI_VEN) | ACPI_HPET_BLKID_PCI_VEN_n((n)))
+
+// LegacyReplacement IRQ routing capable
 #define ACPI_HPET_BLKID_LEGACY_CAP_SET(r,n)          ((r) \
     = ((r) & ~ACPI_HPET_BLKID_LEGACY_CAP) | ACPI_HPET_BLKID_LEGACY_CAP_n((n)))
+
+// 64-bit counters
 #define ACPI_HPET_BLKID_COUNTER_SZ_SET(r,n)          ((r) \
     = ((r) & ~ACPI_HPET_BLKID_COUNTER_SZ) | ACPI_HPET_BLKID_COUNTER_SZ_n((n)))
+
+// Number of comparators in 1st block
 #define ACPI_HPET_BLKID_NUM_TIM_CMP_SET(r,n)         ((r) = \
     ((r) & ~ACPI_HPET_BLKID_NUM_TIM_CMP) | ACPI_HPET_BLKID_NUM_TIM_CMP_n((n)))
 #define ACPI_HPET_BLKID_REV_ID_SET(r,n) \

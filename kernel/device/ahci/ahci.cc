@@ -33,6 +33,8 @@ PCI_DRIVER_BY_CLASS(
 #define AHCI_TRACE(...) ((void)0)
 #endif
 
+__BEGIN_ANONYMOUS
+
 enum ahci_fis_type_t {
     // Register FIS - host to device
     FIS_TYPE_REG_H2D    = 0x27,
@@ -985,7 +987,8 @@ static ext::vector<ahci_dev_t*> ahci_drives;
 
 bool ahci_if_t::supports_64bit()
 {
-    return (mmio_base->cap & AHCI_HC_CAP_S64A) != 0;
+    uint64_t cap = mm_rd(mmio_base->cap);
+    return (cap & AHCI_HC_CAP_S64A) != 0;
 }
 
 // Must be holding port lock
@@ -1223,7 +1226,7 @@ isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
 uint32_t ahci_if_t::mmio_read_intr_status()
 {
 //    uint64_t st = time_ns();
-    uint32_t intr_status = mmio_base->intr_status;
+    uint32_t intr_status = mm_rd(mmio_base->intr_status);
 //    uint64_t en = time_ns();
 //    uint64_t el = en - st;
 //    printdbg("AHCI read intr status %ss\n", engineering_t(el, -3).ptr());
@@ -1246,7 +1249,7 @@ void ahci_if_t::irq_handler(int irq_ofs)
     // Handle every port that has an interrupt pending
     unsigned port;
     uint32_t accumulated_acks = 0;
-    
+
     // Loop for each set bit
     for (uint32_t intr_status = mmio_read_intr_status();
          intr_status != 0; intr_status &= ~(UINT32_C(1) << port)) {
@@ -1256,9 +1259,9 @@ void ahci_if_t::irq_handler(int irq_ofs)
         handle_port_irq(port);
 
         // Acknowledge the interrupt on the port
-        accumulated_acks |= UINT32_C(1) << port;        
+        accumulated_acks |= UINT32_C(1) << port;
     }
-    
+
     mmio_irq_acknowledge_ports(accumulated_acks);
 }
 
@@ -1398,7 +1401,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
     bios_handoff();
 
     // 2. Cache implemented port bitmask
-    ports_impl_mask = mmio_base->ports_impl_mask;
+    ports_impl_mask = mm_rd(mmio_base->ports_impl_mask);
 
 #if 0
     // Reset the HBA
@@ -1846,7 +1849,7 @@ void ahci_if_t::port_reset(unsigned port_num)
 void ahci_if_t::rebase()
 {
     AHCI_TRACE("Stopping all ports\n");
-    
+
     // Stop all ports
     port_stop_all();
 
@@ -1981,16 +1984,18 @@ void ahci_if_t::rebase()
 
 void ahci_if_t::bios_handoff()
 {
+    uint32_t cap2 = mm_rd(mmio_base->cap2);
+
     // If BIOS handoff is not supported then return
-    if ((mmio_base->cap2 & AHCI_HC_CAP2_BOH) == 0)
+    if ((cap2 & AHCI_HC_CAP2_BOH) == 0)
         return;
 
     // Request BIOS handoff
-    mmio_base->bios_handoff =
+    mm_wr(mmio_base->bios_handoff,
             (mmio_base->bios_handoff & ~AHCI_HC_BOH_OOC) |
-            AHCI_HC_BOH_OOS;
+            AHCI_HC_BOH_OOS);
 
-    while ((mmio_base->bios_handoff &
+    while ((mm_rd(mmio_base->bios_handoff) &
             (AHCI_HC_BOH_BOS | AHCI_HC_BOH_OOS)) !=
            AHCI_HC_BOH_OOS)
         thread_sleep_for(64);//ms
@@ -2255,3 +2260,5 @@ long ahci_dev_t::info(storage_dev_info_t key)
 }
 
 static ahci_if_factory_t ahci_if_factory;
+
+__END_ANONYMOUS

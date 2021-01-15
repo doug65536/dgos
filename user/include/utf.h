@@ -17,8 +17,13 @@ size_t utf8_count(char const *in);
 size_t utf16_count(char16_t const *in);
 size_t utf8_to_utf16(char16_t *output, size_t out_size_words, char const *in);
 
-size_t utf16_to_utf8(char *output, size_t output_sz,
-                     char16_t const *input, size_t input_sz);
+struct size_pair_t {
+    size_t output_produced;
+    size_t input_consumed;
+};
+
+size_pair_t utf16_to_utf8(char *output, size_t output_sz,
+                          char16_t const *input, size_t input_sz);
 
 #ifdef __cplusplus
 }
@@ -27,8 +32,8 @@ size_t utf16_to_utf8(char *output, size_t output_sz,
 int tchar_strcmp_utf8(char const *lhs, char const *rhs);
 int tchar_strcmp_utf8(char16_t const *lhs, char const *rhs);
 
-size_t tchar_to_utf8(char *output, size_t output_sz,
-                     char const *input, size_t input_sz);
+size_pair_t tchar_to_utf8(char *output, size_t output_sz,
+                          char const *input, size_t input_sz);
 
-size_t tchar_to_utf8(char *output, size_t output_sz,
-                     char16_t const *input, size_t input_sz);
+size_pair_t tchar_to_utf8(char *output, size_t output_sz,
+                          char16_t const *input, size_t input_sz);

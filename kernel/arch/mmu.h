@@ -22,7 +22,7 @@ extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
 
 #define PAGE_SIZE_BIT 12
 #ifndef PAGE_SIZE
-#define PAGE_SIZE           (1UL << PAGE_SIZE_BIT)
+#define PAGE_SIZE           (1 << PAGE_SIZE_BIT)
 #endif
 #define PAGE_MASK           (PAGE_SIZE - 1UL)
 // Page table entries

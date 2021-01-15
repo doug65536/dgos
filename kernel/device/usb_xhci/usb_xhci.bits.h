@@ -57,25 +57,55 @@
 //
 // USBXHCI_CAPREG_HCSPARAMS2: 5.3.4 HXSPARAMS2
 
+
+// Isochronous scheduling threshold
 #define USBXHCI_CAPREG_HCSPARAMS2_IST_BIT               0
+
+// Event ring segment table max (log2)
 #define USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_BIT           4
+
+// Max scratchpad bufs hi
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_BIT       21
+
+// Scratchpad restore
 #define USBXHCI_CAPREG_HCSPARAMS2_SPR_BIT               26
+
+// Max scratchpad bufs lo
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_BIT       27
 
+
+// Isochronous scheduling threshold
 #define USBXHCI_CAPREG_HCSPARAMS2_IST_BITS              4
+
+// Event ring segment table max (log2)
 #define USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_BITS          4
+
+// Max scratchpad bufs hi
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_BITS      5
+
+// Scratchpad restore
 #define USBXHCI_CAPREG_HCSPARAMS2_SPR_BITS              1
+
+// Max scratchpad bufs lo
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_BITS      5
+
+// Isochronous scheduling threshold
 #define USBXHCI_CAPREG_HCSPARAMS2_IST_MASK \
     ((1U << USBXHCI_CAPREG_HCSPARAMS2_IST_BITS)-1)
+
+// Event ring segment table max (log2)
 #define USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_MASK \
     ((1U << USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_BITS)-1)
+
+// Max scratchpad bufs hi
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_MASK \
     ((1U << USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_BITS)-1)
+
+// Scratchpad restore
 #define USBXHCI_CAPREG_HCSPARAMS2_SPR_MASK \
     ((1U << USBXHCI_CAPREG_HCSPARAMS2_SPR_BITS)-1)
+
+// Max scratchpad bufs lo
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_MASK \
     ((1U << USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_BITS)-1)
 
@@ -102,41 +132,71 @@
     (USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_MASK \
     << USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_BIT)
 
+
+// Isochronous scheduling threshold
 #define USBXHCI_CAPREG_HCSPARAMS2_IST_n(n) \
     ((n) << USBXHCI_CAPREG_HCSPARAMS2_IST_BIT)
+
+// Event ring segment table max (log2)
 #define USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_n(n) \
     ((n) << USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_BIT)
+
+// Max scratchpad bufs hi
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_n(n) \
     ((n) << USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_BIT)
+
+// Scratchpad restore
 #define USBXHCI_CAPREG_HCSPARAMS2_SPR_n(n) \
     ((n) << USBXHCI_CAPREG_HCSPARAMS2_SPR_BIT)
+
+// Max scratchpad bufs lo
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_n(n) \
     ((n) << USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_BIT)
 
+
+// Isochronous scheduling threshold
 #define USBXHCI_CAPREG_HCSPARAMS2_IST_GET(n)            (((n) \
     >> USBXHCI_CAPREG_HCSPARAMS2_IST_BIT) & USBXHCI_CAPREG_HCSPARAMS2_IST_MASK)
+
+// Event ring segment table max (log2)
 #define USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_GET(n) \
     (((n) >> USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_BIT) \
     & USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_MASK)
+
+// Max scratchpad bufs hi
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_GET(n) \
     (((n) >> USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_BIT) \
     & USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_MASK)
+
+// Scratchpad restore
 #define USBXHCI_CAPREG_HCSPARAMS2_SPR_GET(n)            (((n) \
     >> USBXHCI_CAPREG_HCSPARAMS2_SPR_BIT) & USBXHCI_CAPREG_HCSPARAMS2_SPR_MASK)
+
+// Max scratchpad bufs lo
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_GET(n) \
     (((n) >> USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_BIT) \
     & USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_MASK)
 
+
+// Isochronous scheduling threshold
 #define USBXHCI_CAPREG_HCSPARAMS2_IST_SET(r,n)          ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCSPARAMS2_IST) | USBXHCI_CAPREG_HCSPARAMS2_IST_n((n)))
+
+// Event ring segment table max (log2)
 #define USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX) \
     | USBXHCI_CAPREG_HCSPARAMS2_ERSTMAX_n((n)))
+
+// Max scratchpad bufs hi
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI) \
     | USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFHI_n((n)))
+
+// Scratchpad restore
 #define USBXHCI_CAPREG_HCSPARAMS2_SPR_SET(r,n)          ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCSPARAMS2_SPR) | USBXHCI_CAPREG_HCSPARAMS2_SPR_n((n)))
+
+// Max scratchpad bufs lo
 #define USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO) \
     | USBXHCI_CAPREG_HCSPARAMS2_MAXSCRBUFLO_n((n)))
@@ -144,13 +204,25 @@
 //
 // USBXHCI_CAPREG_HCSPARAMS3: 5.3.5 HCSPARAMS3
 
+
+// U1 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_BIT       0
+
+// U2 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_BIT       16
 
+
+// U1 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_BITS      8
+
+// U2 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_BITS      16
+
+// U1 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_MASK \
     ((1U << USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_BITS)-1)
+
+// U2 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_MASK \
     ((1U << USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_BITS)-1)
 
@@ -164,21 +236,33 @@
     (USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_MASK \
     << USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_BIT)
 
+
+// U1 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_n(n) \
     ((n) << USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_BIT)
+
+// U2 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_n(n) \
     ((n) << USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_BIT)
 
+
+// U1 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_GET(n) \
     (((n) >> USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_BIT) \
     & USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_MASK)
+
+// U2 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_GET(n) \
     (((n) >> USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_BIT) \
     & USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_MASK)
 
+
+// U1 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT) \
     | USBXHCI_CAPREG_HCSPARAMS3_U1EXITLAT_n((n)))
+
+// U2 device exit latency
 #define USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT) \
     | USBXHCI_CAPREG_HCSPARAMS3_U2EXITLAT_n((n)))
@@ -186,61 +270,145 @@
 //
 // USBXHCI_CAPREG_HCCPARAMS1: 5.3.6 HCCPARAMS1
 
+
+// 64-bit addressing capability
 #define USBXHCI_CAPREG_HCCPARAMS1_AC64_BIT           0
+
+// Bandwidth negotiation capability
 #define USBXHCI_CAPREG_HCCPARAMS1_BNC_BIT            1
+
+// Context size (1=64 byte, 0=32 byte)
 #define USBXHCI_CAPREG_HCCPARAMS1_CSZ_BIT            2
+
+// Port power control (1=each port's power can be turned off)
 #define USBXHCI_CAPREG_HCCPARAMS1_PPC_BIT            3
+
+// Port indicators
 #define USBXHCI_CAPREG_HCCPARAMS1_PIND_BIT           4
+
+// Light HC reset capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LHRC_BIT           5
+
+// Latency tolerance messaging capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LTC_BIT            6
+
+// No secondary SID support
 #define USBXHCI_CAPREG_HCCPARAMS1_NSS_BIT            7
+
+// Parse all event data
 #define USBXHCI_CAPREG_HCCPARAMS1_PAE_BIT            8
+
+// Stopped short packet capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SPC_BIT            9
+
+// Stopped EDTLA capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SEC_BIT            10
+
+// Contiguous frame ID capability
 #define USBXHCI_CAPREG_HCCPARAMS1_CFC_BIT            11
+
+// Maximum primary stream array size
 #define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BIT       12
+
+// xHCI extended capabilities pointer
 #define USBXHCI_CAPREG_HCCPARAMS1_XECP_BIT           16
 
+
+// 64-bit addressing capability
 #define USBXHCI_CAPREG_HCCPARAMS1_AC64_BITS          1
+
+// Bandwidth negotiation capability
 #define USBXHCI_CAPREG_HCCPARAMS1_BNC_BITS           1
+
+// Context size (1=64 byte, 0=32 byte)
 #define USBXHCI_CAPREG_HCCPARAMS1_CSZ_BITS           1
+
+// Port power control (1=each port's power can be turned off)
 #define USBXHCI_CAPREG_HCCPARAMS1_PPC_BITS           1
+
+// Port indicators
 #define USBXHCI_CAPREG_HCCPARAMS1_PIND_BITS          1
+
+// Light HC reset capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LHRC_BITS          1
+
+// Latency tolerance messaging capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LTC_BITS           1
+
+// No secondary SID support
 #define USBXHCI_CAPREG_HCCPARAMS1_NSS_BITS           1
+
+// Parse all event data
 #define USBXHCI_CAPREG_HCCPARAMS1_PAE_BITS           1
+
+// Stopped short packet capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SPC_BITS           1
+
+// Stopped EDTLA capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SEC_BITS           1
+
+// Contiguous frame ID capability
 #define USBXHCI_CAPREG_HCCPARAMS1_CFC_BITS           1
+
+// Maximum primary stream array size
 #define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BITS      4
+
+// xHCI extended capabilities pointer
 #define USBXHCI_CAPREG_HCCPARAMS1_XECP_BITS          16
+
+// 64-bit addressing capability
 #define USBXHCI_CAPREG_HCCPARAMS1_AC64_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_AC64_BITS)-1)
+
+// Bandwidth negotiation capability
 #define USBXHCI_CAPREG_HCCPARAMS1_BNC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_BNC_BITS)-1)
+
+// Context size (1=64 byte, 0=32 byte)
 #define USBXHCI_CAPREG_HCCPARAMS1_CSZ_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_CSZ_BITS)-1)
+
+// Port power control (1=each port's power can be turned off)
 #define USBXHCI_CAPREG_HCCPARAMS1_PPC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_PPC_BITS)-1)
+
+// Port indicators
 #define USBXHCI_CAPREG_HCCPARAMS1_PIND_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_PIND_BITS)-1)
+
+// Light HC reset capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LHRC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_LHRC_BITS)-1)
+
+// Latency tolerance messaging capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LTC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_LTC_BITS)-1)
+
+// No secondary SID support
 #define USBXHCI_CAPREG_HCCPARAMS1_NSS_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_NSS_BITS)-1)
+
+// Parse all event data
 #define USBXHCI_CAPREG_HCCPARAMS1_PAE_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_PAE_BITS)-1)
+
+// Stopped short packet capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SPC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_SPC_BITS)-1)
+
+// Stopped EDTLA capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SEC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_SEC_BITS)-1)
+
+// Contiguous frame ID capability
 #define USBXHCI_CAPREG_HCCPARAMS1_CFC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_CFC_BITS)-1)
+
+// Maximum primary stream array size
 #define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BITS)-1)
+
+// xHCI extended capabilities pointer
 #define USBXHCI_CAPREG_HCCPARAMS1_XECP_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS1_XECP_BITS)-1)
 
@@ -301,120 +469,240 @@
 #define USBXHCI_CAPREG_HCCPARAMS1_XECP \
     (USBXHCI_CAPREG_HCCPARAMS1_XECP_MASK << USBXHCI_CAPREG_HCCPARAMS1_XECP_BIT)
 
+
+// 64-bit addressing capability
 #define USBXHCI_CAPREG_HCCPARAMS1_AC64_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_AC64_BIT)
+
+// Bandwidth negotiation capability
 #define USBXHCI_CAPREG_HCCPARAMS1_BNC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_BNC_BIT)
+
+// Context size (1=64 byte, 0=32 byte)
 #define USBXHCI_CAPREG_HCCPARAMS1_CSZ_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_CSZ_BIT)
+
+// Port power control (1=each port's power can be turned off)
 #define USBXHCI_CAPREG_HCCPARAMS1_PPC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_PPC_BIT)
+
+// Port indicators
 #define USBXHCI_CAPREG_HCCPARAMS1_PIND_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_PIND_BIT)
+
+// Light HC reset capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LHRC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_LHRC_BIT)
+
+// Latency tolerance messaging capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LTC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_LTC_BIT)
+
+// No secondary SID support
 #define USBXHCI_CAPREG_HCCPARAMS1_NSS_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_NSS_BIT)
+
+// Parse all event data
 #define USBXHCI_CAPREG_HCCPARAMS1_PAE_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_PAE_BIT)
+
+// Stopped short packet capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SPC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_SPC_BIT)
+
+// Stopped EDTLA capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SEC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_SEC_BIT)
+
+// Contiguous frame ID capability
 #define USBXHCI_CAPREG_HCCPARAMS1_CFC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_CFC_BIT)
+
+// Maximum primary stream array size
 #define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BIT)
+
+// xHCI extended capabilities pointer
 #define USBXHCI_CAPREG_HCCPARAMS1_XECP_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS1_XECP_BIT)
 
+
+// 64-bit addressing capability
 #define USBXHCI_CAPREG_HCCPARAMS1_AC64_GET(n)        (((n) >> \
     USBXHCI_CAPREG_HCCPARAMS1_AC64_BIT) & USBXHCI_CAPREG_HCCPARAMS1_AC64_MASK)
+
+// Bandwidth negotiation capability
 #define USBXHCI_CAPREG_HCCPARAMS1_BNC_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_BNC_BIT) & USBXHCI_CAPREG_HCCPARAMS1_BNC_MASK)
+
+// Context size (1=64 byte, 0=32 byte)
 #define USBXHCI_CAPREG_HCCPARAMS1_CSZ_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_CSZ_BIT) & USBXHCI_CAPREG_HCCPARAMS1_CSZ_MASK)
+
+// Port power control (1=each port's power can be turned off)
 #define USBXHCI_CAPREG_HCCPARAMS1_PPC_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_PPC_BIT) & USBXHCI_CAPREG_HCCPARAMS1_PPC_MASK)
+
+// Port indicators
 #define USBXHCI_CAPREG_HCCPARAMS1_PIND_GET(n)        (((n) >> \
     USBXHCI_CAPREG_HCCPARAMS1_PIND_BIT) & USBXHCI_CAPREG_HCCPARAMS1_PIND_MASK)
+
+// Light HC reset capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LHRC_GET(n)        (((n) >> \
     USBXHCI_CAPREG_HCCPARAMS1_LHRC_BIT) & USBXHCI_CAPREG_HCCPARAMS1_LHRC_MASK)
+
+// Latency tolerance messaging capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LTC_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_LTC_BIT) & USBXHCI_CAPREG_HCCPARAMS1_LTC_MASK)
+
+// No secondary SID support
 #define USBXHCI_CAPREG_HCCPARAMS1_NSS_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_NSS_BIT) & USBXHCI_CAPREG_HCCPARAMS1_NSS_MASK)
+
+// Parse all event data
 #define USBXHCI_CAPREG_HCCPARAMS1_PAE_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_PAE_BIT) & USBXHCI_CAPREG_HCCPARAMS1_PAE_MASK)
+
+// Stopped short packet capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SPC_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_SPC_BIT) & USBXHCI_CAPREG_HCCPARAMS1_SPC_MASK)
+
+// Stopped EDTLA capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SEC_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_SEC_BIT) & USBXHCI_CAPREG_HCCPARAMS1_SEC_MASK)
+
+// Contiguous frame ID capability
 #define USBXHCI_CAPREG_HCCPARAMS1_CFC_GET(n)         (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS1_CFC_BIT) & USBXHCI_CAPREG_HCCPARAMS1_CFC_MASK)
+
+// Maximum primary stream array size
 #define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_GET(n) \
     (((n) >> USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BIT) \
     & USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_MASK)
+
+// xHCI extended capabilities pointer
 #define USBXHCI_CAPREG_HCCPARAMS1_XECP_GET(n)        (((n) >> \
     USBXHCI_CAPREG_HCCPARAMS1_XECP_BIT) & USBXHCI_CAPREG_HCCPARAMS1_XECP_MASK)
 
+
+// 64-bit addressing capability
 #define USBXHCI_CAPREG_HCCPARAMS1_AC64_SET(r,n)      ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_AC64) | USBXHCI_CAPREG_HCCPARAMS1_AC64_n((n)))
+
+// Bandwidth negotiation capability
 #define USBXHCI_CAPREG_HCCPARAMS1_BNC_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_BNC) | USBXHCI_CAPREG_HCCPARAMS1_BNC_n((n)))
+
+// Context size (1=64 byte, 0=32 byte)
 #define USBXHCI_CAPREG_HCCPARAMS1_CSZ_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_CSZ) | USBXHCI_CAPREG_HCCPARAMS1_CSZ_n((n)))
+
+// Port power control (1=each port's power can be turned off)
 #define USBXHCI_CAPREG_HCCPARAMS1_PPC_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_PPC) | USBXHCI_CAPREG_HCCPARAMS1_PPC_n((n)))
+
+// Port indicators
 #define USBXHCI_CAPREG_HCCPARAMS1_PIND_SET(r,n)      ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_PIND) | USBXHCI_CAPREG_HCCPARAMS1_PIND_n((n)))
+
+// Light HC reset capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LHRC_SET(r,n)      ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_LHRC) | USBXHCI_CAPREG_HCCPARAMS1_LHRC_n((n)))
+
+// Latency tolerance messaging capability
 #define USBXHCI_CAPREG_HCCPARAMS1_LTC_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_LTC) | USBXHCI_CAPREG_HCCPARAMS1_LTC_n((n)))
+
+// No secondary SID support
 #define USBXHCI_CAPREG_HCCPARAMS1_NSS_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_NSS) | USBXHCI_CAPREG_HCCPARAMS1_NSS_n((n)))
+
+// Parse all event data
 #define USBXHCI_CAPREG_HCCPARAMS1_PAE_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_PAE) | USBXHCI_CAPREG_HCCPARAMS1_PAE_n((n)))
+
+// Stopped short packet capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SPC_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_SPC) | USBXHCI_CAPREG_HCCPARAMS1_SPC_n((n)))
+
+// Stopped EDTLA capability
 #define USBXHCI_CAPREG_HCCPARAMS1_SEC_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_SEC) | USBXHCI_CAPREG_HCCPARAMS1_SEC_n((n)))
+
+// Contiguous frame ID capability
 #define USBXHCI_CAPREG_HCCPARAMS1_CFC_SET(r,n)       ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_CFC) | USBXHCI_CAPREG_HCCPARAMS1_CFC_n((n)))
+
+// Maximum primary stream array size
 #define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ) \
     | USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_n((n)))
+
+// xHCI extended capabilities pointer
 #define USBXHCI_CAPREG_HCCPARAMS1_XECP_SET(r,n)      ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS1_XECP) | USBXHCI_CAPREG_HCCPARAMS1_XECP_n((n)))
 
 // USBXHCI_CAPREG_HCCPARAMS2
 
+
+// U3 entry capability
 #define USBXHCI_CAPREG_HCCPARAMS2_U3C_BIT       0
+
+// Configure endpoint command max exit latency too large capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CMC_BIT       1
+
+// Force save context capability
 #define USBXHCI_CAPREG_HCCPARAMS2_FSC_BIT       2
+
+// Compliance transition capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CTC_BIT       3
+
+// Large ESIT payload capability
 #define USBXHCI_CAPREG_HCCPARAMS2_LEC_BIT       4
+
+// Configuration information capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CIC_BIT       5
 
+
+// U3 entry capability
 #define USBXHCI_CAPREG_HCCPARAMS2_U3C_BITS      1
+
+// Configure endpoint command max exit latency too large capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CMC_BITS      1
+
+// Force save context capability
 #define USBXHCI_CAPREG_HCCPARAMS2_FSC_BITS      1
+
+// Compliance transition capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CTC_BITS      1
+
+// Large ESIT payload capability
 #define USBXHCI_CAPREG_HCCPARAMS2_LEC_BITS      1
+
+// Configuration information capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CIC_BITS      1
+
+// U3 entry capability
 #define USBXHCI_CAPREG_HCCPARAMS2_U3C_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS2_U3C_BITS)-1)
+
+// Configure endpoint command max exit latency too large capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CMC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS2_CMC_BITS)-1)
+
+// Force save context capability
 #define USBXHCI_CAPREG_HCCPARAMS2_FSC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS2_FSC_BITS)-1)
+
+// Compliance transition capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CTC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS2_CTC_BITS)-1)
+
+// Large ESIT payload capability
 #define USBXHCI_CAPREG_HCCPARAMS2_LEC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS2_LEC_BITS)-1)
+
+// Configuration information capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CIC_MASK \
     ((1U << USBXHCI_CAPREG_HCCPARAMS2_CIC_BITS)-1)
 
@@ -442,82 +730,184 @@
 #define USBXHCI_CAPREG_HCCPARAMS2_CIC \
     (USBXHCI_CAPREG_HCCPARAMS2_CIC_MASK << USBXHCI_CAPREG_HCCPARAMS2_CIC_BIT)
 
+
+// U3 entry capability
 #define USBXHCI_CAPREG_HCCPARAMS2_U3C_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS2_U3C_BIT)
+
+// Configure endpoint command max exit latency too large capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CMC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS2_CMC_BIT)
+
+// Force save context capability
 #define USBXHCI_CAPREG_HCCPARAMS2_FSC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS2_FSC_BIT)
+
+// Compliance transition capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CTC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS2_CTC_BIT)
+
+// Large ESIT payload capability
 #define USBXHCI_CAPREG_HCCPARAMS2_LEC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS2_LEC_BIT)
+
+// Configuration information capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CIC_n(n) \
     ((n) << USBXHCI_CAPREG_HCCPARAMS2_CIC_BIT)
 
+
+// U3 entry capability
 #define USBXHCI_CAPREG_HCCPARAMS2_U3C_GET(n)    (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS2_U3C_BIT) & USBXHCI_CAPREG_HCCPARAMS2_U3C_MASK)
+
+// Configure endpoint command max exit latency too large capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CMC_GET(n)    (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS2_CMC_BIT) & USBXHCI_CAPREG_HCCPARAMS2_CMC_MASK)
+
+// Force save context capability
 #define USBXHCI_CAPREG_HCCPARAMS2_FSC_GET(n)    (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS2_FSC_BIT) & USBXHCI_CAPREG_HCCPARAMS2_FSC_MASK)
+
+// Compliance transition capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CTC_GET(n)    (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS2_CTC_BIT) & USBXHCI_CAPREG_HCCPARAMS2_CTC_MASK)
+
+// Large ESIT payload capability
 #define USBXHCI_CAPREG_HCCPARAMS2_LEC_GET(n)    (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS2_LEC_BIT) & USBXHCI_CAPREG_HCCPARAMS2_LEC_MASK)
+
+// Configuration information capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CIC_GET(n)    (((n) \
     >> USBXHCI_CAPREG_HCCPARAMS2_CIC_BIT) & USBXHCI_CAPREG_HCCPARAMS2_CIC_MASK)
 
+
+// U3 entry capability
 #define USBXHCI_CAPREG_HCCPARAMS2_U3C_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS2_U3C) | USBXHCI_CAPREG_HCCPARAMS2_U3C_n((n)))
+
+// Configure endpoint command max exit latency too large capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CMC_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS2_CMC) | USBXHCI_CAPREG_HCCPARAMS2_CMC_n((n)))
+
+// Force save context capability
 #define USBXHCI_CAPREG_HCCPARAMS2_FSC_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS2_FSC) | USBXHCI_CAPREG_HCCPARAMS2_FSC_n((n)))
+
+// Compliance transition capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CTC_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS2_CTC) | USBXHCI_CAPREG_HCCPARAMS2_CTC_n((n)))
+
+// Large ESIT payload capability
 #define USBXHCI_CAPREG_HCCPARAMS2_LEC_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS2_LEC) | USBXHCI_CAPREG_HCCPARAMS2_LEC_n((n)))
+
+// Configuration information capability
 #define USBXHCI_CAPREG_HCCPARAMS2_CIC_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CAPREG_HCCPARAMS2_CIC) | USBXHCI_CAPREG_HCCPARAMS2_CIC_n((n)))
 
 //
 // USBXHCI_USBCMD: 5.4.1 USBCMD USB command
 
+
+// Run/stop (1=run, 0=stop)
 #define USBXHCI_USBCMD_RUNSTOP_BIT       0
+
+// Host controller reset
 #define USBXHCI_USBCMD_HCRST_BIT         1
+
+// Interrupter enable (1=enable)
 #define USBXHCI_USBCMD_INTE_BIT          2
+
+// Host system error enable
 #define USBXHCI_USBCMD_HSEE_BIT          3
+
+// Light host controller reset
 #define USBXHCI_USBCMD_LHCRST_BIT        7
+
+// Controller save state
 #define USBXHCI_USBCMD_CSS_BIT           8
+
+// Controller restore state
 #define USBXHCI_USBCMD_CRS_BIT           9
+
+// Enable wrap event
 #define USBXHCI_USBCMD_EWE_BIT           10
+
+// Enable U3 MFINDEX stop
 #define USBXHCI_USBCMD_EU3S_BIT          11
+
+// Stopped short packet enable
 #define USBXHCI_USBCMD_SPE_BIT           12
+
+// CEM enable
 #define USBXHCI_USBCMD_CME_BIT           13
 
+
+// Run/stop (1=run, 0=stop)
 #define USBXHCI_USBCMD_RUNSTOP_BITS      1
+
+// Host controller reset
 #define USBXHCI_USBCMD_HCRST_BITS        1
+
+// Interrupter enable (1=enable)
 #define USBXHCI_USBCMD_INTE_BITS         1
+
+// Host system error enable
 #define USBXHCI_USBCMD_HSEE_BITS         1
+
+// Light host controller reset
 #define USBXHCI_USBCMD_LHCRST_BITS       1
+
+// Controller save state
 #define USBXHCI_USBCMD_CSS_BITS          1
+
+// Controller restore state
 #define USBXHCI_USBCMD_CRS_BITS          1
+
+// Enable wrap event
 #define USBXHCI_USBCMD_EWE_BITS          1
+
+// Enable U3 MFINDEX stop
 #define USBXHCI_USBCMD_EU3S_BITS         1
+
+// Stopped short packet enable
 #define USBXHCI_USBCMD_SPE_BITS          1
+
+// CEM enable
 #define USBXHCI_USBCMD_CME_BITS          1
+
+// Run/stop (1=run, 0=stop)
 #define USBXHCI_USBCMD_RUNSTOP_MASK \
     ((1U << USBXHCI_USBCMD_RUNSTOP_BITS)-1)
+
+// Host controller reset
 #define USBXHCI_USBCMD_HCRST_MASK        ((1U << USBXHCI_USBCMD_HCRST_BITS)-1)
+
+// Interrupter enable (1=enable)
 #define USBXHCI_USBCMD_INTE_MASK         ((1U << USBXHCI_USBCMD_INTE_BITS)-1)
+
+// Host system error enable
 #define USBXHCI_USBCMD_HSEE_MASK         ((1U << USBXHCI_USBCMD_HSEE_BITS)-1)
+
+// Light host controller reset
 #define USBXHCI_USBCMD_LHCRST_MASK       ((1U << USBXHCI_USBCMD_LHCRST_BITS)-1)
+
+// Controller save state
 #define USBXHCI_USBCMD_CSS_MASK          ((1U << USBXHCI_USBCMD_CSS_BITS)-1)
+
+// Controller restore state
 #define USBXHCI_USBCMD_CRS_MASK          ((1U << USBXHCI_USBCMD_CRS_BITS)-1)
+
+// Enable wrap event
 #define USBXHCI_USBCMD_EWE_MASK          ((1U << USBXHCI_USBCMD_EWE_BITS)-1)
+
+// Enable U3 MFINDEX stop
 #define USBXHCI_USBCMD_EU3S_MASK         ((1U << USBXHCI_USBCMD_EU3S_BITS)-1)
+
+// Stopped short packet enable
 #define USBXHCI_USBCMD_SPE_MASK          ((1U << USBXHCI_USBCMD_SPE_BITS)-1)
+
+// CEM enable
 #define USBXHCI_USBCMD_CME_MASK          ((1U << USBXHCI_USBCMD_CME_BITS)-1)
 
 // Run/stop (1=run, 0=stop)
@@ -564,94 +954,214 @@
 #define USBXHCI_USBCMD_CME \
     (USBXHCI_USBCMD_CME_MASK << USBXHCI_USBCMD_CME_BIT)
 
+
+// Run/stop (1=run, 0=stop)
 #define USBXHCI_USBCMD_RUNSTOP_n(n)      ((n) << USBXHCI_USBCMD_RUNSTOP_BIT)
+
+// Host controller reset
 #define USBXHCI_USBCMD_HCRST_n(n)        ((n) << USBXHCI_USBCMD_HCRST_BIT)
+
+// Interrupter enable (1=enable)
 #define USBXHCI_USBCMD_INTE_n(n)         ((n) << USBXHCI_USBCMD_INTE_BIT)
+
+// Host system error enable
 #define USBXHCI_USBCMD_HSEE_n(n)         ((n) << USBXHCI_USBCMD_HSEE_BIT)
+
+// Light host controller reset
 #define USBXHCI_USBCMD_LHCRST_n(n)       ((n) << USBXHCI_USBCMD_LHCRST_BIT)
+
+// Controller save state
 #define USBXHCI_USBCMD_CSS_n(n)          ((n) << USBXHCI_USBCMD_CSS_BIT)
+
+// Controller restore state
 #define USBXHCI_USBCMD_CRS_n(n)          ((n) << USBXHCI_USBCMD_CRS_BIT)
+
+// Enable wrap event
 #define USBXHCI_USBCMD_EWE_n(n)          ((n) << USBXHCI_USBCMD_EWE_BIT)
+
+// Enable U3 MFINDEX stop
 #define USBXHCI_USBCMD_EU3S_n(n)         ((n) << USBXHCI_USBCMD_EU3S_BIT)
+
+// Stopped short packet enable
 #define USBXHCI_USBCMD_SPE_n(n)          ((n) << USBXHCI_USBCMD_SPE_BIT)
+
+// CEM enable
 #define USBXHCI_USBCMD_CME_n(n)          ((n) << USBXHCI_USBCMD_CME_BIT)
 
+
+// Run/stop (1=run, 0=stop)
 #define USBXHCI_USBCMD_RUNSTOP_GET(n) \
     (((n) >> USBXHCI_USBCMD_RUNSTOP_BIT) & USBXHCI_USBCMD_RUNSTOP_MASK)
+
+// Host controller reset
 #define USBXHCI_USBCMD_HCRST_GET(n) \
     (((n) >> USBXHCI_USBCMD_HCRST_BIT) & USBXHCI_USBCMD_HCRST_MASK)
+
+// Interrupter enable (1=enable)
 #define USBXHCI_USBCMD_INTE_GET(n) \
     (((n) >> USBXHCI_USBCMD_INTE_BIT) & USBXHCI_USBCMD_INTE_MASK)
+
+// Host system error enable
 #define USBXHCI_USBCMD_HSEE_GET(n) \
     (((n) >> USBXHCI_USBCMD_HSEE_BIT) & USBXHCI_USBCMD_HSEE_MASK)
+
+// Light host controller reset
 #define USBXHCI_USBCMD_LHCRST_GET(n) \
     (((n) >> USBXHCI_USBCMD_LHCRST_BIT) & USBXHCI_USBCMD_LHCRST_MASK)
+
+// Controller save state
 #define USBXHCI_USBCMD_CSS_GET(n) \
     (((n) >> USBXHCI_USBCMD_CSS_BIT) & USBXHCI_USBCMD_CSS_MASK)
+
+// Controller restore state
 #define USBXHCI_USBCMD_CRS_GET(n) \
     (((n) >> USBXHCI_USBCMD_CRS_BIT) & USBXHCI_USBCMD_CRS_MASK)
+
+// Enable wrap event
 #define USBXHCI_USBCMD_EWE_GET(n) \
     (((n) >> USBXHCI_USBCMD_EWE_BIT) & USBXHCI_USBCMD_EWE_MASK)
+
+// Enable U3 MFINDEX stop
 #define USBXHCI_USBCMD_EU3S_GET(n) \
     (((n) >> USBXHCI_USBCMD_EU3S_BIT) & USBXHCI_USBCMD_EU3S_MASK)
+
+// Stopped short packet enable
 #define USBXHCI_USBCMD_SPE_GET(n) \
     (((n) >> USBXHCI_USBCMD_SPE_BIT) & USBXHCI_USBCMD_SPE_MASK)
+
+// CEM enable
 #define USBXHCI_USBCMD_CME_GET(n) \
     (((n) >> USBXHCI_USBCMD_CME_BIT) & USBXHCI_USBCMD_CME_MASK)
 
+
+// Run/stop (1=run, 0=stop)
 #define USBXHCI_USBCMD_RUNSTOP_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_RUNSTOP) | USBXHCI_USBCMD_RUNSTOP_n((n)))
+
+// Host controller reset
 #define USBXHCI_USBCMD_HCRST_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_HCRST) | USBXHCI_USBCMD_HCRST_n((n)))
+
+// Interrupter enable (1=enable)
 #define USBXHCI_USBCMD_INTE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_INTE) | USBXHCI_USBCMD_INTE_n((n)))
+
+// Host system error enable
 #define USBXHCI_USBCMD_HSEE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_HSEE) | USBXHCI_USBCMD_HSEE_n((n)))
+
+// Light host controller reset
 #define USBXHCI_USBCMD_LHCRST_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_LHCRST) | USBXHCI_USBCMD_LHCRST_n((n)))
+
+// Controller save state
 #define USBXHCI_USBCMD_CSS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_CSS) | USBXHCI_USBCMD_CSS_n((n)))
+
+// Controller restore state
 #define USBXHCI_USBCMD_CRS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_CRS) | USBXHCI_USBCMD_CRS_n((n)))
+
+// Enable wrap event
 #define USBXHCI_USBCMD_EWE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_EWE) | USBXHCI_USBCMD_EWE_n((n)))
+
+// Enable U3 MFINDEX stop
 #define USBXHCI_USBCMD_EU3S_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_EU3S) | USBXHCI_USBCMD_EU3S_n((n)))
+
+// Stopped short packet enable
 #define USBXHCI_USBCMD_SPE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_SPE) | USBXHCI_USBCMD_SPE_n((n)))
+
+// CEM enable
 #define USBXHCI_USBCMD_CME_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBCMD_CME) | USBXHCI_USBCMD_CME_n((n)))
 
 //
 // USBXHCI_USBSTS: 5.4.2 USBSTS USB status
 
+
+// Halted (1=halted)
 #define USBXHCI_USBSTS_HCH_BIT        0
+
+// (RW1C) Host system error (0=ok, 1=serious error)
 #define USBXHCI_USBSTS_HSE_BIT        2
+
+// (RW1C) Event interrupt (1=interrupt pending)
 #define USBXHCI_USBSTS_EINT_BIT       3
+
+// (RW1C) Port change detect (1=changed)
 #define USBXHCI_USBSTS_PCD_BIT        4
+
+// Save state status (1=still saving)
 #define USBXHCI_USBSTS_SSS_BIT        8
+
+// Restore state status (1=still restoring)
 #define USBXHCI_USBSTS_RSS_BIT        9
+
+// (RW1C) Save/restore error (1=error)
 #define USBXHCI_USBSTS_SRE_BIT        10
+
+// Controller not ready (1=not ready)
 #define USBXHCI_USBSTS_CNR_BIT        11
+
+// Host controller error (1=xHC error)
 #define USBXHCI_USBSTS_HCE_BIT        12
 
+
+// Halted (1=halted)
 #define USBXHCI_USBSTS_HCH_BITS       1
+
+// (RW1C) Host system error (0=ok, 1=serious error)
 #define USBXHCI_USBSTS_HSE_BITS       1
+
+// (RW1C) Event interrupt (1=interrupt pending)
 #define USBXHCI_USBSTS_EINT_BITS      1
+
+// (RW1C) Port change detect (1=changed)
 #define USBXHCI_USBSTS_PCD_BITS       1
+
+// Save state status (1=still saving)
 #define USBXHCI_USBSTS_SSS_BITS       1
+
+// Restore state status (1=still restoring)
 #define USBXHCI_USBSTS_RSS_BITS       1
+
+// (RW1C) Save/restore error (1=error)
 #define USBXHCI_USBSTS_SRE_BITS       1
+
+// Controller not ready (1=not ready)
 #define USBXHCI_USBSTS_CNR_BITS       1
+
+// Host controller error (1=xHC error)
 #define USBXHCI_USBSTS_HCE_BITS       1
+
+// Halted (1=halted)
 #define USBXHCI_USBSTS_HCH_MASK       ((1U << USBXHCI_USBSTS_HCH_BITS)-1)
+
+// (RW1C) Host system error (0=ok, 1=serious error)
 #define USBXHCI_USBSTS_HSE_MASK       ((1U << USBXHCI_USBSTS_HSE_BITS)-1)
+
+// (RW1C) Event interrupt (1=interrupt pending)
 #define USBXHCI_USBSTS_EINT_MASK      ((1U << USBXHCI_USBSTS_EINT_BITS)-1)
+
+// (RW1C) Port change detect (1=changed)
 #define USBXHCI_USBSTS_PCD_MASK       ((1U << USBXHCI_USBSTS_PCD_BITS)-1)
+
+// Save state status (1=still saving)
 #define USBXHCI_USBSTS_SSS_MASK       ((1U << USBXHCI_USBSTS_SSS_BITS)-1)
+
+// Restore state status (1=still restoring)
 #define USBXHCI_USBSTS_RSS_MASK       ((1U << USBXHCI_USBSTS_RSS_BITS)-1)
+
+// (RW1C) Save/restore error (1=error)
 #define USBXHCI_USBSTS_SRE_MASK       ((1U << USBXHCI_USBSTS_SRE_BITS)-1)
+
+// Controller not ready (1=not ready)
 #define USBXHCI_USBSTS_CNR_MASK       ((1U << USBXHCI_USBSTS_CNR_BITS)-1)
+
+// Host controller error (1=xHC error)
 #define USBXHCI_USBSTS_HCE_MASK       ((1U << USBXHCI_USBSTS_HCE_BITS)-1)
 
 // Halted (1=halted)
@@ -690,112 +1200,220 @@
 #define USBXHCI_USBSTS_HCE \
     (USBXHCI_USBSTS_HCE_MASK << USBXHCI_USBSTS_HCE_BIT)
 
+
+// Halted (1=halted)
 #define USBXHCI_USBSTS_HCH_n(n)       ((n) << USBXHCI_USBSTS_HCH_BIT)
+
+// (RW1C) Host system error (0=ok, 1=serious error)
 #define USBXHCI_USBSTS_HSE_n(n)       ((n) << USBXHCI_USBSTS_HSE_BIT)
+
+// (RW1C) Event interrupt (1=interrupt pending)
 #define USBXHCI_USBSTS_EINT_n(n)      ((n) << USBXHCI_USBSTS_EINT_BIT)
+
+// (RW1C) Port change detect (1=changed)
 #define USBXHCI_USBSTS_PCD_n(n)       ((n) << USBXHCI_USBSTS_PCD_BIT)
+
+// Save state status (1=still saving)
 #define USBXHCI_USBSTS_SSS_n(n)       ((n) << USBXHCI_USBSTS_SSS_BIT)
+
+// Restore state status (1=still restoring)
 #define USBXHCI_USBSTS_RSS_n(n)       ((n) << USBXHCI_USBSTS_RSS_BIT)
+
+// (RW1C) Save/restore error (1=error)
 #define USBXHCI_USBSTS_SRE_n(n)       ((n) << USBXHCI_USBSTS_SRE_BIT)
+
+// Controller not ready (1=not ready)
 #define USBXHCI_USBSTS_CNR_n(n)       ((n) << USBXHCI_USBSTS_CNR_BIT)
+
+// Host controller error (1=xHC error)
 #define USBXHCI_USBSTS_HCE_n(n)       ((n) << USBXHCI_USBSTS_HCE_BIT)
 
+
+// Halted (1=halted)
 #define USBXHCI_USBSTS_HCH_GET(n) \
     (((n) >> USBXHCI_USBSTS_HCH_BIT) & USBXHCI_USBSTS_HCH_MASK)
+
+// (RW1C) Host system error (0=ok, 1=serious error)
 #define USBXHCI_USBSTS_HSE_GET(n) \
     (((n) >> USBXHCI_USBSTS_HSE_BIT) & USBXHCI_USBSTS_HSE_MASK)
+
+// (RW1C) Event interrupt (1=interrupt pending)
 #define USBXHCI_USBSTS_EINT_GET(n) \
     (((n) >> USBXHCI_USBSTS_EINT_BIT) & USBXHCI_USBSTS_EINT_MASK)
+
+// (RW1C) Port change detect (1=changed)
 #define USBXHCI_USBSTS_PCD_GET(n) \
     (((n) >> USBXHCI_USBSTS_PCD_BIT) & USBXHCI_USBSTS_PCD_MASK)
+
+// Save state status (1=still saving)
 #define USBXHCI_USBSTS_SSS_GET(n) \
     (((n) >> USBXHCI_USBSTS_SSS_BIT) & USBXHCI_USBSTS_SSS_MASK)
+
+// Restore state status (1=still restoring)
 #define USBXHCI_USBSTS_RSS_GET(n) \
     (((n) >> USBXHCI_USBSTS_RSS_BIT) & USBXHCI_USBSTS_RSS_MASK)
+
+// (RW1C) Save/restore error (1=error)
 #define USBXHCI_USBSTS_SRE_GET(n) \
     (((n) >> USBXHCI_USBSTS_SRE_BIT) & USBXHCI_USBSTS_SRE_MASK)
+
+// Controller not ready (1=not ready)
 #define USBXHCI_USBSTS_CNR_GET(n) \
     (((n) >> USBXHCI_USBSTS_CNR_BIT) & USBXHCI_USBSTS_CNR_MASK)
+
+// Host controller error (1=xHC error)
 #define USBXHCI_USBSTS_HCE_GET(n) \
     (((n) >> USBXHCI_USBSTS_HCE_BIT) & USBXHCI_USBSTS_HCE_MASK)
 
+
+// Halted (1=halted)
 #define USBXHCI_USBSTS_HCH_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_HCH) | USBXHCI_USBSTS_HCH_n((n)))
+
+// (RW1C) Host system error (0=ok, 1=serious error)
 #define USBXHCI_USBSTS_HSE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_HSE) | USBXHCI_USBSTS_HSE_n((n)))
+
+// (RW1C) Event interrupt (1=interrupt pending)
 #define USBXHCI_USBSTS_EINT_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_EINT) | USBXHCI_USBSTS_EINT_n((n)))
+
+// (RW1C) Port change detect (1=changed)
 #define USBXHCI_USBSTS_PCD_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_PCD) | USBXHCI_USBSTS_PCD_n((n)))
+
+// Save state status (1=still saving)
 #define USBXHCI_USBSTS_SSS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_SSS) | USBXHCI_USBSTS_SSS_n((n)))
+
+// Restore state status (1=still restoring)
 #define USBXHCI_USBSTS_RSS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_RSS) | USBXHCI_USBSTS_RSS_n((n)))
+
+// (RW1C) Save/restore error (1=error)
 #define USBXHCI_USBSTS_SRE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_SRE) | USBXHCI_USBSTS_SRE_n((n)))
+
+// Controller not ready (1=not ready)
 #define USBXHCI_USBSTS_CNR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_CNR) | USBXHCI_USBSTS_CNR_n((n)))
+
+// Host controller error (1=xHC error)
 #define USBXHCI_USBSTS_HCE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_USBSTS_HCE) | USBXHCI_USBSTS_HCE_n((n)))
 
 //
 // USBXHCI_PAGESIZE: 5.4.3 PAGESIZE
 
+
+// Page size (2**12 * X4K))
 #define USBXHCI_PAGESIZE_X4K_BIT       0
 
+
+// Page size (2**12 * X4K))
 #define USBXHCI_PAGESIZE_X4K_BITS      16
+
+// Page size (2**12 * X4K))
 #define USBXHCI_PAGESIZE_X4K_MASK      ((1U << USBXHCI_PAGESIZE_X4K_BITS)-1)
 
 // Page size (2**12 * X4K))
 #define USBXHCI_PAGESIZE_X4K \
     (USBXHCI_PAGESIZE_X4K_MASK << USBXHCI_PAGESIZE_X4K_BIT)
 
+
+// Page size (2**12 * X4K))
 #define USBXHCI_PAGESIZE_X4K_n(n)      ((n) << USBXHCI_PAGESIZE_X4K_BIT)
 
+
+// Page size (2**12 * X4K))
 #define USBXHCI_PAGESIZE_X4K_GET(n) \
     (((n) >> USBXHCI_PAGESIZE_X4K_BIT) & USBXHCI_PAGESIZE_X4K_MASK)
 
+
+// Page size (2**12 * X4K))
 #define USBXHCI_PAGESIZE_X4K_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PAGESIZE_X4K) | USBXHCI_PAGESIZE_X4K_n((n)))
 
 //
 // USBXHCI_DNCTRL: 5.4.4 DNCTRL Device notification control
 
+
+// Notification enable (bit significant)
 #define USBXHCI_DNCTRL_N0_15_BIT       0
 
+
+// Notification enable (bit significant)
 #define USBXHCI_DNCTRL_N0_15_BITS      16
+
+// Notification enable (bit significant)
 #define USBXHCI_DNCTRL_N0_15_MASK      ((1U << USBXHCI_DNCTRL_N0_15_BITS)-1)
 
 // Notification enable (bit significant)
 #define USBXHCI_DNCTRL_N0_15 \
     (USBXHCI_DNCTRL_N0_15_MASK << USBXHCI_DNCTRL_N0_15_BIT)
 
+
+// Notification enable (bit significant)
 #define USBXHCI_DNCTRL_N0_15_n(n)      ((n) << USBXHCI_DNCTRL_N0_15_BIT)
 
+
+// Notification enable (bit significant)
 #define USBXHCI_DNCTRL_N0_15_GET(n) \
     (((n) >> USBXHCI_DNCTRL_N0_15_BIT) & USBXHCI_DNCTRL_N0_15_MASK)
 
+
+// Notification enable (bit significant)
 #define USBXHCI_DNCTRL_N0_15_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_DNCTRL_N0_15) | USBXHCI_DNCTRL_N0_15_n((n)))
 
 //
 // USBXHCI_CRCR: 5.4.5 CRCR Command ring control register
 
+
+// Consumer ring cycle state
 #define USBXHCI_CRCR_RCS_BIT         0
+
+// (RW1S) Command stop (0=normal, 1=stop command ring)
 #define USBXHCI_CRCR_CS_BIT          1
+
+// (RW1S) Command abort (0=normal, 1=abort command)
 #define USBXHCI_CRCR_CA_BIT          2
+
+// Command ring running (1=running)
 #define USBXHCI_CRCR_CRR_BIT         3
+
+// Command ring pointer (512-bit aligned start address of command ring)
 #define USBXHCI_CRCR_CRPTR_BIT       6
 
+
+// Consumer ring cycle state
 #define USBXHCI_CRCR_RCS_BITS        1
+
+// (RW1S) Command stop (0=normal, 1=stop command ring)
 #define USBXHCI_CRCR_CS_BITS         1
+
+// (RW1S) Command abort (0=normal, 1=abort command)
 #define USBXHCI_CRCR_CA_BITS         1
+
+// Command ring running (1=running)
 #define USBXHCI_CRCR_CRR_BITS        1
+
+// Command ring pointer (512-bit aligned start address of command ring)
 #define USBXHCI_CRCR_CRPTR_BITS      58
+
+// Consumer ring cycle state
 #define USBXHCI_CRCR_RCS_MASK        ((1UL << USBXHCI_CRCR_RCS_BITS)-1)
+
+// (RW1S) Command stop (0=normal, 1=stop command ring)
 #define USBXHCI_CRCR_CS_MASK         ((1UL << USBXHCI_CRCR_CS_BITS)-1)
+
+// (RW1S) Command abort (0=normal, 1=abort command)
 #define USBXHCI_CRCR_CA_MASK         ((1UL << USBXHCI_CRCR_CA_BITS)-1)
+
+// Command ring running (1=running)
 #define USBXHCI_CRCR_CRR_MASK        ((1UL << USBXHCI_CRCR_CRR_BITS)-1)
+
+// Command ring pointer (512-bit aligned start address of command ring)
 #define USBXHCI_CRCR_CRPTR_MASK      ((1UL << USBXHCI_CRCR_CRPTR_BITS)-1)
 
 // Consumer ring cycle state
@@ -818,68 +1436,128 @@
 #define USBXHCI_CRCR_CRPTR \
     (USBXHCI_CRCR_CRPTR_MASK << USBXHCI_CRCR_CRPTR_BIT)
 
+
+// Consumer ring cycle state
 #define USBXHCI_CRCR_RCS_n(n)        (uint64_t(n) << USBXHCI_CRCR_RCS_BIT)
+
+// (RW1S) Command stop (0=normal, 1=stop command ring)
 #define USBXHCI_CRCR_CS_n(n)         (uint64_t(n) << USBXHCI_CRCR_CS_BIT)
+
+// (RW1S) Command abort (0=normal, 1=abort command)
 #define USBXHCI_CRCR_CA_n(n)         (uint64_t(n) << USBXHCI_CRCR_CA_BIT)
+
+// Command ring running (1=running)
 #define USBXHCI_CRCR_CRR_n(n)        (uint64_t(n) << USBXHCI_CRCR_CRR_BIT)
+
+// Command ring pointer (512-bit aligned start address of command ring)
 #define USBXHCI_CRCR_CRPTR_n(n)      (uint64_t(n) << USBXHCI_CRCR_CRPTR_BIT)
 
+
+// Consumer ring cycle state
 #define USBXHCI_CRCR_RCS_GET(n) \
     (((n) >> USBXHCI_CRCR_RCS_BIT) & USBXHCI_CRCR_RCS_MASK)
+
+// (RW1S) Command stop (0=normal, 1=stop command ring)
 #define USBXHCI_CRCR_CS_GET(n) \
     (((n) >> USBXHCI_CRCR_CS_BIT) & USBXHCI_CRCR_CS_MASK)
+
+// (RW1S) Command abort (0=normal, 1=abort command)
 #define USBXHCI_CRCR_CA_GET(n) \
     (((n) >> USBXHCI_CRCR_CA_BIT) & USBXHCI_CRCR_CA_MASK)
+
+// Command ring running (1=running)
 #define USBXHCI_CRCR_CRR_GET(n) \
     (((n) >> USBXHCI_CRCR_CRR_BIT) & USBXHCI_CRCR_CRR_MASK)
+
+// Command ring pointer (512-bit aligned start address of command ring)
 #define USBXHCI_CRCR_CRPTR_GET(n) \
     (((n) >> USBXHCI_CRCR_CRPTR_BIT) & USBXHCI_CRCR_CRPTR_MASK)
 
+
+// Consumer ring cycle state
 #define USBXHCI_CRCR_RCS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CRCR_RCS) | USBXHCI_CRCR_RCS_n((n)))
+
+// (RW1S) Command stop (0=normal, 1=stop command ring)
 #define USBXHCI_CRCR_CS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CRCR_CS) | USBXHCI_CRCR_CS_n((n)))
+
+// (RW1S) Command abort (0=normal, 1=abort command)
 #define USBXHCI_CRCR_CA_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CRCR_CA) | USBXHCI_CRCR_CA_n((n)))
+
+// Command ring running (1=running)
 #define USBXHCI_CRCR_CRR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CRCR_CRR) | USBXHCI_CRCR_CRR_n((n)))
+
+// Command ring pointer (512-bit aligned start address of command ring)
 #define USBXHCI_CRCR_CRPTR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CRCR_CRPTR) | USBXHCI_CRCR_CRPTR_n((n)))
 
 //
 // USBXHCI_DCBAAP: 5.4.6 DCBAAP Device context base address
 
+
+// Device context base address array pointer (512-bit aligned)
 #define USBXHCI_DCBAAP_DCPTR_BIT       6
 
+
+// Device context base address array pointer (512-bit aligned)
 #define USBXHCI_DCBAAP_DCPTR_BITS      58
+
+// Device context base address array pointer (512-bit aligned)
 #define USBXHCI_DCBAAP_DCPTR_MASK      ((1UL << USBXHCI_DCBAAP_DCPTR_BITS)-1)
 
 // Device context base address array pointer (512-bit aligned)
 #define USBXHCI_DCBAAP_DCPTR \
     (USBXHCI_DCBAAP_DCPTR_MASK << USBXHCI_DCBAAP_DCPTR_BIT)
 
+
+// Device context base address array pointer (512-bit aligned)
 #define USBXHCI_DCBAAP_DCPTR_n(n) \
     (uint64_t(n) << USBXHCI_DCBAAP_DCPTR_BIT)
 
+
+// Device context base address array pointer (512-bit aligned)
 #define USBXHCI_DCBAAP_DCPTR_GET(n) \
     (((n) >> USBXHCI_DCBAAP_DCPTR_BIT) & USBXHCI_DCBAAP_DCPTR_MASK)
 
+
+// Device context base address array pointer (512-bit aligned)
 #define USBXHCI_DCBAAP_DCPTR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_DCBAAP_DCPTR) | USBXHCI_DCBAAP_DCPTR_n((n)))
 
 //
 // USBXHCI_CONFIG: 5.4.7 CONFIG
 
+
+// (RW) Max device slots enabled
 #define USBXHCI_CONFIG_MAXSLOTSEN_BIT       0
+
+// U3 entry enable
 #define USBXHCI_CONFIG_U3E_BIT              8
+
+// Configuration information enable
 #define USBXHCI_CONFIG_CIE_BIT              9
 
+
+// (RW) Max device slots enabled
 #define USBXHCI_CONFIG_MAXSLOTSEN_BITS      8
+
+// U3 entry enable
 #define USBXHCI_CONFIG_U3E_BITS             1
+
+// Configuration information enable
 #define USBXHCI_CONFIG_CIE_BITS             1
+
+// (RW) Max device slots enabled
 #define USBXHCI_CONFIG_MAXSLOTSEN_MASK \
     ((1U << USBXHCI_CONFIG_MAXSLOTSEN_BITS)-1)
+
+// U3 entry enable
 #define USBXHCI_CONFIG_U3E_MASK             ((1U << USBXHCI_CONFIG_U3E_BITS)-1)
+
+// Configuration information enable
 #define USBXHCI_CONFIG_CIE_MASK             ((1U << USBXHCI_CONFIG_CIE_BITS)-1)
 
 // (RW) Max device slots enabled
@@ -894,93 +1572,243 @@
 #define USBXHCI_CONFIG_CIE \
     (USBXHCI_CONFIG_CIE_MASK << USBXHCI_CONFIG_CIE_BIT)
 
+
+// (RW) Max device slots enabled
 #define USBXHCI_CONFIG_MAXSLOTSEN_n(n) \
     ((n) << USBXHCI_CONFIG_MAXSLOTSEN_BIT)
+
+// U3 entry enable
 #define USBXHCI_CONFIG_U3E_n(n)             ((n) << USBXHCI_CONFIG_U3E_BIT)
+
+// Configuration information enable
 #define USBXHCI_CONFIG_CIE_n(n)             ((n) << USBXHCI_CONFIG_CIE_BIT)
 
+
+// (RW) Max device slots enabled
 #define USBXHCI_CONFIG_MAXSLOTSEN_GET(n) \
     (((n) >> USBXHCI_CONFIG_MAXSLOTSEN_BIT) & USBXHCI_CONFIG_MAXSLOTSEN_MASK)
+
+// U3 entry enable
 #define USBXHCI_CONFIG_U3E_GET(n) \
     (((n) >> USBXHCI_CONFIG_U3E_BIT) & USBXHCI_CONFIG_U3E_MASK)
+
+// Configuration information enable
 #define USBXHCI_CONFIG_CIE_GET(n) \
     (((n) >> USBXHCI_CONFIG_CIE_BIT) & USBXHCI_CONFIG_CIE_MASK)
 
+
+// (RW) Max device slots enabled
 #define USBXHCI_CONFIG_MAXSLOTSEN_SET(r,n)  ((r) \
     = ((r) & ~USBXHCI_CONFIG_MAXSLOTSEN) | USBXHCI_CONFIG_MAXSLOTSEN_n((n)))
+
+// U3 entry enable
 #define USBXHCI_CONFIG_U3E_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CONFIG_U3E) | USBXHCI_CONFIG_U3E_n((n)))
+
+// Configuration information enable
 #define USBXHCI_CONFIG_CIE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CONFIG_CIE) | USBXHCI_CONFIG_CIE_n((n)))
 
 // USBXHCI_PORTSC
 
+
+// Current connect status (1=connected)
 #define USBXHCI_PORTSC_CCS_BIT       0
+
+// (RW1CS) Port enabled/disabled (1=enabled, write 1 to disable)
 #define USBXHCI_PORTSC_PED_BIT       1
+
+// Overcurrent active (0=normal, 1=over current)
 #define USBXHCI_PORTSC_OCA_BIT       3
+
+// (RW1S) Port reset
 #define USBXHCI_PORTSC_PR_BIT        4
+
+// Port link state
 #define USBXHCI_PORTSC_PLS_BIT       5
+
+// Port power
 #define USBXHCI_PORTSC_PP_BIT        9
+
+// Port speed (section 7.2.1)
 #define USBXHCI_PORTSC_SPD_BIT       10
+
+// Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
 #define USBXHCI_PORTSC_PIC_BIT       14
+
+// Port link state write strobe
 #define USBXHCI_PORTSC_LWS_BIT       16
+
+// (RW1CS) Connect status change (1=changed)
 #define USBXHCI_PORTSC_CSC_BIT       17
+
+// (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_BIT       18
+
+// (RW1CS) Warn port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_BIT       19
+
+// (RW1CS) Overcurrent change (1=changed)
 #define USBXHCI_PORTSC_OCC_BIT       20
+
+// (RW1CS) Port reset change (1=changed)
 #define USBXHCI_PORTSC_PRC_BIT       21
+
+// (RW1CS) Port link state change (1=changed)
 #define USBXHCI_PORTSC_PLC_BIT       22
+
+// (RW1CS) Port config error change (1=changed)
 #define USBXHCI_PORTSC_CEC_BIT       23
+
+// Cold attach status
 #define USBXHCI_PORTSC_CAS_BIT       24
+
+// Wake on connect enable (1=wake)
 #define USBXHCI_PORTSC_WCE_BIT       25
+
+// Wake on disconnect enable (1=wake)
 #define USBXHCI_PORTSC_WDE_BIT       26
+
+// Wake on overcurrent enable (1=wake)
 #define USBXHCI_PORTSC_WOE_BIT       27
+
+// Device removable
 #define USBXHCI_PORTSC_DR_BIT        30
+
+// (RW1S) Warm port reset (0=normal, 1=warm reset)
 #define USBXHCI_PORTSC_WPR_BIT       31
 
+
+// Current connect status (1=connected)
 #define USBXHCI_PORTSC_CCS_BITS      1
+
+// (RW1CS) Port enabled/disabled (1=enabled, write 1 to disable)
 #define USBXHCI_PORTSC_PED_BITS      1
+
+// Overcurrent active (0=normal, 1=over current)
 #define USBXHCI_PORTSC_OCA_BITS      1
+
+// (RW1S) Port reset
 #define USBXHCI_PORTSC_PR_BITS       1
+
+// Port link state
 #define USBXHCI_PORTSC_PLS_BITS      4
+
+// Port power
 #define USBXHCI_PORTSC_PP_BITS       1
+
+// Port speed (section 7.2.1)
 #define USBXHCI_PORTSC_SPD_BITS      4
+
+// Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
 #define USBXHCI_PORTSC_PIC_BITS      2
+
+// Port link state write strobe
 #define USBXHCI_PORTSC_LWS_BITS      1
+
+// (RW1CS) Connect status change (1=changed)
 #define USBXHCI_PORTSC_CSC_BITS      1
+
+// (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_BITS      1
+
+// (RW1CS) Warn port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_BITS      1
+
+// (RW1CS) Overcurrent change (1=changed)
 #define USBXHCI_PORTSC_OCC_BITS      1
+
+// (RW1CS) Port reset change (1=changed)
 #define USBXHCI_PORTSC_PRC_BITS      1
+
+// (RW1CS) Port link state change (1=changed)
 #define USBXHCI_PORTSC_PLC_BITS      1
+
+// (RW1CS) Port config error change (1=changed)
 #define USBXHCI_PORTSC_CEC_BITS      1
+
+// Cold attach status
 #define USBXHCI_PORTSC_CAS_BITS      1
+
+// Wake on connect enable (1=wake)
 #define USBXHCI_PORTSC_WCE_BITS      1
+
+// Wake on disconnect enable (1=wake)
 #define USBXHCI_PORTSC_WDE_BITS      1
+
+// Wake on overcurrent enable (1=wake)
 #define USBXHCI_PORTSC_WOE_BITS      1
+
+// Device removable
 #define USBXHCI_PORTSC_DR_BITS       1
+
+// (RW1S) Warm port reset (0=normal, 1=warm reset)
 #define USBXHCI_PORTSC_WPR_BITS      1
+
+// Current connect status (1=connected)
 #define USBXHCI_PORTSC_CCS_MASK      ((1U << USBXHCI_PORTSC_CCS_BITS)-1)
+
+// (RW1CS) Port enabled/disabled (1=enabled, write 1 to disable)
 #define USBXHCI_PORTSC_PED_MASK      ((1U << USBXHCI_PORTSC_PED_BITS)-1)
+
+// Overcurrent active (0=normal, 1=over current)
 #define USBXHCI_PORTSC_OCA_MASK      ((1U << USBXHCI_PORTSC_OCA_BITS)-1)
+
+// (RW1S) Port reset
 #define USBXHCI_PORTSC_PR_MASK       ((1U << USBXHCI_PORTSC_PR_BITS)-1)
+
+// Port link state
 #define USBXHCI_PORTSC_PLS_MASK      ((1U << USBXHCI_PORTSC_PLS_BITS)-1)
+
+// Port power
 #define USBXHCI_PORTSC_PP_MASK       ((1U << USBXHCI_PORTSC_PP_BITS)-1)
+
+// Port speed (section 7.2.1)
 #define USBXHCI_PORTSC_SPD_MASK      ((1U << USBXHCI_PORTSC_SPD_BITS)-1)
+
+// Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
 #define USBXHCI_PORTSC_PIC_MASK      ((1U << USBXHCI_PORTSC_PIC_BITS)-1)
+
+// Port link state write strobe
 #define USBXHCI_PORTSC_LWS_MASK      ((1U << USBXHCI_PORTSC_LWS_BITS)-1)
+
+// (RW1CS) Connect status change (1=changed)
 #define USBXHCI_PORTSC_CSC_MASK      ((1U << USBXHCI_PORTSC_CSC_BITS)-1)
+
+// (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_MASK      ((1U << USBXHCI_PORTSC_PEC_BITS)-1)
+
+// (RW1CS) Warn port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_MASK      ((1U << USBXHCI_PORTSC_WRC_BITS)-1)
+
+// (RW1CS) Overcurrent change (1=changed)
 #define USBXHCI_PORTSC_OCC_MASK      ((1U << USBXHCI_PORTSC_OCC_BITS)-1)
+
+// (RW1CS) Port reset change (1=changed)
 #define USBXHCI_PORTSC_PRC_MASK      ((1U << USBXHCI_PORTSC_PRC_BITS)-1)
+
+// (RW1CS) Port link state change (1=changed)
 #define USBXHCI_PORTSC_PLC_MASK      ((1U << USBXHCI_PORTSC_PLC_BITS)-1)
+
+// (RW1CS) Port config error change (1=changed)
 #define USBXHCI_PORTSC_CEC_MASK      ((1U << USBXHCI_PORTSC_CEC_BITS)-1)
+
+// Cold attach status
 #define USBXHCI_PORTSC_CAS_MASK      ((1U << USBXHCI_PORTSC_CAS_BITS)-1)
+
+// Wake on connect enable (1=wake)
 #define USBXHCI_PORTSC_WCE_MASK      ((1U << USBXHCI_PORTSC_WCE_BITS)-1)
+
+// Wake on disconnect enable (1=wake)
 #define USBXHCI_PORTSC_WDE_MASK      ((1U << USBXHCI_PORTSC_WDE_BITS)-1)
+
+// Wake on overcurrent enable (1=wake)
 #define USBXHCI_PORTSC_WOE_MASK      ((1U << USBXHCI_PORTSC_WOE_BITS)-1)
+
+// Device removable
 #define USBXHCI_PORTSC_DR_MASK       ((1U << USBXHCI_PORTSC_DR_BITS)-1)
+
+// (RW1S) Warm port reset (0=normal, 1=warm reset)
 #define USBXHCI_PORTSC_WPR_MASK      ((1U << USBXHCI_PORTSC_WPR_BITS)-1)
 
 // Current connect status (1=connected)
@@ -1071,133 +1899,283 @@
 #define USBXHCI_PORTSC_WPR \
     (USBXHCI_PORTSC_WPR_MASK << USBXHCI_PORTSC_WPR_BIT)
 
+
+// Current connect status (1=connected)
 #define USBXHCI_PORTSC_CCS_n(n)      ((n) << USBXHCI_PORTSC_CCS_BIT)
+
+// (RW1CS) Port enabled/disabled (1=enabled, write 1 to disable)
 #define USBXHCI_PORTSC_PED_n(n)      ((n) << USBXHCI_PORTSC_PED_BIT)
+
+// Overcurrent active (0=normal, 1=over current)
 #define USBXHCI_PORTSC_OCA_n(n)      ((n) << USBXHCI_PORTSC_OCA_BIT)
+
+// (RW1S) Port reset
 #define USBXHCI_PORTSC_PR_n(n)       ((n) << USBXHCI_PORTSC_PR_BIT)
+
+// Port link state
 #define USBXHCI_PORTSC_PLS_n(n)      ((n) << USBXHCI_PORTSC_PLS_BIT)
+
+// Port power
 #define USBXHCI_PORTSC_PP_n(n)       ((n) << USBXHCI_PORTSC_PP_BIT)
+
+// Port speed (section 7.2.1)
 #define USBXHCI_PORTSC_SPD_n(n)      ((n) << USBXHCI_PORTSC_SPD_BIT)
+
+// Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
 #define USBXHCI_PORTSC_PIC_n(n)      ((n) << USBXHCI_PORTSC_PIC_BIT)
+
+// Port link state write strobe
 #define USBXHCI_PORTSC_LWS_n(n)      ((n) << USBXHCI_PORTSC_LWS_BIT)
+
+// (RW1CS) Connect status change (1=changed)
 #define USBXHCI_PORTSC_CSC_n(n)      ((n) << USBXHCI_PORTSC_CSC_BIT)
+
+// (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_n(n)      ((n) << USBXHCI_PORTSC_PEC_BIT)
+
+// (RW1CS) Warn port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_n(n)      ((n) << USBXHCI_PORTSC_WRC_BIT)
+
+// (RW1CS) Overcurrent change (1=changed)
 #define USBXHCI_PORTSC_OCC_n(n)      ((n) << USBXHCI_PORTSC_OCC_BIT)
+
+// (RW1CS) Port reset change (1=changed)
 #define USBXHCI_PORTSC_PRC_n(n)      ((n) << USBXHCI_PORTSC_PRC_BIT)
+
+// (RW1CS) Port link state change (1=changed)
 #define USBXHCI_PORTSC_PLC_n(n)      ((n) << USBXHCI_PORTSC_PLC_BIT)
+
+// (RW1CS) Port config error change (1=changed)
 #define USBXHCI_PORTSC_CEC_n(n)      ((n) << USBXHCI_PORTSC_CEC_BIT)
+
+// Cold attach status
 #define USBXHCI_PORTSC_CAS_n(n)      ((n) << USBXHCI_PORTSC_CAS_BIT)
+
+// Wake on connect enable (1=wake)
 #define USBXHCI_PORTSC_WCE_n(n)      ((n) << USBXHCI_PORTSC_WCE_BIT)
+
+// Wake on disconnect enable (1=wake)
 #define USBXHCI_PORTSC_WDE_n(n)      ((n) << USBXHCI_PORTSC_WDE_BIT)
+
+// Wake on overcurrent enable (1=wake)
 #define USBXHCI_PORTSC_WOE_n(n)      ((n) << USBXHCI_PORTSC_WOE_BIT)
+
+// Device removable
 #define USBXHCI_PORTSC_DR_n(n)       ((n) << USBXHCI_PORTSC_DR_BIT)
+
+// (RW1S) Warm port reset (0=normal, 1=warm reset)
 #define USBXHCI_PORTSC_WPR_n(n)      ((n) << USBXHCI_PORTSC_WPR_BIT)
 
+
+// Current connect status (1=connected)
 #define USBXHCI_PORTSC_CCS_GET(n) \
     (((n) >> USBXHCI_PORTSC_CCS_BIT) & USBXHCI_PORTSC_CCS_MASK)
+
+// (RW1CS) Port enabled/disabled (1=enabled, write 1 to disable)
 #define USBXHCI_PORTSC_PED_GET(n) \
     (((n) >> USBXHCI_PORTSC_PED_BIT) & USBXHCI_PORTSC_PED_MASK)
+
+// Overcurrent active (0=normal, 1=over current)
 #define USBXHCI_PORTSC_OCA_GET(n) \
     (((n) >> USBXHCI_PORTSC_OCA_BIT) & USBXHCI_PORTSC_OCA_MASK)
+
+// (RW1S) Port reset
 #define USBXHCI_PORTSC_PR_GET(n) \
     (((n) >> USBXHCI_PORTSC_PR_BIT) & USBXHCI_PORTSC_PR_MASK)
+
+// Port link state
 #define USBXHCI_PORTSC_PLS_GET(n) \
     (((n) >> USBXHCI_PORTSC_PLS_BIT) & USBXHCI_PORTSC_PLS_MASK)
+
+// Port power
 #define USBXHCI_PORTSC_PP_GET(n) \
     (((n) >> USBXHCI_PORTSC_PP_BIT) & USBXHCI_PORTSC_PP_MASK)
+
+// Port speed (section 7.2.1)
 #define USBXHCI_PORTSC_SPD_GET(n) \
     (((n) >> USBXHCI_PORTSC_SPD_BIT) & USBXHCI_PORTSC_SPD_MASK)
+
+// Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
 #define USBXHCI_PORTSC_PIC_GET(n) \
     (((n) >> USBXHCI_PORTSC_PIC_BIT) & USBXHCI_PORTSC_PIC_MASK)
+
+// Port link state write strobe
 #define USBXHCI_PORTSC_LWS_GET(n) \
     (((n) >> USBXHCI_PORTSC_LWS_BIT) & USBXHCI_PORTSC_LWS_MASK)
+
+// (RW1CS) Connect status change (1=changed)
 #define USBXHCI_PORTSC_CSC_GET(n) \
     (((n) >> USBXHCI_PORTSC_CSC_BIT) & USBXHCI_PORTSC_CSC_MASK)
+
+// (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_GET(n) \
     (((n) >> USBXHCI_PORTSC_PEC_BIT) & USBXHCI_PORTSC_PEC_MASK)
+
+// (RW1CS) Warn port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_GET(n) \
     (((n) >> USBXHCI_PORTSC_WRC_BIT) & USBXHCI_PORTSC_WRC_MASK)
+
+// (RW1CS) Overcurrent change (1=changed)
 #define USBXHCI_PORTSC_OCC_GET(n) \
     (((n) >> USBXHCI_PORTSC_OCC_BIT) & USBXHCI_PORTSC_OCC_MASK)
+
+// (RW1CS) Port reset change (1=changed)
 #define USBXHCI_PORTSC_PRC_GET(n) \
     (((n) >> USBXHCI_PORTSC_PRC_BIT) & USBXHCI_PORTSC_PRC_MASK)
+
+// (RW1CS) Port link state change (1=changed)
 #define USBXHCI_PORTSC_PLC_GET(n) \
     (((n) >> USBXHCI_PORTSC_PLC_BIT) & USBXHCI_PORTSC_PLC_MASK)
+
+// (RW1CS) Port config error change (1=changed)
 #define USBXHCI_PORTSC_CEC_GET(n) \
     (((n) >> USBXHCI_PORTSC_CEC_BIT) & USBXHCI_PORTSC_CEC_MASK)
+
+// Cold attach status
 #define USBXHCI_PORTSC_CAS_GET(n) \
     (((n) >> USBXHCI_PORTSC_CAS_BIT) & USBXHCI_PORTSC_CAS_MASK)
+
+// Wake on connect enable (1=wake)
 #define USBXHCI_PORTSC_WCE_GET(n) \
     (((n) >> USBXHCI_PORTSC_WCE_BIT) & USBXHCI_PORTSC_WCE_MASK)
+
+// Wake on disconnect enable (1=wake)
 #define USBXHCI_PORTSC_WDE_GET(n) \
     (((n) >> USBXHCI_PORTSC_WDE_BIT) & USBXHCI_PORTSC_WDE_MASK)
+
+// Wake on overcurrent enable (1=wake)
 #define USBXHCI_PORTSC_WOE_GET(n) \
     (((n) >> USBXHCI_PORTSC_WOE_BIT) & USBXHCI_PORTSC_WOE_MASK)
+
+// Device removable
 #define USBXHCI_PORTSC_DR_GET(n) \
     (((n) >> USBXHCI_PORTSC_DR_BIT) & USBXHCI_PORTSC_DR_MASK)
+
+// (RW1S) Warm port reset (0=normal, 1=warm reset)
 #define USBXHCI_PORTSC_WPR_GET(n) \
     (((n) >> USBXHCI_PORTSC_WPR_BIT) & USBXHCI_PORTSC_WPR_MASK)
 
+
+// Current connect status (1=connected)
 #define USBXHCI_PORTSC_CCS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_CCS) | USBXHCI_PORTSC_CCS_n((n)))
+
+// (RW1CS) Port enabled/disabled (1=enabled, write 1 to disable)
 #define USBXHCI_PORTSC_PED_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PED) | USBXHCI_PORTSC_PED_n((n)))
+
+// Overcurrent active (0=normal, 1=over current)
 #define USBXHCI_PORTSC_OCA_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_OCA) | USBXHCI_PORTSC_OCA_n((n)))
+
+// (RW1S) Port reset
 #define USBXHCI_PORTSC_PR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PR) | USBXHCI_PORTSC_PR_n((n)))
+
+// Port link state
 #define USBXHCI_PORTSC_PLS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PLS) | USBXHCI_PORTSC_PLS_n((n)))
+
+// Port power
 #define USBXHCI_PORTSC_PP_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PP) | USBXHCI_PORTSC_PP_n((n)))
+
+// Port speed (section 7.2.1)
 #define USBXHCI_PORTSC_SPD_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_SPD) | USBXHCI_PORTSC_SPD_n((n)))
+
+// Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
 #define USBXHCI_PORTSC_PIC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PIC) | USBXHCI_PORTSC_PIC_n((n)))
+
+// Port link state write strobe
 #define USBXHCI_PORTSC_LWS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_LWS) | USBXHCI_PORTSC_LWS_n((n)))
+
+// (RW1CS) Connect status change (1=changed)
 #define USBXHCI_PORTSC_CSC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_CSC) | USBXHCI_PORTSC_CSC_n((n)))
+
+// (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PEC) | USBXHCI_PORTSC_PEC_n((n)))
+
+// (RW1CS) Warn port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_WRC) | USBXHCI_PORTSC_WRC_n((n)))
+
+// (RW1CS) Overcurrent change (1=changed)
 #define USBXHCI_PORTSC_OCC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_OCC) | USBXHCI_PORTSC_OCC_n((n)))
+
+// (RW1CS) Port reset change (1=changed)
 #define USBXHCI_PORTSC_PRC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PRC) | USBXHCI_PORTSC_PRC_n((n)))
+
+// (RW1CS) Port link state change (1=changed)
 #define USBXHCI_PORTSC_PLC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PLC) | USBXHCI_PORTSC_PLC_n((n)))
+
+// (RW1CS) Port config error change (1=changed)
 #define USBXHCI_PORTSC_CEC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_CEC) | USBXHCI_PORTSC_CEC_n((n)))
+
+// Cold attach status
 #define USBXHCI_PORTSC_CAS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_CAS) | USBXHCI_PORTSC_CAS_n((n)))
+
+// Wake on connect enable (1=wake)
 #define USBXHCI_PORTSC_WCE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_WCE) | USBXHCI_PORTSC_WCE_n((n)))
+
+// Wake on disconnect enable (1=wake)
 #define USBXHCI_PORTSC_WDE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_WDE) | USBXHCI_PORTSC_WDE_n((n)))
+
+// Wake on overcurrent enable (1=wake)
 #define USBXHCI_PORTSC_WOE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_WOE) | USBXHCI_PORTSC_WOE_n((n)))
+
+// Device removable
 #define USBXHCI_PORTSC_DR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_DR) | USBXHCI_PORTSC_DR_n((n)))
+
+// (RW1S) Warm port reset (0=normal, 1=warm reset)
 #define USBXHCI_PORTSC_WPR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_WPR) | USBXHCI_PORTSC_WPR_n((n)))
 
 //
 // USBXHCI_USB3_PORTPMSC: 5.4.9.1 PORTPMSC Port PM status and control
 
+
+// U1 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U1TO_BIT       0
+
+// U2 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U2TO_BIT       8
+
+// Force link PM accept
 #define USBXHCI_USB3_PORTPMSC_FLA_BIT        16
 
+
+// U1 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U1TO_BITS      8
+
+// U2 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U2TO_BITS      8
+
+// Force link PM accept
 #define USBXHCI_USB3_PORTPMSC_FLA_BITS       1
+
+// U1 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U1TO_MASK \
     ((1U << USBXHCI_USB3_PORTPMSC_U1TO_BITS)-1)
+
+// U2 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U2TO_MASK \
     ((1U << USBXHCI_USB3_PORTPMSC_U2TO_BITS)-1)
+
+// Force link PM accept
 #define USBXHCI_USB3_PORTPMSC_FLA_MASK \
     ((1U << USBXHCI_USB3_PORTPMSC_FLA_BITS)-1)
 
@@ -1213,53 +2191,107 @@
 #define USBXHCI_USB3_PORTPMSC_FLA \
     (USBXHCI_USB3_PORTPMSC_FLA_MASK << USBXHCI_USB3_PORTPMSC_FLA_BIT)
 
+
+// U1 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U1TO_n(n) \
     ((n) << USBXHCI_USB3_PORTPMSC_U1TO_BIT)
+
+// U2 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U2TO_n(n) \
     ((n) << USBXHCI_USB3_PORTPMSC_U2TO_BIT)
+
+// Force link PM accept
 #define USBXHCI_USB3_PORTPMSC_FLA_n(n) \
     ((n) << USBXHCI_USB3_PORTPMSC_FLA_BIT)
 
+
+// U1 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U1TO_GET(n) \
     (((n) >> USBXHCI_USB3_PORTPMSC_U1TO_BIT) & USBXHCI_USB3_PORTPMSC_U1TO_MASK)
+
+// U2 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U2TO_GET(n) \
     (((n) >> USBXHCI_USB3_PORTPMSC_U2TO_BIT) & USBXHCI_USB3_PORTPMSC_U2TO_MASK)
+
+// Force link PM accept
 #define USBXHCI_USB3_PORTPMSC_FLA_GET(n) \
     (((n) >> USBXHCI_USB3_PORTPMSC_FLA_BIT) & USBXHCI_USB3_PORTPMSC_FLA_MASK)
 
+
+// U1 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U1TO_SET(r,n)  ((r) \
     = ((r) & ~USBXHCI_USB3_PORTPMSC_U1TO) | USBXHCI_USB3_PORTPMSC_U1TO_n((n)))
+
+// U2 timeout (0xFF=disabled)
 #define USBXHCI_USB3_PORTPMSC_U2TO_SET(r,n)  ((r) \
     = ((r) & ~USBXHCI_USB3_PORTPMSC_U2TO) | USBXHCI_USB3_PORTPMSC_U2TO_n((n)))
+
+// Force link PM accept
 #define USBXHCI_USB3_PORTPMSC_FLA_SET(r,n)   ((r) \
     = ((r) & ~USBXHCI_USB3_PORTPMSC_FLA) | USBXHCI_USB3_PORTPMSC_FLA_n((n)))
 
 //
 // USBXHCI_USB2_PORTPMSC: 5.4.9.2 PORTPMSC Port PM status and control
 
+
+// L1 suspend request status
 #define USBXHCI_USB2_PORTPMSC_L1S_BIT        0
+
+// Remote wake enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_RWE_BIT        3
+
+// Best effort service latency
 #define USBXHCI_USB2_PORTPMSC_BESL_BIT       4
+
+// L1 device slot (1=attached)
 #define USBXHCI_USB2_PORTPMSC_L1DS_BIT       8
+
+// Hardware LPM enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_HLE_BIT        16
+
+// Port test control (0=test mode not enabled)
 #define USBXHCI_USB2_PORTPMSC_PTC_BIT        28
 
+
+// L1 suspend request status
 #define USBXHCI_USB2_PORTPMSC_L1S_BITS       3
+
+// Remote wake enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_RWE_BITS       1
+
+// Best effort service latency
 #define USBXHCI_USB2_PORTPMSC_BESL_BITS      4
+
+// L1 device slot (1=attached)
 #define USBXHCI_USB2_PORTPMSC_L1DS_BITS      8
+
+// Hardware LPM enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_HLE_BITS       1
+
+// Port test control (0=test mode not enabled)
 #define USBXHCI_USB2_PORTPMSC_PTC_BITS       4
+
+// L1 suspend request status
 #define USBXHCI_USB2_PORTPMSC_L1S_MASK \
     ((1U << USBXHCI_USB2_PORTPMSC_L1S_BITS)-1)
+
+// Remote wake enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_RWE_MASK \
     ((1U << USBXHCI_USB2_PORTPMSC_RWE_BITS)-1)
+
+// Best effort service latency
 #define USBXHCI_USB2_PORTPMSC_BESL_MASK \
     ((1U << USBXHCI_USB2_PORTPMSC_BESL_BITS)-1)
+
+// L1 device slot (1=attached)
 #define USBXHCI_USB2_PORTPMSC_L1DS_MASK \
     ((1U << USBXHCI_USB2_PORTPMSC_L1DS_BITS)-1)
+
+// Hardware LPM enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_HLE_MASK \
     ((1U << USBXHCI_USB2_PORTPMSC_HLE_BITS)-1)
+
+// Port test control (0=test mode not enabled)
 #define USBXHCI_USB2_PORTPMSC_PTC_MASK \
     ((1U << USBXHCI_USB2_PORTPMSC_PTC_BITS)-1)
 
@@ -1287,57 +2319,111 @@
 #define USBXHCI_USB2_PORTPMSC_PTC \
     (USBXHCI_USB2_PORTPMSC_PTC_MASK << USBXHCI_USB2_PORTPMSC_PTC_BIT)
 
+
+// L1 suspend request status
 #define USBXHCI_USB2_PORTPMSC_L1S_n(n) \
     ((n) << USBXHCI_USB2_PORTPMSC_L1S_BIT)
+
+// Remote wake enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_RWE_n(n) \
     ((n) << USBXHCI_USB2_PORTPMSC_RWE_BIT)
+
+// Best effort service latency
 #define USBXHCI_USB2_PORTPMSC_BESL_n(n) \
     ((n) << USBXHCI_USB2_PORTPMSC_BESL_BIT)
+
+// L1 device slot (1=attached)
 #define USBXHCI_USB2_PORTPMSC_L1DS_n(n) \
     ((n) << USBXHCI_USB2_PORTPMSC_L1DS_BIT)
+
+// Hardware LPM enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_HLE_n(n) \
     ((n) << USBXHCI_USB2_PORTPMSC_HLE_BIT)
+
+// Port test control (0=test mode not enabled)
 #define USBXHCI_USB2_PORTPMSC_PTC_n(n) \
     ((n) << USBXHCI_USB2_PORTPMSC_PTC_BIT)
 
+
+// L1 suspend request status
 #define USBXHCI_USB2_PORTPMSC_L1S_GET(n) \
     (((n) >> USBXHCI_USB2_PORTPMSC_L1S_BIT) & USBXHCI_USB2_PORTPMSC_L1S_MASK)
+
+// Remote wake enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_RWE_GET(n) \
     (((n) >> USBXHCI_USB2_PORTPMSC_RWE_BIT) & USBXHCI_USB2_PORTPMSC_RWE_MASK)
+
+// Best effort service latency
 #define USBXHCI_USB2_PORTPMSC_BESL_GET(n) \
     (((n) >> USBXHCI_USB2_PORTPMSC_BESL_BIT) & USBXHCI_USB2_PORTPMSC_BESL_MASK)
+
+// L1 device slot (1=attached)
 #define USBXHCI_USB2_PORTPMSC_L1DS_GET(n) \
     (((n) >> USBXHCI_USB2_PORTPMSC_L1DS_BIT) & USBXHCI_USB2_PORTPMSC_L1DS_MASK)
+
+// Hardware LPM enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_HLE_GET(n) \
     (((n) >> USBXHCI_USB2_PORTPMSC_HLE_BIT) & USBXHCI_USB2_PORTPMSC_HLE_MASK)
+
+// Port test control (0=test mode not enabled)
 #define USBXHCI_USB2_PORTPMSC_PTC_GET(n) \
     (((n) >> USBXHCI_USB2_PORTPMSC_PTC_BIT) & USBXHCI_USB2_PORTPMSC_PTC_MASK)
 
+
+// L1 suspend request status
 #define USBXHCI_USB2_PORTPMSC_L1S_SET(r,n)   ((r) \
     = ((r) & ~USBXHCI_USB2_PORTPMSC_L1S) | USBXHCI_USB2_PORTPMSC_L1S_n((n)))
+
+// Remote wake enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_RWE_SET(r,n)   ((r) \
     = ((r) & ~USBXHCI_USB2_PORTPMSC_RWE) | USBXHCI_USB2_PORTPMSC_RWE_n((n)))
+
+// Best effort service latency
 #define USBXHCI_USB2_PORTPMSC_BESL_SET(r,n)  ((r) \
     = ((r) & ~USBXHCI_USB2_PORTPMSC_BESL) | USBXHCI_USB2_PORTPMSC_BESL_n((n)))
+
+// L1 device slot (1=attached)
 #define USBXHCI_USB2_PORTPMSC_L1DS_SET(r,n)  ((r) \
     = ((r) & ~USBXHCI_USB2_PORTPMSC_L1DS) | USBXHCI_USB2_PORTPMSC_L1DS_n((n)))
+
+// Hardware LPM enable (1=enable)
 #define USBXHCI_USB2_PORTPMSC_HLE_SET(r,n)   ((r) \
     = ((r) & ~USBXHCI_USB2_PORTPMSC_HLE) | USBXHCI_USB2_PORTPMSC_HLE_n((n)))
+
+// Port test control (0=test mode not enabled)
 #define USBXHCI_USB2_PORTPMSC_PTC_SET(r,n)   ((r) \
     = ((r) & ~USBXHCI_USB2_PORTPMSC_PTC) | USBXHCI_USB2_PORTPMSC_PTC_n((n)))
 
 //
 // USBXHCI_PORTLI: 5.4.10.1 Port link info (USB3 only)
 
+
+// Link error count
 #define USBXHCI_PORTLI_LEC_BIT       0
+
+// Rx lane count
 #define USBXHCI_PORTLI_RLC_BIT       16
+
+// Tx lane count
 #define USBXHCI_PORTLI_TLC_BIT       20
 
+
+// Link error count
 #define USBXHCI_PORTLI_LEC_BITS      16
+
+// Rx lane count
 #define USBXHCI_PORTLI_RLC_BITS      4
+
+// Tx lane count
 #define USBXHCI_PORTLI_TLC_BITS      4
+
+// Link error count
 #define USBXHCI_PORTLI_LEC_MASK      ((1U << USBXHCI_PORTLI_LEC_BITS)-1)
+
+// Rx lane count
 #define USBXHCI_PORTLI_RLC_MASK      ((1U << USBXHCI_PORTLI_RLC_BITS)-1)
+
+// Tx lane count
 #define USBXHCI_PORTLI_TLC_MASK      ((1U << USBXHCI_PORTLI_TLC_BITS)-1)
 
 // Link error count
@@ -1352,38 +2438,74 @@
 #define USBXHCI_PORTLI_TLC \
     (USBXHCI_PORTLI_TLC_MASK << USBXHCI_PORTLI_TLC_BIT)
 
+
+// Link error count
 #define USBXHCI_PORTLI_LEC_n(n)      ((n) << USBXHCI_PORTLI_LEC_BIT)
+
+// Rx lane count
 #define USBXHCI_PORTLI_RLC_n(n)      ((n) << USBXHCI_PORTLI_RLC_BIT)
+
+// Tx lane count
 #define USBXHCI_PORTLI_TLC_n(n)      ((n) << USBXHCI_PORTLI_TLC_BIT)
 
+
+// Link error count
 #define USBXHCI_PORTLI_LEC_GET(n) \
     (((n) >> USBXHCI_PORTLI_LEC_BIT) & USBXHCI_PORTLI_LEC_MASK)
+
+// Rx lane count
 #define USBXHCI_PORTLI_RLC_GET(n) \
     (((n) >> USBXHCI_PORTLI_RLC_BIT) & USBXHCI_PORTLI_RLC_MASK)
+
+// Tx lane count
 #define USBXHCI_PORTLI_TLC_GET(n) \
     (((n) >> USBXHCI_PORTLI_TLC_BIT) & USBXHCI_PORTLI_TLC_MASK)
 
+
+// Link error count
 #define USBXHCI_PORTLI_LEC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTLI_LEC) | USBXHCI_PORTLI_LEC_n((n)))
+
+// Rx lane count
 #define USBXHCI_PORTLI_RLC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTLI_RLC) | USBXHCI_PORTLI_RLC_n((n)))
+
+// Tx lane count
 #define USBXHCI_PORTLI_TLC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTLI_TLC) | USBXHCI_PORTLI_TLC_n((n)))
 
 //
 // USBXHCI_PORTHLPMC: 5.4.11 Port hardware LPM control (USB2 only)
 
+
+// Host initiated resume duration mode
 #define USBXHCI_PORTHLPMC_HIRDM_BIT       0
+
+// L1 timeout
 #define USBXHCI_PORTHLPMC_L1TO_BIT        2
+
+// Best effort service latency deep
 #define USBXHCI_PORTHLPMC_BESLD_BIT       10
 
+
+// Host initiated resume duration mode
 #define USBXHCI_PORTHLPMC_HIRDM_BITS      2
+
+// L1 timeout
 #define USBXHCI_PORTHLPMC_L1TO_BITS       8
+
+// Best effort service latency deep
 #define USBXHCI_PORTHLPMC_BESLD_BITS      4
+
+// Host initiated resume duration mode
 #define USBXHCI_PORTHLPMC_HIRDM_MASK \
     ((1U << USBXHCI_PORTHLPMC_HIRDM_BITS)-1)
+
+// L1 timeout
 #define USBXHCI_PORTHLPMC_L1TO_MASK \
     ((1U << USBXHCI_PORTHLPMC_L1TO_BITS)-1)
+
+// Best effort service latency deep
 #define USBXHCI_PORTHLPMC_BESLD_MASK \
     ((1U << USBXHCI_PORTHLPMC_BESLD_BITS)-1)
 
@@ -1399,53 +2521,95 @@
 #define USBXHCI_PORTHLPMC_BESLD \
     (USBXHCI_PORTHLPMC_BESLD_MASK << USBXHCI_PORTHLPMC_BESLD_BIT)
 
+
+// Host initiated resume duration mode
 #define USBXHCI_PORTHLPMC_HIRDM_n(n)      ((n) << USBXHCI_PORTHLPMC_HIRDM_BIT)
+
+// L1 timeout
 #define USBXHCI_PORTHLPMC_L1TO_n(n)       ((n) << USBXHCI_PORTHLPMC_L1TO_BIT)
+
+// Best effort service latency deep
 #define USBXHCI_PORTHLPMC_BESLD_n(n)      ((n) << USBXHCI_PORTHLPMC_BESLD_BIT)
 
+
+// Host initiated resume duration mode
 #define USBXHCI_PORTHLPMC_HIRDM_GET(n) \
     (((n) >> USBXHCI_PORTHLPMC_HIRDM_BIT) & USBXHCI_PORTHLPMC_HIRDM_MASK)
+
+// L1 timeout
 #define USBXHCI_PORTHLPMC_L1TO_GET(n) \
     (((n) >> USBXHCI_PORTHLPMC_L1TO_BIT) & USBXHCI_PORTHLPMC_L1TO_MASK)
+
+// Best effort service latency deep
 #define USBXHCI_PORTHLPMC_BESLD_GET(n) \
     (((n) >> USBXHCI_PORTHLPMC_BESLD_BIT) & USBXHCI_PORTHLPMC_BESLD_MASK)
 
+
+// Host initiated resume duration mode
 #define USBXHCI_PORTHLPMC_HIRDM_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTHLPMC_HIRDM) | USBXHCI_PORTHLPMC_HIRDM_n((n)))
+
+// L1 timeout
 #define USBXHCI_PORTHLPMC_L1TO_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTHLPMC_L1TO) | USBXHCI_PORTHLPMC_L1TO_n((n)))
+
+// Best effort service latency deep
 #define USBXHCI_PORTHLPMC_BESLD_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTHLPMC_BESLD) | USBXHCI_PORTHLPMC_BESLD_n((n)))
 
 //
 // USBXHCI_MFINDEX: 5.5.1 Microframe index
 
+
+// Current microframe index
 #define USBXHCI_MFINDEX_INDEX_BIT       0
 
+
+// Current microframe index
 #define USBXHCI_MFINDEX_INDEX_BITS      14
+
+// Current microframe index
 #define USBXHCI_MFINDEX_INDEX_MASK      ((1U << USBXHCI_MFINDEX_INDEX_BITS)-1)
 
 // Current microframe index
 #define USBXHCI_MFINDEX_INDEX \
     (USBXHCI_MFINDEX_INDEX_MASK << USBXHCI_MFINDEX_INDEX_BIT)
 
+
+// Current microframe index
 #define USBXHCI_MFINDEX_INDEX_n(n)      ((n) << USBXHCI_MFINDEX_INDEX_BIT)
 
+
+// Current microframe index
 #define USBXHCI_MFINDEX_INDEX_GET(n) \
     (((n) >> USBXHCI_MFINDEX_INDEX_BIT) & USBXHCI_MFINDEX_INDEX_MASK)
 
+
+// Current microframe index
 #define USBXHCI_MFINDEX_INDEX_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_MFINDEX_INDEX) | USBXHCI_MFINDEX_INDEX_n((n)))
 
 //
 // USBXHCI_INTR_IMAN: 5.5.2 Interrupter management
 
+
+// (RW1C) Interrupt pending (1=pending)
 #define USBXHCI_INTR_IMAN_IP_BIT       0
+
+// Interrupt enable (1=enabled)
 #define USBXHCI_INTR_IMAN_IE_BIT       1
 
+
+// (RW1C) Interrupt pending (1=pending)
 #define USBXHCI_INTR_IMAN_IP_BITS      1
+
+// Interrupt enable (1=enabled)
 #define USBXHCI_INTR_IMAN_IE_BITS      1
+
+// (RW1C) Interrupt pending (1=pending)
 #define USBXHCI_INTR_IMAN_IP_MASK      ((1U << USBXHCI_INTR_IMAN_IP_BITS)-1)
+
+// Interrupt enable (1=enabled)
 #define USBXHCI_INTR_IMAN_IE_MASK      ((1U << USBXHCI_INTR_IMAN_IE_BITS)-1)
 
 // (RW1C) Interrupt pending (1=pending)
@@ -1456,29 +2620,53 @@
 #define USBXHCI_INTR_IMAN_IE \
     (USBXHCI_INTR_IMAN_IE_MASK << USBXHCI_INTR_IMAN_IE_BIT)
 
+
+// (RW1C) Interrupt pending (1=pending)
 #define USBXHCI_INTR_IMAN_IP_n(n)      ((n) << USBXHCI_INTR_IMAN_IP_BIT)
+
+// Interrupt enable (1=enabled)
 #define USBXHCI_INTR_IMAN_IE_n(n)      ((n) << USBXHCI_INTR_IMAN_IE_BIT)
 
+
+// (RW1C) Interrupt pending (1=pending)
 #define USBXHCI_INTR_IMAN_IP_GET(n) \
     (((n) >> USBXHCI_INTR_IMAN_IP_BIT) & USBXHCI_INTR_IMAN_IP_MASK)
+
+// Interrupt enable (1=enabled)
 #define USBXHCI_INTR_IMAN_IE_GET(n) \
     (((n) >> USBXHCI_INTR_IMAN_IE_BIT) & USBXHCI_INTR_IMAN_IE_MASK)
 
+
+// (RW1C) Interrupt pending (1=pending)
 #define USBXHCI_INTR_IMAN_IP_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_INTR_IMAN_IP) | USBXHCI_INTR_IMAN_IP_n((n)))
+
+// Interrupt enable (1=enabled)
 #define USBXHCI_INTR_IMAN_IE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_INTR_IMAN_IE) | USBXHCI_INTR_IMAN_IE_n((n)))
 
 //
 // USBXHCI_INTR_IMOD: 5.5.2.2 Interrupter moderation
 
+
+// Minimum interval (1=250ns, 4000=1ms)
 #define USBXHCI_INTR_IMOD_IMODI_BIT       0
+
+// Interrupt moderation countdown
 #define USBXHCI_INTR_IMOD_IMODC_BIT       16
 
+
+// Minimum interval (1=250ns, 4000=1ms)
 #define USBXHCI_INTR_IMOD_IMODI_BITS      16
+
+// Interrupt moderation countdown
 #define USBXHCI_INTR_IMOD_IMODC_BITS      16
+
+// Minimum interval (1=250ns, 4000=1ms)
 #define USBXHCI_INTR_IMOD_IMODI_MASK \
     ((1U << USBXHCI_INTR_IMOD_IMODI_BITS)-1)
+
+// Interrupt moderation countdown
 #define USBXHCI_INTR_IMOD_IMODC_MASK \
     ((1U << USBXHCI_INTR_IMOD_IMODC_BITS)-1)
 
@@ -1490,45 +2678,75 @@
 #define USBXHCI_INTR_IMOD_IMODC \
     (USBXHCI_INTR_IMOD_IMODC_MASK << USBXHCI_INTR_IMOD_IMODC_BIT)
 
+
+// Minimum interval (1=250ns, 4000=1ms)
 #define USBXHCI_INTR_IMOD_IMODI_n(n)      ((n) << USBXHCI_INTR_IMOD_IMODI_BIT)
+
+// Interrupt moderation countdown
 #define USBXHCI_INTR_IMOD_IMODC_n(n)      ((n) << USBXHCI_INTR_IMOD_IMODC_BIT)
 
+
+// Minimum interval (1=250ns, 4000=1ms)
 #define USBXHCI_INTR_IMOD_IMODI_GET(n) \
     (((n) >> USBXHCI_INTR_IMOD_IMODI_BIT) & USBXHCI_INTR_IMOD_IMODI_MASK)
+
+// Interrupt moderation countdown
 #define USBXHCI_INTR_IMOD_IMODC_GET(n) \
     (((n) >> USBXHCI_INTR_IMOD_IMODC_BIT) & USBXHCI_INTR_IMOD_IMODC_MASK)
 
+
+// Minimum interval (1=250ns, 4000=1ms)
 #define USBXHCI_INTR_IMOD_IMODI_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_INTR_IMOD_IMODI) | USBXHCI_INTR_IMOD_IMODI_n((n)))
+
+// Interrupt moderation countdown
 #define USBXHCI_INTR_IMOD_IMODC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_INTR_IMOD_IMODC) | USBXHCI_INTR_IMOD_IMODC_n((n)))
 
 //
 // USBXHCI_ERSTSZ: 5.5.2.3.1 Event ring segment table size
 
+
+// Number of event ring segment table entries
 #define USBXHCI_ERSTSZ_SZ_BIT       0
 
+
+// Number of event ring segment table entries
 #define USBXHCI_ERSTSZ_SZ_BITS      16
+
+// Number of event ring segment table entries
 #define USBXHCI_ERSTSZ_SZ_MASK      ((1U << USBXHCI_ERSTSZ_SZ_BITS)-1)
 
 // Number of event ring segment table entries
 #define USBXHCI_ERSTSZ_SZ \
     (USBXHCI_ERSTSZ_SZ_MASK << USBXHCI_ERSTSZ_SZ_BIT)
 
+
+// Number of event ring segment table entries
 #define USBXHCI_ERSTSZ_SZ_n(n)      ((n) << USBXHCI_ERSTSZ_SZ_BIT)
 
+
+// Number of event ring segment table entries
 #define USBXHCI_ERSTSZ_SZ_GET(n) \
     (((n) >> USBXHCI_ERSTSZ_SZ_BIT) & USBXHCI_ERSTSZ_SZ_MASK)
 
+
+// Number of event ring segment table entries
 #define USBXHCI_ERSTSZ_SZ_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_ERSTSZ_SZ) | USBXHCI_ERSTSZ_SZ_n((n)))
 
 //
 // USBXHCI_ERSTBA: 5.5.2.3.2 Event ring segment table base address
 
+
+// Event ring segment table base address
 #define USBXHCI_ERSTBA_BASEADDR_BIT       6
 
+
+// Event ring segment table base address
 #define USBXHCI_ERSTBA_BASEADDR_BITS      58
+
+// Event ring segment table base address
 #define USBXHCI_ERSTBA_BASEADDR_MASK \
     ((1UL << USBXHCI_ERSTBA_BASEADDR_BITS)-1)
 
@@ -1536,27 +2754,51 @@
 #define USBXHCI_ERSTBA_BASEADDR \
     (USBXHCI_ERSTBA_BASEADDR_MASK << USBXHCI_ERSTBA_BASEADDR_BIT)
 
+
+// Event ring segment table base address
 #define USBXHCI_ERSTBA_BASEADDR_n(n) \
     (uint64_t(n) << USBXHCI_ERSTBA_BASEADDR_BIT)
 
+
+// Event ring segment table base address
 #define USBXHCI_ERSTBA_BASEADDR_GET(n) \
     (((n) >> USBXHCI_ERSTBA_BASEADDR_BIT) & USBXHCI_ERSTBA_BASEADDR_MASK)
 
+
+// Event ring segment table base address
 #define USBXHCI_ERSTBA_BASEADDR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_ERSTBA_BASEADDR) | USBXHCI_ERSTBA_BASEADDR_n((n)))
 
 //
 // USBXHCI_ERDP: 5.5.2.3.3 Event ring dequeue pointer
 
+
+// Dequeue ERST segment index
 #define USBXHCI_ERDP_DESI_BIT        0
+
+// (RW1C) Event handler busy
 #define USBXHCI_ERDP_EHB_BIT         3
+
+// ring dequeue pointer
 #define USBXHCI_ERDP_Event_BIT       4
 
+
+// Dequeue ERST segment index
 #define USBXHCI_ERDP_DESI_BITS       3
+
+// (RW1C) Event handler busy
 #define USBXHCI_ERDP_EHB_BITS        1
+
+// ring dequeue pointer
 #define USBXHCI_ERDP_Event_BITS      60
+
+// Dequeue ERST segment index
 #define USBXHCI_ERDP_DESI_MASK       ((1UL << USBXHCI_ERDP_DESI_BITS)-1)
+
+// (RW1C) Event handler busy
 #define USBXHCI_ERDP_EHB_MASK        ((1UL << USBXHCI_ERDP_EHB_BITS)-1)
+
+// ring dequeue pointer
 #define USBXHCI_ERDP_Event_MASK      ((1UL << USBXHCI_ERDP_Event_BITS)-1)
 
 // Dequeue ERST segment index
@@ -1571,33 +2813,63 @@
 #define USBXHCI_ERDP_Event \
     (USBXHCI_ERDP_Event_MASK << USBXHCI_ERDP_Event_BIT)
 
+
+// Dequeue ERST segment index
 #define USBXHCI_ERDP_DESI_n(n)       (uint64_t(n) << USBXHCI_ERDP_DESI_BIT)
+
+// (RW1C) Event handler busy
 #define USBXHCI_ERDP_EHB_n(n)        (uint64_t(n) << USBXHCI_ERDP_EHB_BIT)
+
+// ring dequeue pointer
 #define USBXHCI_ERDP_Event_n(n)      (uint64_t(n) << USBXHCI_ERDP_Event_BIT)
 
+
+// Dequeue ERST segment index
 #define USBXHCI_ERDP_DESI_GET(n) \
     (((n) >> USBXHCI_ERDP_DESI_BIT) & USBXHCI_ERDP_DESI_MASK)
+
+// (RW1C) Event handler busy
 #define USBXHCI_ERDP_EHB_GET(n) \
     (((n) >> USBXHCI_ERDP_EHB_BIT) & USBXHCI_ERDP_EHB_MASK)
+
+// ring dequeue pointer
 #define USBXHCI_ERDP_Event_GET(n) \
     (((n) >> USBXHCI_ERDP_Event_BIT) & USBXHCI_ERDP_Event_MASK)
 
+
+// Dequeue ERST segment index
 #define USBXHCI_ERDP_DESI_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_ERDP_DESI) | USBXHCI_ERDP_DESI_n((n)))
+
+// (RW1C) Event handler busy
 #define USBXHCI_ERDP_EHB_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_ERDP_EHB) | USBXHCI_ERDP_EHB_n((n)))
+
+// ring dequeue pointer
 #define USBXHCI_ERDP_Event_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_ERDP_Event) | USBXHCI_ERDP_Event_n((n)))
 
 //
 // USBXHCI_DB: 5.6 Doorbell
 
+
+// Target endpoint
 #define USBXHCI_DB_TARGET_BIT       0
+
+// Target stream
 #define USBXHCI_DB_STREAM_BIT       16
 
+
+// Target endpoint
 #define USBXHCI_DB_TARGET_BITS      8
+
+// Target stream
 #define USBXHCI_DB_STREAM_BITS      16
+
+// Target endpoint
 #define USBXHCI_DB_TARGET_MASK      ((1U << USBXHCI_DB_TARGET_BITS)-1)
+
+// Target stream
 #define USBXHCI_DB_STREAM_MASK      ((1U << USBXHCI_DB_STREAM_BITS)-1)
 
 // Target endpoint
@@ -1608,56 +2880,122 @@
 #define USBXHCI_DB_STREAM \
     (USBXHCI_DB_STREAM_MASK << USBXHCI_DB_STREAM_BIT)
 
+
+// Target endpoint
 #define USBXHCI_DB_TARGET_n(n)      ((n) << USBXHCI_DB_TARGET_BIT)
+
+// Target stream
 #define USBXHCI_DB_STREAM_n(n)      ((n) << USBXHCI_DB_STREAM_BIT)
 
+
+// Target endpoint
 #define USBXHCI_DB_TARGET_GET(n) \
     (((n) >> USBXHCI_DB_TARGET_BIT) & USBXHCI_DB_TARGET_MASK)
+
+// Target stream
 #define USBXHCI_DB_STREAM_GET(n) \
     (((n) >> USBXHCI_DB_STREAM_BIT) & USBXHCI_DB_STREAM_MASK)
 
+
+// Target endpoint
 #define USBXHCI_DB_TARGET_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_DB_TARGET) | USBXHCI_DB_TARGET_n((n)))
+
+// Target stream
 #define USBXHCI_DB_STREAM_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_DB_STREAM) | USBXHCI_DB_STREAM_n((n)))
 
 // USBXHCI_CTL_TRB_FLAGS
 
+
+// Cycle bit
 #define USBXHCI_CTL_TRB_FLAGS_C_BIT              0
+
+// Evaluate next TRB
 #define USBXHCI_CTL_TRB_FLAGS_ENT_BIT            1
+
+// Interrupt on short packet
 #define USBXHCI_CTL_TRB_FLAGS_ISP_BIT            2
+
+// No snoop
 #define USBXHCI_CTL_TRB_FLAGS_NS_BIT             3
+
+// Chain bit
 #define USBXHCI_CTL_TRB_FLAGS_CH_BIT             4
+
+// Interrupt on completion
 #define USBXHCI_CTL_TRB_FLAGS_IOC_BIT            5
+
+// Immediate data
 #define USBXHCI_CTL_TRB_FLAGS_IDT_BIT            6
+
+// Block event interrupt
 #define USBXHCI_CTL_TRB_FLAGS_BEI_BIT            9
+
+// type
 #define USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_BIT       10
 
+
+// Cycle bit
 #define USBXHCI_CTL_TRB_FLAGS_C_BITS             1
+
+// Evaluate next TRB
 #define USBXHCI_CTL_TRB_FLAGS_ENT_BITS           1
+
+// Interrupt on short packet
 #define USBXHCI_CTL_TRB_FLAGS_ISP_BITS           1
+
+// No snoop
 #define USBXHCI_CTL_TRB_FLAGS_NS_BITS            1
+
+// Chain bit
 #define USBXHCI_CTL_TRB_FLAGS_CH_BITS            1
+
+// Interrupt on completion
 #define USBXHCI_CTL_TRB_FLAGS_IOC_BITS           1
+
+// Immediate data
 #define USBXHCI_CTL_TRB_FLAGS_IDT_BITS           1
+
+// Block event interrupt
 #define USBXHCI_CTL_TRB_FLAGS_BEI_BITS           1
+
+// type
 #define USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_BITS      6
+
+// Cycle bit
 #define USBXHCI_CTL_TRB_FLAGS_C_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_C_BITS)-1)
+
+// Evaluate next TRB
 #define USBXHCI_CTL_TRB_FLAGS_ENT_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_ENT_BITS)-1)
+
+// Interrupt on short packet
 #define USBXHCI_CTL_TRB_FLAGS_ISP_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_ISP_BITS)-1)
+
+// No snoop
 #define USBXHCI_CTL_TRB_FLAGS_NS_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_NS_BITS)-1)
+
+// Chain bit
 #define USBXHCI_CTL_TRB_FLAGS_CH_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_CH_BITS)-1)
+
+// Interrupt on completion
 #define USBXHCI_CTL_TRB_FLAGS_IOC_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_IOC_BITS)-1)
+
+// Immediate data
 #define USBXHCI_CTL_TRB_FLAGS_IDT_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_IDT_BITS)-1)
+
+// Block event interrupt
 #define USBXHCI_CTL_TRB_FLAGS_BEI_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_BEI_BITS)-1)
+
+// type
 #define USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_MASK \
     ((1U << USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_BITS)-1)
 
@@ -1697,73 +3035,139 @@
 #define USBXHCI_CTL_TRB_FLAGS_TRB_TYPE \
     (USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_MASK << USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_BIT)
 
+
+// Cycle bit
 #define USBXHCI_CTL_TRB_FLAGS_C_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_C_BIT)
+
+// Evaluate next TRB
 #define USBXHCI_CTL_TRB_FLAGS_ENT_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_ENT_BIT)
+
+// Interrupt on short packet
 #define USBXHCI_CTL_TRB_FLAGS_ISP_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_ISP_BIT)
+
+// No snoop
 #define USBXHCI_CTL_TRB_FLAGS_NS_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_NS_BIT)
+
+// Chain bit
 #define USBXHCI_CTL_TRB_FLAGS_CH_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_CH_BIT)
+
+// Interrupt on completion
 #define USBXHCI_CTL_TRB_FLAGS_IOC_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_IOC_BIT)
+
+// Immediate data
 #define USBXHCI_CTL_TRB_FLAGS_IDT_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_IDT_BIT)
+
+// Block event interrupt
 #define USBXHCI_CTL_TRB_FLAGS_BEI_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_BEI_BIT)
+
+// type
 #define USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(n) \
     ((n) << USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_BIT)
 
+
+// Cycle bit
 #define USBXHCI_CTL_TRB_FLAGS_C_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_C_BIT) & USBXHCI_CTL_TRB_FLAGS_C_MASK)
+
+// Evaluate next TRB
 #define USBXHCI_CTL_TRB_FLAGS_ENT_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_ENT_BIT) & USBXHCI_CTL_TRB_FLAGS_ENT_MASK)
+
+// Interrupt on short packet
 #define USBXHCI_CTL_TRB_FLAGS_ISP_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_ISP_BIT) & USBXHCI_CTL_TRB_FLAGS_ISP_MASK)
+
+// No snoop
 #define USBXHCI_CTL_TRB_FLAGS_NS_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_NS_BIT) & USBXHCI_CTL_TRB_FLAGS_NS_MASK)
+
+// Chain bit
 #define USBXHCI_CTL_TRB_FLAGS_CH_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_CH_BIT) & USBXHCI_CTL_TRB_FLAGS_CH_MASK)
+
+// Interrupt on completion
 #define USBXHCI_CTL_TRB_FLAGS_IOC_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_IOC_BIT) & USBXHCI_CTL_TRB_FLAGS_IOC_MASK)
+
+// Immediate data
 #define USBXHCI_CTL_TRB_FLAGS_IDT_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_IDT_BIT) & USBXHCI_CTL_TRB_FLAGS_IDT_MASK)
+
+// Block event interrupt
 #define USBXHCI_CTL_TRB_FLAGS_BEI_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_FLAGS_BEI_BIT) & USBXHCI_CTL_TRB_FLAGS_BEI_MASK)
+
+// type
 #define USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_GET(n)    (((n) >> \
     USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_BIT) & USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_MASK)
 
+
+// Cycle bit
 #define USBXHCI_CTL_TRB_FLAGS_C_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CTL_TRB_FLAGS_C) | USBXHCI_CTL_TRB_FLAGS_C_n((n)))
+
+// Evaluate next TRB
 #define USBXHCI_CTL_TRB_FLAGS_ENT_SET(r,n)       ((r) \
     = ((r) & ~USBXHCI_CTL_TRB_FLAGS_ENT) | USBXHCI_CTL_TRB_FLAGS_ENT_n((n)))
+
+// Interrupt on short packet
 #define USBXHCI_CTL_TRB_FLAGS_ISP_SET(r,n)       ((r) \
     = ((r) & ~USBXHCI_CTL_TRB_FLAGS_ISP) | USBXHCI_CTL_TRB_FLAGS_ISP_n((n)))
+
+// No snoop
 #define USBXHCI_CTL_TRB_FLAGS_NS_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CTL_TRB_FLAGS_NS) | USBXHCI_CTL_TRB_FLAGS_NS_n((n)))
+
+// Chain bit
 #define USBXHCI_CTL_TRB_FLAGS_CH_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CTL_TRB_FLAGS_CH) | USBXHCI_CTL_TRB_FLAGS_CH_n((n)))
+
+// Interrupt on completion
 #define USBXHCI_CTL_TRB_FLAGS_IOC_SET(r,n)       ((r) \
     = ((r) & ~USBXHCI_CTL_TRB_FLAGS_IOC) | USBXHCI_CTL_TRB_FLAGS_IOC_n((n)))
+
+// Immediate data
 #define USBXHCI_CTL_TRB_FLAGS_IDT_SET(r,n)       ((r) \
     = ((r) & ~USBXHCI_CTL_TRB_FLAGS_IDT) | USBXHCI_CTL_TRB_FLAGS_IDT_n((n)))
+
+// Block event interrupt
 #define USBXHCI_CTL_TRB_FLAGS_BEI_SET(r,n)       ((r) \
     = ((r) & ~USBXHCI_CTL_TRB_FLAGS_BEI) | USBXHCI_CTL_TRB_FLAGS_BEI_n((n)))
+
+// type
 #define USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CTL_TRB_FLAGS_TRB_TYPE) | USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n((n)))
 
 //
 // USBXHCI_EVT_CMDCOMP_INFO: 6.4.2.2
 
+
+// Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT       0
+
+// Completion code
 #define USBXHCI_EVT_CMDCOMP_INFO_CC_BIT        24
 
+
+// Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_BITS      24
+
+// Completion code
 #define USBXHCI_EVT_CMDCOMP_INFO_CC_BITS       8
+
+// Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_MASK \
     ((1U << USBXHCI_EVT_CMDCOMP_INFO_CCP_BITS)-1)
+
+// Completion code
 #define USBXHCI_EVT_CMDCOMP_INFO_CC_MASK \
     ((1U << USBXHCI_EVT_CMDCOMP_INFO_CC_BITS)-1)
 
@@ -1775,43 +3179,85 @@
 #define USBXHCI_EVT_CMDCOMP_INFO_CC \
     (USBXHCI_EVT_CMDCOMP_INFO_CC_MASK << USBXHCI_EVT_CMDCOMP_INFO_CC_BIT)
 
+
+// Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_n(n) \
     ((n) << USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT)
+
+// Completion code
 #define USBXHCI_EVT_CMDCOMP_INFO_CC_n(n) \
     ((n) << USBXHCI_EVT_CMDCOMP_INFO_CC_BIT)
 
+
+// Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_GET(n)    (((n) \
     >> USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT) & USBXHCI_EVT_CMDCOMP_INFO_CCP_MASK)
+
+// Completion code
 #define USBXHCI_EVT_CMDCOMP_INFO_CC_GET(n)     (((n) \
     >> USBXHCI_EVT_CMDCOMP_INFO_CC_BIT) & USBXHCI_EVT_CMDCOMP_INFO_CC_MASK)
 
+
+// Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_EVT_CMDCOMP_INFO_CCP) | USBXHCI_EVT_CMDCOMP_INFO_CCP_n((n)))
+
+// Completion code
 #define USBXHCI_EVT_CMDCOMP_INFO_CC_SET(r,n)   ((r) = \
     ((r) & ~USBXHCI_EVT_CMDCOMP_INFO_CC) | USBXHCI_EVT_CMDCOMP_INFO_CC_n((n)))
 
 //
 // USBXHCI_SLOTCTX_RSMHC: 6.2.2 Slot context
 
+
+// Route string
 #define USBXHCI_SLOTCTX_RSMHC_ROUTE_BIT        0
+
+// PSIV value same as PORTSC speed
 #define USBXHCI_SLOTCTX_RSMHC_SPEED_BIT        20
+
+// Multi-transaction-translator
 #define USBXHCI_SLOTCTX_RSMHC_MTT_BIT          25
+
+// Hub flag
 #define USBXHCI_SLOTCTX_RSMHC_HUB_BIT          26
+
+// Context entries
 #define USBXHCI_SLOTCTX_RSMHC_CTXENT_BIT       27
 
+
+// Route string
 #define USBXHCI_SLOTCTX_RSMHC_ROUTE_BITS       20
+
+// PSIV value same as PORTSC speed
 #define USBXHCI_SLOTCTX_RSMHC_SPEED_BITS       4
+
+// Multi-transaction-translator
 #define USBXHCI_SLOTCTX_RSMHC_MTT_BITS         1
+
+// Hub flag
 #define USBXHCI_SLOTCTX_RSMHC_HUB_BITS         1
+
+// Context entries
 #define USBXHCI_SLOTCTX_RSMHC_CTXENT_BITS      5
+
+// Route string
 #define USBXHCI_SLOTCTX_RSMHC_ROUTE_MASK \
     ((1U << USBXHCI_SLOTCTX_RSMHC_ROUTE_BITS)-1)
+
+// PSIV value same as PORTSC speed
 #define USBXHCI_SLOTCTX_RSMHC_SPEED_MASK \
     ((1U << USBXHCI_SLOTCTX_RSMHC_SPEED_BITS)-1)
+
+// Multi-transaction-translator
 #define USBXHCI_SLOTCTX_RSMHC_MTT_MASK \
     ((1U << USBXHCI_SLOTCTX_RSMHC_MTT_BITS)-1)
+
+// Hub flag
 #define USBXHCI_SLOTCTX_RSMHC_HUB_MASK \
     ((1U << USBXHCI_SLOTCTX_RSMHC_HUB_BITS)-1)
+
+// Context entries
 #define USBXHCI_SLOTCTX_RSMHC_CTXENT_MASK \
     ((1U << USBXHCI_SLOTCTX_RSMHC_CTXENT_BITS)-1)
 
@@ -1835,55 +3281,109 @@
 #define USBXHCI_SLOTCTX_RSMHC_CTXENT \
     (USBXHCI_SLOTCTX_RSMHC_CTXENT_MASK << USBXHCI_SLOTCTX_RSMHC_CTXENT_BIT)
 
+
+// Route string
 #define USBXHCI_SLOTCTX_RSMHC_ROUTE_n(n) \
     ((n) << USBXHCI_SLOTCTX_RSMHC_ROUTE_BIT)
+
+// PSIV value same as PORTSC speed
 #define USBXHCI_SLOTCTX_RSMHC_SPEED_n(n) \
     ((n) << USBXHCI_SLOTCTX_RSMHC_SPEED_BIT)
+
+// Multi-transaction-translator
 #define USBXHCI_SLOTCTX_RSMHC_MTT_n(n) \
     ((n) << USBXHCI_SLOTCTX_RSMHC_MTT_BIT)
+
+// Hub flag
 #define USBXHCI_SLOTCTX_RSMHC_HUB_n(n) \
     ((n) << USBXHCI_SLOTCTX_RSMHC_HUB_BIT)
+
+// Context entries
 #define USBXHCI_SLOTCTX_RSMHC_CTXENT_n(n) \
     ((n) << USBXHCI_SLOTCTX_RSMHC_CTXENT_BIT)
 
+
+// Route string
 #define USBXHCI_SLOTCTX_RSMHC_ROUTE_GET(n)     (((n) \
     >> USBXHCI_SLOTCTX_RSMHC_ROUTE_BIT) & USBXHCI_SLOTCTX_RSMHC_ROUTE_MASK)
+
+// PSIV value same as PORTSC speed
 #define USBXHCI_SLOTCTX_RSMHC_SPEED_GET(n)     (((n) \
     >> USBXHCI_SLOTCTX_RSMHC_SPEED_BIT) & USBXHCI_SLOTCTX_RSMHC_SPEED_MASK)
+
+// Multi-transaction-translator
 #define USBXHCI_SLOTCTX_RSMHC_MTT_GET(n) \
     (((n) >> USBXHCI_SLOTCTX_RSMHC_MTT_BIT) & USBXHCI_SLOTCTX_RSMHC_MTT_MASK)
+
+// Hub flag
 #define USBXHCI_SLOTCTX_RSMHC_HUB_GET(n) \
     (((n) >> USBXHCI_SLOTCTX_RSMHC_HUB_BIT) & USBXHCI_SLOTCTX_RSMHC_HUB_MASK)
+
+// Context entries
 #define USBXHCI_SLOTCTX_RSMHC_CTXENT_GET(n)    (((n) \
     >> USBXHCI_SLOTCTX_RSMHC_CTXENT_BIT) & USBXHCI_SLOTCTX_RSMHC_CTXENT_MASK)
 
+
+// Route string
 #define USBXHCI_SLOTCTX_RSMHC_ROUTE_SET(r,n)   ((r) = \
     ((r) & ~USBXHCI_SLOTCTX_RSMHC_ROUTE) | USBXHCI_SLOTCTX_RSMHC_ROUTE_n((n)))
+
+// PSIV value same as PORTSC speed
 #define USBXHCI_SLOTCTX_RSMHC_SPEED_SET(r,n)   ((r) = \
     ((r) & ~USBXHCI_SLOTCTX_RSMHC_SPEED) | USBXHCI_SLOTCTX_RSMHC_SPEED_n((n)))
+
+// Multi-transaction-translator
 #define USBXHCI_SLOTCTX_RSMHC_MTT_SET(r,n)     ((r) \
     = ((r) & ~USBXHCI_SLOTCTX_RSMHC_MTT) | USBXHCI_SLOTCTX_RSMHC_MTT_n((n)))
+
+// Hub flag
 #define USBXHCI_SLOTCTX_RSMHC_HUB_SET(r,n)     ((r) \
     = ((r) & ~USBXHCI_SLOTCTX_RSMHC_HUB) | USBXHCI_SLOTCTX_RSMHC_HUB_n((n)))
+
+// Context entries
 #define USBXHCI_SLOTCTX_RSMHC_CTXENT_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_SLOTCTX_RSMHC_CTXENT) | USBXHCI_SLOTCTX_RSMHC_CTXENT_n((n)))
 
 // USBXHCI_CMD_TRB
 
+
+// TRB type
 #define USBXHCI_CMD_TRB_TYPE_BIT             2
+
+// Cycle
 #define USBXHCI_CMD_TRB_C_BIT                0
+
+// Toggle cycle (link trbs)
 #define USBXHCI_CMD_TRB_TC_BIT               1
+
+// Interrupter target
 #define USBXHCI_CMD_TRB_INTRTARGET_BIT       6
 
+
+// TRB type
 #define USBXHCI_CMD_TRB_TYPE_BITS            6
+
+// Cycle
 #define USBXHCI_CMD_TRB_C_BITS               1
+
+// Toggle cycle (link trbs)
 #define USBXHCI_CMD_TRB_TC_BITS              1
+
+// Interrupter target
 #define USBXHCI_CMD_TRB_INTRTARGET_BITS      10
+
+// TRB type
 #define USBXHCI_CMD_TRB_TYPE_MASK \
     ((1U << USBXHCI_CMD_TRB_TYPE_BITS)-1)
+
+// Cycle
 #define USBXHCI_CMD_TRB_C_MASK               ((1U << USBXHCI_CMD_TRB_C_BITS)-1)
+
+// Toggle cycle (link trbs)
 #define USBXHCI_CMD_TRB_TC_MASK \
     ((1U << USBXHCI_CMD_TRB_TC_BITS)-1)
+
+// Interrupter target
 #define USBXHCI_CMD_TRB_INTRTARGET_MASK \
     ((1U << USBXHCI_CMD_TRB_INTRTARGET_BITS)-1)
 
@@ -1903,27 +3403,51 @@
 #define USBXHCI_CMD_TRB_INTRTARGET \
     (USBXHCI_CMD_TRB_INTRTARGET_MASK << USBXHCI_CMD_TRB_INTRTARGET_BIT)
 
+
+// TRB type
 #define USBXHCI_CMD_TRB_TYPE_n(n)            ((n) << USBXHCI_CMD_TRB_TYPE_BIT)
+
+// Cycle
 #define USBXHCI_CMD_TRB_C_n(n)               ((n) << USBXHCI_CMD_TRB_C_BIT)
+
+// Toggle cycle (link trbs)
 #define USBXHCI_CMD_TRB_TC_n(n)              ((n) << USBXHCI_CMD_TRB_TC_BIT)
+
+// Interrupter target
 #define USBXHCI_CMD_TRB_INTRTARGET_n(n) \
     ((n) << USBXHCI_CMD_TRB_INTRTARGET_BIT)
 
+
+// TRB type
 #define USBXHCI_CMD_TRB_TYPE_GET(n) \
     (((n) >> USBXHCI_CMD_TRB_TYPE_BIT) & USBXHCI_CMD_TRB_TYPE_MASK)
+
+// Cycle
 #define USBXHCI_CMD_TRB_C_GET(n) \
     (((n) >> USBXHCI_CMD_TRB_C_BIT) & USBXHCI_CMD_TRB_C_MASK)
+
+// Toggle cycle (link trbs)
 #define USBXHCI_CMD_TRB_TC_GET(n) \
     (((n) >> USBXHCI_CMD_TRB_TC_BIT) & USBXHCI_CMD_TRB_TC_MASK)
+
+// Interrupter target
 #define USBXHCI_CMD_TRB_INTRTARGET_GET(n) \
     (((n) >> USBXHCI_CMD_TRB_INTRTARGET_BIT) & USBXHCI_CMD_TRB_INTRTARGET_MASK)
 
+
+// TRB type
 #define USBXHCI_CMD_TRB_TYPE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CMD_TRB_TYPE) | USBXHCI_CMD_TRB_TYPE_n((n)))
+
+// Cycle
 #define USBXHCI_CMD_TRB_C_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CMD_TRB_C) | USBXHCI_CMD_TRB_C_n((n)))
+
+// Toggle cycle (link trbs)
 #define USBXHCI_CMD_TRB_TC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CMD_TRB_TC) | USBXHCI_CMD_TRB_TC_n((n)))
+
+// Interrupter target
 #define USBXHCI_CMD_TRB_INTRTARGET_SET(r,n)  ((r) \
     = ((r) & ~USBXHCI_CMD_TRB_INTRTARGET) | USBXHCI_CMD_TRB_INTRTARGET_n((n)))
 
@@ -1991,17 +3515,35 @@
 
 // USBXHCI_EPCTX_CEH
 
+
+// Error count
 #define USBXHCI_EPCTX_CEH_CERR_BIT         1
+
+// Endpoint type
 #define USBXHCI_EPCTX_CEH_EPTYPE_BIT       3
+
+// Host initiate disable
 #define USBXHCI_EPCTX_CEH_HID_BIT          7
 
+
+// Error count
 #define USBXHCI_EPCTX_CEH_CERR_BITS        2
+
+// Endpoint type
 #define USBXHCI_EPCTX_CEH_EPTYPE_BITS      3
+
+// Host initiate disable
 #define USBXHCI_EPCTX_CEH_HID_BITS         1
+
+// Error count
 #define USBXHCI_EPCTX_CEH_CERR_MASK \
     ((1U << USBXHCI_EPCTX_CEH_CERR_BITS)-1)
+
+// Endpoint type
 #define USBXHCI_EPCTX_CEH_EPTYPE_MASK \
     ((1U << USBXHCI_EPCTX_CEH_EPTYPE_BITS)-1)
+
+// Host initiate disable
 #define USBXHCI_EPCTX_CEH_HID_MASK \
     ((1U << USBXHCI_EPCTX_CEH_HID_BITS)-1)
 
@@ -2017,34 +3559,64 @@
 #define USBXHCI_EPCTX_CEH_HID \
     (USBXHCI_EPCTX_CEH_HID_MASK << USBXHCI_EPCTX_CEH_HID_BIT)
 
+
+// Error count
 #define USBXHCI_EPCTX_CEH_CERR_n(n)        ((n) << USBXHCI_EPCTX_CEH_CERR_BIT)
+
+// Endpoint type
 #define USBXHCI_EPCTX_CEH_EPTYPE_n(n) \
     ((n) << USBXHCI_EPCTX_CEH_EPTYPE_BIT)
+
+// Host initiate disable
 #define USBXHCI_EPCTX_CEH_HID_n(n)         ((n) << USBXHCI_EPCTX_CEH_HID_BIT)
 
+
+// Error count
 #define USBXHCI_EPCTX_CEH_CERR_GET(n) \
     (((n) >> USBXHCI_EPCTX_CEH_CERR_BIT) & USBXHCI_EPCTX_CEH_CERR_MASK)
+
+// Endpoint type
 #define USBXHCI_EPCTX_CEH_EPTYPE_GET(n) \
     (((n) >> USBXHCI_EPCTX_CEH_EPTYPE_BIT) & USBXHCI_EPCTX_CEH_EPTYPE_MASK)
+
+// Host initiate disable
 #define USBXHCI_EPCTX_CEH_HID_GET(n) \
     (((n) >> USBXHCI_EPCTX_CEH_HID_BIT) & USBXHCI_EPCTX_CEH_HID_MASK)
 
+
+// Error count
 #define USBXHCI_EPCTX_CEH_CERR_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_EPCTX_CEH_CERR) | USBXHCI_EPCTX_CEH_CERR_n((n)))
+
+// Endpoint type
 #define USBXHCI_EPCTX_CEH_EPTYPE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_EPCTX_CEH_EPTYPE) | USBXHCI_EPCTX_CEH_EPTYPE_n((n)))
+
+// Host initiate disable
 #define USBXHCI_EPCTX_CEH_HID_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_EPCTX_CEH_HID) | USBXHCI_EPCTX_CEH_HID_n((n)))
 
 // USBXHCI_EPCTX_TR_DQ_PTR
 
+
+// Dequeue cycle state
 #define USBXHCI_EPCTX_TR_DQ_PTR_DCS_BIT       0
+
+// Dequeue pointer
 #define USBXHCI_EPCTX_TR_DQ_PTR_PTR_BIT       4
 
+
+// Dequeue cycle state
 #define USBXHCI_EPCTX_TR_DQ_PTR_DCS_BITS      1
+
+// Dequeue pointer
 #define USBXHCI_EPCTX_TR_DQ_PTR_PTR_BITS      60
+
+// Dequeue cycle state
 #define USBXHCI_EPCTX_TR_DQ_PTR_DCS_MASK \
     ((1UL << USBXHCI_EPCTX_TR_DQ_PTR_DCS_BITS)-1)
+
+// Dequeue pointer
 #define USBXHCI_EPCTX_TR_DQ_PTR_PTR_MASK \
     ((1UL << USBXHCI_EPCTX_TR_DQ_PTR_PTR_BITS)-1)
 
@@ -2056,34 +3628,64 @@
 #define USBXHCI_EPCTX_TR_DQ_PTR_PTR \
     (USBXHCI_EPCTX_TR_DQ_PTR_PTR_MASK << USBXHCI_EPCTX_TR_DQ_PTR_PTR_BIT)
 
+
+// Dequeue cycle state
 #define USBXHCI_EPCTX_TR_DQ_PTR_DCS_n(n) \
     (uint64_t(n) << USBXHCI_EPCTX_TR_DQ_PTR_DCS_BIT)
+
+// Dequeue pointer
 #define USBXHCI_EPCTX_TR_DQ_PTR_PTR_n(n) \
     (uint64_t(n) << USBXHCI_EPCTX_TR_DQ_PTR_PTR_BIT)
 
+
+// Dequeue cycle state
 #define USBXHCI_EPCTX_TR_DQ_PTR_DCS_GET(n)    (((n) \
     >> USBXHCI_EPCTX_TR_DQ_PTR_DCS_BIT) & USBXHCI_EPCTX_TR_DQ_PTR_DCS_MASK)
+
+// Dequeue pointer
 #define USBXHCI_EPCTX_TR_DQ_PTR_PTR_GET(n)    (((n) \
     >> USBXHCI_EPCTX_TR_DQ_PTR_PTR_BIT) & USBXHCI_EPCTX_TR_DQ_PTR_PTR_MASK)
 
+
+// Dequeue cycle state
 #define USBXHCI_EPCTX_TR_DQ_PTR_DCS_SET(r,n)  ((r) = \
     ((r) & ~USBXHCI_EPCTX_TR_DQ_PTR_DCS) | USBXHCI_EPCTX_TR_DQ_PTR_DCS_n((n)))
+
+// Dequeue pointer
 #define USBXHCI_EPCTX_TR_DQ_PTR_PTR_SET(r,n)  ((r) = \
     ((r) & ~USBXHCI_EPCTX_TR_DQ_PTR_PTR) | USBXHCI_EPCTX_TR_DQ_PTR_PTR_n((n)))
 
 // USBXHCI_CTL_TRB_BMREQT
 
+
+// Recipient
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_BIT        0
+
+// Type
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_BIT         5
+
+// IN
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST_BIT       7
 
+
+// Recipient
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_BITS       5
+
+// Type
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_BITS        2
+
+// IN
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST_BITS      1
+
+// Recipient
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_MASK \
     ((1U << USBXHCI_CTL_TRB_BMREQT_RECIP_BITS)-1)
+
+// Type
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_MASK \
     ((1U << USBXHCI_CTL_TRB_BMREQT_TYPE_BITS)-1)
+
+// IN
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST_MASK \
     ((1U << USBXHCI_CTL_TRB_BMREQT_TOHOST_BITS)-1)
 
@@ -2099,24 +3701,42 @@
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST \
     (USBXHCI_CTL_TRB_BMREQT_TOHOST_MASK << USBXHCI_CTL_TRB_BMREQT_TOHOST_BIT)
 
+
+// Recipient
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_n(n) \
     ((n) << USBXHCI_CTL_TRB_BMREQT_RECIP_BIT)
+
+// Type
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_n(n) \
     ((n) << USBXHCI_CTL_TRB_BMREQT_TYPE_BIT)
+
+// IN
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST_n(n) \
     ((n) << USBXHCI_CTL_TRB_BMREQT_TOHOST_BIT)
 
+
+// Recipient
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_GET(n)     (((n) \
     >> USBXHCI_CTL_TRB_BMREQT_RECIP_BIT) & USBXHCI_CTL_TRB_BMREQT_RECIP_MASK)
+
+// Type
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_GET(n)      (((n) \
     >> USBXHCI_CTL_TRB_BMREQT_TYPE_BIT) & USBXHCI_CTL_TRB_BMREQT_TYPE_MASK)
+
+// IN
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST_GET(n)    (((n) \
     >> USBXHCI_CTL_TRB_BMREQT_TOHOST_BIT) & USBXHCI_CTL_TRB_BMREQT_TOHOST_MASK)
 
+
+// Recipient
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_SET(r,n)   ((r) = ((r) \
     & ~USBXHCI_CTL_TRB_BMREQT_RECIP) | USBXHCI_CTL_TRB_BMREQT_RECIP_n((n)))
+
+// Type
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_SET(r,n)    ((r) = \
     ((r) & ~USBXHCI_CTL_TRB_BMREQT_TYPE) | USBXHCI_CTL_TRB_BMREQT_TYPE_n((n)))
+
+// IN
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST_SET(r,n)  ((r) = ((r) \
     & ~USBXHCI_CTL_TRB_BMREQT_TOHOST) | USBXHCI_CTL_TRB_BMREQT_TOHOST_n((n)))
 
@@ -2193,13 +3813,25 @@
 
 // USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP
 
+
+// Transfer state preserve
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_BIT            1
+
+// Type
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_BIT       2
 
+
+// Transfer state preserve
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_BITS           1
+
+// Type
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_BITS      6
+
+// Transfer state preserve
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_MASK \
     ((1U << USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_BITS)-1)
+
+// Type
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_MASK \
     ((1U << USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_BITS)-1)
 
@@ -2213,36 +3845,66 @@
     (USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_MASK \
     << USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_BIT)
 
+
+// Transfer state preserve
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_n(n) \
     ((n) << USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_BIT)
+
+// Type
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_n(n) \
     ((n) << USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_BIT)
 
+
+// Transfer state preserve
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_BIT) \
     & USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_MASK)
+
+// Type
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_GET(n) \
     (((n) >> USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_BIT) \
     & USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_MASK)
 
+
+// Transfer state preserve
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP) \
     | USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TSP_n((n)))
+
+// Type
 #define USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE) \
     | USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_n((n)))
 
 // USBXHCI_EXTCAP
 
+
+// Capability ID
 #define USBXHCI_EXTCAP_CAPID_BIT          0
+
+// Offset in dwords to next capability ID
 #define USBXHCI_EXTCAP_NEXT_BIT           8
+
+// Capability specific
 #define USBXHCI_EXTCAP_SPECIFIC_BIT       16
 
+
+// Capability ID
 #define USBXHCI_EXTCAP_CAPID_BITS         8
+
+// Offset in dwords to next capability ID
 #define USBXHCI_EXTCAP_NEXT_BITS          8
+
+// Capability specific
 #define USBXHCI_EXTCAP_SPECIFIC_BITS      16
+
+// Capability ID
 #define USBXHCI_EXTCAP_CAPID_MASK         ((1U << USBXHCI_EXTCAP_CAPID_BITS)-1)
+
+// Offset in dwords to next capability ID
 #define USBXHCI_EXTCAP_NEXT_MASK          ((1U << USBXHCI_EXTCAP_NEXT_BITS)-1)
+
+// Capability specific
 #define USBXHCI_EXTCAP_SPECIFIC_MASK \
     ((1U << USBXHCI_EXTCAP_SPECIFIC_BITS)-1)
 
@@ -2258,29 +3920,53 @@
 #define USBXHCI_EXTCAP_SPECIFIC \
     (USBXHCI_EXTCAP_SPECIFIC_MASK << USBXHCI_EXTCAP_SPECIFIC_BIT)
 
+
+// Capability ID
 #define USBXHCI_EXTCAP_CAPID_n(n)         ((n) << USBXHCI_EXTCAP_CAPID_BIT)
+
+// Offset in dwords to next capability ID
 #define USBXHCI_EXTCAP_NEXT_n(n)          ((n) << USBXHCI_EXTCAP_NEXT_BIT)
+
+// Capability specific
 #define USBXHCI_EXTCAP_SPECIFIC_n(n)      ((n) << USBXHCI_EXTCAP_SPECIFIC_BIT)
 
+
+// Capability ID
 #define USBXHCI_EXTCAP_CAPID_GET(n) \
     (((n) >> USBXHCI_EXTCAP_CAPID_BIT) & USBXHCI_EXTCAP_CAPID_MASK)
+
+// Offset in dwords to next capability ID
 #define USBXHCI_EXTCAP_NEXT_GET(n) \
     (((n) >> USBXHCI_EXTCAP_NEXT_BIT) & USBXHCI_EXTCAP_NEXT_MASK)
+
+// Capability specific
 #define USBXHCI_EXTCAP_SPECIFIC_GET(n) \
     (((n) >> USBXHCI_EXTCAP_SPECIFIC_BIT) & USBXHCI_EXTCAP_SPECIFIC_MASK)
 
+
+// Capability ID
 #define USBXHCI_EXTCAP_CAPID_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_EXTCAP_CAPID) | USBXHCI_EXTCAP_CAPID_n((n)))
+
+// Offset in dwords to next capability ID
 #define USBXHCI_EXTCAP_NEXT_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_EXTCAP_NEXT) | USBXHCI_EXTCAP_NEXT_n((n)))
+
+// Capability specific
 #define USBXHCI_EXTCAP_SPECIFIC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_EXTCAP_SPECIFIC) | USBXHCI_EXTCAP_SPECIFIC_n((n)))
 
 // USBXHCI_PROTCAP_USB3
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB3_MHD_BIT       25
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB3_MHD_BITS      3
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB3_MHD_MASK \
     ((1U << USBXHCI_PROTCAP_USB3_MHD_BITS)-1)
 
@@ -2288,36 +3974,72 @@
 #define USBXHCI_PROTCAP_USB3_MHD \
     (USBXHCI_PROTCAP_USB3_MHD_MASK << USBXHCI_PROTCAP_USB3_MHD_BIT)
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB3_MHD_n(n) \
     ((n) << USBXHCI_PROTCAP_USB3_MHD_BIT)
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB3_MHD_GET(n) \
     (((n) >> USBXHCI_PROTCAP_USB3_MHD_BIT) & USBXHCI_PROTCAP_USB3_MHD_MASK)
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB3_MHD_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PROTCAP_USB3_MHD) | USBXHCI_PROTCAP_USB3_MHD_n((n)))
 
 // USBXHCI_PROTCAP_USB2
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB2_MHD_BIT       25
+
+// BESL LPM capability
 #define USBXHCI_PROTCAP_USB2_BLC_BIT       20
+
+// Hardware LPM capability
 #define USBXHCI_PROTCAP_USB2_HLC_BIT       19
+
+// Integrated hub implemented
 #define USBXHCI_PROTCAP_USB2_IHI_BIT       18
+
+// High speed only
 #define USBXHCI_PROTCAP_USB2_HSO_BIT       17
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB2_MHD_BITS      3
+
+// BESL LPM capability
 #define USBXHCI_PROTCAP_USB2_BLC_BITS      1
+
+// Hardware LPM capability
 #define USBXHCI_PROTCAP_USB2_HLC_BITS      1
+
+// Integrated hub implemented
 #define USBXHCI_PROTCAP_USB2_IHI_BITS      1
+
+// High speed only
 #define USBXHCI_PROTCAP_USB2_HSO_BITS      1
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB2_MHD_MASK \
     ((1U << USBXHCI_PROTCAP_USB2_MHD_BITS)-1)
+
+// BESL LPM capability
 #define USBXHCI_PROTCAP_USB2_BLC_MASK \
     ((1U << USBXHCI_PROTCAP_USB2_BLC_BITS)-1)
+
+// Hardware LPM capability
 #define USBXHCI_PROTCAP_USB2_HLC_MASK \
     ((1U << USBXHCI_PROTCAP_USB2_HLC_BITS)-1)
+
+// Integrated hub implemented
 #define USBXHCI_PROTCAP_USB2_IHI_MASK \
     ((1U << USBXHCI_PROTCAP_USB2_IHI_BITS)-1)
+
+// High speed only
 #define USBXHCI_PROTCAP_USB2_HSO_MASK \
     ((1U << USBXHCI_PROTCAP_USB2_HSO_BITS)-1)
 
@@ -2341,36 +4063,66 @@
 #define USBXHCI_PROTCAP_USB2_HSO \
     (USBXHCI_PROTCAP_USB2_HSO_MASK << USBXHCI_PROTCAP_USB2_HSO_BIT)
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB2_MHD_n(n) \
     ((n) << USBXHCI_PROTCAP_USB2_MHD_BIT)
+
+// BESL LPM capability
 #define USBXHCI_PROTCAP_USB2_BLC_n(n) \
     ((n) << USBXHCI_PROTCAP_USB2_BLC_BIT)
+
+// Hardware LPM capability
 #define USBXHCI_PROTCAP_USB2_HLC_n(n) \
     ((n) << USBXHCI_PROTCAP_USB2_HLC_BIT)
+
+// Integrated hub implemented
 #define USBXHCI_PROTCAP_USB2_IHI_n(n) \
     ((n) << USBXHCI_PROTCAP_USB2_IHI_BIT)
+
+// High speed only
 #define USBXHCI_PROTCAP_USB2_HSO_n(n) \
     ((n) << USBXHCI_PROTCAP_USB2_HSO_BIT)
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB2_MHD_GET(n) \
     (((n) >> USBXHCI_PROTCAP_USB2_MHD_BIT) & USBXHCI_PROTCAP_USB2_MHD_MASK)
+
+// BESL LPM capability
 #define USBXHCI_PROTCAP_USB2_BLC_GET(n) \
     (((n) >> USBXHCI_PROTCAP_USB2_BLC_BIT) & USBXHCI_PROTCAP_USB2_BLC_MASK)
+
+// Hardware LPM capability
 #define USBXHCI_PROTCAP_USB2_HLC_GET(n) \
     (((n) >> USBXHCI_PROTCAP_USB2_HLC_BIT) & USBXHCI_PROTCAP_USB2_HLC_MASK)
+
+// Integrated hub implemented
 #define USBXHCI_PROTCAP_USB2_IHI_GET(n) \
     (((n) >> USBXHCI_PROTCAP_USB2_IHI_BIT) & USBXHCI_PROTCAP_USB2_IHI_MASK)
+
+// High speed only
 #define USBXHCI_PROTCAP_USB2_HSO_GET(n) \
     (((n) >> USBXHCI_PROTCAP_USB2_HSO_BIT) & USBXHCI_PROTCAP_USB2_HSO_MASK)
 
+
+// Hub depth
 #define USBXHCI_PROTCAP_USB2_MHD_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PROTCAP_USB2_MHD) | USBXHCI_PROTCAP_USB2_MHD_n((n)))
+
+// BESL LPM capability
 #define USBXHCI_PROTCAP_USB2_BLC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PROTCAP_USB2_BLC) | USBXHCI_PROTCAP_USB2_BLC_n((n)))
+
+// Hardware LPM capability
 #define USBXHCI_PROTCAP_USB2_HLC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PROTCAP_USB2_HLC) | USBXHCI_PROTCAP_USB2_HLC_n((n)))
+
+// Integrated hub implemented
 #define USBXHCI_PROTCAP_USB2_IHI_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PROTCAP_USB2_IHI) | USBXHCI_PROTCAP_USB2_IHI_n((n)))
+
+// High speed only
 #define USBXHCI_PROTCAP_USB2_HSO_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PROTCAP_USB2_HSO) | USBXHCI_PROTCAP_USB2_HSO_n((n)))
 

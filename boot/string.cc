@@ -4,8 +4,10 @@
 #include "malloc.h"
 #include "assert.h"
 
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__i386__)
 #define USE_REP_STRING
+#else
+#error No fast strings!
 #endif
 
 size_t strlen(char const *src)
@@ -152,6 +154,8 @@ void *memcpy_rev(void *dest, void const *src, size_t n)
             : "+S" (src)
             , "+D" (d)
             , "+c" (n)
+            :
+            : "memory"
         );
     } else {
         src = (char*)src + n - 4;
@@ -163,6 +167,8 @@ void *memcpy_rev(void *dest, void const *src, size_t n)
             : "+S" (src)
             , "+D" (d)
             , "+c" (n)
+            :
+            : "memory"
         );
     }
     return dest;
@@ -180,12 +186,14 @@ void *memmove(void *dest, void const *src, size_t n)
     char *d = (char*)dest;
     char const *s = (char const *)src;
 
-    if (d < s || s + n <= d)
-        return memcpy(d, s, n);
+    if (likely(n)) {
+        if (d < s || s + n <= d)
+            return memcpy(d, s, n);
 
-    if (d != s) {
-        for (size_t i = n; i; --i)
-            d[i-1] = s[i-1];
+        if (d != s) {
+            for (size_t i = n; i; --i)
+                d[i-1] = s[i-1];
+        }
     }
 
     return dest;
@@ -195,22 +203,19 @@ void *memset(void *dest, int c, size_t n)
 {
 #if 1
     char *d = (char*)dest;
-    if ((n & 3) == 0) {
-        n >>= 2;
-        __asm__ __volatile__ (
-            "rep stosl\n\t"
-            : "+D" (d)
-            , "+c" (n)
-            : "a" ((c & 0xFF) * 0x01010101)
-        );
-    } else {
-        __asm__ __volatile__ (
-            "rep stosb\n\t"
-            : "+D" (d)
-            , "+c" (n)
-            : "a" (c)
-        );
-    }
+    size_t remainder = n & 3;
+
+    n >>= 2;
+    __asm__ __volatile__ (
+        "rep stosl\n\t"
+        "mov %[remainder],%[count]\n\t"
+        "rep stosb\n\t"
+        : "+D" (d)
+        , [count] "+c" (n)
+        : "a" ((c & 0xFF) * 0x01010101)
+        , [remainder] "d" (remainder)
+        : "memory"
+    );
 #else
     char *p = (char*)dest;
     while (n--)
@@ -223,10 +228,14 @@ void *memset(void *dest, int c, size_t n)
 void *memcpy(void *dest, void const *src, size_t n)
 {
     void *ret = dest;
+    size_t remainder = n & 3;
+    n >>= 2;
     __asm__ __volatile__ (
+        "rep movsl\n\t"
+        "mov %[remainder],%[count]\n\t"
         "rep movsb\n\t"
-        : "+D" (dest), "+S" (src), "+c" (n)
-        :
+        : "+D" (dest), "+S" (src), [count] "+c" (n)
+        : [remainder] "d" (remainder)
         : "memory"
     );
     return ret;

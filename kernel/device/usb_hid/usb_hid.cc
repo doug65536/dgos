@@ -1,6 +1,3 @@
-
-
-
 #include "usb_hid.h"
 #include "dev_usb_ctl.h"
 #include "keyboard.h"
@@ -14,6 +11,8 @@
 #else
 #define USBHID_TRACE(...) ((void)0)
 #endif
+
+__BEGIN_ANONYMOUS
 
 class usb_hid_report_parser_t {
 public:
@@ -65,7 +64,7 @@ protected:
     uint8_t iface_idx;
 };
 
-class usb_hid_keybd_t final : public usb_hid_dev_t {
+class usb_hid_keybd_t final : public usb_hid_dev_t, public keybd_dev_t {
 public:
     usb_hid_keybd_t(usb_pipe_t const& control,
                     usb_pipe_t const& in,
@@ -84,7 +83,31 @@ private:
 
     uint8_t last_keybd_state[8];
     uint8_t this_keybd_state[phase_count][8];
+
+    // keybd_dev_t interface
+public:
+    int set_layout_name(const char *name) override final;
+    int get_modifiers() override final;
+    int set_indicators(int indicators) override final;
 };
+
+int usb_hid_keybd_t::set_layout_name(const char *name)
+{
+    // FIXME
+    return -int(errno_t::ENOTSUP);
+}
+
+int usb_hid_keybd_t::get_modifiers()
+{
+    // FIXME
+    return -int(errno_t::ENOTSUP);
+}
+
+int usb_hid_keybd_t::set_indicators(int indicators)
+{
+    // FIXME
+    return -int(errno_t::ENOTSUP);
+}
 
 class usb_hid_mouse_t final : public usb_hid_dev_t {
 public:
@@ -282,7 +305,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
         int sign = (((state[0] & mask) != 0) * 2) - 1;
 
         if (modifier_changes & mask)
-            fsa.deliver_vk(modifier_vk[i] * sign);
+            fsa.deliver_vk(keybd_id, modifier_vk[i] * sign);
     }
 
     // Scan for keys released since last event
@@ -302,7 +325,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
             USBHID_TRACE("keyup, scancode=%#x, vk=%#x\n", scancode, vk);
 
-            fsa.deliver_vk(-vk);
+            fsa.deliver_vk(keybd_id, -vk);
         }
     }
 
@@ -323,7 +346,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
         USBHID_TRACE("keydown, scancode=%#x, vk=%#x\n", scancode, vk);
 
-        fsa.deliver_vk(vk);
+        fsa.deliver_vk(keybd_id, vk);
     }
 
     memcpy(last_keybd_state, state, sizeof(last_keybd_state));
@@ -413,3 +436,5 @@ usb_hid_mouse_t::usb_hid_mouse_t(usb_pipe_t const& control,
 }
 
 usb_hid_class_drv_t usb_hid_class_drv_t::usb_hid;
+
+__END_ANONYMOUS

@@ -5,16 +5,166 @@
 #include <new>
 #include "../../user/include/utf.h"
 
-vga_console_ring_t::bit8_to_pixels_ptr vga_console_ring_t::bit8_to_pixels;
+__BEGIN_ANONYMOUS
 
-vga_console_ring_t::bit8_to_pixels_transparent_ptr 
-    vga_console_ring_t::bit8_to_pixels_transparent;
+#define CHARHEIGHT 16
+
+struct bitmap_glyph_t {
+    uint8_t bits[CHARHEIGHT];
+};
+
+class vga_font_t {
+public:
+
+    // Font dimensions in pixels
+    static constexpr uint32_t font_w = 9;
+    static constexpr uint32_t font_h = 16;
+
+    using bit8_to_pixels_ptr = void (*)
+        (uint32_t * restrict out, uint8_t bitmap, uint32_t bg, uint32_t fg);
+
+    using bit8_to_pixels_transparent_ptr = void (*)
+        (uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+
+    static bit8_to_pixels_ptr bit8_to_pixels_resolve();
+
+    static bit8_to_pixels_transparent_ptr bit8_to_pixels_transparent_resolve();
+
+    // Function pointers point to best function for runtime CPU
+    static bit8_to_pixels_ptr bit8_to_pixels;
+    static bit8_to_pixels_transparent_ptr bit8_to_pixels_transparent;
+
+    static void resolver();
+
+    size_t glyph_index(size_t codepoint);
+    bitmap_glyph_t const *get_glyph(char32_t codepoint);
+
+private:
+    static void bit8_to_pixels_generic(uint32_t * restrict out, uint8_t bitmap,
+                                       uint32_t bg, uint32_t fg);
+
+    static void bit8_to_pixels_sse(uint32_t * restrict out, uint8_t bitmap,
+                                   uint32_t bg, uint32_t fg);
+
+    static void bit8_to_pixels_avx2(uint32_t * restrict out, uint8_t bitmap,
+                                    uint32_t bg, uint32_t fg);
+
+    static void bit8_to_pixels_transparent_generic(
+            uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+
+    static void bit8_to_pixels_transparent_sse(
+            uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+
+    static void bit8_to_pixels_transparent_avx2(
+            uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+};
+
+vga_font_t::bit8_to_pixels_ptr vga_font_t::bit8_to_pixels;
+
+vga_font_t::bit8_to_pixels_transparent_ptr
+    vga_font_t::bit8_to_pixels_transparent;
 
 __attribute__((__constructor__))
-static void vga_console_ring_constructor()
+static void vga_font_constructor()
 {
-    vga_console_ring_t::resolver();
+    vga_font_t::resolver();
 }
+
+/// Scrolling text ring
+/// Represented as a circular ring of rows.
+/// Scrolling the display up is a zero copy operation, just clear the new
+/// line and advance the index to the oldest row. The start is moved down
+/// a row and the newly exposed old row is cleared.
+/// When the bottom of the ring and the top of the ring are in the viewport
+/// simultaneously, do a pair of blts. The top portion of the screen gets the
+/// portion from the first displayed row until the bottom of the surface,
+/// the bottom portion of the screen gets the remainder starting from the
+/// top of the surface.
+/// Renders a blinking cursor at any character position.
+/// Named VGA because it is specialized to draw VGA bitmap fonts fast.
+class vga_console_ring_t : public vga_console_t {
+public:
+    vga_console_ring_t(int32_t width, int32_t height);
+
+    void reset() final;
+    void new_line(uint32_t color) final;
+    void write(char const *data, size_t size,
+               uint32_t bg, uint32_t fg) final;
+    void render(fb_info_t *fb, int dx, int dy, int dw, int dh) final;
+
+    inline uint32_t wrap_row(uint32_t row) const
+    {
+        assert(row < ring_h * 2U);
+        return row < ring_h ? row : (row - ring_h);
+    }
+
+    inline uint32_t wrap_row_signed(uint32_t row) const
+    {
+        // "signed" meaning, handles the case where the row wrapped around
+        // past zero and became an enormous unsigned number
+        // unsigned(-1) would wrap around to the last row
+        // row must be within ring_h rows of a valid range off either end
+        assert(row + ring_h < ring_h * 3U);
+        return row >= -ring_h
+                ? row + ring_h
+                : row >= ring_h
+                  ? row - ring_h
+                  : row;
+    }
+
+    // Clear the specified row, in surface space
+    void clear_row(uint32_t row, uint32_t color);
+
+private:
+
+    // The place where writing text will go in surface space
+    // This is advanced by writing text and newlines
+    uint32_t out_x = 0, out_y = 0;
+
+    // Size of ring in glyphs
+    uint32_t ring_w, ring_h;
+
+    vga_font_t font;
+
+    // The row index of the top row when scrolled all the way to the top
+    uint32_t oldest_row;
+
+    // The distance from the oldest row to the row at the top of the screen
+    uint32_t scroll_top;
+
+    // The y coordinates and heights of the region visible on
+    // top region (band0) and bottom region (band1) of the screen
+    uint32_t band0_y, band0_h;
+    uint32_t band1_y, band1_h;
+
+    // Number of rows actually emitted to the output
+    // Indicates how much of the surface has actually been initialized
+    uint32_t row_count;
+
+    // The standard VGA blinked every 16 frames,
+    // 16/60 blinks per second, 266 and 2/3 ms per blink, 3.75 blinks/sec
+    uint32_t blink_cycle_ns = 266666666;
+
+    // A flashing cursor is shown at this location
+    uint32_t crsr_x, crsr_y;
+
+    // The start and end scanline of the cursor in the character cell
+    uint32_t crsr_s, crsr_e;
+};
+
+// Record that represents a single box of area on the screen
+struct comp_area_t {
+    // This screen area...
+    int32_t sy;
+    int32_t sx;
+    int32_t ey;
+    int32_t ex;
+
+    // ...contains this area of this surface
+    surface_t *surface;
+    int32_t y;
+    int32_t x;
+};
 
 // The screen is decomposed into a series of boxes that
 // correspond to offscreen surface areas
@@ -292,6 +442,8 @@ static bool area_insert(comp_area_t *area)
     return area_insert_at(area, comp_areas_size);
 }
 
+__END_ANONYMOUS
+
 //
 // Public API
 
@@ -391,7 +543,7 @@ surface_t *surface_create(int32_t width, int32_t height)
 }
 
 vga_console_ring_t::vga_console_ring_t(int32_t width, int32_t height)
-    : surface_t(width, height, (uint32_t*)(this + 1))
+    : vga_console_t(width, height, (uint32_t*)(this + 1))
 {
 }
 
@@ -424,7 +576,26 @@ void vga_console_ring_t::new_line(uint32_t color)
     clear_row(exposed_row, color);
 }
 
-void vga_console_ring_t::resolver()
+vga_font_t::bit8_to_pixels_ptr vga_font_t::bit8_to_pixels_resolve()
+{
+    return __builtin_cpu_supports("avx2")
+            ? bit8_to_pixels_avx2
+            : __builtin_cpu_supports("sse2")
+              ? bit8_to_pixels_sse
+              : bit8_to_pixels_generic;
+}
+
+vga_font_t::bit8_to_pixels_transparent_ptr
+vga_font_t::bit8_to_pixels_transparent_resolve()
+{
+    return __builtin_cpu_supports("avx2")
+            ? &vga_font_t::bit8_to_pixels_transparent_avx2
+            : __builtin_cpu_supports("sse2")
+              ? &vga_font_t::bit8_to_pixels_transparent_sse
+              : &vga_font_t::bit8_to_pixels_transparent_generic;
+}
+
+void vga_font_t::resolver()
 {
     bit8_to_pixels_resolve();
     bit8_to_pixels_transparent_resolve();
@@ -463,9 +634,9 @@ void vga_console_ring_t::clear_row(uint32_t row, uint32_t color)
 {
     assert(row < ring_h);
     uint32_t sx = 0;
-    uint32_t sy = row * font_h;
-    uint32_t ex = ring_w * font_w;
-    uint32_t ey = sy + font_h;
+    uint32_t sy = row * font.font_h;
+    uint32_t ex = ring_w * font.font_w;
+    uint32_t ey = sy + font.font_h;
 
     fill(sx, sy, ex, ey, color);
 }
@@ -474,7 +645,7 @@ void vga_console_ring_t::clear_row(uint32_t row, uint32_t color)
 #include <immintrin.h>
 #endif
 
-void vga_console_ring_t::bit8_to_pixels_generic(
+void vga_font_t::bit8_to_pixels_generic(
         uint32_t * restrict out, uint8_t bitmap,
         uint32_t bg, uint32_t fg)
 {
@@ -485,10 +656,10 @@ void vga_console_ring_t::bit8_to_pixels_generic(
     out[4] = bitmap & 0x08 ? fg : bg;
     out[5] = bitmap & 0x04 ? fg : bg;
     out[6] = bitmap & 0x02 ? fg : bg;
-    out[7] = bitmap & 0x01 ? fg : bg;    
+    out[7] = bitmap & 0x01 ? fg : bg;
 }
 
-void vga_console_ring_t::bit8_to_pixels_transparent_generic(
+void vga_font_t::bit8_to_pixels_transparent_generic(
         uint32_t * restrict out, uint8_t bitmap,
         uint32_t fg)
 {
@@ -503,7 +674,7 @@ void vga_console_ring_t::bit8_to_pixels_transparent_generic(
 }
 
 __attribute__((__target__("sse2")))
-void vga_console_ring_t::bit8_to_pixels_sse(
+void vga_font_t::bit8_to_pixels_sse(
         uint32_t * restrict out, uint8_t bitmap,
         uint32_t bg, uint32_t fg)
 {
@@ -542,16 +713,16 @@ void vga_console_ring_t::bit8_to_pixels_sse(
 }
 
 __attribute__((__target__("avx2")))
-void vga_console_ring_t::bit8_to_pixels_avx2(
+void vga_font_t::bit8_to_pixels_avx2(
         uint32_t * restrict out, uint8_t bitmap, uint32_t fg, uint32_t bg)
 {
     // Load bitmap into all lanes
     __m256i map = _mm256_set1_epi32(bitmap);
-    
+
     // Generate mask that checks one bit in each lane
-    __m256i mask = _mm256_set_epi32(0x80, 0x40, 0x20, 0x10, 
+    __m256i mask = _mm256_set_epi32(0x80, 0x40, 0x20, 0x10,
                                     0x08, 0x04, 0x02, 0x01);
-    
+
     // Make a value that is not zero if the bit is set for this lane
     mask = _mm256_and_si256(mask, map);
 
@@ -568,13 +739,13 @@ void vga_console_ring_t::bit8_to_pixels_avx2(
     // the bitmap bit for this lane was set
     mask = _mm256_or_si256(_mm256_and_si256(bgs, mask),
                           _mm256_andnot_si256(fgs, mask));
-    
+
     // Store 8 pixels
     _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(out), mask);
 }
 
 __attribute__((__target__("sse2")))
-void vga_console_ring_t::bit8_to_pixels_transparent_sse(
+void vga_font_t::bit8_to_pixels_transparent_sse(
         uint32_t * restrict out, uint8_t bitmap, uint32_t fg)
 {
     // Load existing pixels for transparency merge
@@ -583,11 +754,11 @@ void vga_console_ring_t::bit8_to_pixels_transparent_sse(
 
     // Load bitmap into all lanes
     __m128i map = _mm_set1_epi32(bitmap);
-    
+
     // Generate mask that checks one bit in each lane
     __m128i lomask = _mm_set_epi32(0x8, 0x4, 0x2, 0x1);
     __m128i himask = _mm_slli_epi32(lomask, 4);
-    
+
     // Make a value that is not zero if the bit is set for this lane
     lomask = _mm_and_si128(lomask, map);
     himask = _mm_and_si128(himask, map);
@@ -606,14 +777,14 @@ void vga_console_ring_t::bit8_to_pixels_transparent_sse(
                           _mm_andnot_si128(fgs, lomask));
     // Store low pixels
     _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out), lomask);
-    
+
     himask = _mm_or_si128(_mm_and_si128(hibg, himask),
                           _mm_andnot_si128(fgs, himask));
-    _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out + 4), himask);    
+    _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out + 4), himask);
 }
 
 __attribute__((__target__("avx2")))
-void vga_console_ring_t::bit8_to_pixels_transparent_avx2(
+void vga_font_t::bit8_to_pixels_transparent_avx2(
         uint32_t * restrict out, uint8_t bitmap, uint32_t fg)
 {
     // Load existing pixels for transparency merge
@@ -621,11 +792,11 @@ void vga_console_ring_t::bit8_to_pixels_transparent_avx2(
 
     // Load bitmap into all lanes
     __m256i map = _mm256_set1_epi32(bitmap);
-    
+
     // Generate mask that checks one bit in each lane
-    __m256i mask = _mm256_set_epi32(0x80, 0x40, 0x20, 0x10, 
+    __m256i mask = _mm256_set_epi32(0x80, 0x40, 0x20, 0x10,
                                       0x08, 0x04, 0x02, 0x01);
-    
+
     // Make a value that is not zero if the bit is set for this lane
     mask = _mm256_and_si256(mask, map);
 
@@ -669,18 +840,20 @@ void vga_console_ring_t::write(const char *data, size_t size,
 
         // Draw glyph into surface
 
-        uint32_t *row = pixels + width * font_h * out_y + font_w * out_x;
+        uint32_t *row = pixels +
+                width * font.font_h * out_y +
+                font.font_w * out_x;
 
         // Doing loop interchange to write whole cache line of output across
         // Doing 0th scanline of each glyph, then 1st of each, then 2nd, etc
 
-        for (size_t y = 0; y < 16; ++y, row += width) {
+        for (size_t y = 0; y < font.font_h; ++y, row += width) {
             // Scanline
 
             uint32_t *out = row;
 
-            for (size_t i = 0; i < cp; ++i, out += font_w)
-                bit8_to_pixels(out, glyphs[i]->bits[y], bg, fg);
+            for (size_t i = 0; i < cp; ++i, out += font.font_w)
+                vga_font_t::bit8_to_pixels(out, glyphs[i]->bits[y], bg, fg);
         }
 
         out_x += cp;
@@ -732,3 +905,15 @@ void surface_t::fill(uint32_t sx, uint32_t sy,
 // (adds 3 rect) 25%
 // (adds 0 rect) 6.25%
 // (adds 4 rect) 6.25%
+
+vga_console_t *vga_console_factory_t::create(int32_t w, int32_t h)
+{
+    vga_console_ring_t *console = new (w * 9, h * 16)
+            vga_console_ring_t(w * 9, h * 16);
+    return console;
+}
+
+void vga_console_ring_t::render(fb_info_t *fb, int dx, int dy, int dw, int dh)
+{
+
+}

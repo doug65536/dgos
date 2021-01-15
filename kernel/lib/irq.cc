@@ -34,12 +34,12 @@ uint16_t sse_avx512_xregs_offset;
 uint16_t sse_avx512_xregs_size;
 
 // Singly linked list head for each interrupt
-static intr_link_t intr_first[256];
+static intr_link_t intr_first[INTR_COUNT];
 
 // Unmask count for each interrupt
-static uint8_t intr_unmask_count[256];
+static uint8_t intr_unmask_count[INTR_COUNT];
 
-// Interrupt handler vectors
+// Interrupt handler vectors, could be large from IRQ sharing
 #define MAX_INTR_HANDLERS   256
 static intr_link_t intr_first_free;
 static intr_link_t intr_handlers_count;

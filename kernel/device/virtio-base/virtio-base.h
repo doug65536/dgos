@@ -109,20 +109,27 @@ public:
               uint32_t notify_off_multiplier,
               uint16_t msix_vector);
 
-    desc_t *alloc_desc(bool dev_writable);
-
-    void alloc_multiple(desc_t **descs, size_t count);
-
     uint16_t index_of(desc_t *desc) const
     {
         return desc - desc_tab;
     }
 
-    void enqueue_avail(desc_t **desc, size_t count, virtio_iocp_t *iocp);
-
     void sendrecv(void const *sent_data, size_t sent_size,
                   void *rcvd_data, size_t rcvd_size,
                   virtio_iocp_t *iocp);
+
+    _use_result
+    bool sendrecv(void const *sent_data, size_t sent_size,
+                  void *rcvd_data, size_t rcvd_size,
+                  virtio_iocp_t *iocp, uint64_t timeout_time_ns);
+
+    _use_result
+    bool sendrecv(void const *sent_data, size_t sent_size,
+                  void *rcvd_data, size_t rcvd_size,
+                  int64_t timeout_time_ns);
+
+    void sendrecv(void const *sent_data, size_t sent_size,
+                  void *rcvd_data, size_t rcvd_size);
 
     void recycle_used();
 
@@ -131,9 +138,22 @@ public:
         return log2_queue_size;
     }
 
+
+    bool alloc_multiple(desc_t **descs, size_t count,
+                        int64_t timeout_time_ns = INT64_MAX);
+
+    void enqueue_avail(desc_t **desc, size_t count, virtio_iocp_t *iocp);
+
 private:
     using lock_type = ext::noirq_lock<ext::spinlock>;
     using scoped_lock = ext::unique_lock<lock_type>;
+
+    desc_t *alloc_desc(bool dev_writable, scoped_lock &lock);
+
+    void enqueue_avail(desc_t **desc, size_t count, virtio_iocp_t *iocp, scoped_lock &lock);
+
+    bool wait_for_descriptors(size_t count, int64_t timeout_time_ns,
+                              scoped_lock &lock);
 
     lock_type queue_lock;
     ext::condition_variable queue_not_full;

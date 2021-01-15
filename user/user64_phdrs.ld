@@ -140,7 +140,6 @@ SECTIONS {
 
 	PROVIDE_HIDDEN(__image_end = .);
 
-/*
 	.debug          0 : { *(.debug)         } :NONE
 	.debug_info		0 : { *(.debug_info)    } :NONE
 	.debug_abbrev	0 : { *(.debug_abbrev)  } :NONE
@@ -152,7 +151,6 @@ SECTIONS {
 	.debug_str		0 : { *(.debug_str)     } :NONE
 	.debug_loc		0 : { *(.debug_loc)     } :NONE
 	.comment        0 : { *(.comment)       } :NONE
-*/
 
 	/DISCARD/       : { *(.comment)       }
 }

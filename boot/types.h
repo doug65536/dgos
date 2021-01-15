@@ -88,6 +88,6 @@ typedef char tchar;
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE_BIT   12
-#define PAGE_SIZE       (size_t(1) << PAGE_SIZE_BIT)
+#define PAGE_SIZE       4096
 #define PAGE_MASK       (PAGE_SIZE - 1)
 #endif

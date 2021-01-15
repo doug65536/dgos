@@ -3,10 +3,38 @@
 #include "mmu.h"
 #include "bootinfo.h"
 #include "contig_alloc.h"
+#include "engunit.h"
+
+constexpr uintptr_t const oneGB = 1 << (12+9+9);
+constexpr uintptr_t const twoMB = 1 << (12+9);
+constexpr uintptr_t const fourK = 1 << (12);
 
 #if 0
 
 __BEGIN_ANONYMOUS
+
+/// Hierarchy of multiple allocators, one per large page size
+///
+/// 1GB pages, 2MB pages, 4KB pages
+///
+/// All available memory is added to the appropriate pools
+/// When a page is needed and none are available, a page of the next larger
+/// size is shattered into the next smaller page size.
+///
+/// When all of the pages in the region are freed, the larger region becomes
+/// free again. This is accomplished by two arrays.
+///
+/// The L1 table is the largest page size, each entry covers
+/// 1GB of physical memory. A completely free L1 entry has
+/// 512*512 pages (262144) as the freecount
+///
+/// The L2 table is the next smaller page size, each entry covers 2MB of
+/// physical memory. A completely free L2 entry has 512 as the freecount.
+///
+/// Allocating a 4KB page decrements the corresponding L1 and L0 entries
+/// by one, and freeing a 4KB page increments the entries. Freeing a 2MB
+/// page adds 512 to L2 and L1. Freeing a 1GB page adds 262144 to L1.
+///
 
 struct bump_allocator_t {
     uint64_t start;
@@ -96,6 +124,7 @@ static void mmu_init(int ap)
 
         uint64_t aligned_st = (ranges[i].base + (PAGESIZE - 1)) & -PAGESIZE;
 
+        // Ignore memory below 1MB
         if (aligned_st < 0x100000)
             continue;
 
@@ -107,14 +136,17 @@ static void mmu_init(int ap)
         if (unlikely(!aligned_sz))
             continue;
 
+        // If availble, update free and total sums
         if (ranges[i].type == PHYSMEM_TYPE_NORMAL) {
             free_mem += aligned_sz;
             total_mem += aligned_sz;
         }
 
+        // If allocated, just update total sum
         if (ranges[i].type == PHYSMEM_TYPE_ALLOCATED)
             total_mem += aligned_sz;
 
+        // If the end of this is past the highest usable address so far
         if (top_mem < aligned_en &&
                 (ranges[i].type == PHYSMEM_TYPE_ALLOCATED ||
                  ranges[i].type == PHYSMEM_TYPE_NORMAL))
@@ -127,16 +159,44 @@ static void mmu_init(int ap)
     // 512 PTEs per page table, assume half wasted (256 used entries per page)
     uint64_t max_page_tables = max_mapped_4k_pages >> 8;
 
-    printdbg("Reserving %" PRIu64 " pages"
-             " for page table pool\n", max_page_tables);
+    uint64_t used_mem = total_mem - free_mem;
 
+    constexpr char const *format = "%5s %13" PRIx64 " %4siB\n";
 
+    printdbg(format, "Top", top_mem, engineering_t(top_mem, 0).ptr());
+    printdbg(format, "Free", free_mem, engineering_t(free_mem, 0).ptr());
+    printdbg(format, "Used", used_mem, engineering_t(used_mem, 0).ptr());
+    printdbg(format, "Total", total_mem, engineering_t(total_mem, 0).ptr());
+
+    printdbg("Reserving %" PRIu64 " pages (%siB)"
+             " for page table pool\n", max_page_tables,
+             engineering_t(max_page_tables << PAGE_SCALE).ptr());
 }
 
 _constructor(ctor_mmu_init)
 static void mmu_init_bsp()
 {
     mmu_init(0);
+}
+
+KERNEL_API uintptr_t mm_alloc_contiguous(size_t size)
+{
+    return 0;
+}
+
+KERNEL_API void *mmap_register_device(void *context,
+                                      uint64_t block_size,
+                                      uint64_t block_count,
+                                      int prot,
+                                      mm_dev_mapping_callback_t callback,
+                                      void *addr)
+{
+    return nullptr;
+}
+
+KERNEL_API void mm_free_contiguous(uintptr_t addr, size_t size)
+{
+
 }
 
 uintptr_t mm_fork_kernel_text()
@@ -171,7 +231,7 @@ int madvise(void *addr, size_t len, int advice)
     return -1;
 }
 
-int msync(const void *addr, size_t len, int flags)
+int msync(void const *addr, size_t len, int flags)
 {
     return -1;
 }
@@ -205,6 +265,36 @@ void mm_free_hole(uintptr_t addr, size_t size)
 }
 
 uintptr_t mphysaddr(void const volatile *addr)
+{
+    return 0;
+}
+
+size_t mphysranges(
+        mmphysrange_t *ranges, size_t ranges_count,
+        void const *addr, size_t size, size_t max_size)
+{
+    return 0;
+}
+
+bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
+                       size_t count_limit, uint8_t log2_boundary)
+{
+    return false;
+}
+
+size_t mphysranges_total(mmphysrange_t *ranges, size_t ranges_count)
+{
+    return 0;
+}
+
+void *mmap_window(size_t size)
+{
+    return nullptr;
+}
+
+int alias_window(void *addr, size_t size,
+                 mmphysrange_t const *ranges,
+                 size_t range_count)
 {
     return 0;
 }
@@ -799,9 +889,9 @@ static _always_inline constexpr T *init_phys(uint64_t addr)
 
     // Physical mappings at highest 512GB boundary
     // that is >= 512GB before .text
-    assert(addr < kernel_params->phys_mapping_sz);
+    assert(addr < bootinfo_parameter(bootparam_t::phys_mapping_sz));
 
-    uint64_t physmap = kernel_params->phys_mapping;
+    uint64_t physmap = bootinfo_parameter(bootparam_t::phys_mapping);
 
     return (T*)(physmap + addr);
 }
@@ -942,7 +1032,7 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
         for (int i = 0; i < 3; ++i) {
             pte = *ptes[i];
 
-            if (!pte) {
+            if (likely(!pte)) {
                 physaddr_t ptaddr = init_take_page();
                 clear_phys(ptaddr);
                 *ptes[i] = (ptaddr | path_flags) & global_mask;
@@ -1384,11 +1474,64 @@ static void mmu_configure_pat(void)
 #define TRACE_INIT(...) ((void)0)
 #endif
 
-static bool mmu_init_pagedir(size_t idx, uint8_t log2_pagesz, physaddr_t paddr)
+// Up to 16 ranges of physical memory reserved for large pages
+static mmphysrange_t mm_large_page_pool[16];
+static size_t mm_large_page_pool_count;
+
+static void mmu_take_large_pages()
 {
-    clear_phys(paddr);
-    PT0_PTR[idx + 256] = paddr | PTE_WRITABLE | PTE_PRESENT;
-    return true;
+    uint64_t wanted = thread_cpu_count();
+
+    // Take from the highest addresses
+    for (size_t i = usable_early_mem_ranges; i > 0 &&
+         mm_large_page_pool_count < countof(mm_large_page_pool); ++i) {
+        physmem_range_t &range = early_mem_ranges[i - 1];
+
+        // Look for usable
+        if (unlikely(range.type != PHYSMEM_TYPE_NORMAL))
+            continue;
+
+        // Round end down to 2MB boundary
+        uint64_t en = (range.base + range.size) & -twoMB;
+
+        // Round start up to 2MB boundary
+        uint64_t st = (range.base + (twoMB - 1)) & -twoMB;
+
+        uint64_t sz = st < en ? en - st : 0;
+
+        if (sz > 0) {
+            // Get some 2MB pages
+            uint64_t count = sz / twoMB;
+
+            uint64_t leftover_before = st - range.base;
+            uint64_t leftover_after = (range.base + range.size) - en;
+
+            // Calculate how many entries we are adding
+            // The existing entry is going to become allocated
+            size_t adding = leftover_after > 0;
+            adding += leftover_before > 0;
+
+            physmem_range_t before{};
+
+            if (leftover_before) {
+                before.base = st;
+                before.size = st - range.base;
+                before.type = PHYSMEM_TYPE_NORMAL;
+                before.valid = 1;
+            }
+
+            physmem_range_t after{};
+
+            if (leftover_after) {
+                after.base = en;
+                after.size = (range.base + range.size) - en;
+                after.type = PHYSMEM_TYPE_NORMAL;
+                after.valid = 1;
+            }
+
+            break;
+        }
+    }
 }
 
 static void mmu_init()
@@ -1404,19 +1547,38 @@ static void mmu_init()
     intr_hook(INTR_IPI_TLB_SHTDN, mmu_tlb_shootdown_handler,
               "sw_tlbshoot", eoi_lapic);
 
-    if (unlikely(sizeof(*phys_mem_map) * kernel_params->phys_mem_table_size >
-                 sizeof(phys_mem_map))) {
+    size_t const phys_mem_table_size =
+            bootinfo_parameter(bootparam_t::phys_mem_table_size);
+
+    physmem_range_t const * const table =
+            (physmem_range_t const *)bootinfo_parameter(
+                bootparam_t::phys_mem_table);
+
+    if (unlikely(sizeof(*phys_mem_map) * phys_mem_table_size >
+            sizeof(phys_mem_map))) {
         printk("Warning: Memory map is too large to fit\n");
     }
 
-    memcpy(phys_mem_map, kernel_params->phys_mem_table,
-           ext::min(sizeof(phys_mem_map), sizeof(*phys_mem_map) *
-                           kernel_params->phys_mem_table_size));
+    for (size_t i = 0; i < phys_mem_table_size; ++i) {
+        physmem_range_t const &range = table[i];
+        printdbg("raw physmem:"
+                 " base=%16" PRIx64
+                 " size=%16" PRIx64
+                 " type=%s\n",
+                 range.base, range.size,
+                 range.type < physmem_names_count
+                 ? physmem_names[range.type]
+                 : "<unknown>");
+    }
 
-    if (unlikely(kernel_params->phys_mem_table_size > countof(phys_mem_map)))
+    memcpy(phys_mem_map, table,
+           ext::min(sizeof(phys_mem_map), sizeof(*phys_mem_map) *
+                    phys_mem_table_size));
+
+    if (unlikely(phys_mem_table_size > countof(phys_mem_map)))
         printdbg("Memory map exceeded static sized in-kernel buffer\n");
 
-    phys_mem_map_count = ext::min(kernel_params->phys_mem_table_size,
+    phys_mem_map_count = ext::min(phys_mem_table_size,
                                   countof(phys_mem_map));
 
     usable_early_mem_ranges = mmu_fixup_mem_map(
@@ -1427,6 +1589,7 @@ static void mmu_init()
         usable_early_mem_ranges = countof(early_mem_ranges);
     }
 
+
     for (physmem_range_t *ranges_in = phys_mem_map,
          *ranges_out = early_mem_ranges;
          ranges_out < early_mem_ranges + usable_early_mem_ranges;
@@ -1434,6 +1597,8 @@ static void mmu_init()
         if (ranges_in->type == PHYSMEM_TYPE_NORMAL)
             *ranges_out++ = *ranges_in;
     }
+
+    mmu_take_large_pages();
 
     size_t usable_pages = 0;
     physaddr_t highest_usable = 0;
@@ -1519,7 +1684,8 @@ static void mmu_init()
 
             if (range.size == 0) {
                 memmove(early_mem_ranges + i - 1, early_mem_ranges + i,
-                        sizeof(*early_mem_ranges) * --usable_early_mem_ranges - i);
+                        sizeof(*early_mem_ranges) *
+                        --usable_early_mem_ranges - i);
             }
 
             break;
@@ -1581,6 +1747,9 @@ static void mmu_init()
     malloc_startup(nullptr);
 
     assert(malloc_validate(false));
+
+    // Round linear base up to 2MB boundary
+    linear_base = (linear_base + twoMB - 1) & -twoMB;
 
     uintptr_t kmembase = linear_allocator.early_init(
                 min_kern_addr - linear_base, "linear_allocator");
@@ -1659,8 +1828,11 @@ static void mmu_init()
         }
     }
 
+    uint64_t phys_mapping_sz = bootinfo_parameter(
+                bootparam_t::phys_mapping_sz);
+
     // Unmap physical mapping of first 4GB
-    munmap(init_phys<void>(0), kernel_params->phys_mapping_sz);
+    munmap(init_phys<void>(0), phys_mapping_sz);
     cpu_tlb_flush();
 
     callout_call(callout_type_t::vmm_ready);
@@ -1830,10 +2002,10 @@ static pte_t *mm_create_pagetables_aligned(
     pte_t *pte_st[4];
     pte_t *pte_en[4];
 
-    uintptr_t const end = start + size - 1;
+    uintptr_t const last = start + size - 1;
 
     ptes_from_addr(pte_st, start);
-    ptes_from_addr(pte_en, end);
+    ptes_from_addr(pte_en, last);
 
     // Fastpath small allocations fully within a 2MB region,
     // where there is nothing to do
@@ -1866,8 +2038,10 @@ static pte_t *mm_create_pagetables_aligned(
 
     for (unsigned level = 0; level < levels; ++level) {
         pte_t * const base = pte_st[level];
+
         // Plus one because it is an inclusive end, not half open range
         size_t const range_count = (pte_en[level] - base) + 1;
+
         for (size_t i = 0; i < range_count; ++i) {
             pte_t old = base[i];
             if (!(old & PTE_PRESENT)) {
@@ -1915,7 +2089,8 @@ static _always_inline T select_mask(bool cond, T true_val, T false_val)
 
 KERNEL_API void *mm_alloc_space(size_t size)
 {
-    return (void*)linear_allocator.alloc_linear(round_up(size));
+    size = round_up(size);
+    return (void*)linear_allocator.alloc_linear(size);
 }
 
 void *mmap(void *addr, size_t len, int prot,
@@ -2000,10 +2175,6 @@ void *mmap(void *addr, size_t len, int prot,
     PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
 
     linaddr_t linear_addr;
-
-    uintptr_t const oneGB = 1 << (12+9+9);
-    uintptr_t const twoMB = 1 << (12+9);
-    uintptr_t const fourK = 1 << (12);
 
     if (likely(!addr || (flags & MAP_PHYSICAL))) {
         if (likely(!(flags & MAP_HUGETLB))) {
@@ -2115,7 +2286,7 @@ void *mmap(void *addr, size_t len, int prot,
                 return MAP_FAILED;
             }
         } else if (!(flags & MAP_PHYSICAL)) {
-            // Demand paged
+            // Demand paged or comitted
 
             size_t ofs = 0;
             pte_t pte;
@@ -2287,14 +2458,14 @@ void *mmap(void *addr, size_t len, int prot,
         for (size_t ofs = len; ofs > 0; ofs -= PAGE_SIZE)
         {
             if (likely(!(flags & MAP_PHYSICAL))) {
-                // Allocate normal memory
+                // Allocate normal memory early
 
                 // Not present pages with max physaddr are demand committed
                 physaddr_t page = PTE_ADDR;
 
                 // If populating, assign physical memory immediately
                 // Always commit first page immediately
-                if (ofs == PAGE_SIZE || unlikely(flags & MAP_POPULATE)) {
+                if (unlikely((ofs == PAGE_SIZE) || (flags & MAP_POPULATE))) {
                     page = init_take_page();
                     assert(page != 0);
                     if (likely(!(flags & MAP_UNINITIALIZED)))
@@ -2302,7 +2473,7 @@ void *mmap(void *addr, size_t len, int prot,
                 }
 
                 mmu_map_page(linear_addr + ofs - PAGE_SIZE, page, page_flags |
-                             ((ofs == 0) & PTE_PRESENT));
+                             (-(ofs == 0) & PTE_PRESENT));
             } else {
                 // addr is a physical address, caller uses
                 // returned linear address to access it
@@ -3071,6 +3242,14 @@ static _always_inline int mphysranges_callback(
     }
 
     return 1;
+}
+
+size_t mphysranges_total(mmphysrange_t *ranges, size_t ranges_count)
+{
+    size_t total = 0;
+    for (size_t i = 0; i < ranges_count; ++i)
+        total += ranges[i].size;
+    return total;
 }
 
 size_t mphysranges(

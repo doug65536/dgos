@@ -318,8 +318,8 @@ SECTIONS {
 	/DISCARD/		0 : { *(.comment)       } :readonly
 */
 
-/*
 	/DISCARD/		0 : { *(.interp)               }
+/*
 	/DISCARD/		0 : { *(.gnu*)                 }
 	/DISCARD/		0 : { *(.comment)              }
 	/DISCARD/		0 : { *(.note.gnu.build-id)    }

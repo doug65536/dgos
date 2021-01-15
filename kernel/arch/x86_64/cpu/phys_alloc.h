@@ -60,6 +60,9 @@ public:
             if (unlikely(!addr || addr == PTE_ADDR))
                 return;
 
+            assert(addr >= 0x100000);
+            assert(addr < UINT64_C(0x0010000000000000));
+
             if (unlikely(count == countof(pages)))
                 flush();
 

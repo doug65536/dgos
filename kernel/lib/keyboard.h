@@ -159,11 +159,14 @@ typedef enum keyboard_virtual_key_t {
 struct keyboard_event_t {
     // Positive values indicate keydown/repeat
     // Negative values indicate keyup
-    uint64_t timestamp;
     int vk;
     int codepoint;
 
+    uint64_t timestamp;
+    size_t keybd_id;
+
     int flags;
+    int reserved;
 };
 
 // Mouse events use these too:
@@ -220,16 +223,19 @@ keyboard_event_t keybd_waitevent(
         ext::chrono::steady_clock::time_point const& timeout_time);
 keyboard_event_t keybd_waitevent();
 
-class keybd_dev_t {
-    virtual int set_layout_name(char const *name);
-    virtual int get_modifiers(char const *name);
-    virtual int set_indicators(int indicators);
+class KERNEL_API keybd_dev_t {
+public:
+    virtual int set_layout_name(char const *name) = 0;
+    virtual int get_modifiers() = 0;
+    virtual int set_indicators(int indicators) = 0;
+
+    size_t keybd_id;
 };
 
 // Plugged in by drivers
-KERNEL_API extern int (*keybd_set_layout_name)(char const *name);
-KERNEL_API extern int (*keybd_get_modifiers)(void);
-KERNEL_API extern int (*keybd_set_indicators)(int indicators);
+//KERNEL_API extern int (*keybd_set_layout_name)(char const *name);
+//KERNEL_API extern int (*keybd_get_modifiers)(void);
+//KERNEL_API extern int (*keybd_set_indicators)(int indicators);
 
 void keybd_init(void);
 
@@ -237,7 +243,7 @@ class KERNEL_API keybd_fsa_t {
 public:
     keybd_fsa_t();
 
-    void deliver_vk(int vk);
+    void deliver_vk(size_t keybd_id, int vk);
 
     int get_modifiers(void);
 
@@ -254,3 +260,5 @@ private:
     uint8_t shift_state;
 };
 
+KERNEL_API int keybd_add(keybd_dev_t *keybd_dev);
+KERNEL_API bool keybd_remove(keybd_dev_t *keybd_dev);

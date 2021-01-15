@@ -1061,7 +1061,7 @@ private:
     bool poll_tx_empty(bool past_min, clock::time_point timeout);
 
     _noinline
-    void send_block(const void *buf, size_t block_size);
+    void send_block(void const *buf, size_t block_size);
 
     static constexpr uint8_t log2_buffer_size = 7;
     uint8_t rx_buffer[1 << log2_buffer_size];

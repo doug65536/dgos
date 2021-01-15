@@ -61,6 +61,8 @@ PCI_DRIVER(rtl8139,
 #define RTL8139_MM_RD_32(reg) \
     rtl8139_mm_in_32(reg)
 
+__BEGIN_ANONYMOUS
+
 struct rtl8139_factory_t : public eth_dev_factory_t {
     rtl8139_factory_t() : eth_dev_factory_t("rtl8139") {}
     virtual int detect(eth_dev_base_t ***result) override;
@@ -81,14 +83,14 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     _always_inline void rtl8139_mm_out_8(uint32_t reg, uint8_t val)
     {
         RTL8139_MMIO(uint8_t, reg) = val;
-        atomic_barrier();
+        compiler_barrier();
     }
 
     _used
     _always_inline void rtl8139_mm_out_16(uint32_t reg, uint16_t val)
     {
         RTL8139_MMIO(uint16_t, reg) = val;
-        atomic_barrier();
+        compiler_barrier();
     }
 
     _used
@@ -885,3 +887,5 @@ static void rtl8139_startup()
 #endif
 
 static rtl8139_factory_t rtl8139_factory;
+
+__END_ANONYMOUS

@@ -17,3 +17,16 @@ struct physmem_range_t {
 // Custom types
 #define PHYSMEM_TYPE_ALLOCATED      6
 #define PHYSMEM_TYPE_BOOTLOADER     7
+
+static const char *physmem_names[] = {
+    "<zero>",
+    "NORMAL",
+    "UNUSABLE",
+    "RECLAIMABLE",
+    "NVS",
+    "BAD",
+
+    "ALLOCATED",
+    "BOOTLOADER"
+};
+static const size_t physmem_names_count = countof(physmem_names);
