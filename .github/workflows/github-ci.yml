@@ -22,7 +22,7 @@ jobs:
       shell: bash
 
     - uses: actions/checkout@v2
-    
+
     - name: dependencies
       run: sudo apt-get update && sudo apt-get install lemon mtools genisoimage qemu-system-x86 cpu-checker
 
@@ -42,7 +42,7 @@ jobs:
       # bootstrap runs whether or not we got cached toolchain - it skips as necessary
 
     - name: disks
-      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc))
+      run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc)
 
     - uses: actions/upload-artifact@v2
       with:
