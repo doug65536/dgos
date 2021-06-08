@@ -1,7 +1,7 @@
 #include "spinlock.h"
 #include "atomic.h"
 #include "assert.h"
-#include "control_regs.h"
+#include "cpu/control_regs.h"
 #include "printk.h"
 #include "export.h"
 #include "thread.h"
@@ -307,7 +307,7 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock,
 
     atomic_st_rel(&node->next, nullptr);
 
-    if (atomic_cmpxchg(lock, nullptr, node) == nullptr)
+    if (likely(atomic_cmpxchg(lock, nullptr, node) == nullptr))
         return true;
 
     cs_leave();

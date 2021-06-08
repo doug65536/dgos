@@ -18,9 +18,9 @@ SRCS := $(ASRCS) $(CSRCS)
 
 OBJS := $(AOBJS) $(COBJS)
 
-LINKERSCRIPT ?= $(BUILDROOT)/arch/$(ARCH)/module.ld
+LINKERSCRIPT ?= $(BUILDROOT)/arch/@ARCH@/module.ld
 
-KERNELINCLUDES := arch/$(ARCH) lib net $(BUILDROOT)
+KERNELINCLUDES := arch/@ARCH@ lib net $(BUILDROOT)
 INCS := $(INCS) $(patsubst %,$(BUILDROOT)/%,$(KERNELINCLUDES))
 INCLUDEPATHS := $(realpath $(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))

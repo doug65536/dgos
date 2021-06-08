@@ -12,7 +12,7 @@ prefixdir=
 logfile=
 cleanbuild=
 extractonly=
-enablepatch=
+enablepatch=1
 parallel="-j$(which nproc >/dev/null && nproc || echo 1)"
 
 function log() {
@@ -55,7 +55,7 @@ function download_file() {
 	local dest_file="$dest/$filename"
 
 	if ! [[ -f $dest_file ]]; then
-		log wget -P "$dest" -N "$url" || return
+		log "$WGET" -P "$dest" -N "$url" || return
 	else
 		printf "Skipping download of %s\n" "$dest"
 	fi
@@ -98,9 +98,9 @@ function extract_tool() {
 
 	pushd "$src" || exit
 	if ! [[ -d "$name" ]]; then
-		tar xf "$input" || exit
+		"$TAR" xf "$input" || exit
 
-		if [[ -n $extractonly ]] && [[ -z $enablepatch ]]; then
+		if [[ $enablepatch -eq 0 ]]; then
 			printf "Skipping patch because extract only mode\n"
 		elif [[ -f "$patchname" ]]; then
 			log echo Applying patch "$patchname"
@@ -225,6 +225,7 @@ function process_tarball() {
 
 function help() {
 	echo ' -a <arch list>   architectures to build (space separated list)'
+	echo ' -n               no patch'
 	echo ' -m <url>         use specified GNU mirror'
 	echo ' -j <#>           use <#> parallel workers to build'
 	echo ' -o <dir>         output directory'
@@ -237,9 +238,10 @@ function help() {
 }
 
 # Parse arguments
-while getopts a:m:j:o:cxXp:qh? arg
+while getopts na:m:j:o:cxXp:qh? arg
 do
 	case $arg in
+	    n ) enablepatch=0 ;;
 		a ) arches="$OPTARG" ;;
 		m ) gnu_mirror="$OPTARG" ;;
 		j ) parallel="-j$OPTARG" ;;
@@ -288,7 +290,18 @@ then
 	log echo "$log_banner"
 fi
 
-require_cmd "wget" "tar" "g++" "gcc" "as" "ar" "ranlib" "nm" "tee" "tail"
+CXX=${CXX:g++}
+CC=${CC:gcc}
+AS=${AS:as}
+AR=${AR:gcc-ar}
+RANLIB=${RANLIB:gcc-ranlib}
+NM=${NM:gcc-nm}
+WGET=${WGET:wget}
+TAR=${TAR:tar}
+TEE=${TEE:tee}
+TAIL=${TAIL:tail}
+
+require_cmd "$WGET" "$TAR" "$CXX" "$CC" "$AS" "$AR" "$RANLIB" "$NM" "$TEE" "$TAIL"
 
 # Set gccver, binver, etc...
 . "$scriptroot/build-crossgcc-versions"
@@ -354,7 +367,6 @@ fi
 
 
 bin_config="--target=$arches \
---enable-targets=x86_64-dgos,x86_64-pe
 --disable-nls \
 --enable-gold \
 --enable-ld \
@@ -363,6 +375,10 @@ bin_config="--target=$arches \
 --with-sysroot \
 --enable-shared \
 --enable-multiarch"
+
+if [[ $arches =~ "x86" ]]; then
+	bin_config+=" --enable-targets=x86_64-dgos,x86_64-pe,elf32-x86-64"
+fi
 
 gdb_config="--target=$arches \
 --disable-nls \
@@ -373,16 +389,17 @@ gdb_config="--target=$arches \
 --with-gnu-ld \
 --enable-plugins \
 --enable-gdbserver=no \
---enable-targets=x86_64-dgos,i686-dgos,x86_64-pe \
 --enable-64-bit-bfd \
 --enable-multiarch"
+
+if [[ $arches =~ "x86" ]]; then
+	gdb_config+=" --enable-targets=x86_64-dgos,i686-dgos,x86_64-pe"
+fi
 
 gcc_config="--target=$arches \
 --enable-languages=c,c++ \
 --enable-multilib \
 --enable-multiarch \
---with-arch-32=i686 \
---with-multilib-list=m32,m64,mx32 \
 --disable-nls \
 --enable-initfini-array \
 --enable-gnu-indirect-function \
@@ -397,9 +414,14 @@ gcc_config="--target=$arches \
 --without-headers \
 --with-long-double-128 \
 --with-readline \
---with-abi=m64 \
 --with-gnu-as \
 --with-gnu-ld"
+
+if [[ $arches =~ "x86" ]]; then
+	gcc_config+=" --with-arch-32=i686 \
+	--with-abi=m64 \
+	--with-multilib-list=m32,m64,mx32"
+fi
 
 #--enable-threads=posix
 #--disable-hosted-libstdcxx

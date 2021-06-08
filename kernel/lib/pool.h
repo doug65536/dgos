@@ -73,15 +73,17 @@ public:
 
     void free(T* item)
     {
-        size_t index = item - reinterpret_cast<T*>(items);
-        assert(index < item_capacity);
-        item->~T();
+        if (item) {
+            size_t index = item - reinterpret_cast<T*>(items);
+            assert(index < item_capacity);
+            item->~T();
 
 #if HEAP_DEBUG
-        memset(reinterpret_cast<void*>(item), 0xfe, sizeof(T));
+            memset(reinterpret_cast<void*>(item), 0xfe, sizeof(T));
 #endif
 
-        pool_base_t::free(index);
+            pool_base_t::free(index);
+        }
     }
 
 //    template<typename U>

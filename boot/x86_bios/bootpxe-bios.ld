@@ -138,9 +138,9 @@ SECTIONS {
 	/* If the following line errors, the bootloader is too big */
 	. = 0x1F000;
 
-	. = 0x20000;
+	. = ABSOLUTE(0x20000);
 	___initial_stack_limit = .;
-	. = 0x30000;
+	. = ABSOLUTE(0x30000);
 	___initial_stack = .;
 	. += 16;
 	___heap_st = .;

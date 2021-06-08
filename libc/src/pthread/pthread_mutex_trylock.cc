@@ -22,7 +22,7 @@ int pthread_mutex_trylock(pthread_mutex_t *m)
 
     int value;
 
-    for ( ; ; __builtin_ia32_pause()) {
+    for ( ; ; __pause()) {
         value = __atomic_load_n(&m->owner, __ATOMIC_ACQUIRE);
 
         if (likely(value == -1)) {

@@ -91,7 +91,8 @@ bootpxe_relocated_reloc_self_continuation:
     calll bootpxe_reloc_chunk
 
     // Move stack to 0x20000-0x2FFFF
-    movl $ 0x2000,%eax
+    movl $ ___initial_stack_limit,%eax
+    shr $ 4,%eax
     movw %ax,%ss
     xorl %esp,%esp
 
@@ -210,16 +211,17 @@ pxe_call_rm:
 
     // Enter real mode
     ljmpw $ 0,$ 0f
-0:  xor %ax,%ax
+0:  xor %eax,%eax
     mov %ax,%ds
     mov %ax,%es
     mov %ax,%fs
     mov %ax,%gs
     mov %ax,%ss
 
-    movl $ 0x2000,%eax
+    movl $ ___initial_stack_limit,%eax
+    shr $ 4,%eax
     movw %ax,%ss
-    subl $ 0x20000,%esp
+    subl $ ___initial_stack_limit,%esp
 
     sti
 
@@ -241,14 +243,14 @@ pxe_call_rm:
 
     ljmpw $ GDT_SEL_PM_CODE32,$ 0f
 .code32
-0:  mov $ GDT_SEL_PM_DATA32,%ax
+0:  movl $ GDT_SEL_PM_DATA32,%eax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs
     movw %ax,%gs
     movw %ax,%ss
 
-    addl $ 0x20000,%esp
+    addl $ ___initial_stack_limit,%esp
 
     call cpu_a20_enterpm
 
@@ -290,27 +292,34 @@ pxe_call_bangpxe_pm:
     pushl %esi
     pushl %ebx
 
-    movw $ GDT_SEL_PM_DATA16,%di
+    // Switch to 16 bit stack segment
+    movl $ GDT_SEL_PM_STAC16,%edi
     movw %di,%ss
+    subl $ ___initial_stack_limit,%esp
 
     // Update GDT entry base to point to argument
-    mov $ gdt + GDT_SEL_PXE_TEMP*8,%edi
-    mov %dx,2(%edi)
-    shr $ 16,%edx
-    mov %dl,4(%edi)
-    mov %dh,7(%edi)
+    movl $ gdt + GDT_SEL_PXE_TEMP,%edi
+    movw %dx,2(%edi)
+    shrl $ 16,%edx
+    movb %dl,4(%edi)
+    shrl $ 8,%edx
+    movb %dl,7(%edi)
+
+    // Just for easy debugging, load it into ds
+//    movl $ GDT_SEL_PXE_TEMP,%edi
+//    movw %di,%ds
 
     // 16 bit cdecl call
-    pushw bang_pxe_farp16+2
-    pushw bang_pxe_farp16
+    pushl bang_pxe_farp16
     pushw $ GDT_SEL_PXE_TEMP
     pushw $ 0
     pushw %ax
     lcallw *pxe_entry_farp16
     addl $ 5*2,%esp
 
-    movw $ GDT_SEL_PM_DATA32,%di
+    movl $ GDT_SEL_PM_DATA32,%edi
     movw %di,%ss
+    addl $ ___initial_stack_limit,%esp
 
     popl %ebx
     popl %esi

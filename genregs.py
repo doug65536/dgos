@@ -212,7 +212,7 @@ def process_input():
 
 			items = []
 
-			debug('Starting bitfield {}'. format(prefix))
+			debug('Starting bitfield {}'.format(prefix))
 
 			prefixes.append({
 				'name': prefix,

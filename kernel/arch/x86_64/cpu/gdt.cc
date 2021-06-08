@@ -26,7 +26,7 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     // 16 bit data, code, stack: 0x8, 0x10, 0x18
     GDT_MAKE_DATASEG16(0, 0),
     GDT_MAKE_CODESEG16(0),
-    GDT_MAKE_DATASEG16(0, 0x20000),
+    GDT_MAKE_DATASEG16(0, 0x20000), // FIXME sometimes bootloader stack
 
     // 32 bit code, data: 0x20, 0x28
     GDT_MAKE_CODESEG32(0),

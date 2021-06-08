@@ -6,7 +6,7 @@
 #include "heap.h"
 #include "callout.h"
 #include "thread.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "export.h"
 
 ext::nothrow_t const ext::nothrow;

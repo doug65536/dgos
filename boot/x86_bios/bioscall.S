@@ -40,16 +40,7 @@ bioscall:
     jz 0f
     call cpu_a20_exitpm
 
-    // Setup %ss close to 64KB below esp (alignment permitting)
-    // setup esp to the distance from ebp to esp,
-    // so nothing really changed
-    // the stack frame for this function is reachable from real mode stack
-0:  lea (-(64 * 1024) + 15 + 16*4)(%esp),%ebp
-    and $ -16,%ebp
-    mov %ebp,%edx
-    shr $ 4,%edx
-
-    // Jump to 16 bit protected mode to load 64KB segment limits
+0:  // Jump to 16 bit protected mode to load 64KB segment limits
     ljmpw $ GDT_SEL_PM_CODE16,$ 0f
 .code16
     // 16-bit protected mode
@@ -60,8 +51,15 @@ bioscall:
     movw %ax,%es
     movw %ax,%fs
     movw %ax,%gs
+    // Point ss:esp to where %esp was, where we copied the bios_regs_t
+    // using stack segment with nonzero base
     movl $ GDT_SEL_PM_STAC16,%eax
+    mov $ ___initial_stack_limit,%edx
+    // Atomically set ss and adjust esp
     movw %ax,%ss
+    subl %edx,%esp
+    // Turn ss base into real mode segment
+    shrl $ 4,%edx
 
     // Turn off protected mode
     movl %cr0,%eax
@@ -71,18 +69,17 @@ bioscall:
     // Real mode
     ljmpw $ 0,$ 0f
 
-    // Point ss:esp to where %esp was, where we copied the bios_regs_t
+    // Load real mode ss
 0:  mov %dx,%ss
-    sub %ebp,%esp
-
-    // If it got a perfect 64KB stack size, clear bit 16 (which would be 1)
-    movzwl %sp,%esp
 
     xorl %eax,%eax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs
     movw %ax,%gs
+
+    // Real mode IDT
+    lidtl idtr_rm+2
 
     // Sane enough to allow BIOS to handle IRQs now
     sti
@@ -140,13 +137,14 @@ bioscall:
     movw %ax,%fs
     movw %ax,%gs
 
-    // Translate real mode ss:sp back to flat esp
-    mov %ss,%edx
-    shl $ 4,%edx
-    // There's no way sp could be zero here, don't waste space handling it
-    movzwl %sp,%ebp
+    // Load 16 bit stack segment
+    mov $ ___initial_stack_limit,%edx
+    // Atomically set ss and adjust esp
     movw %ax,%ss
-    lea (%edx,%ebp),%esp
+    addl %edx,%esp
+
+    // 32-bit IDT
+    lidtl idtr_32+2
 
     // Copy saved outgoing context back into bios_regs_t structure
     mov 44(%esp),%eax

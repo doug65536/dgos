@@ -23,7 +23,7 @@
 //   20:12 Page table     (4KB regions)   (PTE)
 //   11:0  Offset (bytes)
 
-#define DEBUG_PAGING	1
+#define DEBUG_PAGING	0
 #if DEBUG_PAGING
 #define PAGING_TRACE(...) PRINT("paging: " __VA_ARGS__)
 #else
@@ -44,7 +44,7 @@ static void clear_page_table(pte_t *page)
 
 static pte_t *allocate_page_table()
 {
-    phys_alloc_t alloc = alloc_phys(PAGE_SIZE);
+    phys_alloc_t alloc = alloc_high();
     assert(alloc.size == PAGE_SIZE && !(alloc.base & PAGE_MASK));
     pte_t *page = (pte_t*)alloc.base;
     // malloc_aligned(PAGE_SIZE, PAGE_SIZE);
@@ -88,7 +88,7 @@ static pte_t *paging_find_pte(addr64_t linear_addr,
             next_segment = (pte_t)allocate_page_table();
 
             pte = next_segment | (PTE_PRESENT | PTE_WRITABLE |
-                                  ((intptr_t)linear_addr < 0 ? 0 : PTE_USER));
+                    ((intptr_t)linear_addr < 0 ? 0 : PTE_USER));
             ref[slot] = pte;
         }
 
@@ -176,6 +176,8 @@ void paging_map_range(
 
         // At start and when allocation runs out of space, allocate more
         // This is likely to happen once and not again until loop is finished
+        // Could run more times if things were in the way and it couldn't
+        // get it all at once
         if (unlikely(!allocation.size)) {
             allocation = allocator->alloc(needed, addr);
             assert(needed >= allocation.size);
@@ -238,7 +240,7 @@ size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
             auto& iovec_last = iovec[count-1];
 
             // If this entry is contiguous with the previous entry
-            if (likely(iovec_last.base + iovec_last.size == iovec_curr.base)) {
+            if (likely(iovec_last.end() == iovec_curr.base)) {
                 // Compute how much we can add onto the previous entry
                 auto max_coalesce = max_chunk - iovec_last.size;
 

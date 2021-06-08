@@ -265,10 +265,10 @@
 // Supervisor Mode Execution Protection Enable
 #define CPU_CR4_SMEP_BIT        20
 
-// (Intel) Supervisor Mode Access Protection Enable
+// Supervisor Mode Access Protection Enable
 #define CPU_CR4_SMAP_BIT        21
 
-// (Intel) Protection Key Enable
+// Protection Key Enable
 #define CPU_CR4_PKE_BIT         22
 
 #define CPU_CR4_VME             (1U << CPU_CR4_VME_BIT     )
@@ -719,3 +719,33 @@
 #define CPU_APIC_BASE_ADDR_MASK     ((1UL<<CPU_APIC_BASE_ADDR_BITS)-1)
 #define CPU_APIC_BASE_ADDR          \
     (CPU_APIC_BASE_ADDR_MASK<<CPU_APIC_BASE_ADDR_BIT)
+
+//
+// MTRR
+
+
+#define CPU_MTRRCAP    0xFE
+
+#define CPU_MTRR_PHYSBASE_n(n) (0x200 + ((n)*2))
+#define CPU_MTRR_PHYSMASK_n(n) (0x201 + ((n)*2))
+#define CPU_MTRR_FIX64K_00000  0x250
+#define CPU_MTRR_FIX16K_80000  0x258
+#define CPU_MTRR_FIX16K_A0000  0x259
+#define CPU_MTRR_FIX4K_C0000   0x268
+#define CPU_MTRR_FIX4K_C8000   0x269
+#define CPU_MTRR_FIX4K_D0000   0x26A
+#define CPU_MTRR_FIX4K_D8000   0x26B
+#define CPU_MTRR_FIX4K_E0000   0x26C
+#define CPU_MTRR_FIX4K_E8000   0x26D
+#define CPU_MTRR_FIX4K_F0000   0x26E
+#define CPU_MTRR_FIX4K_F8000   0x26F
+#define CPU_MTRR_DEF_TYPE      0x2FF
+#define CPU_MTRR_DEF_TYPE_MASK     0x3
+#define CPU_MTRR_DEF_TYPE_FIXED_EN (1<<10)
+#define CPU_MTRR_DEF_TYPE_MTRR_EN  (1<<11)
+
+#define CPU_MTRR_MEMTYPE_UC 0
+#define CPU_MTRR_MEMTYPE_WC 1
+#define CPU_MTRR_MEMTYPE_WT 4
+#define CPU_MTRR_MEMTYPE_WP 5
+#define CPU_MTRR_MEMTYPE_WB 6

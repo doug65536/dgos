@@ -1,12 +1,12 @@
 #pragma once
 
 #include "types.h"
+#include "likely.h"
 #include "elf64decl.h"
-#include "screen.h"
-
-#define ELF64_DEBUG    0
+#include "debug.h"
+#define ELF64_DEBUG    1
 #if ELF64_DEBUG
-#define ELF64_TRACE(...) PRINT(TSTR "elf64: " __VA_ARGS__)
+#define ELF64_TRACE(...) DEBUG(TSTR "elf64: " __VA_ARGS__)
 #else
 #define ELF64_TRACE(...) ((void)0)
 #endif
@@ -22,6 +22,16 @@ struct elf64_context_t {
     uintptr_t address_window;
     uint64_t page_flags;
 };
+
+//#include "arch_paging.h"
+
+//#if defined(__x86_64__) || defined(__i386__)
+//#include "cpuid.h"
+//#elif defined(__aarch64__)
+//#include "../kernel/arch/aarch64/reg_bits.bits.h"
+//#else
+//#error Unknown processor
+//#endif
 
 elf64_context_t *load_kernel_begin();
 bool load_kernel_chunk(Elf64_Phdr *blk, int file, elf64_context_t *ctx);

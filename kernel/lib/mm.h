@@ -415,7 +415,7 @@ class inval_user_pf : public ext::exception {
 
     // exception interface
 protected:
-    const char *what() const noexcept override;
+    char const *what() const noexcept override;
 };
 
 class ralloc_item_t : refcounted<ralloc_item_t> {

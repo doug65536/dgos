@@ -53,7 +53,7 @@ bool get_ram_regions()
         if (entry.type == PHYSMEM_TYPE_NORMAL)
             total_memory += entry.size;
 
-        physmap_insert(entry);
+        physmap_insert(entry, false);
 
         PRINT("base=0x%" PRIx64 " length=0x%" PRIx64
               " type=0x%" PRIx32 " valid=0x%" PRIx32,

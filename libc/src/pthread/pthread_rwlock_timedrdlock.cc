@@ -12,7 +12,7 @@ int pthread_rwlock_timedrdlock(pthread_rwlock_t *m, timespec const *timeout)
     // Most likely path is straight to that return 0, make it no branches
     // Spin 1000x first time, 1x after waits
     for (int spins_remain = 1000; ; spins_remain = 1) {
-        for ( ; c >= 0 || --spins_remain; __builtin_ia32_pause()) {
+        for ( ; c >= 0 || --spins_remain; __pause()) {
             if (likely(c >= 0)) {
                 // It is unlocked or there are already readers,
                 // attempt to increment read lock and complete

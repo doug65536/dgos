@@ -23,6 +23,7 @@ shell/lemon_highlight.xml
 libpng/png.cc
 libwing/window.h
 libwing/window.cc
+include/utf.h
 include/png.h
 include/surface.h
 libpng/surface.cc

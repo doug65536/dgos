@@ -3,7 +3,7 @@
 #include "stdlib.h"
 //#include "basic_set.h"
 #include "hash_table.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "refcount.h"
 #include "export.h"
 

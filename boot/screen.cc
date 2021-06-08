@@ -2,7 +2,10 @@
 #include <stdarg.h>
 #include "debug.h"
 #include "malloc.h"
+#include "utf.h"
 #include "likely.h"
+
+bool screen_enabled = false;
 
 #define clamp(v, minv, maxv) \
     ((v) < (maxv) \
@@ -19,9 +22,9 @@ static void buffer_char(tchar *buf, tchar **pptr, tchar c, void *arg)
         *(*pptr) = 0;
 
         print_at(info[0], info[1], info[2], len, buf);
-        debug_out(buf, len);
+        //debug_out(buf, len);
         char nl = '\n';
-        debug_out(&nl, 1);
+        //debug_out(&nl, 1);
         *pptr = buf;
     }
     if (likely(c >= 32))
@@ -39,6 +42,14 @@ static void debug_out_writer(tchar const *s, size_t sz, void *)
 #define FLAG_LONG       0x08
 
 char const hexlookup[] = "0123456789ABCDEF";
+
+void write_char_dummy(tchar */*buf*/, tchar **/*pptr*/, tchar /*c*/, void *)
+{
+}
+
+void write_debug_dummy(tchar const */*s*/, size_t /*sz*/, void *)
+{
+}
 
 void formatter(tchar const *format, va_list ap,
                void (*write_char)(tchar *buf, tchar **pptr, tchar c, void *),
@@ -166,15 +177,73 @@ void formatter(tchar const *format, va_list ap,
                 }
 
                 s = dp;
+
+                while (*s)
+                    write_char(buf, &out, *s++, write_char_arg);
             } else {
-                s = va_arg(ap, tchar const*);
+                char const *s8;
+                char16_t const *s16;
 
-                if (unlikely(!s))
-                    s = TSTR "{[(null)]}";
+                if (flags & FLAG_LONG) {
+                    // wide string
+
+                    s16 = va_arg(ap, char16_t const *);
+
+                    if (unlikely(!s16))
+                        s16 = u"{[(null)]}";
+
+#ifdef __efi
+                    while (*s16)
+                        write_char(buf, &out, *s16++, write_char_arg);
+#else
+                    for (;;) {
+                        char32_t codepoint = utf16_to_ucs4_upd(s16);
+
+                        if (unlikely(!codepoint))
+                            break;
+
+                        char encoded[8];
+                        int sz = ucs4_to_utf8(encoded, codepoint);
+
+                        for (int i = 0; i < sz; ++i)
+                            write_char(buf, &out, encoded[i], write_char_arg);
+                    }
+#endif
+
+                    continue;
+                } else {
+                    // not wide
+
+                    s8 = va_arg(ap, char const *);
+
+                    if (unlikely(!s8))
+                        s8 = "{[(null)]}";
+
+
+#ifdef __efi
+                    for (;;) {
+                        char32_t codepoint = utf8_to_ucs4_upd(s8);
+
+                        if (unlikely(!codepoint))
+                            break;
+
+                        char16_t encoded[4];
+                        int sz = ucs4_to_utf16(encoded, codepoint);
+
+                        for (int i = 0; i < sz; ++i)
+                            write_char(buf, &out, encoded[i], write_char_arg);
+                    }
+#else
+                    while (*s8)
+                        write_char(buf, &out, *s8++, write_char_arg);
+#endif
+
+                    continue;
+                }
+
+                while (*s)
+                    write_char(buf, &out, *s++, write_char_arg);
             }
-
-            while (*s)
-                write_char(buf, &out, *s++, write_char_arg);
 
             break;
         }
@@ -199,12 +268,18 @@ void print_line_at(int x, int y, int attr, tchar const *format, ...)
 
 void vprint_line(int attr, tchar const *format, va_list ap)
 {
+    if (unlikely(!screen_enabled))
+        return;
+
     print_xy(0, 24, ' ', attr, 79);
     vprint_line_at(0, 24, attr, format, ap);
 }
 
 void print_line(tchar const *format, ...)
 {
+    if (unlikely(!screen_enabled))
+        return;
+
     va_list ap;
     va_start(ap, format);
     vprint_line(0x7, format, ap);
@@ -213,6 +288,9 @@ void print_line(tchar const *format, ...)
 
 void print_xy(int x, int y, tchar ch, uint16_t attr, size_t count)
 {
+    if (unlikely(!screen_enabled))
+        return;
+
     tchar lbuf[81];
     tchar *fbuf = nullptr;
     if (count > 80)
@@ -231,6 +309,9 @@ void print_xy(int x, int y, tchar ch, uint16_t attr, size_t count)
 void print_str_xy(int x, int y, tchar const *s, size_t len,
                   uint16_t attr, size_t min_len)
 {
+    if (unlikely(!screen_enabled))
+        return;
+
     tchar lbuf[81];
 
     tchar *fbuf = nullptr;
@@ -282,6 +363,9 @@ void print_lba(uint32_t lba)
 
 void print_box(int left, int top, int right, int bottom, int attr, bool clear)
 {
+    if (unlikely(!screen_enabled))
+        return;
+
     int sx = clamp(left, 0, 80);
     int sy = clamp(top, 0, 25);
     int ex = clamp(right, sx, 80);

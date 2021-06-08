@@ -6,8 +6,6 @@
 
 #if defined(__x86_64__) || defined(__i386__)
 #define USE_REP_STRING
-#else
-#error No fast strings!
 #endif
 
 size_t strlen(char const *src)
@@ -90,7 +88,7 @@ char *strcat(char *dest, char const *src)
 // behavior is undefined if either dest is not a pointer
 // to a null-terminated byte string or src is not a
 // pointer to a character array.
-char *strncat(char *dest, char const *src, size_t n)
+char *strncat(char * restrict dest, char const * restrict src, size_t n)
 {
     return strncpy(dest + strlen(dest), src, n);
 }
@@ -142,7 +140,7 @@ char *strstr(char const *str, char const *substr)
 
 void *memcpy_rev(void *dest, void const *src, size_t n)
 {
-#if 1
+#ifdef USE_REP_STRING
     if ((n & 3) == 0) {
         src = (char*)src + n - 1;
         char *d = (char*)dest + n - 1;
@@ -201,12 +199,13 @@ void *memmove(void *dest, void const *src, size_t n)
 
 void *memset(void *dest, int c, size_t n)
 {
-#if 1
+#ifdef USE_REP_STRING
     char *d = (char*)dest;
     size_t remainder = n & 3;
 
     n >>= 2;
     __asm__ __volatile__ (
+        "cld\n\t"
         "rep stosl\n\t"
         "mov %[remainder],%[count]\n\t"
         "rep stosb\n\t"
@@ -231,6 +230,7 @@ void *memcpy(void *dest, void const *src, size_t n)
     size_t remainder = n & 3;
     n >>= 2;
     __asm__ __volatile__ (
+        "cld\n\t"
         "rep movsl\n\t"
         "mov %[remainder],%[count]\n\t"
         "rep movsb\n\t"

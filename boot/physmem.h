@@ -12,6 +12,8 @@ void take_pages(uint64_t phys_addr, uint64_t size);
 // or, take the entire first free block if it is smaller than size
 phys_alloc_t alloc_phys(uint64_t size, uint64_t for_addr = 0,
                         bool insist = false);
+// Allocate one page from the highest free memory and no fancy alignment
+phys_alloc_t alloc_high();
 void free_phys(phys_alloc_t freed, size_t hint = -1);
 
 class alloc_page_factory_t : public page_factory_t {

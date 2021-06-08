@@ -208,7 +208,7 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
             next_free = new_next;
             free_page_count -= count;
 
-            if (free_page_count < 256)
+            if ((free_page_count << log2_pagesz) < 1048576)
                 printdbg("WARNING: Under 1MB free! Continuing...\n");
 
             break;

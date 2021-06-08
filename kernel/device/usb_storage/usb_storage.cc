@@ -689,7 +689,7 @@ void usb_msc_if_t::issue_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
     // status block wrapper
     bulk_in.recv_async(&cmd->csw, sizeof(cmd->csw), &cmd->io_iocp);
 
-    cmd->io_iocp.set_expect(3);
+    cmd->io_iocp.set_expect(2 + (cmd->count != 0));
 }
 
 void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)

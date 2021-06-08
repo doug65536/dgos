@@ -1,8 +1,9 @@
-## entry.S
+// entry.S
 
 #include "cpu/control_regs_constants.h"
 #include "cpu/interrupts.h"
 #include "cpu/asm_constants.h"
+#include "cpu/cpu_info.ofs.h"
 #include "cfi_helpers.h"
 #include "cpu_bug.h"
 
@@ -19,19 +20,14 @@
 .hidden entry
 .type entry,@function
 entry:
-    .cfi_startproc
+    .cfi_startproc simple
 
-    .cfi_undefined rip
-    .cfi_undefined rsp
-    .cfi_undefined rbp
-    .cfi_undefined rbx
-    .cfi_undefined r12
-    .cfi_undefined r13
-    .cfi_undefined r14
-    .cfi_undefined r15
+    no_caller_cfi
 
     // Save parameter in call-preserved register
     movl %ecx,%r15d
+
+    // use rbp as zero constant
     xorl %ebp,%ebp
 
     // Initialize GSBASE ASAP
@@ -49,7 +45,7 @@ entry:
     imul $ THREAD_INFO_SIZE,thread_booting_ap_index(%rip),%eax
     leaq threads(%rip),%rdx
     addq %rdx,%rax
-    movq %rax,%gs:CPU_INFO_CURTHREAD_OFS(%rbp)
+    movq %rax,%gs:CPU_INFO_CUR_THREAD_OFS(%rbp)
 
     // Initialize APIC ID ASAP
     // Copy APIC ID into gs:CPU_INFO_APIC_ID_OFS
@@ -83,7 +79,7 @@ entry:
 #ifdef _CALL_TRACE_ENABLED
     // Enable FSGSBASE ASAP if tracing
     movq %cr4,%rax
-    orq $ 0x10000,%rax
+    orq $ CPU_CR4_FSGSBASE,%rax
     movq %rax,%cr4
 #endif
 
@@ -342,8 +338,7 @@ __invoke_function_array:
     movq %rsi,%rbp
 0:  cmpq %rbx,%rbp
     jbe 0f
-    mov (%rbx),%rax
-    indirect_call rax
+    indirect_call_mem rax,"(%rbx)"
     addq $ 8,%rbx
     jmp 0b
 0:  pop_cfi %rbp

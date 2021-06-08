@@ -1,4 +1,6 @@
 
+#include <sys/math_targets.h>
+
 //              ∞       1        z - 1
 // ln(z) = 2 *  ∑  * ------ * (( ----- ) ^ (2𝑛+1))
 //             𝑛=0   2𝑛 + 1      z + 1
@@ -24,14 +26,14 @@ constexpr T __logimpl(T z)
 }
 
 extern "C"
-__attribute__((__target_clones__("default,avx")))
+__TARGET_CLONES
 double log(double z)
 {
     return __logimpl<double>(z);
 }
 
 extern "C"
-__attribute__((__target_clones__("default,avx")))
+__TARGET_CLONES
 float logf(float z)
 {
     return __logimpl<float>(z);

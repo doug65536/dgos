@@ -15,7 +15,7 @@ int pthread_spin_lock(pthread_spinlock_t *s)
                     !__atomic_compare_exchange_n(
                         &s->owner, &expect, tid, false,
                         __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)))
-        __builtin_ia32_pause();
+        __pause();
 
     return 0;
 }

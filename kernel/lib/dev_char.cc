@@ -4,7 +4,7 @@ dev_char_t::~dev_char_t()
 {
 }
 
-int dev_char_t::read(void *data, int64_t count)
+ssize_t dev_char_t::read(void *data, size_t count)
 {
     blocking_iocp_t iocp;
     errno_t err = read_async(data, count, &iocp);
@@ -14,7 +14,7 @@ int dev_char_t::read(void *data, int64_t count)
     return iocp.wait_and_return<int>();
 }
 
-int dev_char_t::write(void *data, int64_t count)
+ssize_t dev_char_t::write(void const *data, size_t count)
 {
     blocking_iocp_t iocp;
     errno_t err = write_async(data, count, &iocp);

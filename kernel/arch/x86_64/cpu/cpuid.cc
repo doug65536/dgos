@@ -25,9 +25,13 @@ void cpuid_init()
     cpuid_t info;
 
     if (cpuid(&info, CPUID_HIGHESTFUNC, 0)) {
-        if (!memcmp(&info.ebx, "AuthenticAMD", 12))
+        if (!memcmp(&info.ebx, "Auth", 4) && 
+                !memcmp(&info.edx, "enti", 4) && 
+                !memcmp(&info.ecx, "cAMD", 4))
             cpuid_cache.is_amd = 1;
-        else if (!memcmp(&info.ebx, "GenuineIntel", 12))
+        else if (!memcmp(&info.ebx, "Genu", 4) &&
+                !memcmp(&info.edx, "ineI", 4) &&
+                !memcmp(&info.ecx, "ntel", 4))
             cpuid_cache.is_intel = 1;
     }
 

@@ -7,6 +7,24 @@ size_t strlen(char16_t const *src)
     return len;
 }
 
+char *strnchr(char const *src, int ch, size_t count)
+{
+    for (size_t i = 0; i < count; ++i) {
+        if (src[i] == ch)
+            return (char*)(src + i);
+    }
+    return nullptr;
+}
+
+char16_t *strnchr(char16_t const *src, int ch, size_t count)
+{
+    for (size_t i = 0; i < count; ++i) {
+        if (src[i] == ch)
+            return (char16_t*)(src + i);
+    }
+    return nullptr;
+}
+
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
 char16_t *strchr(char16_t const *s, int ch)
@@ -55,7 +73,7 @@ char16_t *strcat(char16_t *dest, char16_t const *src)
     return dest;
 }
 
-char16_t *strncpy(char16_t *dest, char16_t const *src, size_t n)
+char16_t *strncpy(char16_t * restrict dest, char16_t const *src, size_t n)
 {
     char16_t *d = dest;
 
@@ -72,7 +90,8 @@ char16_t *strncpy(char16_t *dest, char16_t const *src, size_t n)
     return dest;
 }
 
-char16_t *strncat(char16_t *dest, char16_t const *src, size_t n)
+char16_t *strncat(char16_t * restrict dest,
+                  char16_t const * restrict src, size_t n)
 {
     return strncpy(dest + strlen(dest), src, n);
 }

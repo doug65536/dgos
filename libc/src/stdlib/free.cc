@@ -4,7 +4,9 @@
 
 void free(void *p)
 {
-    p = (void*)(uintptr_t(p) & -(4 << 10));
-    size_t sz = *(size_t*)p;
-    munmap(p, sz+64);
+    if (p) {
+        p = (void*)(uintptr_t(p) & -(4 << 10));
+        size_t sz = *(size_t*)p;
+        munmap(p, sz+64);
+    }
 }

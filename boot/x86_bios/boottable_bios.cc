@@ -4,9 +4,9 @@
 #include "string.h"
 #include "screen.h"
 
-#define DEBUG_BOOTTBL   1
+#define DEBUG_BOOTTBL   0
 #if DEBUG_BOOTTBL
-#define BOOTTBL_TRACE(...) PRINT(TSTR "boottbl: " __VA_ARGS__)
+#define BOOTTBL_TRACE(...) PRINT("boottbl: " __VA_ARGS__)
 #else
 #define BOOTTBL_TRACE(...) ((void)0)
 #endif

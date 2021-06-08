@@ -4,6 +4,8 @@
 //#include "bioscall.h"
 #include "screen_abstract.h"
 
+#include "debug.h"
+
 __BEGIN_DECLS
 
 #if defined(__GNUC__) && !defined(__efi)
@@ -47,9 +49,23 @@ static inline tchar boxchar_solid()
     return boxchars[S];
 }
 
+void write_char_dummy(tchar */*buf*/, tchar **/*pptr*/, tchar /*c*/, void *);
+void write_debug_dummy(tchar const */*s*/, size_t /*sz*/, void *);
+
+void formatter(tchar const *format, va_list ap,
+        void (*write_char)(tchar *buf, tchar **pptr, tchar c, void *) =
+            write_char_dummy,
+        void *write_char_arg = nullptr,
+        void (*write_debug)(tchar const *s, size_t sz, void *) =
+            write_debug_dummy,
+        void *write_debug_arg = nullptr);
+
 //void dump_regs(bios_regs_t& regs, bool show_flags = false);
 
-#define PRINT(...) print_line(TSTR __VA_ARGS__)
-#define VPRINT(...) vprint_line(0x7, TSTR __VA_ARGS__)
+//#define PRINT(...) print_line(TSTR __VA_ARGS__)
+#define PRINT(...) (printdbg_dummy(__VA_ARGS__),printdbg(TSTR __VA_ARGS__))
+#define VPRINT(...) (vprintdbg_dummy(__VA_ARGS__),printdbg(TSTR __VA_ARGS__))
+
+extern bool screen_enabled;
 
 __END_DECLS

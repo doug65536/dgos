@@ -1,5 +1,6 @@
 #pragma once
 
+#if defined(__x86_64__) || defined(__i386__)
 #ifdef __ASSEMBLER__
 #ifdef USE_RETPOLINE
 .macro indirect_call reg
@@ -15,6 +16,7 @@
 .macro indirect_jmp reg
     jmp *%\reg
 .endm
+#endif
 #endif
 #endif
 
@@ -40,7 +42,7 @@
 
 #define PTRSZ_DATA .quad
 
-#else
+#elif defined(__i386__)
 
 // For use when the pointer sized register is wanted
 #define RAX %eax

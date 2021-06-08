@@ -94,7 +94,7 @@ static int fat32_sector_iterator_begin(
 
     // Cache cluster chain
     int cluster_count = 0;
-    for (uint32_t walk = cluster; walk; ++cluster_count) {
+    for (uint32_t walk = cluster; !is_eof_cluster(walk); ++cluster_count) {
         walk = next_cluster(walk, &iter->ok);
         if (unlikely(!iter->ok))
             return -1;
@@ -104,11 +104,11 @@ static int fat32_sector_iterator_begin(
 
     iter->cluster_count = cluster_count;
 
-    if (cluster_count <= 1024)
+    //if (cluster_count <= 1024)
         iter->clusters = new (ext::nothrow) uint32_t[cluster_count];
-    else
-        iter->clusters = (uint32_t*)alloc_phys(
-                    sizeof(uint32_t) * cluster_count, true).base;
+    //else
+    //    iter->clusters = (uint32_t*)alloc_phys(
+    //                sizeof(uint32_t) * cluster_count, true).base;
 
     if (unlikely(!iter->clusters))
         PANIC_OOM();
@@ -116,7 +116,7 @@ static int fat32_sector_iterator_begin(
     PRINT("Populating %d entry 32-bit cluster list", cluster_count);
 
     cluster_count = 0;
-    for (int walk = cluster; walk; ++cluster_count) {
+    for (int walk = cluster; !is_eof_cluster(walk); ++cluster_count) {
         iter->clusters[cluster_count] = walk;
         walk = next_cluster(walk, &iter->ok);
         if (unlikely(!iter->ok))
@@ -291,7 +291,7 @@ static int16_t read_directory_move_next(dir_iterator_t *iter, char *sector)
 //  bit 3 = lowercase filename
 //  0 if long filename needed
 //  0xFF if invalid
-static filename_info_t get_filename_info(char const *filename)
+static filename_info_t get_filename_info(tchar const *filename)
 {
     size_t ni;
     size_t ei;
@@ -395,24 +395,26 @@ static filename_info_t get_filename_info(char const *filename)
 
 // Returns an appropriate replacement for a short name
 // Returns 0 if the character is not allowed in a short name
-static char shortname_char(char ch)
+static char shortname_char(tchar codeunit)
 {
     // Allowed
-    if ((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
-        return ch;
+    if ((codeunit >= 'A' && codeunit <= 'Z') ||
+            (codeunit >= '0' && codeunit <= '9'))
+        return codeunit;
 
     // Uppercase only
-    if (ch >= 'a' && ch <= 'z')
-        return ch + 'A' - 'a';
+    if (codeunit >= 'a' && codeunit <= 'z')
+        return codeunit + 'A' - 'a';
 
     // Everything else not allowed
     return '_';
 }
 
-static void fill_short_filename(fat32_dir_union_t *match, char const *filename)
+static void fill_short_filename(fat32_dir_union_t *match,
+        tchar const *filename)
 {
     char *fill_name = match->short_entry.name;
-    char const *src = filename;
+    tchar const *src = filename;
     char ch;
 
     // Take up to 8 characters, not including first '.'
@@ -464,10 +466,7 @@ static char16_t const *encode_lfn_name_fragment(
             lfn_fragment[i*2+1] = 0xFF;
         } else if (*encoded_src != 0) {
             // Encode (sometimes) misaligned UTF-16 codepoints
-            lfn_fragment[i*2] =
-                    *encoded_src & 0xFF;
-            lfn_fragment[i*2+1] =
-                    (*encoded_src >> 8) & 0xFF;
+            memcpy(lfn_fragment + i * 2, encoded_src, sizeof(char16_t));
             ++encoded_src;
         } else {
             // Encode null terminator
@@ -477,6 +476,24 @@ static char16_t const *encode_lfn_name_fragment(
         }
     }
     return encoded_src;
+}
+
+static void dir_extract_lfn_name(char16_t * restrict out,
+        fat32_dir_union_t const * restrict entry)
+{
+    char16_t *piece1 = out;
+    char16_t *piece2 = out + sizeof(entry->long_entry.name) / sizeof(char16_t);
+    char16_t *piece3 = out + sizeof(entry->long_entry.name) / sizeof(char16_t) +
+        sizeof(entry->long_entry.name2) / sizeof(char16_t);
+
+    memcpy(piece1, entry->long_entry.name,
+        sizeof(entry->long_entry.name));
+
+    memcpy(piece2, entry->long_entry.name2,
+        sizeof(entry->long_entry.name2));
+
+    memcpy(piece3, entry->long_entry.name3,
+        sizeof(entry->long_entry.name3));
 }
 
 static bool dir_entry_match(fat32_dir_union_t const *entry,
@@ -494,19 +511,13 @@ static bool dir_entry_match(fat32_dir_union_t const *entry,
         if (entry->long_entry.ordinal != match->long_entry.ordinal)
             return false;
 
-        if (memcmp(entry->long_entry.name,
-                   match->long_entry.name,
-                   sizeof(entry->long_entry.name)))
-            return false;
+        char16_t ent_name[13];
+        char16_t mat_name[13];
 
-        if (memcmp(entry->long_entry.name2,
-                   match->long_entry.name2,
-                   sizeof(entry->long_entry.name2)))
-            return false;
+        dir_extract_lfn_name(ent_name, entry);
+        dir_extract_lfn_name(mat_name, match);
 
-        if (memcmp(entry->long_entry.name3,
-                   match->long_entry.name3,
-                   sizeof(entry->long_entry.name3)))
+        if (strncmp(ent_name, mat_name, countof(ent_name)))
             return false;
 
         return true;
@@ -544,7 +555,7 @@ static void print_dirent(fat32_dir_union_t const *entry)
 #endif
 
 // Returns 0 on failure
-static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
+static uint32_t find_file_by_name(tchar const *filename, uint32_t dir_cluster,
                                   uint32_t *out_file_size)
 {
     if (likely(out_file_size))
@@ -562,15 +573,16 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
     if (info.lowercase_flags == 0) {
         // Needs long filename
         char16_t encoded_name[255];
-        uint_fast16_t encoded_len = utf8_to_utf16(
-                    encoded_name, 255, filename);
+        size_pair_t encoded_len = tchar_to_utf16(
+                    encoded_name, 255,
+                    filename, info.filename_length);
         char16_t const *encoded_src;
 
         // Check for bad UTF-8
-        if (unlikely(encoded_len == 0))
+        if (unlikely(encoded_len.output_produced == 0))
             return 0;
 
-        lfn_entries = (encoded_len + 12) / 13;
+        lfn_entries = (encoded_len.output_produced + 12) / 13;
 
         match = (fat32_dir_union_t*)calloc(lfn_entries, sizeof(*match));
 
@@ -666,16 +678,17 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
     return 0;
 }
 
-static uint32_t find_file_by_pathname(char const *pathname,
+static uint32_t find_file_by_pathname(tchar const *pathname,
                                       uint32_t dir_cluster,
                                       uint32_t *out_file_size)
 {
-    char name[256];
+    tchar name[256];
 
     size_t pathname_len = strlen(pathname);
 
     for (; pathname_len; ) {
-        char const *filename_end = (char*)memchr(pathname, '/', pathname_len);
+
+        tchar const *filename_end = strnchr(pathname, '/', pathname_len);
 
         filename_end = filename_end
                 ? filename_end
@@ -686,7 +699,7 @@ static uint32_t find_file_by_pathname(char const *pathname,
         if (unlikely(filename_len >= sizeof(name)))
             PANIC("Implausible filename length");
 
-        memcpy(name, pathname, filename_len);
+        strncpy(name, pathname, filename_len);
         name[filename_len] = 0;
 
         uint32_t file_size = 0;
@@ -708,6 +721,7 @@ static uint32_t find_file_by_pathname(char const *pathname,
         assert(pathname_len >= filename_len);
 
         pathname += filename_len;
+        assert(pathname_len >= filename_len);
         pathname_len -= filename_len;
     }
 
@@ -728,12 +742,12 @@ static uint64_t fat32_boot_serial()
     return fat32_serial;
 }
 
-static int fat32_boot_open(char const *filename)
+static int fat32_boot_open(tchar const *filename)
 {
     uint32_t cluster;
     uint32_t file_size = 0;
 
-    PRINT("Finding file by pathname: %s", filename);
+    PRINT("Finding file by pathname: %" TFMT, filename);
 
     // Find the start of the file
     cluster = find_file_by_pathname(filename, bpb.root_dir_start, &file_size);
@@ -854,7 +868,7 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     return total_read;
 }
 
-void fat32_boot_partition(uint64_t partition_lba)
+void fat32_use_fs(uint64_t partition_lba)
 {
     file_handles = (fat32_sector_iterator_t *)calloc(
                 MAX_HANDLES, sizeof(*file_handles));
@@ -891,12 +905,18 @@ void fat32_boot_partition(uint64_t partition_lba)
     PRINT("number_of_fats:	  %d", bpb.number_of_fats);
 #endif
 
-    fs_api.name = "direct_fat32";
+    fs_api.name = TSTR "direct_fat32";
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_filesize = fat32_boot_filesize;
     fs_api.boot_close = fat32_boot_close;
     fs_api.boot_pread = fat32_boot_pread;
     fs_api.boot_drv_serial = fat32_boot_serial;
+}
+
+void fat32_boot_partition(uint64_t partition_lba)
+{
+    fat32_use_fs(partition_lba);
+
 
     elf64_boot();
 }
@@ -910,16 +930,17 @@ void fat32_sector_iterator_t::reset()
     ok = false;
     clusters = nullptr;
     cluster_count = 0;
+    file_size = 0;
 }
 
 int fat32_sector_iterator_t::close()
 {
     int result = ok ? 0 : 1;
 
-    if (cluster_count <= 1024)
+    //if (cluster_count <= 1024)
         delete[] clusters;
-    else
-        free_phys({(uint64_t)clusters, cluster_count * sizeof(uint32_t)});
+    //else
+    //    free_phys({(uint64_t)clusters, cluster_count * sizeof(uint32_t)});
 
     reset();
 

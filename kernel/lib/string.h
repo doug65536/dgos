@@ -1,46 +1,82 @@
 #pragma once
 
 #include "types.h"
-#include "cpu/nontemporal.h"
+//#include "cpu/nontemporal.h"
 #include "type_traits.h"
 #include "utf.h"
 
 __BEGIN_DECLS
 
+_access(read_only, 1)
 KERNEL_API_BUILTIN size_t strlen(char const *src);
+
+_access(read_only, 1, 3)
 KERNEL_API_BUILTIN void *memchr(void const *mem, int ch, size_t count);
+
+_access(read_only, 1, 3)
 void *memrchr(void const *mem, int ch, size_t count);
+
+_access(read_only, 1)
 KERNEL_API_BUILTIN char *strchr(char const *s, int ch);
+
+_access(read_only, 1)
 KERNEL_API_BUILTIN char *strrchr(char const *s, int ch);
 
+_access(read_only, 1) _access(read_only, 2)
 KERNEL_API_BUILTIN int strcmp(char const *lhs, char const *rhs);
+
+_access(read_only, 1, 3) _access(read_only, 2, 3)
 KERNEL_API_BUILTIN int strncmp(char const *lhs, char const *rhs, size_t count);
+
+_access(read_only, 1, 3) _access(read_only, 2, 3)
 KERNEL_API_BUILTIN int memcmp(void const *lhs, void const *rhs, size_t count);
+
+_access(read_only, 1) _access(read_only, 2)
 KERNEL_API_BUILTIN char *strstr(char const *str, char const *substr);
+
+_access(read_only, 1, 3) _access(read_only, 2, 3)
 KERNEL_API int const_time_memcmp(void const *lhs, void const *rhs,
                                  size_t count);
 
 void clear64(void *dest, size_t n);
 
+_access(write_only, 1, 3)
 KERNEL_API_BUILTIN void *memset(void *dest, int c, size_t n);
+
+_access(write_only, 1, 3) _access(read_only, 2, 3)
 KERNEL_API_BUILTIN void *memcpy(void * restrict dest,
                                 void const * restrict src, size_t n);
 
+_access(write_only, 1, 3) _access(read_only, 2, 3)
 _no_instrument
 void *memcpy_noinstrument(void * restrict dest,
                           void const * restrict src, size_t n);
+
+_access(write_only, 1, 3) _access(read_only, 2, 3)
 KERNEL_API_BUILTIN void *memmove(void *dest, void const *src, size_t n);
 
-KERNEL_API_BUILTIN char *strcpy(char * restrict dest, char const * restrict src);
-KERNEL_API_BUILTIN char *strcat(char * restrict dest, char const * restrict src);
+_access(write_only, 1) _access(read_only, 2)
+KERNEL_API_BUILTIN char *strcpy(
+        char * restrict dest, char const * restrict src);
 
+_access(read_write, 1) _access(read_only, 2)
+KERNEL_API_BUILTIN char *strcat(
+        char * restrict dest, char const * restrict src);
+
+_access(write_only, 1) _access(read_only, 2)
 char *stpcpy(char *dest, char const *src);
 
+_access(read_only, 1) _access(read_only, 2)
 KERNEL_API_BUILTIN size_t strspn(char const *src, char const *chars);
+
+_access(read_only, 1) _access(read_only, 2)
 KERNEL_API_BUILTIN size_t strcspn(char const *src, char const *chars);
 
+_access(read_only, 2, 3)
 KERNEL_API_BUILTIN char *strncpy(char * restrict dest,
                                  char const * restrict src, size_t n);
+
+_access(read_only, 2, 3)
 KERNEL_API_BUILTIN char *strncat(char * restrict dest,
                                  char const * restrict src, size_t n);
 

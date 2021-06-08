@@ -1,6 +1,7 @@
 #include "bootefi.h"
 #include "string.h"
 #include "screen.h"
+#include "serial.h"
 #include "debug.h"
 #include "assert.h"
 #include "fs.h"
@@ -13,6 +14,12 @@
 #include "../kernel/lib/bswap.h"
 #include "halt.h"
 
+#define USE_FS 1
+
+#if USE_FS
+#include "fs/fat32.h"
+#endif
+
 __attribute__((__visibility__("hidden")))
 void * __dso_handle = &__dso_handle;
 
@@ -23,9 +30,10 @@ extern "C" void __cxa_atexit()
 #if 1
 #include "fs.h"
 
+EFI_BLOCK_IO_PROTOCOL *efi_blk_io;
+
 __BEGIN_ANONYMOUS
 
-static EFI_BLOCK_IO_PROTOCOL *efi_blk_io;
 static EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *efi_simple_filesystem;
 static EFI_PXE_BASE_CODE_PROTOCOL *efi_pxe;
 static EFI_FILE *efi_root_dir;
@@ -110,7 +118,7 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
             size_t dirname_len = first_slash - filename;
 
             if (dirname_len > sizeof(name) - 1)
-                panic(TSTR "invalid filename");
+                PANIC("invalid filename");
 
             memcpy(name, filename, dirname_len * sizeof(*name));
 
@@ -225,11 +233,11 @@ public:
                 dhcp_packet = &efi_pxe->Mode->ProxyOffer;
             }
         } else {
-            PANIC(TSTR "Don't know how to handle IPv6 PXE");
+            PANIC("Don't know how to handle IPv6 PXE");
         }
 
         if (unlikely(!dhcp_packet))
-            PANIC(TSTR "Unable to process DHCP packet");
+            PANIC("Unable to process DHCP packet");
 
         memcpy(&server_addr.ipv4, &dhcp_packet->Dhcpv4.BootpSiAddr,
                sizeof(server_addr.ipv4));
@@ -383,7 +391,7 @@ static _constructor(104) void register_efi_fs()
                 (VOID**)&efi_loaded_image);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
+        PANIC("HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
     // Get the vtbl for the simple_filesystem_protocol of this executable
     status = efi_systab->BootServices->HandleProtocol(
@@ -400,7 +408,7 @@ static _constructor(104) void register_efi_fs()
                     efi_simple_filesystem, &efi_root_dir);
 
         if (unlikely(EFI_ERROR(status)))
-            PANIC(TSTR "OpenVolume for boot partition failed");
+            PANIC("OpenVolume for boot partition failed");
 
         status = efi_systab->BootServices->HandleProtocol(
                 efi_loaded_image->DeviceHandle,
@@ -408,9 +416,16 @@ static _constructor(104) void register_efi_fs()
                 (VOID**)&efi_blk_io);
 
         if (unlikely(EFI_ERROR(status)))
-            PANIC(TSTR "HandleProtocol for block_io_protocol failed");
+            PANIC("HandleProtocol for block_io_protocol failed");
 
+#if USE_FS
+        name = TSTR "EFI_own_fat32";
+        fat32_use_fs(efi_blk_io->Media->LowestAlignedLba);
+        PRINT("EFI using own FAT32: %" TFMT, name);
+        return;
+#else
         name = TSTR "EFI_boot_partition";
+#endif
     } else {
         // PXE
         status = efi_systab->BootServices->HandleProtocol(
@@ -419,7 +434,7 @@ static _constructor(104) void register_efi_fs()
                     (VOID**)&efi_pxe);
 
         if (unlikely(EFI_ERROR(status)))
-            PANIC(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
+            PANIC("HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
         efi_pxe_file_handle_t::initialize();
         PRINT("EFI PXE API initialized");
@@ -433,8 +448,7 @@ static _constructor(104) void register_efi_fs()
     fs_api.boot_pread = file_handle_base_t::pread;
     fs_api.boot_close = file_handle_base_t::close;
     fs_api.boot_drv_serial = file_handle_base_t::boot_drv_serial;
-
-    PRINT("EFI FS API initialized: %s", name);
+    PRINT("EFI FS API initialized: %" TFMT, name);
 }
 #endif
 
@@ -550,6 +564,8 @@ file_handle_base_t::~file_handle_base_t()
 __END_ANONYMOUS
 
 extern char __text_st[];
+
+void (*serial_dep)(int) = arch_serial_init;
 
 extern "C" _noreturn
 EFI_STATUS efi_main()

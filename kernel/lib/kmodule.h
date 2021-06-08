@@ -14,7 +14,7 @@ KERNEL_API void cpu_apply_fixups(uint8_t * const *rodata_st,
 
 using module_entry_fn_t = int(*)(int __argc, char const **__argv);
 
-int module_main(int __argc, char const * const * __argv) _used;
+int module_main(int __argc, char const * const * __argv) _unused;
 
 KERNEL_API void __module_register_frame(
         void const * const *__module_dso_handle,

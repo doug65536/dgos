@@ -5,7 +5,7 @@
 #include "bitsearch.h"
 #include "asan.h"
 #include "stdlib.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "debug.h"
 #include "printk.h"
 

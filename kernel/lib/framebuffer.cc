@@ -1,3 +1,4 @@
+#include "framebuffer.h"
 #include "assert.h"
 #include "modeinfo.h"
 #include "export.h"

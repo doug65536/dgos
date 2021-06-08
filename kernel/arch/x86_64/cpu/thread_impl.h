@@ -2,7 +2,8 @@
 #include "types.h"
 #include "cpu/isr.h"
 #include "segrw.h"
-#include "asm_constants.h"
+#include "cpu_info.ofs.h"
+#include "thread_info.ofs.h"
 #include "atomic.h"
 
 __BEGIN_DECLS
@@ -57,8 +58,8 @@ void *thread_get_gsbase(int thread);
 _const
 static _always_inline process_t *fast_cur_process()
 {
-    void *thread_info = cpu_gs_read<void*, CPU_INFO_CURTHREAD_OFS>();
-    return *(process_t**)((char*)thread_info + THREAD_PROCESS_PTR_OFS);
+    void *thread_info = cpu_gs_read<void*, CPU_INFO_CUR_THREAD_OFS>();
+    return *(process_t**)((char*)thread_info + THREAD_INFO_PROCESS_OFS);
 }
 
 void thread_set_process(int tid, process_t *process);

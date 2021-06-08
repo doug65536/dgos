@@ -5,8 +5,8 @@
 extern "C" _noreturn void panic(tchar const *s)
 {
     //debug_out(s, -1);
-    PRINT("%s", s);
+    PRINT("%" TFMT, s);
 
     for (;;)
-        __asm__ __volatile__ ("hlt");
+        __asm__ __volatile__ ("wfi");
 }

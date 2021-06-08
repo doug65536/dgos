@@ -8,6 +8,7 @@
 #include "likely.h"
 
 #include "thread.h"
+#include "asm_constants.h"
 #include "main.h"
 #include "halt.h"
 #include "cpu.h"
@@ -27,6 +28,9 @@
 #include "engunit.h"
 #include "idt.h"
 #include "user_mem.h"
+#include "thread_info.h"
+
+#include "cpu_info.h"
 
 // Implements platform independent thread.h
 
@@ -44,25 +48,6 @@
 #define THREAD_STK_TRACE(...) ((void)0)
 #endif
 
-enum thread_state_t : uint32_t {
-    THREAD_IS_UNINITIALIZED = 0U,
-    THREAD_IS_INITIALIZING,
-    THREAD_IS_SLEEPING,
-    THREAD_IS_READY,
-    THREAD_IS_RUNNING,
-    THREAD_IS_EXITING,
-    THREAD_IS_DESTRUCTING,
-    THREAD_IS_FINISHED,
-
-    // Flag keeps other cpus from taking thread
-    // until after stack switch
-    THREAD_BUSY = 0x10U,
-    THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
-    THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
-    THREAD_IS_EXITING_BUSY = THREAD_IS_EXITING | THREAD_BUSY,
-    THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY,
-    THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY
-};
 
 // When state is equal to one of these:
 //  THREAD_IS_READY
@@ -103,131 +88,25 @@ using timestamp_t = uint64_t;
 //// debugger displays thread nicely
 //using ready_set_t = ext::fast_set<ext::pair<uintptr_t, thread_info_t*>>;
 //#else
-// might as well use the exact same one as contig_alloc
-using ready_set_t = ext::fast_set<ext::pair<uintptr_t, uintptr_t>>;
 //#endif
 
-struct alignas(256) thread_info_t {
-    // Exclusive line, frequently modified items, rarely shared
-
-    isr_context_t * volatile ctx;
-
-    // Modified every context switch and/or syscall
-    // TODO: need place to put 32 bit flags during syscall entry
-    void * volatile fsbase;
-    void * volatile gsbase;
-    uint32_t syscall_mxcsr, syscall_fcw87;
-    char * volatile xsave_ptr;
-
-    // Modified every context switch
-    uint64_t used_time;
-
-    // When used_time >= preempt_time, get a new timestamp
-    uint64_t preempt_time;
-
-    uint8_t reserved[8];
-
-    // --- cache line --- shared line
-
-    // 2 64-bit pointers
-    uint64_t reserved3[2];
-
-    // Owning process
-    process_t *process;
-
-    char *xsave_stack;
-
-    // Points to place in stack to use when an interrupt occurs at lower priv
-    char *priv_chg_stack;
-
-    thread_t thread_id;
-
-    // 1 until closed, then 0
-    int ref_count;
-
-    thread_state_t volatile state;
-
-    // Higher numbers are higher priority
-    thread_priority_t priority;
-    uint8_t reserved5[3];
-
-    uint64_t volatile wake_time;
-
-    // --- cache line ---
-
-    // 4 64-bit values
-    using lock_type = ext::irq_spinlock;   // 32 bytes
-    using scoped_lock = ext::unique_lock<lock_type>;
-    lock_type lock;
-
-    // 3 64-bit values
-    ext::condition_variable done_cond;
-
-    // Current CPU exception longjmp container
-    void *exception_chain;
-
-    // --- cache line ---
-
-    // Thread current kernel errno
-    errno_t errno;
-    // 3 bytes...
-
-    // Doesn't include guard pages
-    uint32_t stack_size;
-
-    uint32_t thread_flags;
-
-    uint32_t reserved4;
-
-    // Process exit code
-    intptr_t exit_code;
-
-    // 2 64-bit values
-    __cxa_eh_globals cxx_exception_info;
-
-    // Timestamp at moment thread was resumed
-    uint64_t sched_timestamp;
-
-    // Threads that got their timeslice sooner are ones that have slept,
-    // so they are implicitly higher priority
-    // When their timeslice is used up, they get a new one timestamped now
-    // losing their privileged status allowing other threads to have a turn
-    uint64_t timeslice_timestamp;
-
-    // Each time a thread context switches, time is removed from this value
-    // When it reaches zero, it is replenished, and timeslice_timestamp
-    // is set to now. Preemption is set up so the timer will fire when this
-    // time elapses (or the earliest timer expiry, whichever is earlier).
-    uint64_t timeslice_remaining;
-
-    // --- cache line ---
-
-    char *stack;
-
-    thread_cpu_mask_t cpu_affinity;
-
-    char const *name;
-
-    //bool closed;
-
-    // Iterator points to the node we inserted into
-    // scheduler list, otherwise default constructed
-    ready_set_t::const_iterator schedule_node;
-};
 
 static void thread_free_stacks(thread_info_t *thread);
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
 
 // Verify asm_constants.h values
-C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
-C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
-C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
-C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
-C_ASSERT(offsetof(thread_info_t, priv_chg_stack) == THREAD_PRIV_CHG_STACK_OFS);
-C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
-C_ASSERT(offsetof(thread_info_t, syscall_mxcsr) == THREAD_SC_MXCSR_OFS);
-C_ASSERT(offsetof(thread_info_t, syscall_fcw87) == THREAD_SC_FCW87_OFS);
+C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_INFO_FSBASE_OFS);
+C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_INFO_GSBASE_OFS);
+C_ASSERT(offsetof(thread_info_t, process) == THREAD_INFO_PROCESS_OFS);
+C_ASSERT(offsetof(thread_info_t, fpusave_ptr) == THREAD_INFO_FPUSAVE_PTR_OFS);
+C_ASSERT(offsetof(thread_info_t, priv_chg_stack) ==
+         THREAD_INFO_PRIV_CHG_STACK_OFS);
+C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_INFO_THREAD_ID_OFS);
+C_ASSERT(offsetof(thread_info_t, syscall_mxcsr) ==
+         THREAD_INFO_SYSCALL_MXCSR_OFS);
+C_ASSERT(offsetof(thread_info_t, syscall_fcw87) ==
+         THREAD_INFO_SYSCALL_FCW87_OFS);
 C_ASSERT(sizeof(thread_info_t) == THREAD_INFO_SIZE);
 
 // Save FPU context when interrupted in user mode
@@ -260,151 +139,14 @@ bool thread_cls_ready;
 
 static size_t constexpr xsave_stack_size = (size_t(8) << 10);
 
-void dump_scheduler_list(const char *prefix, ready_set_t &list);
-
-enum fpu_state_t : uint8_t {
-    // FPU is discarded at entry to syscall
-    discarded,
-    saved,
-    restored
-};
-
-struct alignas(256) cpu_info_t {
-    cpu_info_t *self = nullptr;
-
-    thread_info_t * volatile cur_thread = nullptr;
-
-    // Accessed every syscall
-    tss_t *tss_ptr = nullptr;
-    uintptr_t syscall_flags = 0;
-
-    bool online = false;
-    fpu_state_t fpu_state = discarded;
-    uint8_t apic_dcr = 0;
-
-    // in_irq is incremented after irq entry and decremented before irq exit
-    // you can expect setting should_reschedule to work when in_irq is > 0
-    // thread_entering_irq() and thread_finishing_irq() adjust the value
-    // of in_irq
-    uint8_t in_irq = 0;
-
-    // Which thread's context is in the FPU, or -1 if discarded
-    thread_t fpu_owner = -1;
-
-    thread_info_t *goto_thread = nullptr;
-
-    isr_syscall_context_t *syscall_ctx = nullptr;
-
-    // Context switch is prevented when this is nonzero
-    uint32_t locks_held = 0;
-    // When locks_held transitions to zero, a context switch is forced
-    // when this is true. Deferring a context switch because locks_held
-    // is nonzero sets this to true
-    uint32_t csw_deferred = 0;
-
-    // --- cache line ---
-
-    uint32_t apic_id = ~uint32_t(0);
-    uint32_t time_ratio = 0;
-
-    uint32_t busy_ratio = 0;
-    uint32_t busy_percent_x1M = 0;
-
-    uint32_t cr0_shadow = 0;
-    uint32_t cpu_nr = 0;
-
-    uint64_t irq_count = 0;
-
-    uint64_t irq_time = 0;
-
-    uint64_t pf_count = 0;
-
-    // Cleanup to be run after switching stacks on a context switch
-    void (*after_csw_fn)(void*) = nullptr;
-    void *after_csw_vp = nullptr;
-
-    // --- cache line ---
-
-    static constexpr const size_t max_cls = 8;
-    void *storage[max_cls] = {};
-
-    // --- cache line ---
-
-    // Resume ring. Cross-CPU thread_resume will enqueue a thread_id
-    // here and kick the target CPU with a reschedule IPI
-
-    // Each resumed thread takes 3 slots, thread id, exitcode low, exitcode hi
-    // Room enough for 4 items
-    struct resume_ent_t {
-        thread_t tid;
-        uint32_t ret_lo;
-        uint32_t ret_hi;
-    };
-
-    resume_ent_t resume_ring[4];
-    ext::atomic_uint8_t resume_head;
-    ext::atomic_uint8_t resume_tail;
-    bool should_reschedule;
-    uint8_t reserved5[5];
-    ext::irq_spinlock resume_lock;
-
-    // --- ^ 2 cache lines ---
-
-    using lock_type = ext::irq_spinlock;
-    using scoped_lock = ext::unique_lock<lock_type>;
-
-    // This lock protects ready_list and sleep_list
-    lock_type queue_lock;
-
-    // Oldest timeslice first
-    // Tree sorted in order of when timestamp was issued.
-    // Only threads that are ready to run appear in this tree.
-    // Threads that block on I/O and keep an old timeslice are
-    // selected to run before threads that keep using up their
-    // timeslice and therefore have newer timeslices.
-    // The threaded interrupt handler permanently has a timestamp
-    // equal to 1, making it utterly overrule every thread
-    ready_set_t ready_list;
-
-    // Sleeping threads are keyed here in the order they wake up,
-    // using (thread->wake_time). Threads waiting forever are here too.
-    ready_set_t sleep_list;
-
-    uint64_t volatile tlb_shootdown_count = 0;
-
-
-    static inline constexpr uint32_t resume_next(uint32_t curr)
-    {
-        return curr + 1 < 4 ? curr + 1 : 0;
-    }
-
-    bool enqueue_resume(thread_t tid, uintptr_t value)
-    {
-        size_t head = resume_head;
-
-        if (unlikely(resume_next(head) == resume_tail)) {
-            printdbg("Resume ring was full!");
-            return false;
-        }
-
-        THREAD_TRACE("Enqueuing cross cpu resume, tid=%d\n", tid);
-
-        resume_ring[head].tid = tid;
-        resume_ring[head].ret_lo = uint32_t(value & 0xFFFFFFFFU);
-        resume_ring[head].ret_hi = uint32_t((value >> 32) & 0xFFFFFFFFU);
-
-        resume_head = resume_next(resume_head);
-
-        return true;
-    }
-};
+void dump_scheduler_list(char const *prefix, ready_set_t &list);
 
 // Make sure pointer arithmetic would never do a divide
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
 // Verify asm_constants.h values
 C_ASSERT(offsetof(cpu_info_t, self) == CPU_INFO_SELF_OFS);
-C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
+C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CUR_THREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, apic_id) == CPU_INFO_APIC_ID_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, syscall_flags) == CPU_INFO_SYSCALL_FLAGS_OFS);
@@ -420,13 +162,13 @@ C_ASSERT((offsetof(cpu_info_t, self) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, apic_id) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, storage) & ~-64) == 0);
 C_ASSERT((offsetof(cpu_info_t, resume_ring) & ~-64) == 0);
-C_ASSERT((offsetof(cpu_info_t, queue_lock) & ~-64) == 0);
+//C_ASSERT((offsetof(cpu_info_t, queue_lock) & ~-64) == 0);
 C_ASSERT(sizeof(cpu_info_t) == CPU_INFO_SIZE);
 
 _section(".data.cpus")
 cpu_info_t cpus[MAX_CPUS];
 size_t const cpus_sizeof = sizeof(*cpus);
-cpu_info_t *cpus_end = cpus + MAX_CPUS;
+cpu_info_t * const cpus_end = cpus + MAX_CPUS;
 
 _constructor(ctor_cpu_init_cpus) static void cpus_init_ctor()
 {
@@ -674,9 +416,9 @@ static thread_t thread_create_with_state(
                     i, xsave_stack_size, "xsave", 0);
 
         assert(sse_context_size >= 512);
-        thread->xsave_ptr = xsave_stack - sse_context_size;
+        thread->fpusave_ptr = xsave_stack - sse_context_size;
     } else {
-        thread->xsave_ptr = nullptr;
+        thread->fpusave_ptr = nullptr;
     }
 
     thread->xsave_stack = xsave_stack;
@@ -703,7 +445,7 @@ static thread_t thread_create_with_state(
     isr_context_t *ctx = (isr_context_t*)ctx_addr;
     memset(ctx, 0, ctx_size);
 
-    ISR_CTX_FPU(ctx) = (isr_xsave_context_t*)thread->xsave_ptr;
+    ISR_CTX_FPU(ctx) = (isr_xsave_context_t*)thread->fpusave_ptr;
 
     ISR_CTX_REG_RSP(ctx) = stack_end;
 
@@ -1010,7 +752,7 @@ void thread_init(int ap)
         thread->stack_size = kernel_stack_size;
 
         thread->xsave_stack = nullptr;
-        thread->xsave_ptr = nullptr;
+        thread->fpusave_ptr = nullptr;
         thread->cpu_affinity = thread_cpu_mask_t(0);
         thread->name = "Idle(BSP)";
         atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
@@ -1299,149 +1041,203 @@ static void thread_csw_fpu(isr_context_t *ctx, cpu_info_t *cpu,
 {
     fpu_state_t& fpu_state = cpu->fpu_state;
 
-    if (incoming != outgoing) {
+    assume(incoming != outgoing);
+
+    //
+    // FPU context switch save and/or restore, lockout/unlock
+
+    unsigned from_cs = ISR_CTX_REG_CS(ctx);
+    unsigned to_cs = ISR_CTX_REG_CS(ctx);
+
+    bool from_kern = GDT_SEL_RPL_IS_KERNEL(from_cs);
+    bool to_kern = GDT_SEL_RPL_IS_KERNEL(to_cs);
+
+    bool from_cs64 = GDT_SEL_IS_C64(from_cs);
+    bool to_cs64 = GDT_SEL_IS_C64(to_cs);
+
+    bool from_fpu = outgoing->thread_flags & THREAD_FLAGS_ANY_FPU;
+    bool to_fpu = incoming->thread_flags & THREAD_FLAGS_ANY_FPU;
+
+    bool from_kern_fpu = outgoing->thread_flags & THREAD_FLAGS_KERNEL_FPU;
+    bool to_kern_fpu = incoming->thread_flags & THREAD_FLAGS_KERNEL_FPU;
+
+    enum action_t { ignore, ctrlwords, zeros, dataregs };
+
+    action_t save = ignore;
+
+    if (from_fpu) {
+        // Only save control words when fpu is discarded
+        if (fpu_state == discarded)
+            save = ctrlwords;
+
+        // Don't save FPU again on nested context save
+        else if (fpu_state == saved)
+            save = ignore;
+
+        // Possibly save FPU registers from kernel mode
+        else if (!from_kern || from_kern_fpu)
+            save = dataregs;
+    }
+
+    action_t restore = ignore;
+
+    if (to_fpu) {
+        // In decreasing order of likelihood
+        if (!to_kern)
+            restore = dataregs;
+        else if (!to_kern_fpu)
+            restore = ctrlwords;
+        else
+            restore = dataregs;
+    }
+
+    switch (save) {
+    case dataregs:
         //
-        // FPU context switch save and/or restore, lockout/unlock
+        // The outgoing FPU context needs to be saved
 
-        unsigned from_cs = ISR_CTX_REG_CS(ctx);
-        unsigned to_cs = ISR_CTX_REG_CS(ctx);
+        THREAD_TRACE("Saving fpu context of thread %#x\n",
+                     outgoing->thread_id);
 
-        bool from_kern = GDT_SEL_RPL_IS_KERNEL(from_cs);
-        bool to_kern = GDT_SEL_RPL_IS_KERNEL(to_cs);
-
-        bool from_cs64 = GDT_SEL_IS_C64(from_cs);
-        bool to_cs64 = GDT_SEL_IS_C64(to_cs);
-
-        bool from_fpu = outgoing->thread_flags & THREAD_FLAGS_ANY_FPU;
-        bool to_fpu = incoming->thread_flags & THREAD_FLAGS_ANY_FPU;
-
-        bool from_kern_fpu = outgoing->thread_flags & THREAD_FLAGS_KERNEL_FPU;
-        bool to_kern_fpu = incoming->thread_flags & THREAD_FLAGS_KERNEL_FPU;
-
-        enum action_t { ignore, ctrlwords, zeros, dataregs };
-
-        action_t save = ignore;
-
-        if (from_fpu) {
-            // Only save control words when fpu is discarded
-            if (fpu_state == discarded)
-                save = ctrlwords;
-
-            // Don't save FPU again on nested context save
-            else if (fpu_state == saved)
-                save = ignore;
-
-            // Possibly save FPU registers from kernel mode
-            else if (!from_kern || from_kern_fpu)
-                save = dataregs;
-        }
-
-        action_t restore = ignore;
-
-        if (to_fpu) {
-            // In decreasing order of likelihood
-            if (!to_kern)
-                restore = dataregs;
-            else if (!to_kern_fpu)
-                restore = ctrlwords;
-            else
-                restore = dataregs;
-        }
-
-        switch (save) {
-        case dataregs:
-            //
-            // The outgoing FPU context needs to be saved
-
-            THREAD_TRACE("Saving fpu context of thread %#x\n",
-                         outgoing->thread_id);
-
-            // Save it correctly
-            // Don't bother saving FPU for voluntary context switch
-            if (ISR_CTX_INTR(ctx) != INTR_THREAD_YIELD) {
-                ISR_CTX_FPU(outgoing->ctx) = from_cs64
-                        ? isr_save_fpu_ctx64(outgoing)
-                        : isr_save_fpu_ctx32(outgoing);
-            } else {
-                // Only save FPU control words, not data registers
-                outgoing->syscall_mxcsr = cpu_mxcsr_get();
-                outgoing->syscall_fcw87 = cpu_fcw_get();
-                ISR_CTX_FPU(outgoing->ctx) = nullptr;
-            }
-
-            fpu_state = saved;
-            break;
-
-        case ctrlwords:
+        // Save it correctly
+        // Don't bother saving FPU for voluntary context switch
+        if (ISR_CTX_INTR(ctx) != INTR_THREAD_YIELD) {
+            ISR_CTX_FPU(outgoing->ctx) = from_cs64
+                    ? isr_save_fpu_ctx64(outgoing)
+                    : isr_save_fpu_ctx32(outgoing);
+        } else {
+            // Only save FPU control words, not data registers
             outgoing->syscall_mxcsr = cpu_mxcsr_get();
             outgoing->syscall_fcw87 = cpu_fcw_get();
             ISR_CTX_FPU(outgoing->ctx) = nullptr;
-            fpu_state = saved;
-            break;
-
-        case zeros:
-        case ignore:
-            assert(ISR_CTX_FPU(outgoing->ctx) == nullptr);
-            break;
         }
 
-        switch (restore) {
-        case dataregs:
-            //
-            // The incoming FPU context needs to be restored
+        fpu_state = saved;
+        break;
 
-            // If FPU is blocked...
-            if (cpu->cr0_shadow & CPU_CR0_TS) {
-                // Clear TS flag to unblock access to FPU
-                cpu->cr0_shadow &= ~CPU_CR0_TS;
-                cpu_cr0_clts();
-            }
+    case ctrlwords:
+        outgoing->syscall_mxcsr = cpu_mxcsr_get();
+        outgoing->syscall_fcw87 = cpu_fcw_get();
+        ISR_CTX_FPU(outgoing->ctx) = nullptr;
+        fpu_state = saved;
+        break;
 
-            THREAD_TRACE("Restoring fpu context of thread %#x\n",
-                         incoming->thread_id);
+    case zeros:
+    case ignore:
+        assert(ISR_CTX_FPU(outgoing->ctx) == nullptr);
+        break;
+    }
 
-            if (ISR_CTX_FPU(ctx)) {
-                // Use the correct one
-                if (likely(to_cs64))
-                    isr_restore_fpu_ctx64(incoming);
-                else
-                    isr_restore_fpu_ctx32(incoming);
+    switch (restore) {
+    case dataregs:
+        //
+        // The incoming FPU context needs to be restored
 
-            } else if (ISR_CTX_INTR(ctx) == INTR_THREAD_YIELD) {
-                // Restore just control words
-                cpu_mxcsr_set(incoming->syscall_mxcsr);
-                cpu_fcw_set(incoming->syscall_fcw87);
-            }
-
-            fpu_state = restored;
-            break;
-
-        case ctrlwords:
-        case zeros:
-            if (!(cpu->cr0_shadow & CPU_CR0_TS))
-                cpu_clear_fpu();
-            fpu_state = saved;
-            break;
-
-        case ignore:
-            break;
+        // If FPU is blocked...
+        if (cpu->cr0_shadow & CPU_CR0_TS) {
+            // Clear TS flag to unblock access to FPU
+            cpu->cr0_shadow &= ~CPU_CR0_TS;
+            cpu_cr0_clts();
         }
 
-        if (to_fpu) {
-            if (cpu->cr0_shadow & CPU_CR0_TS) {
-                // Allow use of FPU
-                THREAD_TRACE("FPU allowed\n");
-                cpu->cr0_shadow &= ~CPU_CR0_TS;
-                cpu_cr0_clts();
-            }
-        } else if ((cpu->cr0_shadow & CPU_CR0_TS) == 0) {
-            // Lock out the FPU
-            // Set TS flag to block access to FPU
-            THREAD_TRACE("FPU locked out\n");
-            cpu->cr0_shadow |= CPU_CR0_TS;
-            cpu_cr0_set(cpu->cr0_shadow);
+        THREAD_TRACE("Restoring fpu context of thread %#x\n",
+                     incoming->thread_id);
+
+        if (ISR_CTX_FPU(ctx)) {
+            // Use the correct one
+            if (likely(to_cs64))
+                isr_restore_fpu_ctx64(incoming);
+            else
+                isr_restore_fpu_ctx32(incoming);
+
+        } else if (ISR_CTX_INTR(ctx) == INTR_THREAD_YIELD) {
+            // Restore just control words
+            cpu_mxcsr_set(incoming->syscall_mxcsr);
+            cpu_fcw_set(incoming->syscall_fcw87);
+        }
+
+        fpu_state = restored;
+        break;
+
+    case ctrlwords:
+    case zeros:
+        if (!(cpu->cr0_shadow & CPU_CR0_TS))
+            cpu_clear_fpu();
+        fpu_state = saved;
+        break;
+
+    case ignore:
+        break;
+    }
+
+    if (to_fpu) {
+        if (cpu->cr0_shadow & CPU_CR0_TS) {
+            // Allow use of FPU
+            THREAD_TRACE("FPU allowed\n");
+            cpu->cr0_shadow &= ~CPU_CR0_TS;
+            cpu_cr0_clts();
+        }
+    } else if ((cpu->cr0_shadow & CPU_CR0_TS) == 0) {
+        // Lock out the FPU
+        // Set TS flag to block access to FPU
+        THREAD_TRACE("FPU locked out\n");
+        cpu->cr0_shadow |= CPU_CR0_TS;
+        cpu_cr0_set(cpu->cr0_shadow);
+    }
+}
+
+void arch_thread_cswitch(thread_info_t* const outgoing,
+                         isr_context_t *ctx, thread_info_t *incoming)
+{
+    assume(outgoing != incoming);
+
+    outgoing->fsbase = cpu_fsbase_get();
+    outgoing->gsbase = cpu_altgsbase_get();
+
+    if (outgoing->fsbase != incoming->fsbase)
+        cpu_fsbase_set((void*)incoming->fsbase);
+
+    // User threads are expected to always have null gsbase
+    if (unlikely(outgoing->gsbase != incoming->gsbase))
+        cpu_altgsbase_set((void*)incoming->gsbase);
+
+    // If segments changed
+    if (unlikely(ISR_CTX_REG_SEG_IMG(outgoing->ctx) !=
+                 ISR_CTX_REG_SEG_IMG(ctx))) {
+        if (unlikely(ISR_CTX_REG_DS(outgoing->ctx) !=
+                     ISR_CTX_REG_DS(ctx)))
+            cpu_ds_set(ISR_CTX_REG_DS(ctx));
+
+        if (unlikely(ISR_CTX_REG_ES(outgoing->ctx) !=
+                     ISR_CTX_REG_ES(ctx)))
+            cpu_es_set(ISR_CTX_REG_ES(ctx));
+
+        if (unlikely(ISR_CTX_REG_FS(outgoing->ctx) !=
+                     ISR_CTX_REG_FS(ctx))) {
+            cpu_fs_set(ISR_CTX_REG_FS(ctx));
+
+            cpu_fsbase_set((void*)incoming->fsbase);
+        }
+
+        if (unlikely(ISR_CTX_REG_GS(outgoing->ctx) !=
+                     ISR_CTX_REG_GS(ctx))) {
+            // Move the kernel gsbase to safety
+            cpu_swapgs();
+
+            // Load the incoming gs
+            cpu_gs_set(ISR_CTX_REG_GS(ctx));
+
+            cpu_gsbase_set((void*)incoming->gsbase);
+
+            // Restore kernel gsbase
+            cpu_swapgs();
         }
     }
+
+    // Update CR3
+    if (unlikely(ISR_CTX_REG_CR3(outgoing->ctx) !=
+                 ISR_CTX_REG_CR3(ctx)))
+        cpu_page_directory_set(ISR_CTX_REG_CR3(ctx));
 }
 
 _hot
@@ -1598,58 +1394,12 @@ isr_context_t *thread_schedule(isr_context_t *ctx, bool was_timer)
     //if (timeslice < UINT64_MAX)
     thread_set_timer(cpu->apic_dcr, timeslice);
 
-    thread_csw_fpu(ctx, cpu, outgoing, thread);
 
     if (thread != outgoing) {
-        // Swap fsgsbase context
+        // Swap context
 
-        outgoing->fsbase = cpu_fsbase_get();
-        outgoing->gsbase = cpu_altgsbase_get();
-
-        if (outgoing->fsbase != thread->fsbase)
-            cpu_fsbase_set((void*)thread->fsbase);
-
-        // User threads are expected to always have null gsbase
-        if (unlikely(outgoing->gsbase != thread->gsbase))
-            cpu_altgsbase_set((void*)thread->gsbase);
-
-        // If segments changed
-        if (unlikely(ISR_CTX_REG_SEG_IMG(outgoing->ctx) !=
-                     ISR_CTX_REG_SEG_IMG(ctx))) {
-            if (unlikely(ISR_CTX_REG_DS(outgoing->ctx) !=
-                         ISR_CTX_REG_DS(ctx)))
-                cpu_ds_set(ISR_CTX_REG_DS(ctx));
-
-            if (unlikely(ISR_CTX_REG_ES(outgoing->ctx) !=
-                         ISR_CTX_REG_ES(ctx)))
-                cpu_es_set(ISR_CTX_REG_ES(ctx));
-
-            if (unlikely(ISR_CTX_REG_FS(outgoing->ctx) !=
-                         ISR_CTX_REG_FS(ctx))) {
-                cpu_fs_set(ISR_CTX_REG_FS(ctx));
-
-                cpu_fsbase_set((void*)thread->fsbase);
-            }
-
-            if (unlikely(ISR_CTX_REG_GS(outgoing->ctx) !=
-                         ISR_CTX_REG_GS(ctx))) {
-                // Move the kernel gsbase to safety
-                cpu_swapgs();
-
-                // Load the incoming gs
-                cpu_gs_set(ISR_CTX_REG_GS(ctx));
-
-                cpu_gsbase_set((void*)thread->gsbase);
-
-                // Restore kernel gsbase
-                cpu_swapgs();
-            }
-        }
-
-        // Update CR3
-        if (unlikely(ISR_CTX_REG_CR3(outgoing->ctx) !=
-                     ISR_CTX_REG_CR3(ctx)))
-            cpu_page_directory_set(ISR_CTX_REG_CR3(ctx));
+        thread_csw_fpu(ctx, cpu, outgoing, thread);
+        arch_thread_cswitch(outgoing, ctx, thread);
     }
 
     thread->sched_timestamp = (uint64_t(thread->priority ^ 0xFF) << 56) | now;
@@ -2509,7 +2259,7 @@ int sys_sigreturn(void *mctx)
 
     assert(data_ptr >= uintptr_t(data));
 
-    mcontext_x86_fpu_t * fpuctx = (mcontext_x86_fpu_t*)data_ptr;
+    mcontext_x86_fpu_t *fpuctx = (mcontext_x86_fpu_t*)data_ptr;
 
     if (process->use64) {
         if (unlikely(!mm_is_user_range(mctx, sizeof(mcontext_t))))

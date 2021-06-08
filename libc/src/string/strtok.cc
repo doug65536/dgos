@@ -1,3 +1,8 @@
 #include <string.h>
 
-//char *strtok(char *restrict, char const *restrict);
+static __thread char *strtok_current;
+
+char *strtok(char * restrict str, char const * restrict delim)
+{
+    return strtok_r(str, delim, &strtok_current);
+}

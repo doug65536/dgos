@@ -72,5 +72,8 @@ for module in $modules; do
 done
 
 if [[ -n "$failed" ]]; then
+    echo errors! failed
     exit 1
+else
+    echo good
 fi

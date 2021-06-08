@@ -1,7 +1,7 @@
 #pragma once
 #include "errno.h"
 #include "mutex.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "chrono.h"
 
 namespace dgos {
@@ -71,7 +71,7 @@ public:
                     const& timeout_time)
     {
         return wait_until(ext::chrono::steady_clock::time_point(
-                              timeout_time).time_since_epoch().count());
+                          timeout_time).time_since_epoch().count());
     }
 
     bool wait_until(uint64_t timeout_time);

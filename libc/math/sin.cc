@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <sys/math_targets.h>
 
 static constexpr double PI = 3.14159265358979323;
 static constexpr double PI2 = 6.28318530717958647;
@@ -156,7 +157,7 @@ T __sinimpl(T x)
 }
 
 extern "C"
-__attribute__((__target_clones__("default,avx")))
+__TARGET_CLONES
 __attribute__((__flatten__))
 double sin(double x)
 {
@@ -164,7 +165,7 @@ double sin(double x)
 }
 
 extern "C"
-__attribute__((__target_clones__("default,avx")))
+__TARGET_CLONES
 __attribute__((__flatten__))
 float sinf(float x)
 {

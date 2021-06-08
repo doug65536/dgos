@@ -1,5 +1,5 @@
 #include "time.h"
-#include "cpu/halt.h"
+#include "halt.h"
 #include "thread.h"
 #include "printk.h"
 #include "export.h"

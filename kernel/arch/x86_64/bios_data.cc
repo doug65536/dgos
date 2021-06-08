@@ -2,7 +2,7 @@
 #include "mm.h"
 #include "callout.h"
 
-char *zero_page;
+extern HIDDEN char *zero_page;
 
 static void biosdata_remap(void *arg)
 {

@@ -86,12 +86,12 @@ private:
 
     // keybd_dev_t interface
 public:
-    int set_layout_name(const char *name) override final;
+    int set_layout_name(char const *name) override final;
     int get_modifiers() override final;
     int set_indicators(int indicators) override final;
 };
 
-int usb_hid_keybd_t::set_layout_name(const char *name)
+int usb_hid_keybd_t::set_layout_name(char const *name)
 {
     // FIXME
     return -int(errno_t::ENOTSUP);

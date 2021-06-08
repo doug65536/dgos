@@ -14,6 +14,8 @@
 #include "user_mem.h"
 #include "string.h"
 
+__BEGIN_ANONYMOUS
+
 struct iso9660_factory_t : public fs_factory_t {
 public:
     iso9660_factory_t();
@@ -1099,3 +1101,5 @@ int iso9660_fs_t::poll(fs_file_info_t *fi,
 }
 
 static iso9660_factory_t iso9660_factory;
+
+__END_ANONYMOUS

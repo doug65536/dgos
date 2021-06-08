@@ -30,7 +30,7 @@ int pthread_mutex_timedlock(pthread_mutex_t *m, timespec const *timeout_time)
 
     // Spin 1000x first time, 1x after waits
     for (int spins_remain = 1000; ; spins_remain = 1) {
-        for ( ; value == -1 || --spins_remain; __builtin_ia32_pause()) {
+        for ( ; value == -1 || --spins_remain; __pause()) {
             if (likely(value == -1)) {
                 if (likely(__atomic_compare_exchange_n(
                             &m->owner, &value, tid, true,

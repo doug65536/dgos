@@ -13,7 +13,7 @@ PCI_DRIVER_BY_CLASS(
 #include "printk.h"
 #include "stdlib.h"
 #include "mm.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "string.h"
 #include "hash_table.h"
 #include "mutex.h"
@@ -899,14 +899,17 @@ private:
                        usb_desctype_t desc_type,
                        uint8_t desc_index);
 
+    _use_result
     usb_cc_t fetch_inp_ctx(int slotid, int epid, usbxhci_inpctx_t &inp,
                       usbxhci_inpctlctx_t **p_ctlctx,
                       usbxhci_slotctx_t **p_inpslotctx,
                       usbxhci_ep_ctx_t **p_inpepctx);
 
+    _use_result
     usb_cc_t commit_inp_ctx(int slotid, int epid,
                             usbxhci_inpctx_t &inp, uint32_t trb_type);
 
+    _use_result
     usb_cc_t update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc);
 
     void get_config(uint8_t slotid, usb_desc_config *desc, uint8_t desc_size,
@@ -914,8 +917,10 @@ private:
 
     void cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp);
 
+    _use_result
     usbxhci_endpoint_data_t *add_endpoint(uint8_t slotid, uint8_t epid);
 
+    _use_result
     usbxhci_endpoint_data_t *lookup_endpoint(uint8_t slotid, uint8_t epid);
 
     bool remove_endpoint(uint8_t slotid, uint8_t epid);
@@ -1133,7 +1138,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
     ext::unique_ptr<usbxhci_endpoint_data_t> newepd(
             new (ext::nothrow) usbxhci_endpoint_data_t);
 
-    if (!newepd)
+    if (unlikely(!newepd))
         return nullptr;
 
     newepd->target.slotid = slotid;
@@ -1150,7 +1155,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
     }
     newepd->ring.reserve_link();
 
-    if (!endpoint_lookup.insert(newepd)) {
+    if (unlikely(!endpoint_lookup.insert(newepd))) {
         endpoints.pop_back();
         return nullptr;
     }
@@ -1911,7 +1916,7 @@ bool usbxhci::alloc_pipe(int slotid, usb_pipe_t &pipe,
                          int max_packet_sz, int interval,
                          usb_ep_attr ep_type)
 {
-    if (slotid < 0)
+    if (unlikely(slotid < 0))
         return false;
 
     if (likely(lookup_endpoint(slotid, epid))) {
@@ -1919,11 +1924,11 @@ bool usbxhci::alloc_pipe(int slotid, usb_pipe_t &pipe,
         return true;
     }
 
-    if (!assert(epid != 0))
+    if (unlikely(!assert(epid != 0)))
         return false;
 
     usbxhci_endpoint_data_t *epd = add_endpoint(slotid, epid);
-    if (!epd)
+    if (unlikely(!epd))
         return false;
 
     usbxhci_inpctx_t inp;
@@ -1934,7 +1939,11 @@ bool usbxhci::alloc_pipe(int slotid, usb_pipe_t &pipe,
     bool in = epid & 0x80;
     int ep_index = epid & 0xF;
 
-    fetch_inp_ctx(slotid, ep_index, inp, &ctlctx, &inpslotctx, &inpepctx);
+    usb_cc_t cc;
+    cc = fetch_inp_ctx(slotid, ep_index, inp,
+                       &ctlctx, &inpslotctx, &inpepctx);
+    if (unlikely(!assert(cc != usb_cc_t::success)))
+        return false;
 
     int bit_index;
     if (in)
@@ -1963,8 +1972,8 @@ bool usbxhci::alloc_pipe(int slotid, usb_pipe_t &pipe,
 
     USBXHCI_EPCTX_CEH_EPTYPE_SET(ep->ceh, ep_type_value);
 
-    usb_cc_t cc = commit_inp_ctx(slotid, epid, inp,
-                                 USBXHCI_TRB_TYPE_CONFIGUREEPCMD);
+    cc = commit_inp_ctx(slotid, epid, inp,
+                        USBXHCI_TRB_TYPE_CONFIGUREEPCMD);
     if (unlikely(cc != usb_cc_t::success)) {
         pipe = usb_pipe_t(nullptr, -1, -1);
         return false;
@@ -2196,7 +2205,10 @@ usb_cc_t usbxhci::update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc)
     usbxhci_slotctx_t *inpslotctx;
     usbxhci_ep_ctx_t *inpepctx;
 
-    fetch_inp_ctx(slotid, 0, inp, &ctlctx, &inpslotctx, &inpepctx);
+    usb_cc_t cc;
+    cc = fetch_inp_ctx(slotid, 0, inp, &ctlctx, &inpslotctx, &inpepctx);
+    if (unlikely(!assert(cc == usb_cc_t::success)))
+        return cc;
 
     // Update max packet size
     inpepctx->max_packet = dev_desc->maxpktsz;
@@ -2206,10 +2218,12 @@ usb_cc_t usbxhci::update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc)
     // Set A0 and A1
     ctlctx->add_bits = (1 << 0) | (1 << 1);
 
-    usb_cc_t status = commit_inp_ctx(slotid, 0, inp,
-                                     USBXHCI_TRB_TYPE_EVALCTXCMD);
+    cc = commit_inp_ctx(slotid, 0, inp,
+                        USBXHCI_TRB_TYPE_EVALCTXCMD);
 
-    return status;
+    assert(cc == usb_cc_t::success);
+
+    return cc;
 }
 
 void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
@@ -2363,12 +2377,25 @@ void usbxhci::irq_handler(int irq_ofs)
             uint32_t portsc = p.portsc;
 
 #if USBXHCI_DEBUG
+            // Connect status change
             bool conn_chg = USBXHCI_PORTSC_CSC_GET(portsc);
+
+            // Port enabled/disabled change
             bool enab_chg = USBXHCI_PORTSC_PEC_GET(portsc);
+
+            // Warm port reset change
             bool wrst_chg = USBXHCI_PORTSC_WRC_GET(portsc);
+
+            // Overcurrent change
             bool curr_chg = USBXHCI_PORTSC_OCC_GET(portsc);
+
+            // Port reset change
             bool rset_chg = USBXHCI_PORTSC_PRC_GET(portsc);
+
+            // Port link state change
             bool link_chg = USBXHCI_PORTSC_PLC_GET(portsc);
+
+            // Port config error change
             bool cerr_chg = USBXHCI_PORTSC_CEC_GET(portsc);
 #endif
 

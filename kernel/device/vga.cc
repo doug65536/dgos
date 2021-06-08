@@ -39,7 +39,7 @@ public:
         return -int(errno_t::ENOSYS);
     }
 
-    ssize_t write(const char *buf, size_t size, off_t offset) override final
+    ssize_t write(char const *buf, size_t size, off_t offset) override final
     {
         user_str_t text(buf, size, user_str_t::truncate_t());
 

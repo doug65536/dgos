@@ -27,13 +27,12 @@ _use_result
 _const
 KERNEL_API size_t mm_max_user_len(void const *buf);
 
-
-__END_DECLS
-
 using mm_copy_string_result_t = ext::pair<ext::string, bool>;
 
 KERNEL_API mm_copy_string_result_t mm_copy_user_string(
         char const *user_src, size_t max_size);
+
+__END_DECLS
 
 struct user_str_t {
     struct truncate_t {};

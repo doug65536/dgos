@@ -9,6 +9,9 @@ __BEGIN_ANONYMOUS
 
 #define CHARHEIGHT 16
 
+#define _sse2 __attribute__((__target__("sse2")))
+#define _avx2 __attribute__((__target__("avx2")))
+
 struct bitmap_glyph_t {
     uint8_t bits[CHARHEIGHT];
 };
@@ -43,20 +46,24 @@ private:
     static void bit8_to_pixels_generic(uint32_t * restrict out, uint8_t bitmap,
                                        uint32_t bg, uint32_t fg);
 
+#if defined(__x86_64__) || defined(__i386__)
     static void bit8_to_pixels_sse(uint32_t * restrict out, uint8_t bitmap,
                                    uint32_t bg, uint32_t fg);
 
     static void bit8_to_pixels_avx2(uint32_t * restrict out, uint8_t bitmap,
                                     uint32_t bg, uint32_t fg);
+#endif
 
     static void bit8_to_pixels_transparent_generic(
             uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
 
+#if defined(__x86_64__) || defined(__i386__)
     static void bit8_to_pixels_transparent_sse(
             uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
 
     static void bit8_to_pixels_transparent_avx2(
             uint32_t * restrict out, uint8_t bitmap, uint32_t fg);
+#endif
 };
 
 vga_font_t::bit8_to_pixels_ptr vga_font_t::bit8_to_pixels;
@@ -86,11 +93,11 @@ class vga_console_ring_t : public vga_console_t {
 public:
     vga_console_ring_t(int32_t width, int32_t height);
 
-    void reset() final;
-    void new_line(uint32_t color) final;
+    void reset() override final;
+    void new_line(uint32_t color) override final;
     void write(char const *data, size_t size,
-               uint32_t bg, uint32_t fg) final;
-    void render(fb_info_t *fb, int dx, int dy, int dw, int dh) final;
+               uint32_t bg, uint32_t fg) override final;
+    void render(fb_info_t *fb, int dx, int dy, int dw, int dh) override final;
 
     inline uint32_t wrap_row(uint32_t row) const
     {
@@ -241,14 +248,25 @@ comp_area_t *comp_areas;
 size_t comp_areas_capacity;
 size_t comp_areas_size;
 
+#define PAGE_SIZE 4096
+#define HEAP_OVERHEAD 64
+
 static bool grow_areas()
 {
     size_t new_capacity;
 
-    if (comp_areas_capacity)
-        new_capacity = comp_areas_capacity * 2;
-    else
-        new_capacity = 16;
+    // Grow in whole pages
+    if (comp_areas_capacity) {
+        size_t old_pages = (comp_areas_capacity * sizeof(comp_area_t) +
+                (PAGE_SIZE - 1)) / PAGE_SIZE;
+                
+        size_t new_pages = old_pages * 2;
+        
+        new_capacity = ((new_pages * PAGE_SIZE) - 
+                HEAP_OVERHEAD) / sizeof(comp_area_t);
+    } else {
+        new_capacity = (PAGE_SIZE-64)/sizeof(comp_area_t);
+    }
 
     comp_area_t *new_comp_areas = (comp_area_t*)realloc(
                 comp_areas, sizeof(*comp_areas) * new_capacity);
@@ -578,21 +596,29 @@ void vga_console_ring_t::new_line(uint32_t color)
 
 vga_font_t::bit8_to_pixels_ptr vga_font_t::bit8_to_pixels_resolve()
 {
+#if defined(__x86_64__) || defined(__i386__)
     return __builtin_cpu_supports("avx2")
             ? bit8_to_pixels_avx2
             : __builtin_cpu_supports("sse2")
               ? bit8_to_pixels_sse
               : bit8_to_pixels_generic;
+#else
+    return bit8_to_pixels_generic;
+#endif
 }
 
 vga_font_t::bit8_to_pixels_transparent_ptr
 vga_font_t::bit8_to_pixels_transparent_resolve()
 {
+#if defined(__x86_64__) || defined(__i386__)
     return __builtin_cpu_supports("avx2")
             ? &vga_font_t::bit8_to_pixels_transparent_avx2
             : __builtin_cpu_supports("sse2")
               ? &vga_font_t::bit8_to_pixels_transparent_sse
               : &vga_font_t::bit8_to_pixels_transparent_generic;
+#else
+    return &vga_font_t::bit8_to_pixels_transparent_generic;
+#endif
 }
 
 void vga_font_t::resolver()
@@ -673,12 +699,12 @@ void vga_font_t::bit8_to_pixels_transparent_generic(
     out[7] = bitmap & 0x01 ? fg : out[7];
 }
 
-__attribute__((__target__("sse2")))
+#if defined(__x86_64__) || defined(__i386__)
+_sse2
 void vga_font_t::bit8_to_pixels_sse(
         uint32_t * restrict out, uint8_t bitmap,
         uint32_t bg, uint32_t fg)
 {
-#ifdef __x86_64__
     __m128i map = _mm_set1_epi32(bitmap);
 
     __m128i lomask = _mm_set_epi32(0x8, 0x4, 0x2, 0x1);
@@ -700,19 +726,9 @@ void vga_font_t::bit8_to_pixels_sse(
 
     _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out), lomask);
     _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out + 4), himask);
-#else
-    out[0] = bitmap & 0x80 ? fg : bg;
-    out[1] = bitmap & 0x40 ? fg : bg;
-    out[2] = bitmap & 0x20 ? fg : bg;
-    out[3] = bitmap & 0x10 ? fg : bg;
-    out[4] = bitmap & 0x08 ? fg : bg;
-    out[5] = bitmap & 0x04 ? fg : bg;
-    out[6] = bitmap & 0x02 ? fg : bg;
-    out[7] = bitmap & 0x01 ? fg : bg;
-#endif
 }
 
-__attribute__((__target__("avx2")))
+_avx2
 void vga_font_t::bit8_to_pixels_avx2(
         uint32_t * restrict out, uint8_t bitmap, uint32_t fg, uint32_t bg)
 {
@@ -744,7 +760,7 @@ void vga_font_t::bit8_to_pixels_avx2(
     _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(out), mask);
 }
 
-__attribute__((__target__("sse2")))
+_sse2
 void vga_font_t::bit8_to_pixels_transparent_sse(
         uint32_t * restrict out, uint8_t bitmap, uint32_t fg)
 {
@@ -783,7 +799,7 @@ void vga_font_t::bit8_to_pixels_transparent_sse(
     _mm_storeu_si128(reinterpret_cast<__m128i_u*>(out + 4), himask);
 }
 
-__attribute__((__target__("avx2")))
+_avx2
 void vga_font_t::bit8_to_pixels_transparent_avx2(
         uint32_t * restrict out, uint8_t bitmap, uint32_t fg)
 {
@@ -815,8 +831,9 @@ void vga_font_t::bit8_to_pixels_transparent_avx2(
     // Store 8 pixels
     _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(out), mask);
 }
+#endif
 
-void vga_console_ring_t::write(const char *data, size_t size,
+void vga_console_ring_t::write(char const *data, size_t size,
                                uint32_t bg, uint32_t fg)
 {
     // 16 32-bit pixels == 1 cache line of output pixels

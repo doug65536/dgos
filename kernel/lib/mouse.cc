@@ -4,7 +4,7 @@
 #include "export.h"
 #include "fs/devfs.h"
 #include "pipe.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "user_mem.h"
 
 #define DEBUG_MOUSE 0

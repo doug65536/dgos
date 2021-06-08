@@ -294,13 +294,13 @@ public:
         using other = bump_allocator<_U, _Alloc>;
     };
 
-    bump_allocator()
+    constexpr bump_allocator()
     {
     }
 
-    bump_allocator(bump_allocator const&) = default;
-    bump_allocator(bump_allocator&&) noexcept = default;
-    bump_allocator& operator=(bump_allocator const&) = default;
+    constexpr bump_allocator(bump_allocator const&) = default;
+    constexpr bump_allocator(bump_allocator&&) noexcept = default;
+    constexpr bump_allocator& operator=(bump_allocator const&) = default;
 
     template<typename _U>
     bump_allocator(bump_allocator<_U, _Alloc> const& rhs)

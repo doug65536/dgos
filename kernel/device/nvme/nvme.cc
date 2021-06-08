@@ -13,7 +13,7 @@ PCI_DRIVER_BY_CLASS(
 #include "device/pci.h"
 #include "mm.h"
 #include "printk.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "nvme.bits.h"
 #include "string.h"
 #include "utility.h"
@@ -625,11 +625,9 @@ private:
     sub_queue_t sub_queue;
     cmp_queue_t cmp_queue;
 
-    void wait_sub_queue_not_full(scoped_lock& lock_);
-
     _use_result
-    bool wait_sub_queue_not_full_until(scoped_lock &lock_,
-                                       int64_t timeout_time);
+    bool wait_sub_queue_not_full_until(
+            scoped_lock &lock_, int64_t timeout_time);
 
     ext::vector<nvme_cmp_t> cmp_buf;
 
@@ -1712,12 +1710,6 @@ bool nvme_queue_state_t::submit_cmd(
     sub_queue.enqueue(ext::move(cmd));
 
     return true;
-}
-
-void nvme_queue_state_t::wait_sub_queue_not_full(scoped_lock& lock_)
-{
-    while (sub_queue.is_full())
-        not_full.wait(lock_);
 }
 
 bool nvme_queue_state_t::wait_sub_queue_not_full_until(

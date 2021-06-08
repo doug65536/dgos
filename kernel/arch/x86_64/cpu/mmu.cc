@@ -133,24 +133,21 @@ static void mmu_init(int ap)
                 ? aligned_en - aligned_st
                 : 0;
 
-        if (unlikely(!aligned_sz))
-            continue;
-
-        // If availble, update free and total sums
-        if (ranges[i].type == PHYSMEM_TYPE_NORMAL) {
+        switch (ranges[i].type) {
+        case PHYSMEM_TYPE_NORMAL:
+            // Available, update free and total sums
             free_mem += aligned_sz;
+
+            // fall through
+        case PHYSMEM_TYPE_ALLOCATED:
+            // Taken but potentially freeable
             total_mem += aligned_sz;
+
+            // If the end is past the highest usable address so far
+            if (aligned_sz && top_mem < aligned_en)
+                top_mem = aligned_en;
+
         }
-
-        // If allocated, just update total sum
-        if (ranges[i].type == PHYSMEM_TYPE_ALLOCATED)
-            total_mem += aligned_sz;
-
-        // If the end of this is past the highest usable address so far
-        if (top_mem < aligned_en &&
-                (ranges[i].type == PHYSMEM_TYPE_ALLOCATED ||
-                 ranges[i].type == PHYSMEM_TYPE_NORMAL))
-            top_mem = aligned_en;
     }
 
     // Allocate enough page tables for 4x overcommit
@@ -827,7 +824,7 @@ static size_t mmu_fixup_mem_map(physmem_range_t *list, size_t count)
     for (size_t i = 0; i < count; ++i) {
         physmem_range_t const& item = list[i];
 
-        usable_count += (item.type == PHYSMEM_TYPE_NORMAL);
+        usable_count += item.is_normal();
 
         // Sanity
         if (i > 0) {
@@ -1463,8 +1460,44 @@ no_landing_pad:
 
 static void mmu_configure_pat(void)
 {
-    if (likely(cpuid_has_pat()))
+    // We are expecting this to be in the AP startup code before it enters
+    // the threading system, and the BSP has the cache and MTRRs disabled
+    // and is spinning waiting for this CPU to enter the threading system
+
+    assert(!(cpu_eflags_get() & CPU_EFLAGS_IF));
+    if (likely(cpuid_has_pat())) {
+        // Intel manual vol 3 11.11.8 MTRR Considerations in MP Systems
+        // for explanation of why all this
+        
+        cpu_cache_disable();
+        
+        // Manual specifically says you can skip flush if self snoop supported
+        if (likely(!cpuid_has_self_snoop()))
+            cpu_cache_flush();
+        
+        cpu_tlb_flush();
+        
+        // Disable the MTRRs
+        uint64_t old_mtrr_en = cpu_msr_change_bits(CPU_MTRR_DEF_TYPE, 
+            CPU_MTRR_DEF_TYPE_MTRR_EN | CPU_MTRR_DEF_TYPE_FIXED_EN, 0);
+        
+        // Now that we have utterly killed it and all memory access is UC,
+        // and everything is a cache miss every time...
+        
+        // Change the PAT config
         cpu_msr_set(CPU_MSR_IA32_PAT, PAT_CFG);
+        
+        // Enable the MTRRs
+        cpu_msr_set(CPU_MTRR_DEF_TYPE, old_mtrr_en);
+        
+        // Intel manual vaguely implies that future processors might need this
+        cpu_cache_flush();
+        
+        // Required on all out of order processors
+        cpu_tlb_flush();
+        
+        cpu_cache_enable();
+    }
 }
 
 #define INIT_DEBUG 1
@@ -1480,11 +1513,10 @@ static size_t mm_large_page_pool_count;
 
 static void mmu_take_large_pages()
 {
-    uint64_t wanted = thread_cpu_count();
-
     // Take from the highest addresses
-    for (size_t i = usable_early_mem_ranges; i > 0 &&
-         mm_large_page_pool_count < countof(mm_large_page_pool); ++i) {
+    for (size_t i = usable_early_mem_ranges,
+         e = countof(mm_large_page_pool);
+         i > 0 && mm_large_page_pool_count < e; --i) {
         physmem_range_t &range = early_mem_ranges[i - 1];
 
         // Look for usable
@@ -1534,6 +1566,10 @@ static void mmu_take_large_pages()
     }
 }
 
+// Separate allocators for 1GB and 2MB capable regions
+mmu_phys_allocator_t phys_allocator_1gb;
+mmu_phys_allocator_t phys_allocator_2mb;
+
 static void mmu_init()
 {
     // just a curiosity, crashes in qemu-kvm
@@ -1556,7 +1592,8 @@ static void mmu_init()
 
     if (unlikely(sizeof(*phys_mem_map) * phys_mem_table_size >
             sizeof(phys_mem_map))) {
-        printk("Warning: Memory map is too large to fit\n");
+        printk("Warning: Memory map is too large"
+               " to fit all source entries\n");
     }
 
     for (size_t i = 0; i < phys_mem_table_size; ++i) {
@@ -1564,15 +1601,18 @@ static void mmu_init()
         printdbg("raw physmem:"
                  " base=%16" PRIx64
                  " size=%16" PRIx64
+                 " %4sB"
                  " type=%s\n",
                  range.base, range.size,
+                 engineering_t(range.size, 0, true).ptr(),
                  range.type < physmem_names_count
                  ? physmem_names[range.type]
                  : "<unknown>");
     }
 
     memcpy(phys_mem_map, table,
-           ext::min(sizeof(phys_mem_map), sizeof(*phys_mem_map) *
+           ext::min(sizeof(phys_mem_map),
+                    sizeof(*phys_mem_map) *
                     phys_mem_table_size));
 
     if (unlikely(phys_mem_table_size > countof(phys_mem_map)))
@@ -1585,20 +1625,20 @@ static void mmu_init()
                 phys_mem_map, phys_mem_map_count);
 
     if (unlikely(usable_early_mem_ranges > countof(early_mem_ranges))) {
-        printdbg("Physical memory is incredibly fragmented!\n");
+        printdbg("Physical memory is incredibly fragmented! Truncating\n");
         usable_early_mem_ranges = countof(early_mem_ranges);
     }
 
 
     for (physmem_range_t *ranges_in = phys_mem_map,
-         *ranges_out = early_mem_ranges;
-         ranges_out < early_mem_ranges + usable_early_mem_ranges;
-         ++ranges_in) {
-        if (ranges_in->type == PHYSMEM_TYPE_NORMAL)
+         *ranges_out = early_mem_ranges,
+         *ranges_end = phys_mem_map + phys_mem_map_count;
+         ranges_in < ranges_end; ++ranges_in) {
+        if (ranges_in->is_normal())
             *ranges_out++ = *ranges_in;
     }
 
-    mmu_take_large_pages();
+    //mmu_take_large_pages();
 
     size_t usable_pages = 0;
     physaddr_t highest_usable = 0;
@@ -1624,9 +1664,10 @@ static void mmu_init()
     // Compute number of slots needed
     highest_usable >>= PAGE_SIZE_BIT;
 
-    printdbg("Usable pages = %" PRIu64 " (%" PRIu64 "MB)"
+    printdbg("Usable pages above 1MB = %" PRIu64 " (%4sB)"
              " range_pages=%" PRId64 "\n",
-             usable_pages, usable_pages >> (20 - PAGE_SIZE_BIT),
+             usable_pages,
+             engineering_t(usable_pages << PAGE_SIZE_BIT, 0, true).ptr(),
              highest_usable);
 
     //
@@ -2059,7 +2100,7 @@ static pte_t *mm_create_pagetables_aligned(
                         (zeros_page | PTE_WRITABLE));
 
                 pte_t previous = atomic_cmpxchg(base + i, old, replacement);
-                if (previous != old) {
+                if (unlikely(previous != old)) {
                     assert(pte_is_sysmem(previous));
                     free_batch.free(page);
                 }
@@ -2075,15 +2116,16 @@ static pte_t *mm_create_pagetables_aligned(
 }
 
 template<typename T>
-static _always_inline constexpr T zero_if_false(bool cond, T bits)
+static _always_inline _always_optimize constexpr 
+T zero_if_false(bool cond, T bits)
 {
-    return bits & -cond;
+    return bits & -(T)cond;
 }
 
 template<typename T>
 static _always_inline T select_mask(bool cond, T true_val, T false_val)
 {
-    T mask = -cond;
+    T mask = -(T)cond;
     return (true_val & mask) | (false_val & ~mask);
 }
 

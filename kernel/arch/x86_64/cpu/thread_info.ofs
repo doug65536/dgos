@@ -1,0 +1,12 @@
+type: thread_info_t
+fsbase
+gsbase
+process
+fpusave_ptr
+priv_chg_stack
+thread_id
+syscall_mxcsr
+syscall_fcw87
+
+code:
+#include "arch/x86_64/cpu/thread_info.h"

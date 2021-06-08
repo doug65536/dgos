@@ -260,5 +260,9 @@ private:
     uint8_t shift_state;
 };
 
+__BEGIN_DECLS
+
 KERNEL_API int keybd_add(keybd_dev_t *keybd_dev);
 KERNEL_API bool keybd_remove(keybd_dev_t *keybd_dev);
+
+__END_DECLS

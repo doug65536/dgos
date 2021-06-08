@@ -11,4 +11,8 @@ extern char ___init_brk[];
 extern char kernel_stack[];
 extern size_t const kernel_stack_size;
 
+__BEGIN_DECLS
+
 size_t kernel_get_size();
+
+__END_DECLS

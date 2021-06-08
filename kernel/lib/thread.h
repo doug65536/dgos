@@ -1,6 +1,6 @@
 #pragma once
 #include "types.h"
-#include "cpu/spinlock.h"
+#include "spinlock.h"
 #include "cpu/spinlock_arch.h"
 #include "errno.h"
 
@@ -20,6 +20,26 @@ using thread_priority_t = uint8_t;
 using thread_fn_t = intptr_t(*)(void*);
 
 void thread_check_stack(int intr);
+
+enum thread_state_t : uint32_t {
+    THREAD_IS_UNINITIALIZED = 0U,
+    THREAD_IS_INITIALIZING,
+    THREAD_IS_SLEEPING,
+    THREAD_IS_READY,
+    THREAD_IS_RUNNING,
+    THREAD_IS_EXITING,
+    THREAD_IS_DESTRUCTING,
+    THREAD_IS_FINISHED,
+
+    // Flag keeps other cpus from taking thread
+    // until after stack switch
+    THREAD_BUSY = 0x10U,
+    THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
+    THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
+    THREAD_IS_EXITING_BUSY = THREAD_IS_EXITING | THREAD_BUSY,
+    THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY,
+    THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY
+};
 
 _noreturn
 void thread_startup(thread_fn_t fn, void *p, thread_t id);

@@ -1,7 +1,7 @@
 #include "eth_q.h"
 #include "mm.h"
 #include "assert.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "printk.h"
 #include "mutex.h"
 

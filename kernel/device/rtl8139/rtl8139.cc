@@ -10,7 +10,7 @@ PCI_DRIVER(rtl8139,
 #include "callout.h"
 #include "printk.h"
 #include "stdlib.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "mm.h"
 #include "irq.h"
 #include "mutex.h"

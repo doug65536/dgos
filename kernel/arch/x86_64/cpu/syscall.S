@@ -2,6 +2,8 @@
 
 #include "control_regs_constants.h"
 #include "asm_constants.h"
+#include "cpu_info.ofs.h"
+#include "thread_info.ofs.h"
 #include "cfi_helpers.h"
 #include "cpu_bug.h"
 #include "fixup.h"
@@ -118,10 +120,9 @@ syscall32_entry:
 
     // Read the syscall vector
     lea syscall_handlers(%rip),%r11
-    movq (%r11,%rax,8),%rax
 
     // Call the syscall handler
-    indirect_call rax
+    indirect_call_mem rax,"(%r11,%rax,8)"
 
     // Restore flags
     pop_cfi %r11

@@ -101,7 +101,7 @@
 16 LWS Port link state write strobe
 17 CSC (RW1CS) Connect status change (1=changed)
 18 PEC (RW1CS) Port enabled/disabled change (1=changed)
-19 WRC (RW1CS) Warn port reset change (1=changed)
+19 WRC (RW1CS) Warm port reset change (1=changed)
 20 OCC (RW1CS) Overcurrent change (1=changed)
 21 PRC (RW1CS) Port reset change (1=changed)
 22 PLC (RW1CS) Port link state change (1=changed)

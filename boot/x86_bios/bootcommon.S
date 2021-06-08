@@ -16,7 +16,7 @@ early_init:
     // It is at least a 486 with CPUID instruction if it made it to here
     // without freezing with unsupported CPU message
 
-    calll clear_bss
+    callw clear_bss
 
     // 32 bit instructions are okay if detect_ancient_cpu returned...
 
@@ -77,7 +77,8 @@ boot:
     movl %edx,%esi
     movl %ecx,%edi
 
-    call idt_init
+    call idt_init_32
+    call idt_init_64
     call cpu_a20_check
     // Do need a20 toggles if A20 was off
     xorb $ 1,%al
@@ -125,6 +126,8 @@ pmode_entry:
 
     xorl %eax,%eax
     lldt %ax
+
+    lidt idtr_32+2
 
     mov %esp,%ebp
     and $ -16,%esp
@@ -333,61 +336,52 @@ update_eflags:
     popl %eax
     ret
 
-.global idt_init
-idt_init:
+.global idt_init_64
+idt_init_64:
     push %edi
     push %esi
 
-    // Set up a far pointer to isr_table at %es:(%esi,%ecx,4)
+    // Set up a far pointer to isr_table of 16bit at %es:(%esi,%ecx,2)
     movl $ isr_table,%eax
+    mov %eax,%ecx
     mov %eax,%esi
-    shr $ 4,%eax
+    shr $ 4,%ecx
     and $ 0xF,%esi
-    movw %ax,%es
+    movw %cx,%es
 
-    // Setup a far pointer to idt at %ds:(%edi,%ecx,8)
-    mov $ idt,%eax
+    // Setup a far pointer to idt at %ds:(%edi,%ecx,16)
+    mov $ idt_64,%eax
+    mov %eax,%ecx
     mov %eax,%edi
-    shr $ 4,%eax
+    shr $ 4,%ecx
     and $ 0xF,%edi
     mov %cx,%ds
 
-    xor %ecx,%ecx
-
-    // Fetch function pointer from table
-0:  movzwl %es:(%esi,%ecx,2),%eax
-
-    // offset 15:0
+    add $ 64*8,%edi
+    mov $ -64,%ecx
+    sub %ecx,%esi
+0:  movzwl %es:(%esi,%ecx,1),%eax
     movw %ax,(%edi,%ecx,8)
-
-    // cs selector
     movw $ GDT_SEL_KERNEL_CODE64,2(%edi,%ecx,8)
-
-    // unused 0
-    movb $ 0,4(%edi,%ecx,8)
-
-    // type_attr
-    movw $ 0x8e,5(%edi,%ecx,8)
-
-    // offset 31:16
-    shr $ 16,%eax
-    movw %ax,6(%edi,%ecx,8)
-
-    // Loop
-    addl $ 1,%ecx
-    cmpl $ 32,%ecx
-    jb 0b
+    movw $ 0x8e00,%ax
+    movl %eax,4(%edi,%ecx,8)
+    xorl %eax,%eax
+    movl %eax,8(%edi,%ecx,8)
+    movl %eax,12(%edi,%ecx,8)
+    addl $ 2,%ecx
+    jnz 0b
 
     // Far pointer to idtr in %ds:(%eax)
     mov $ idtr_64,%ecx
+    mov %ecx,%edx
     mov %ecx,%eax
     shr $ 4,%ecx
     and $ 0xF,%eax
     movw %cx,%ds
 
     // Set limit
-    movw $ 32 * 8 - 1,6(%eax)
-    movl $ idt,8(%eax)
+    movw $ 32 * 16 - 1,6(%eax)
+    movl %edx,8(%eax)
 
     xor %eax,%eax
     mov %ax,%ds
@@ -397,8 +391,32 @@ idt_init:
     pop %edi
     ret
 
-.Lidt_ptr:
-    .int idt
+.global idt_init_32
+idt_init_32:
+    push %esi
+    push %edi
+
+    // Set up a far pointer to idt_32 at %es:(%esi,%ecx,4)
+    movl $ idt_32,%eax
+    mov %eax,%esi
+    shr $ 4,%eax
+    and $ 0xF,%esi
+    movw %ax,%ds
+
+    // Translate several simple function pointers to IDT interrupt gates
+    mov $ -32,%ecx
+0:  movl 32*8(%esi,%ecx,8),%eax
+    movw $ GDT_SEL_PM_CODE32,32*8+2(%esi,%ecx,8)
+    movw $ 0x8e00,%ax
+    movl %eax,32*8+4(%esi,%ecx,8)
+    addl $ 1,%ecx
+    jnz 0b
+
+    xor %eax,%eax
+    movw %ax,%ds
+    pop %edi
+    pop %esi
+    ret
 
 // Returns true if a20 is on
 .global cpu_a20_check
@@ -430,7 +448,7 @@ cpu_a20_check:
 //  %al = 1 to expect on, 0 to expect off
 .global cpu_a20_wait
 cpu_a20_wait:
-    movb %al,%dl
+    movzbl %al,%edx
 
     // cpu_a20_chk = wraparound(cpu_a20_chk) + 1
 0:  movb cpu_a20_chk + 0x100000,%al
@@ -438,7 +456,7 @@ cpu_a20_wait:
     movb %al,cpu_a20_chk
 
     // If wraparound(cpu_a20_chk) has not changed, a20 is on
-    decb %al
+    addb $ -1,%al
     cmpb %al,cpu_a20_chk + 0x100000
     sete %al
     cmpb %al,%dl
@@ -476,7 +494,7 @@ clear_bss:
     popl %eax
     popl %ecx
     popl %edi
-    ret
+    retw
 
 .code32
 .balign 16
@@ -487,6 +505,26 @@ __cxa_atexit:
 .section .lowdata, "w", @progbits
 cpu_a20_chk:
     .space 1
+
+.balign 8
+.global idtr_64
+idtr_64:
+    .short 0, 0, 0
+    .short 32*16-1
+    .int idt_64
+    .int 0
+
+.global idtr_32
+idtr_32:
+    .short 0
+    .short (idt_32_en-1) - idt_32
+    .int idt_32
+
+.global idtr_rm
+idtr_rm:
+    .short 0
+    .short 256*4-1
+    .int 0
 
 .section .lowtext, "ax", @progbits
 
@@ -503,3 +541,122 @@ ___unrelocated:
     .skip 512
 ___unrelocated_end:
 
+.section .data
+// extern idt_entry_t idt_32[]
+// extern idt_entry_t idt_32_en[]
+.global idt_32
+idt_32:
+    .int int_entry_00_div, 0
+    .int int_entry_01_debug, 0
+    .int int_entry_02_nmi, 0
+    .int int_entry_03_breakpoint, 0
+    .int int_entry_04_overflow, 0
+    .int int_entry_05_bound, 0
+    .int int_entry_06_opcode, 0
+    .int int_entry_07_dev_not_av, 0
+    .int int_entry_08_dblfault, 0
+    .int int_entry_09_copr_seg, 0
+    .int int_entry_0A_tss, 0
+    .int int_entry_0B_segment, 0
+    .int int_entry_0C_stack, 0
+    .int int_entry_0D_gen_prot, 0
+    .int int_entry_0E_page_fault, 0
+    .int int_entry_0F_reserved, 0
+    .int int_entry_10_ex_math, 0
+    .int int_entry_11_alignment, 0
+    .int int_entry_12_machine_check, 0
+    .int int_entry_13_simd, 0
+    .int int_entry_14_virtualize, 0
+    .int int_entry_15_reserved, 0
+    .int int_entry_16_reserved, 0
+    .int int_entry_17_reserved, 0
+    .int int_entry_18_reserved, 0
+    .int int_entry_19_reserved, 0
+    .int int_entry_1A_reserved, 0
+    .int int_entry_1B_reserved, 0
+    .int int_entry_1C_reserved, 0
+    .int int_entry_1D_reserved, 0
+    .int int_entry_1E_reserved, 0
+    .int int_entry_1F_reserved, 0
+
+.global idt_32_en
+idt_32_en:
+
+.macro isr_entry has_code intr
+    .cfi_startproc
+    .if \has_code == 0
+        // Stack has ss,esp,eflags,cs,eip
+        .cfi_def_cfa esp,5*4
+        .cfi_offset ss,-1*4
+        .cfi_offset esp,-2*4
+        .cfi_offset eflags,-3*4
+        .cfi_offset cs,-4*4
+        .cfi_offset eip,-5*4
+        push $ 0
+        .cfi_adjust_cfa_offset 4
+    .else
+        .cfi_def_cfa esp,6*4
+        .cfi_offset ss,-1*4
+        .cfi_offset esp,-2*4
+        .cfi_offset eflags,-3*4
+        .cfi_offset cs,-4*4
+        .cfi_offset eip,-5*4
+    .endif
+    pushl $ \intr
+    .cfi_adjust_cfa_offset 4
+    jmp isr_common_32
+    .cfi_endproc
+.endm
+
+.code32
+
+int_entry_00_div          : isr_entry 0 0
+int_entry_01_debug        : isr_entry 0 1
+int_entry_02_nmi          : isr_entry 0 2
+int_entry_03_breakpoint   : isr_entry 0 3
+int_entry_04_overflow     : isr_entry 0 4
+int_entry_05_bound        : isr_entry 0 5
+int_entry_06_opcode       : isr_entry 0 6
+int_entry_07_dev_not_av   : isr_entry 0 7
+int_entry_08_dblfault     : isr_entry 1 8
+int_entry_09_copr_seg     : isr_entry 0 9
+int_entry_0A_tss          : isr_entry 1 10
+int_entry_0B_segment      : isr_entry 1 11
+int_entry_0C_stack        : isr_entry 1 12
+int_entry_0D_gen_prot     : isr_entry 1 13
+int_entry_0E_page_fault   : isr_entry 1 14
+int_entry_0F_reserved     : isr_entry 0 15
+int_entry_10_ex_math      : isr_entry 0 16
+int_entry_11_alignment    : isr_entry 1 17
+int_entry_12_machine_check: isr_entry 0 18
+int_entry_13_simd         : isr_entry 0 19
+int_entry_14_virtualize   : isr_entry 0 20
+int_entry_15_reserved     : isr_entry 1 21
+int_entry_16_reserved     : isr_entry 0 22
+int_entry_17_reserved     : isr_entry 0 23
+int_entry_18_reserved     : isr_entry 0 24
+int_entry_19_reserved     : isr_entry 0 25
+int_entry_1A_reserved     : isr_entry 0 26
+int_entry_1B_reserved     : isr_entry 0 27
+int_entry_1C_reserved     : isr_entry 0 28
+int_entry_1D_reserved     : isr_entry 0 29
+int_entry_1E_reserved     : isr_entry 0 30
+int_entry_1F_reserved     : isr_entry 0 31
+
+isr_common_32:
+    .cfi_startproc
+    .cfi_def_cfa esp,7*4
+    .cfi_offset ss,6*4
+    .cfi_offset esp,5*4
+    .cfi_offset eflags,4*4
+    .cfi_offset cs,3*4
+    .cfi_offset eip,2*4
+    push %eax
+    push %ecx
+    push %edx
+0:
+    call cpu_debug_break
+    cli
+    hlt
+    jmp 0b
+    .cfi_endproc

@@ -90,7 +90,7 @@ void set_playback2_sample_rate(unsigned rate)
 //    SampleRateConverter[0x77] = (frequency >> 1);
 }
 
-int module_main(int argc, const char * const *argv)
+int module_main(int argc, char const * const *argv)
 {
     pci_dev_iterator_t pci_iter;
 

@@ -1,3 +1,4 @@
+#include <sys/math_targets.h>
 
 static constexpr double PI = 3.14159265358979323;
 static constexpr double PI2 = 6.28318530717958647;
@@ -47,14 +48,14 @@ T __cosimpl(T x)
 }
 
 extern "C"
-__attribute__((__target_clones__("default,avx")))
+__TARGET_CLONES
 double cos(double x)
 {
     return __cosimpl<double>(x);
 }
 
 extern "C"
-__attribute__((__target_clones__("default,avx")))
+__TARGET_CLONES
 float cosf(float x)
 {
     return __cosimpl<float>(x);

@@ -832,7 +832,7 @@ path_t::operator bool() const
     return valid && err == errno_t::OK;
 }
 
-user_str_t::user_str_t(const char *user_str)
+user_str_t::user_str_t(char const *user_str)
 {
     // Get a pointer to aligned storage
     char *buf = reinterpret_cast<char *>(&data);
@@ -857,7 +857,7 @@ user_str_t::user_str_t(const char *user_str)
     }
 }
 
-user_str_t::user_str_t(const char *user_str, size_t truncate_len, truncate_t)
+user_str_t::user_str_t(char const *user_str, size_t truncate_len, truncate_t)
 {
     truncate_len = ext::min(max_sz, truncate_len);
     lenof_str = 0;
@@ -882,7 +882,7 @@ public:
     int release(fs_file_info_t *fi) override;
     ssize_t read(fs_file_info_t *fi, char *buf,
                  size_t size, off_t offset) override;
-    ssize_t write(fs_file_info_t *fi, const char *buf,
+    ssize_t write(fs_file_info_t *fi, char const *buf,
                   size_t size, off_t offset) override;
 };
 
@@ -922,7 +922,7 @@ ssize_t socket_fs_t::read(fs_file_info_t *fi,
 }
 
 ssize_t socket_fs_t::write(fs_file_info_t *fi,
-                           const char *buf, size_t size, off_t offset)
+                           char const *buf, size_t size, off_t offset)
 {
     return 0;
 }

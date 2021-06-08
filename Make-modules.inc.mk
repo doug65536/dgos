@@ -9,11 +9,11 @@ KERNEL_MODULE_INCLUDE_DIRS = \
 	$(top_srcdir)/kernel/net \
 	$(top_srcdir)/kernel/lib/cc \
 	$(top_srcdir)/kernel/arch \
-	$(top_srcdir)/kernel/arch/x86_64 \
+	$(top_srcdir)/kernel/arch/@ARCH@ \
 	$(top_srcdir)/user/libutf
 
 KERNEL_MODULE_INCLUDE_FLAGS = $(patsubst %,-I%,$(KERNEL_MODULE_INCLUDE_DIRS))
-	
+
 KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(COMPILER_FLAGS) \
 	$(NO_COMMON_FLAGS) \
@@ -38,7 +38,7 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 
 KERNEL_MODULE_LDFLAGS_SHARED = \
 	-Wl,-shared \
-	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
+	-Wl,-T$(top_srcdir)/kernel/arch/@ARCH@/module.ld \
 	-Wl,-z,max-page-size=4096 \
 	-Wl,--relax \
 	-Wl,--eh-frame-hdr \
@@ -49,7 +49,7 @@ KERNEL_MODULE_LDADD_SHARED = \
 	libkm.a
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
-	$(top_srcdir)/kernel/arch/x86_64/module.ld \
+	$(top_srcdir)/kernel/arch/@ARCH@/module.ld \
 	libkm.a
 
 KERNEL_MODULE_LDFLAGS_FN = \
@@ -412,6 +412,29 @@ fat32_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_fat32_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+# NTFS filesystem module
+
+bin_PROGRAMS += ntfs.km
+generate_symbols_list += ntfs.km
+generate_kallsym_list += ntfs.km
+
+ntfs_km_SOURCES = \
+	kernel/fs/ntfs/ntfs.cc \
+	kernel/fs/ntfs/ntfs_decl.h
+
+ntfs_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+ntfs_km_LDFLAGS = \
+	$(call KERNEL_MODULE_LDFLAGS_FN,ntfs)
+
+ntfs_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_ntfs_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========

@@ -40,6 +40,7 @@ arch_run_kernel:
 0:  mov %r13,%cr3
 
     // Caller and caller's stack (probably) just vanished, let's tell debugger
+    .cfi_def_cfa rsp,0
     .cfi_undefined rip
     .cfi_undefined rsp
 

@@ -264,12 +264,12 @@ ssize_t vt100_out_t::recv_csi(char *buf, size_t sz,
     }
 }
 
-ssize_t vt100_out_t::send(const char *str, size_t sz)
+ssize_t vt100_out_t::send(char const *str, size_t sz)
 {
     return uart->write(str, sz);
 }
 
-ssize_t vt100_out_t::send(const char *str)
+ssize_t vt100_out_t::send(char const *str)
 {
     size_t sz = strlen(str);
     return send(str, sz);

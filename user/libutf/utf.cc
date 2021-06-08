@@ -368,6 +368,46 @@ size_pair_t tchar_to_utf8(char *output, size_t output_sz,
     };
 }
 
+size_pair_t tchar_to_utf16(char16_t *output, size_t output_sz,
+                           char const *input, size_t input_sz)
+{
+    char32_t codepoint;
+
+    char const *in = input;
+    char16_t *out = output;
+
+    do {
+        codepoint = utf8_to_ucs4_upd(in);
+        out += ucs4_to_utf16(out, codepoint);
+    } while (codepoint);
+
+    return {
+        size_t(out - output),
+        size_t(in - input)
+    };
+}
+
+size_pair_t tchar_to_utf16(char16_t * restrict output, size_t output_sz,
+                           char16_t const * restrict input, size_t input_sz)
+{
+    size_t i;
+
+    for (i = 0; i < output_sz && i < input_sz; ++i) {
+        output[i] = input[i];
+
+        if (!input[i])
+            break;
+    }
+
+    i -= (i == output_sz);
+    output[i] = 0;
+
+    return {
+        i,
+        i
+    };
+}
+
 size_pair_t tchar_to_utf8(char *output, size_t output_sz,
                           char16_t const *input, size_t input_sz)
 {

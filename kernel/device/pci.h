@@ -86,7 +86,7 @@ struct KERNEL_API pci_config_hdr_t {
     // 0x34
     uint8_t capabilities_ptr;
 
-    // 0x35
+    // 0x35howe
     uint8_t reserved[7];
 
     // 0x3C
@@ -170,11 +170,12 @@ struct KERNEL_API pci_dev_iterator_t : public pci_dev_t {
     bool operator==(pci_dev_iterator_t const& rhs) const;
 };
 
+__BEGIN_DECLS
+
 // Update pci_describe_device if any device classes,
 // subclasses, or progif are added here
-KERNEL_API char const *pci_describe_device(pci_dev_iterator_t const& pci_iter);
-
-__BEGIN_DECLS
+KERNEL_API char const *pci_describe_device_iter(
+        pci_dev_iterator_t const& pci_iter);
 
 KERNEL_API char const *pci_describe_device(
         uint8_t cls, uint8_t sc, uint8_t pif);
@@ -569,6 +570,7 @@ __END_DECLS
 
 // == MMIO accessor helpers
 
+#if defined(__x86_64__)
 #define _MM_WR_IMPL(suffix, type, mm, value) \
     __asm__ __volatile__ ( \
         "mov" suffix " %" type "[src],(%q[dest])\n\t" \
@@ -586,6 +588,27 @@ __END_DECLS
         : "memory" \
     ); \
     return value
+#elif defined(__aarch64__)
+#define _MM_WR_IMPL(suffix, type, mm, value) \
+    __asm__ __volatile__ ( \
+        "str %" type "[src],[%[dest]]\n\t" \
+        : \
+        : [dest] "r" (&(mm)) \
+        , [src] "r" (value) \
+        : "memory" \
+    )
+
+#define _MM_RD_IMPL(suffix, type, value, mm) \
+    __asm__ __volatile__ ( \
+        "ldr [%[src]],%" type "[dest]\n\t" \
+        : [dest] "=r" (value) \
+        : [src] "r" (&(mm)) \
+        : "memory" \
+    ); \
+    return value
+#else
+#error Unimplemented processor
+#endif
 
 _always_optimize
 static _always_inline void mm_wr(uint8_t volatile& dest, uint8_t src)

@@ -4,7 +4,7 @@
 #include "printk.h"
 
 struct source_location {
-    const char *filename;
+    char const *filename;
     uint32_t line;
     uint32_t column;
 };

@@ -1,0 +1,66 @@
+-- PTE
+62:59 PBHA
+58:55 AVAIL1
+54 XN
+53 PXN
+52 CONTIGUOUS
+51 DBM
+50 GP
+16 nT Block translation entry
+15:12 OA
+51:12 ADDR
+11 nG Not global
+10 AF Accessed flag
+9:8 SH Shareability
+7:6 AP
+5 NS
+4:2 ATTRINDX
+1 TABLE
+0 PRESENT
+
+-- SCTLR_EL1 System Control Register (EL1)
+57 EPAN Enhanced privileged access never
+56 EnALS
+55 EnAS0
+54 EnASR
+49:46 TWEDEL
+45 TWEDEn
+44 DSSBS
+43 ATA Access to allocation tags is allowed in EL1
+42 ATA0 Access to allocation tags is allowed in EL0
+41:40 TCF Tag check fault in EL1
+39:38 TCF0 Tag check fault in EL0
+37 ITFSB
+36 BTI
+35 BT0
+31 EnIA
+30 EnIB
+29 LSMAOE
+28 nTLSMD
+27 EnDA
+26 UCI
+25 EE
+24 E0E
+23 SPAN
+22 EIS
+21 IESB
+20 TSCXT
+19 WXN
+18 nTWE
+16 nTWI
+15 UCT
+14 DZE
+13 EnDB
+12 I
+11 EOS
+10 EnRCTX
+9 UMA
+8 SED
+7 ITD
+6 nAA
+5 CP15BEN
+4 SA0
+3 SA
+2 C
+1 A
+0 M

@@ -44,21 +44,22 @@ diff -durN gdb-8.1/gdb/remote-original.c gdb-8.1/gdb/remote.c
    set_gdbarch_frame_align (gdbarch, i386_frame_align);
 --- orig-gdb-9.1/config.sub 2020-09-24 23:03:45.059540100 -0400
 +++ gdb-9.1/config.sub      2020-10-07 01:18:00.736370961 -0400
-@@ -1346,7 +1346,7 @@
+@@ -1343,7 +1343,7 @@
  	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
  	     | sym* | kopensolaris* | plan9* \
  	     | amigaos* | amigados* | msdos* | newsos* | unicos* | aof* \
--	     | aos* | aros* | cloudabi* | sortix* \
-+	     | aos* | aros* | cloudabi* | sortix* | dgos* \
+-	     | aos* | aros* | cloudabi* | sortix* | twizzler* \
++	     | aos* | aros* | cloudabi* | sortix* | twizzler* | dgos* \
  	     | nindy* | vxsim* | vxworks* | ebmon* | hms* | mvs* \
  	     | clix* | riscos* | uniplus* | iris* | isc* | rtu* | xenix* \
  	     | knetbsd* | mirbsd* | netbsd* \
-@@ -1367,7 +1367,7 @@
+@@ -1364,7 +1364,7 @@
  	     | morphos* | superux* | rtmk* | windiss* \
  	     | powermax* | dnix* | nx6 | nx7 | sei* | dragonfly* \
  	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
 -	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
 +	     | onefs* | tirtos* | phoenix* | fuchsia* | dgos* | redox* | bme* \
- 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi*)
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+ 	     | nsk* | powerunix)
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;

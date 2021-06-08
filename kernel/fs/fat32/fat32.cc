@@ -7,15 +7,8 @@
 #include "bitsearch.h"
 #include "pool.h"
 #include "fat32_decl.h"
-#include "unique_ptr.h"
-#include "threadsync.h"
-#include "time.h"
-#include "vector.h"
 #include "bootinfo.h"
-#include "inttypes.h"
-#include "cxxstring.h"
 #include "user_mem.h"
-#include "time.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -236,13 +229,12 @@ int fat32_fs_t::mm_fault_handler(
     uint64_t lba = lba_st + sector_offset;
 
     int result;
-    if (likely(read)) {
-        printdbg("Demand paging LBA %" PRId64 " at addr %p\n", lba, addr);
-
-        result = drive->read_blocks(addr, length >> sector_shift, lba);
-    } else {
+    if (likely(!read)) {
         printdbg("Writing back LBA %" PRId64 " at addr %p\n", lba, addr);
         result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
+    } else {
+        printdbg("Demand paging LBA %" PRId64 " at addr %p\n", lba, addr);
+        result = drive->read_blocks(addr, length >> sector_shift, lba);
     }
 
     if (result < 0)
@@ -437,7 +429,7 @@ char *fat32_fs_t::name_from_lfns(char *pathname, full_lfn_t const *full)
     char16_t chunk[(sizeof(full->fragments[0].long_entry.name) +
             sizeof(full->fragments[0].long_entry.name2) +
             sizeof(full->fragments[0].long_entry.name3)) /
-            sizeof(uint16_t)];
+            sizeof(char16_t)];
 
     char *out = pathname;
 

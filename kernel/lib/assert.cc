@@ -1,7 +1,7 @@
 #include "assert.h"
 #include "printk.h"
 #include "cpu/control_regs.h"
-#include "cpu/halt.h"
+#include "halt.h"
 #include "export.h"
 #include "debug.h"
 

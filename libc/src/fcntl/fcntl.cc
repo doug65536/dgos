@@ -9,7 +9,37 @@ int fcntl(int fd, int cmd, ...)
 {
     va_list ap;
     va_start(ap, cmd);
-    long status = syscall3(fd, cmd, uintptr_t(ap), SYS_fcntl);
+
+    void *arg = nullptr;
+
+    switch (cmd) {
+    case F_DUPFD:
+        break;
+
+    case F_DUPFD_CLOEXEC:
+        break;
+
+    case F_GETFD:
+        break;
+
+    case F_SETFD:
+        break;
+
+    case F_GETFL:
+        break;
+
+    case F_SETFL:
+        break;
+
+    case F_SETLK:
+    case F_SETLKW:
+    case F_GETLK:
+        arg = va_arg(ap, flock *);
+        break;
+
+    }
+
+    long status = syscall3(fd, cmd, uintptr_t(arg), SYS_fcntl);
     va_end(ap);
 
     if (likely(status >= 0))

@@ -2,7 +2,7 @@
 #include "types.h"
 #include "dirent.h"
 #include "errno.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "device/iocp.h"
 #include "vector.h"
 #include "basic_set.h"
@@ -221,14 +221,19 @@ struct KERNEL_API storage_if_base_t {
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
         & name##_factory, callout_type_t::late_dev, "000")
 
+__BEGIN_DECLS
+
 KERNEL_API bool storage_if_unregister_factory(storage_if_factory_t *factory);
 KERNEL_API void storage_if_register_factory(storage_if_factory_t *factory);
 
 typedef int dev_t;
 
+
 size_t storage_dev_count();
 storage_dev_base_t *storage_dev_open(dev_t dev);
 void storage_dev_close(storage_dev_base_t *dev);
+
+__END_DECLS
 
 template<typename T>
 bool unregister_factory(ext::vector<T*> &factories,
@@ -567,6 +572,8 @@ class KERNEL_API fs_base_ro_t : public fs_base_t {
 class KERNEL_API fs_nosys_t : public fs_base_t {
     // fs_base_t interface
 public:
+    constexpr fs_nosys_t() {}
+
     void unmount() override;
     bool is_boot() const override;
     int resolve(fs_file_info_t *dirfi,
@@ -606,7 +613,7 @@ public:
     int release(fs_file_info_t *fi) override;
     ssize_t read(fs_file_info_t *fi, char *buf,
                  size_t size, off_t offset) override;
-    ssize_t write(fs_file_info_t *fi, const char *buf,
+    ssize_t write(fs_file_info_t *fi, char const *buf,
                   size_t size, off_t offset) override;
     int ftruncate(fs_file_info_t *fi, off_t offset) override;
     int fstat(fs_file_info_t *fi, fs_stat_t *st) override;
@@ -618,20 +625,23 @@ public:
                size_t blocksize, uint64_t *blockno) override;
     int statfs(fs_statvfs_t *stbuf) override;
     int setxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
-                   const char *name, const char *value,
+                   char const *name, char const *value,
                    size_t size, int flags) override;
     int getxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
-                   const char *name, char *value, size_t size) override;
+                   char const *name, char *value, size_t size) override;
     int listxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
-                    const char *list, size_t size) override;
+                    char const *list, size_t size) override;
     int ioctl(fs_file_info_t *fi, int cmd, void *arg,
               unsigned int flags, void *data) override;
     int poll(fs_file_info_t *fi, fs_pollhandle_t *ph,
              unsigned *reventsp) override;
 };
 
+__BEGIN_DECLS
 
 KERNEL_API void fs_register_factory(fs_factory_t *fs);
+
+__END_DECLS
 
 //
 // Partitioning scheme (MBR, GPT, and special types like CPIO, etc)
@@ -659,12 +669,14 @@ struct part_factory_t {
 __BEGIN_DECLS
 
 KERNEL_API void part_register_factory(part_factory_t *factory);
+KERNEL_API bool part_unregister_factory(part_factory_t *factory);
 
 KERNEL_API void fs_mount(char const *fs_name, fs_init_info_t *info);
 KERNEL_API void fs_add(fs_factory_t *reg, fs_base_t *fs);
 fs_base_t *fs_from_id(size_t id);
 
 void probe_storage_factory(storage_if_factory_t *factory);
+
 
 __END_DECLS
 

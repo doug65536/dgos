@@ -13,7 +13,7 @@
 #include "conio.h"
 #include "printk.h"
 
-#define DEBUG_PIT   1
+#define DEBUG_PIT   0
 #if DEBUG_PIT
 #define PIT_TRACE(...) printdbg("pit: " __VA_ARGS__)
 #else

@@ -72,7 +72,7 @@ void boottbl_dump_guids()
                 break;
         }
 
-        PRINT("GUID %s %s\n", guid_text,
+        PRINT("GUID %" TFMT " %" TFMT "\n", guid_text,
               k ? guid_names[k-1].name : TSTR "");
     }
 

@@ -1,8 +1,8 @@
-gccver=10.2.0
-binver=2.35
-gdbver=9.1
-gmpver=6.2.0
-mpcver=1.2.0
+gccver=11.1.0
+binver=2.36
+gdbver=10.2
+gmpver=6.2.1
+mpcver=1.2.1
 mpfver=4.1.0
 
 declare -A automakes=(
@@ -18,7 +18,7 @@ declare -A reconfs=(
 #    ["binutils_1"]="./ld"
 #    ["binutils_2"]="./bfd"
 #    ["binutils_3"]="./opcodes"
-   
+
     ["gdb_0"]="./gdb"
 #    ["gdb_1"]="./gdb"
 #    ["gdb_2"]="./intl"
@@ -68,7 +68,7 @@ declare -A reconfs=(
 #    ["gdb_46"]="./sim/msp430"
 #    ["gdb_47"]="./gdb/gdbserver"
 #    ["gdb_49"]="./gdb/testsuite"
-    
+
     ["gcc_0" ]="."
     ["gcc_1" ]="./libgcc"
 #    ["gcc_1" ]="./libgfortran"

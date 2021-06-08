@@ -7,6 +7,9 @@ void progress_bar_draw(int left, int top, int right,
                        int percent, tchar const *title,
                        bool bar_only)
 {
+    if (unlikely(!screen_enabled))
+        return;
+
     if (title) {
         size_t title_len = strlen(title);
 

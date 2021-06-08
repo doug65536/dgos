@@ -16,6 +16,7 @@
 #define UART_TRACE(...) ((void)0)
 #endif
 
+
 // Null modem connections:
 //
 //  Self -- Peer
@@ -45,6 +46,8 @@ EXPORT uint8_t const uart_dev_t::irq[] = {
     5,
     7
 };
+
+__BEGIN_ANONYMOUS
 
 namespace uart_defs {
 
@@ -1027,7 +1030,7 @@ bool uart_async_t::wait_rx_not_empty_until(
 
 class uart_poll_t : public uart_t {
 public:
-    uart_poll_t();
+    constexpr uart_poll_t();
 
     bool init(port_cfg_t const& cfg, bool use_irq) override final;
     virtual ssize_t write(void const *buf, size_t size,
@@ -1070,7 +1073,7 @@ private:
     uint8_t bytes_until_next_poll;
 };
 
-uart_poll_t::uart_poll_t()
+constexpr uart_poll_t::uart_poll_t()
     : rx_head(0)
     , rx_tail(0)
     , bytes_until_next_poll(0)
@@ -1240,6 +1243,7 @@ static uart_poll_t debug_uart;
 
 }   // namespace
 
+__END_ANONYMOUS
 
 // ===========================================================================
 //
@@ -1303,3 +1307,5 @@ bool uart_dev_t::init(ioport_t port, uint8_t port_irq,
     cfg.stop_bits = stop_bits;
     return init(cfg, use_irq);
 }
+
+

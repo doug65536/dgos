@@ -111,7 +111,7 @@
 // Offsets used in assembly
 //
 
-#define PXE_ENTRY_IP_OFS 0x10
+#define PXE_ENTRY_SP_OFS 0x10
 
 #if !defined(__ASSEMBLER__)
 
@@ -154,8 +154,8 @@ struct bangpxe_t {
     ofs16_t BaseROMID_ofs;
     seg16_t BaseROMID_seg;
 
-    ofs16_t EntryPointIP_ofs;
-    seg16_t EntryPointIP_seg;
+    ofs16_t EntryPointSP_ofs;
+    seg16_t EntryPointSP_seg;
 
     ofs16_t EntryPointESP_ofs;
     seg16_t EntryPointESP_seg;
@@ -179,7 +179,7 @@ struct bangpxe_t {
 };
 
 C_ASSERT(sizeof(bangpxe_t) == 0x58);
-C_ASSERT(offsetof(bangpxe_t, EntryPointIP_ofs) == PXE_ENTRY_IP_OFS);
+C_ASSERT(offsetof(bangpxe_t, EntryPointSP_ofs) == PXE_ENTRY_SP_OFS);
 
 typedef uint16_t pxenv_status_t;
 

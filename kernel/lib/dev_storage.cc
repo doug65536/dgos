@@ -578,7 +578,7 @@ part_factory_t::~part_factory_t()
     part_unregister_factory(this);
 }
 
-fs_factory_t::fs_factory_t(const char *factory_name)
+fs_factory_t::fs_factory_t(char const *factory_name)
     : name(factory_name)
 {
 }
@@ -716,7 +716,7 @@ ssize_t fs_nosys_t::read(fs_file_info_t *fi,
 }
 
 ssize_t fs_nosys_t::write(fs_file_info_t *fi,
-                          const char *buf, size_t size, off_t offset)
+                          char const *buf, size_t size, off_t offset)
 {
     return -int(errno_t::ENOSYS);
 }
@@ -763,20 +763,20 @@ int fs_nosys_t::statfs(fs_statvfs_t *stbuf)
 }
 
 int fs_nosys_t::setxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
-                           const char *name, const char *value,
+                           char const *name, char const *value,
                            size_t size, int flags)
 {
     return -int(errno_t::ENOSYS);
 }
 
 int fs_nosys_t::getxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
-                           const char *name, char *value, size_t size)
+                           char const *name, char *value, size_t size)
 {
     return -int(errno_t::ENOSYS);
 }
 
 int fs_nosys_t::listxattrat(fs_file_info_t *dirfi, fs_cpath_t path,
-                            const char *list, size_t size)
+                            char const *list, size_t size)
 {
     return -int(errno_t::ENOSYS);
 }

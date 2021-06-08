@@ -1,7 +1,7 @@
 #include "apic.h"
 #include "debug.h"
 #include "numeric.h"
-#include "cpu/asm_constants.h"
+//#include "cpu/asm_constants.h"
 #include "cpu/mptables.h"
 #include "cpu/ioapic.h"
 #include "device/acpigas.h"
@@ -40,7 +40,7 @@
 
 #define ENABLE_ACPI 1
 
-#define DEBUG_ACPI  1
+#define DEBUG_ACPI  0
 #if DEBUG_ACPI
 #define ACPI_TRACE(...) printk("acpi: " __VA_ARGS__)
 #else
@@ -49,7 +49,7 @@
 
 #define ACPI_ERROR(...) printk("mp: error: " __VA_ARGS__)
 
-#define DEBUG_MPS  1
+#define DEBUG_MPS  0
 #if DEBUG_MPS
 #define MPS_TRACE(...) printk("mp: " __VA_ARGS__)
 #else
@@ -67,7 +67,7 @@
 
 #define APIC_ERROR(...) printk("lapic: error: " __VA_ARGS__)
 
-#define DEBUG_IOAPIC  1
+#define DEBUG_IOAPIC  0
 #if DEBUG_IOAPIC
 #define IOAPIC_TRACE(...) printk("ioapic: " __VA_ARGS__)
 #else
@@ -413,7 +413,7 @@ class lapic_x_t : public lapic_t {
         write32_noinst(APIC_REG_ICR_LO, cmd);
         cpu_irq_toggle_noinst(irq_en);
         while (unlikely(read32_noinst(APIC_REG_ICR_LO) & APIC_CMD_PENDING))
-            __builtin_ia32_pause();
+            pause();
     }
 
     uint32_t read32(uint32_t offset) noexcept override final
@@ -1315,7 +1315,7 @@ static void mp_parse_fps()
     if (unlikely(cth == MAP_FAILED))
         panic_oom();
 
-    if (!acpi_mappings.push_back({uint64_t(cth), 0x10000}))
+    if (unlikely(!acpi_mappings.push_back({uint64_t(cth), 0x10000})))
         panic_oom();
 
     cth = acpi_remap_len(cth, uintptr_t(mp_tables),
@@ -2123,6 +2123,15 @@ static void start_ap_by_apic_id(uint32_t smp_expect,
 
     // Tell booting AP entry code its apic
     atomic_st_rel(&thread_booting_ap_index, smp_expect);
+    
+    // Expecting other CPU to program its MTRR, so kill
+    // everything hard enough for that to work properly
+    assert(!(cpu_eflags_get() & CPU_EFLAGS_IF));
+    cpu_cache_disable();
+    cpu_cache_flush();
+    cpu_tlb_flush();
+    uint64_t old_mtrr_en = cpu_msr_change_bits(CPU_MTRR_DEF_TYPE,
+        CPU_MTRR_DEF_TYPE_MTRR_EN | CPU_MTRR_DEF_TYPE_FIXED_EN, 0);
 
     // Send SIPI to CPU
     apic_send_command(target_apic_id, sipi_command);
@@ -2130,6 +2139,12 @@ static void start_ap_by_apic_id(uint32_t smp_expect,
     //APIC_TRACE("BSP waiting for AP\n");
     cpu_wait_value(&thread_aps_running, smp_expect);
     APIC_TRACE("BSP finished waiting for AP\n");
+    
+    // Turn stuff back on, other CPU done changing memory type stuff
+    cpu_msr_set(CPU_MTRR_DEF_TYPE, old_mtrr_en);
+    cpu_cache_flush();
+    cpu_tlb_flush();
+    cpu_cache_enable();
 }
 
 void apic_init_timer()

@@ -11,7 +11,7 @@ int pthread_rwlock_wrlock(pthread_rwlock_t *m)
 
     // Spin 1000x first time, 1x after waits
     for (int spins_remain = 1000; ; spins_remain = 1) {
-        for ( ; --spins_remain || c == 0; __builtin_ia32_pause()) {
+        for ( ; --spins_remain || c == 0; __pause()) {
             if (likely(c == 0)) {
                 // It is unlocked or there are already readers,
                 // attempt to increment read lock and complete

@@ -127,4 +127,8 @@ int           unsetenv(char const *);
 size_t        wcstombs(char *restrict, wchar_t const *restrict, size_t);
 int           wctomb(char *, wchar_t);
 
+// other
+
+int itoa(int n, char *txt, int base);
+
 __END_DECLS

@@ -8,13 +8,13 @@
 #include "cpu/cpuid.h"
 #include "conio.h"
 #include "printk.h"
-#include "cpu/halt.h"
+#include "halt.h"
 #include "time.h"
 #include "interrupts.h"
 #include "string.h"
 #include "except.h"
 #include "mm.h"
-#include "asm_constants.h"
+//#include "asm_constants.h"
 #include "thread_impl.h"
 #include "stacktrace.h"
 #include "apic.h"
@@ -182,7 +182,7 @@ static void idtr_load(table_register_64_t *table_reg)
 extern "C" isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx);
 extern "C" isr_context_t *cpu_gpf_handler(int intr, isr_context_t *ctx);
 
-_constructor(ctor_ctors_ran) static void isr_lookup_init()
+_constructor(ctor_cpu_init_cpus_done) static void isr_lookup_init()
 {
     // Interrupt dispatch
     // 0x00-0x1F -> exception_isr_handler
@@ -718,7 +718,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
                  rip - modload_get_base_adj(closest_module));
     }
 
-    perf_stacktrace_decoded();
+    //perf_stacktrace_decoded();
 
     //
     // Dump context to screen

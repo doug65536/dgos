@@ -170,7 +170,7 @@ intptr_t process_t::start_clone(clone_data_t const& data)
     __exception_jmp_buf_t *buf = user_threads[index].jmpbuf;
 
     if (!__setjmp(buf)) {
-        void *buf_rsp = buf->rsp;
+        void *buf_rsp = buf->sp;
         lock.unlock();
 
         arch_jump_to_user(uintptr_t((void*)data.bootstrap), uintptr_t(data.sp),
@@ -813,7 +813,7 @@ int process_t::enter_user(uintptr_t ip, uintptr_t sp, bool use64,
         // When interrupts occur, use the stack space we have here
         // isr_sysret does not return
         printdbg("Entering user process\n");
-        arch_jump_to_user(ip, sp, uint64_t(buf->rsp) & -16, use64,
+        arch_jump_to_user(ip, sp, uint64_t(buf->sp) & -16, use64,
                    thread_get_id(), 0, 0);
     }
 

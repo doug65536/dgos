@@ -1,12 +1,6 @@
 #pragma once
 #include "types.h"
-
-struct physmem_range_t {
-    uint64_t base;
-    uint64_t size;
-    uint32_t type;
-    uint32_t valid;
-};
+#include "assert.h"
 
 #define PHYSMEM_TYPE_NORMAL         1
 #define PHYSMEM_TYPE_UNUSABLE       2
@@ -17,8 +11,46 @@ struct physmem_range_t {
 // Custom types
 #define PHYSMEM_TYPE_ALLOCATED      6
 #define PHYSMEM_TYPE_BOOTLOADER     7
+#define PHYSMEM_TYPE_NORMAL_2M      8
+#define PHYSMEM_TYPE_NORMAL_1G      9
 
-static const char *physmem_names[] = {
+struct physmem_range_t {
+    uint64_t base;
+    uint64_t size;
+    uint32_t type;
+    uint32_t valid;
+
+    uint64_t end() const
+    {
+        return base + size;
+    }
+
+    void set_end(uint64_t end)
+    {
+        assert(end >= base);
+
+        size = end - base;
+    }
+
+    void set_start(uint64_t start)
+    {
+        assert(start < end());
+
+        int64_t adj = int64_t(base - start);
+
+        size += adj;
+        base = start;
+    }
+
+    constexpr bool is_normal() const noexcept
+    {
+        return (type == PHYSMEM_TYPE_NORMAL) ||
+                (type == PHYSMEM_TYPE_NORMAL_1G) ||
+                (type == PHYSMEM_TYPE_NORMAL_2M);
+    }
+};
+
+static char const *physmem_names[] = {
     "<zero>",
     "NORMAL",
     "UNUSABLE",
@@ -27,6 +59,10 @@ static const char *physmem_names[] = {
     "BAD",
 
     "ALLOCATED",
-    "BOOTLOADER"
+    "BOOTLOADER",
+
+    "NORMAL_2M",
+    "NORMAL_1G"
 };
-static const size_t physmem_names_count = countof(physmem_names);
+
+static size_t const physmem_names_count = countof(physmem_names);

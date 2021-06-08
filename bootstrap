@@ -6,7 +6,10 @@ scriptroot="$(cd "$(dirname "$0")" && pwd)"
 
 printf "Using gcc version: %s\n" "$gccver"
 
-TARGET=x86_64-dgos
+if [[ -z $TARGET ]]; then
+	TARGET=x86_64-dgos
+	echo TARGET not in environment, assumed $TARGET
+fi
 
 NPROC="$(nproc)"
 
@@ -15,12 +18,14 @@ function help() {
 }
 
 lto=
+optimized=
 cleanbuild=
 quiet=
-while getopts clh?qj arg
+while getopts colh?qj arg
 do
 	case $arg in
 		c ) cleanbuild=1 ; shift ;;
+		o ) optimized=1 ; shift ;;
 		l ) lto=1 ; shift ;;
 		q ) quiet=1 ; shift ;;
 		h ) help && exit ;;
@@ -111,6 +116,9 @@ if [[ -n $lto ]]; then
 	echo "Enabling LTO"
 	configureflags+=("--enable-optimize")
 	configureflags+=("--enable-lto")
+elif [[ -n $optimized ]]; then
+	echo "Enabling optimized"
+	configureflags+=("--enable-optimize")
 fi
 
 rm -rf sysroot || exit

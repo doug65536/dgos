@@ -1,7 +1,7 @@
 #include "threadsync.h"
 #include "thread.h"
 #include "assert.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "printk.h"
 #include "time.h"
 #include "export.h"

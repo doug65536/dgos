@@ -485,8 +485,8 @@ KERNEL_API void cpu_apply_fixups(uint8_t * const *rodata_st,
         assert(new_sz <= old_sz);
 
         // Disable write protection and interrupts temporarily
-        cpu_scoped_wp_disable wp_dis;
         cpu_scoped_irq_disable irq_dis;
+        cpu_scoped_wp_disable wp_dis;
 
         // Replace with a call
         if (dist) {

@@ -17,10 +17,10 @@ public:
     // dev_char_t interface
 
     // Reads keyboard input and escape sequence query responses
-    errno_t read_async(void *data, int64_t count, iocp_t *iocp) override;
+    errno_t read_async(void *data, int64_t count, iocp_t *iocp) ;//override;
 
     // Writes display output and applies escape sequences
-    errno_t write_async(void *data, int64_t count, iocp_t *iocp) override;
+    errno_t write_async(void *data, int64_t count, iocp_t *iocp) ;//override;
 
     // Ensure that no write data is buffered, push it out to the screen
     errno_t flush_async(iocp_t *iocp) override;

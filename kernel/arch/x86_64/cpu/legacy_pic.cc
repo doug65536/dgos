@@ -1,7 +1,7 @@
 #include "legacy_pic.h"
 #include "ioport.h"
 #include "irq.h"
-#include "cpu/halt.h"
+#include "halt.h"
 #include "interrupts.h"
 #include "pic.bits.h"
 #include "assert.h"

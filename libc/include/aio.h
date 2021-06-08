@@ -56,6 +56,8 @@ struct aiocb {
 // complete.
 #define LIO_NOWAIT 1
 
+#define AIO_LISTIO_MAX
+
 // The following shall be declared as functions and may also be
 // defined as macros. Function prototypes shall be provided.
 

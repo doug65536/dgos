@@ -937,7 +937,7 @@ void perf_stacktrace_decoded()
 
 uint64_t perf_adj_divisor(int64_t adjustment)
 {
-    perf_event_divisor += adjustment;
+    perf_event_divisor = perf_event_divisor + adjustment;
 
     if (adjustment)
         return perf_set_divisor(perf_event_divisor);

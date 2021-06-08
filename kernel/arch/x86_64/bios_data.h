@@ -5,7 +5,7 @@
 // Macros to generalize reading from the BIOS data area
 // Allows it to be remapped without having to edit code
 
-HIDDEN extern char *zero_page;
+extern HIDDEN char *zero_page;
 
 // Use identity mapping for now
 #define BIOS_DATA_AREA(type,address) ((type*)(zero_page + address))

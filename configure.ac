@@ -6,6 +6,7 @@ AC_INIT([dgos], [0.8])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_FILES([Makefile])
+AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall -Wno-portability])
 #AX_PROG_CC_FOR_BUILD
 AX_PROG_CXX_FOR_BUILD
@@ -235,14 +236,26 @@ AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
 		std=c++20 fno-fat-lto-objects g3 \
 		fno-integrated-as \
-		Wall Wextra Wpedantic Wdouble-promotion Wformat \
-		Wundef Wwrite-strings Wredundant-decls \
-		Wstrict-overflow Wtautological-compare \
-		Wstrict-aliasing Wlogical-op \
-		Warray-bounds Wformat-overflow \
+		Wall Wextra Wpedantic Wdouble-promotion \
+		Wformat Werror=format \
+		Wuninitialized Werror=uninitialized \
+		Wundef Werror=undef \
+		Wredundant-decls \
+		Wwrite-strings Werror=write-strings \
+		Wstringop-overflow Werror=stringop-overflow \
+		Wstrict-overflow Werror=strict-overflow \
+		Wtautological-compare Werror=tautological-compare \
+		Wstrict-aliasing Werror=strict-aliasing \
+		Wlogical-op \
+		Warray-bounds \
+		Wformat-overflow Werror=format-overflow \
 		Wno-address-of-packed-member \
-		Wsuggest-override Wsuggest-attribute=format \
-		Wduplicated-branches Wduplicated-cond Wc++1z-compat \
+		Wsuggest-override Werror=suggest-override \
+		Wsuggest-attribute=format \
+		Wduplicated-branches Werror=duplicated-branches \
+		Wduplicated-cond Werror=duplicated-cond \
+		Wc++1z-compat \
+		Werror=pointer-arith \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Werror=parentheses Werror=format-security \
@@ -250,6 +263,8 @@ for flag in \
 		mtls-direct-seg-refs fconserve-stack \
 		Wno-unused-parameter \
 		fno-plt \
+		mno-outline-atomics \
+		mstrict-align \
 		$TUNE_FLAGS
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
@@ -766,10 +781,9 @@ AX_CHECK_COMPILE_FLAG([-fno-optimize-sibling-calls],
 AC_SUBST([NO_SIBLING_CALLS_FLAGS])
 
 AS_VAR_SET([TUNE_FLAGS], [])
-#AX_CHECK_COMPILE_FLAG([AS_VAR_SET([-mtune], [znver1])],
-#	[AS_VAR_SET([TUNE_FLAGS], [" -mtune=znver1"])]
-#	[], [])
-#AC_SUBST([TUNE_FLAGS])
+AX_CHECK_COMPILE_FLAG([AS_VAR_SET([-mtune], [znver2])],
+	[AS_VAR_SET([TUNE_FLAGS], [" -mtune=znver2"])], [])
+AC_SUBST([TUNE_FLAGS])
 
 AS_VAR_SET([DEBUGGING_CODE_FLAGS], [" -O0"])
 
@@ -812,6 +826,19 @@ AC_ARG_ENABLE(dynamiclibs,
 )
 AM_CONDITIONAL(userspace_so, test x$enable_userspace_so = xtrue)
 AM_CONDITIONAL(userspace_static, test x$enable_userspace_so != xtrue)
+
+AC_ARG_ENABLE(enable_dual_arch,
+	AS_HELP_STRING([--enable-dual-arch],
+		[Support 32 and 64 bit processes]), [
+		AC_MSG_NOTICE([Enabling dual architecture (32/64)])
+		AS_VAR_SET([enable_dual_arch], [true])
+	], [
+		AC_MSG_NOTICE([Enabling single architecture (64 only)])
+		AS_VAR_SET([enable_dual_arch], [false])
+	]
+)
+AM_CONDITIONAL(dual_arch, test x$dual_arch = xtrue)
+AM_CONDITIONAL(single_arch, test x$dual_arch != xtrue)
 
 AS_VAR_SET([OPTIMIZE_SPEED_FLAGS], [])
 AS_VAR_SET([OPTIMIZE_SIZE_FLAGS], [])
@@ -882,5 +909,26 @@ AS_VAR_SET([DISABLE_OPTIMIZATION_FLAGS], ["-O0 $DISABLE_FRAMEPOINTER_FLAGS"])
 AC_SUBST([DISABLE_OPTIMIZATION_FLAGS])
 AC_SUBST([OPTIMIZE_SIZE_FLAGS])
 AC_SUBST([OPTIMIZE_SPEED_FLAGS])
+
+case $host in
+x86_64*)
+	echo setting x86_64
+	AS_VAR_SET([ARCH], [x86_64])
+	;;
+
+aarch64*)
+	echo setting aarch64
+	AS_VAR_SET([ARCH], [aarch64])
+	;;
+
+*)
+	AC_MSG_FAILURE([Unknown host])
+	;;
+esac
+
+AC_SUBST([ARCH])
+
+AM_CONDITIONAL(x86_64, [ test $ARCH == x86_64 ])
+AM_CONDITIONAL(aarch64, [ test $ARCH == aarch64 ])
 
 AC_OUTPUT

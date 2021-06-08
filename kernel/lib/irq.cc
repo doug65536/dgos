@@ -2,7 +2,7 @@
 #include "types.h"
 #include "string.h"
 #include "mutex.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "assert.h"
 #include "printk.h"
 #include "cpu/interrupts.h"

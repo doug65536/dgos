@@ -3,8 +3,7 @@ OUTPUT_FORMAT(elf32-i386)
 
 MEMORY {
 	lolo            : org = 0x0000000000001000, len = 0x000000006C00
-	unreloc         : org = 0x0000000000007C00, len = 0x000000000200
-	lohi    (rwxai) : org = 0x0000000000007E00, len = 0x000000018200
+	lohi    (rwxai) : org = 0x0000000000007C00, len = 0x000000018400
 	bstk            : org = 0x0000000000020000, len = 0x000000010000
 	bheap           : org = 0x0000000000030000, len = 0x000000070000
 	hilo            : org = 0x0000000000100000, len = 0x0000FFEFFFFF
@@ -25,6 +24,14 @@ SECTIONS {
 
 		/* --- additional sectors --- */
 		KEEP(*(.lowtext))
+	} >lolo :rwx =0
+
+	.bootfatrodata16 : {
+		/* Place 64 bit code high enough to be outside first 4KB */
+		*(.text.code64)
+	} >lolo :rwx =0
+
+	.bootfatdata16 : {
 		KEEP(*(.lowdata))
 
 		. = ALIGN(4);
@@ -44,9 +51,6 @@ SECTIONS {
 		KEEP(*(.fini_array))
 		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
 		___dtors_en = .;
-
-		/* Place 64 bit code high enough to be outside first 4KB */
-		*(.text.code64)
 
 		___smp_st = .;
 		KEEP(*(.smp.entry))
@@ -69,12 +73,6 @@ SECTIONS {
 
 	. = 0x7C00;
 
-	.unreloc : {
-		. = 0x200;
-	} >unreloc =0
-
-	. = 0x7E00;
-
 	.bootfattext : {
 		*(.text)
 		*(.text.*)
@@ -83,12 +81,19 @@ SECTIONS {
 		___text_en = .;
 
 		. = ALIGN(64);
+	} >lohi :rwx =0
 
+	.bootfatrodata : {
+		___rodata_st = .;
+		*(.rodata)
+		*(.rodata.*)
+		___rodata_en = .;
+	}
+
+	.bootfatdata : {
 		___data_st = .;
 		*(.data)
 		*(.data.*)
-		*(.rodata)
-		*(.rodata.*)
 		___data_en = .;
 
 		___bss_st = .;
@@ -105,13 +110,15 @@ SECTIONS {
 	/* Max 124KB image */
 	. = 0x1F000;
 
-	. = 0x20000;
+	. = ABSOLUTE(0x20000);
 	___initial_stack_limit = .;
-	. = 0x30000;
+	. = ABSOLUTE(0x30000);
 	___initial_stack = .;
 	. += 16;
 	___heap_st = .;
 	___end = .;
+
+	/DISCARD/ : { *(.eh_frame)      }
 
 /*
 	.eh_frame       0 : { *(.eh_frame)      }

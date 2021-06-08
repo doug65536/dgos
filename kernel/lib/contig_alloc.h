@@ -13,9 +13,7 @@ struct KERNEL_API contiguous_allocator_t {
 public:
     using linaddr_t = uintptr_t;
 
-    contiguous_allocator_t()
-    {
-    }
+    constexpr contiguous_allocator_t() = default;
 
     void set_early_base(linaddr_t *addr);
     uintptr_t early_init(size_t size, char const *name);

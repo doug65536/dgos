@@ -1,6 +1,6 @@
 #pragma once
 #include "assert.h"
-#include "cpu/spinlock.h"
+#include "spinlock.h"
 #include "thread.h"
 #include "type_traits.h"
 #include "cpu/control_regs.h"
@@ -121,11 +121,12 @@ KERNEL_API void condvar_wake_n(condition_var_t *var, size_t n);
 //                          mcs_queue_ent_t * node,
 //                          uint64_t timeout_time = UINT64_MAX);
 
-__END_DECLS
 
 KERNEL_API void thread_wait_add(thread_wait_link_t *root,
                                 thread_wait_link_t *node);
 KERNEL_API thread_wait_link_t *thread_wait_del(thread_wait_link_t *node);
+
+__END_DECLS
 
 template<typename T>
 bool condvar_wait_ex(condition_var_t *var, T& lock_upd,

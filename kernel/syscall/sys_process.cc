@@ -52,8 +52,6 @@ static futex_tab_t futex_tab;
 
 static long futex_wait(int *uptr, int expect, uint64_t timeout_time)
 {
-    scoped_lock lock(futex_lock);
-
     uintptr_t uphysaddr = mphysaddr(uptr);
 
     // Check value inside lock in case a wake raced ahead of us just
@@ -64,6 +62,8 @@ static long futex_wait(int *uptr, int expect, uint64_t timeout_time)
 
     if (unlikely(value != expect))
         return -int(errno_t::EAGAIN);
+
+    scoped_lock lock(futex_lock);
 
     futex_tab_ent_t *fent = futex_tab.lookup(&uphysaddr);
 
@@ -240,7 +240,7 @@ static long futex_wake_op_locked(int *uaddr2, int op_param,
     if (unlikely(!mm_copy_user(&old2, uaddr2, sizeof(old2))))
         return -int(errno_t::EFAULT);
 
-    for (;; __builtin_ia32_pause()) {
+    for (;; pause()) {
         // Read original value
 
         // Compute replacement for the *uaddr2 = *uaddr2 op oparg atomic update
@@ -293,7 +293,7 @@ static long futex_wait_op(int *lock, int op_param,
     futex_tab_ent_t *lockent = futex_tab.lookup(&lockaddr);
     futex_tab_ent_t *condent = futex_tab.lookup(&condaddr);
 
-    for (;; __builtin_ia32_pause()) {
+    for (;; pause()) {
         // Read original value
 
         // Compute replacement for the *uaddr2 = *uaddr2 op oparg atomic update

@@ -7,6 +7,9 @@
 
 __BEGIN_DECLS
 
+// big enough for /dev/pts/2109876543210987654321
+#define TTY_NAME_MAX 32
+
 // The <unistd.h> header shall define the following symbolic constants.
 // The values shall be suitable for use in #if preprocessing directives.
 

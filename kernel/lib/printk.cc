@@ -1,6 +1,6 @@
 #include "printk.h"
 #include "types.h"
-#include "cpu/halt.h"
+#include "halt.h"
 #include "string.h"
 #include "conio.h"
 #include "debug.h"
@@ -866,8 +866,8 @@ static ext::noirq_lock<ext::spinlock> cprintf_lock;
 
 int vcprintf(char const * restrict format, va_list ap)
 {
-    ext::unique_lock<ext::noirq_lock<ext::spinlock>>
-            hold_cprintf_lock(cprintf_lock);
+//    ext::unique_lock<ext::noirq_lock<ext::spinlock>>
+//            hold_cprintf_lock(cprintf_lock);
 
     int chars_written = 0;
     if (con_exists()) {

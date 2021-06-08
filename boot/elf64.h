@@ -7,7 +7,6 @@ struct elf64_loadaddr_t {
     uint64_t base;
 };
 
-_noreturn
 void elf64_boot();
 
 _use_result

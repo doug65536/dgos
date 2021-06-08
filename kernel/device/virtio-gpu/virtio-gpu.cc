@@ -929,7 +929,8 @@ bool virtio_gpu_dev_t::handle_config_change(int events)
     resize_backing(scrn_w, scrn_h, old_w, old_h);
 
     // Fill the backbuffer
-    memset32_nt(backbuf, 0x123456, backbuf_sz);
+    char *buf_temp = (char*)backbuf;
+    memset32(buf_temp, 0x123456, backbuf_sz);
 
     if (!issue_attach_backing(1, backbuf, backbuf_sz))
         return false;

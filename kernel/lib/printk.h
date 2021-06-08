@@ -124,7 +124,7 @@ public:
         return write_str(str);
     }
 
-    // pointer other than const char *
+    // pointer other than char const *
     template<typename T>
     _always_inline typename ext::enable_if<ext::is_pointer<T>::value &&
     !ext::is_same<T, char const *>::value, debug_out_t&>::type

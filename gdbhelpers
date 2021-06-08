@@ -17,16 +17,16 @@ define startupbreakpoints
 	#set architecture i386
 
 	set osabi none
-	set scheduler-locking off
+	#set scheduler-locking off
 
-	#set scheduler-locking step
+	set scheduler-locking step
 
 	set range-stepping off
 
 	set may-call-functions off
 
 	#on is good for TCG, horrible for KVM or baremetal
-	#set breakpoint always-inserted off
+	set breakpoint always-inserted on
 
 	#exec-file kernel-generic
 	#symbol-file kernel-generic -o -0x000000ff80000000

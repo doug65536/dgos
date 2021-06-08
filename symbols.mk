@@ -4,7 +4,7 @@
 #	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 #		$(top_srcdir)/gensymtab.bash "$(OBJDUMP)" e "$@" "$<"
 #
-#sym/bootx64-efi.sym: bootefi-amd64 \
+#sym/bootx64.sym: bootefi \
 #		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.bash
 #	$(MKDIR) -p $(@D)
 #	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
@@ -46,7 +46,7 @@
 #	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
 #		$(top_srcdir)/gensymtab.bash "$(OBJDUMP)" e "$@" "$<"
 #
-#sym/bootefi-amd64.dis.gz: bootefi-amd64 \
+#sym/bootefi.dis.gz: bootefi \
 #		$(top_srcdir)/symbols.mk
 #	$(MKDIR) -p $(@D)
 #	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@

@@ -5,6 +5,8 @@
 #include "vector.h"
 #include "cxxstring.h"
 
+__BEGIN_DECLS
+
 void fb_init(void);
 
 void fb_change_backing(vbe_selected_mode_t const& mode);
@@ -21,6 +23,8 @@ void fb_clip_aa_line(int x0, int y0, int x1, int y1);
 void fb_update(void);
 
 void fb_draw_char(int x, int y, char32_t codepoint, uint32_t fg, uint32_t bg);
+
+__END_DECLS
 
 // 2D int vector
 struct vec2_t {

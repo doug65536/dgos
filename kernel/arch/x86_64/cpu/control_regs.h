@@ -28,11 +28,6 @@ static _always_inline void cpu_halt()
     );
 }
 
-static _always_inline void cpu_flush_cache()
-{
-    __asm__ __volatile__ ("wbinvd\n\t");
-}
-
 static _always_inline uint64_t cpu_msr_get(uint32_t msr)
 {
     uint32_t lo, hi;
@@ -101,11 +96,12 @@ static _always_inline void cpu_msr_set(uint32_t msr, uint64_t value)
 static _always_inline uint64_t cpu_msr_change_bits(
         uint32_t msr, uint64_t clr, uint64_t set)
 {
-    uint64_t n = cpu_msr_get(msr);
+    uint64_t orig = cpu_msr_get(msr);
+    uint64_t n = orig;
     n &= ~clr;
     n |= set;
     cpu_msr_set(msr, n);
-    return n;
+    return orig;
 }
 
 static _always_inline uint64_t cpu_xcr_change_bits(
@@ -172,6 +168,21 @@ static _always_inline uintptr_t cpu_cr0_change_bits(
         : "memory"
     );
     return rax;
+}
+
+static _always_inline void cpu_cache_flush()
+{
+    __asm__ __volatile__ ("wbinvd\n\t" : : : "memory");
+}
+
+static _always_inline void cpu_cache_enable()
+{
+    cpu_cr0_change_bits(CPU_CR0_CD, 0);
+}
+
+static _always_inline void cpu_cache_disable()
+{
+    cpu_cr0_change_bits(0, CPU_CR0_CD);
 }
 
 static _always_inline uintptr_t cpu_cr4_change_bits(
@@ -354,11 +365,6 @@ static _always_inline void cpu_tlb_flush()
 
         cpu_page_directory_set(cpu_page_directory_get());
     }
-}
-
-static _always_inline void cpu_cache_flush()
-{
-    __asm__ __volatile__ ("wbinvd\n\t" : : : "memory");
 }
 
 static _always_inline void cpu_swapgs()

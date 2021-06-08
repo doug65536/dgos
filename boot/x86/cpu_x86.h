@@ -52,6 +52,16 @@ struct gdt_entry_t {
         return *this;
     }
 
+    gdt_entry_t &set_access_code(int priv)
+    {
+        return set_access(true, priv, true, false, false);
+    }
+
+    gdt_entry_t &set_access_rwdata(int priv)
+    {
+        return set_access(true, priv, false, false, true);
+    }
+
     gdt_entry_t &set_flags(bool is32, bool is64)
     {
         flags_limit_high = (flags_limit_high & GDT_FLAGS_GRAN) |
@@ -60,6 +70,22 @@ struct gdt_entry_t {
                 (flags_limit_high & GDT_LIMIT_HIGH_MASK);
         return *this;
     }
+
+    gdt_entry_t &set_flags_16bit()
+    {
+        return set_flags(false, false);
+    }
+
+    gdt_entry_t &set_flags_32bit()
+    {
+        return set_flags(true, false);
+    }
+
+    gdt_entry_t &set_flags_64bit()
+    {
+        return set_flags(false, true);
+    }
+
 };
 
 C_ASSERT(sizeof(gdt_entry_t) == 8);
@@ -335,4 +361,4 @@ void run_kernel(uint64_t *entry, void *param);
 extern "C" uint8_t xcr0_value;
 
 extern bool nx_available;
-extern uint32_t gp_available;
+extern bool gp_available;

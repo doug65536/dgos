@@ -32,26 +32,22 @@ run_kernel:
 	.cfi_def_cfa esp,4
 	.cfi_offset eip,-1*4
 
-	pushl %esi
-	.cfi_adjust_cfa_offset 4
+	pushl_cfi %esi
 	.cfi_offset esi,-2*4
 
 	movl %eax,%esi
 
-	pushl %edi
-	.cfi_adjust_cfa_offset 4
+	pushl_cfi %edi
 	.cfi_offset edi,-3*4
 
 	movl %edx,%edi
 
-	pushl %ebx
-	.cfi_adjust_cfa_offset 4
+	pushl_cfi %ebx
 	.cfi_offset edi,-12
 
 
 	// Align stack
-	pushl %ebp
-	.cfi_adjust_cfa_offset 4
+	pushl_cfi %ebp
 	.cfi_offset ebp,-16
 
 	movl %esp,%ebp
@@ -64,32 +60,37 @@ run_kernel:
 	movl %eax,%cr3
 
 	// Enable PAE
+    movzbl gp_available,%ecx
 	movl %cr4,%eax
-	orl $ 1 << CPU_CR4_PAE_BIT,%eax
-	orl gp_available,%eax
+	orl $ 1U << CPU_CR4_PAE_BIT,%eax
+    neg %ecx
+    and $ CPU_CR4_PGE,%ecx
+	orl %ecx,%eax
 	movl %eax,%cr4
 
 	// Set NX if supported, and set LME always
 	movl $ CPU_MSR_EFER,%ecx
 	rdmsr
-	movzbl nx_available,%eax
-	negl %eax
-	andl $ 1 << CPU_MSR_EFER_NX_BIT,%eax
-	orl $ 1 << CPU_MSR_EFER_LME_BIT,%eax
+	movzbl nx_available,%ecx
+	negl %ecx
+	andl $ 1U << CPU_MSR_EFER_NX_BIT,%ecx
+    orl %ecx,%eax
+    movl $ CPU_MSR_EFER,%ecx
+	orl $ 1U << CPU_MSR_EFER_LME_BIT,%eax
 	wrmsr
 
 	// Enable paging
 	movl %cr0,%eax
-	orl $ 1 << CPU_CR0_PG_BIT,%eax
+	orl $ 1U << CPU_CR0_PG_BIT,%eax
 	movl %eax,%cr0
 
 	// Far jump to long mode code segment
 
-	pushl $ GDT_SEL_KERNEL_CODE64
-	.cfi_adjust_cfa_offset 4
+    // If it crashes here, you are running it in an i386 vm!
+	pushl_cfi $ GDT_SEL_KERNEL_CODE64
+    // If it crashes here, you are running it in an i386 vm!
 
-	pushl $ 0f
-	.cfi_adjust_cfa_offset 4
+	pushl_cfi $ 0f
 
 	lretl
 	.cfi_adjust_cfa_offset -8
@@ -123,15 +124,15 @@ run_kernel:
 0:	// 32 bit
 	// Paging off
 	movl %cr0,%eax
-	andl $ ~(1 << CPU_CR0_PG_BIT),%eax
+	andl $ ~(1U << CPU_CR0_PG_BIT),%eax
 	movl %eax,%cr0
 
 	movl $ CPU_MSR_EFER,%ecx
 	rdmsr
-	andl $ ~(1 << CPU_MSR_EFER_LME_BIT),%eax
+	andl $ ~(1U << CPU_MSR_EFER_LME_BIT),%eax
 	wrmsr
 
-	lidtl 2+idtr_16
+	lidtl idtr_32+2
 
 	movl %ebp,%esp
 	.cfi_def_cfa_register esp
@@ -150,4 +151,3 @@ run_kernel:
 
 	retl
 	.cfi_endproc
-

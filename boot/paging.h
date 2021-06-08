@@ -16,6 +16,8 @@
 #define PAGE_MASK           (PAGE_SIZE - 1U)
 #endif
 
+#include "arch_paging.h"
+
 #if defined(__x86_64__) || defined(__i386__)
 
 // Page table entries
@@ -63,53 +65,45 @@
 #define PTE_ADDR            (PTE_ADDR_MASK << PTE_ADDR_BIT)
 #define PTE_PK              (PTE_PK_MASK << PTE_PK_BIT)
 #elif defined(__aarch64__)
-#define PTE_PRESENT_BIT     0
-#define PTE_TABLE_BIT       1
-#define PTE_INDX_BIT        2
-#define PTE_NS_BIT          5
-#define PTE_AP_BIT          6
-#define PTE_SH_BIT          8
-#define PTE_AF_BIT          10
-#define PTE_ADDR_BIT        12
-#define PTE_PXN_BIT         53
-#define PTE_UXN_BIT         54
-#define PTE_AVAIL_BIT       55
+#include "../kernel/arch/aarch64/reg_bits.bits.h"
 
-#define PTE_INDX_BITS       3
-#define PTE_AP_BITS         2
-#define PTE_SH_BITS         2
-#define PTE_ADDR_BITS       40
-#define PTE_AVAIL_BITS      4
+//#define PTE_PRESENT_BIT     0
+//#define PTE_TABLE_BIT       1
+//#define PTE_INDX_BIT        2
+//#define PTE_NS_BIT          5
+//#define PTE_AP_BIT          6
+//#define PTE_SH_BIT          8
+//#define PTE_AF_BIT          10
+//#define PTE_ADDR_BIT        12
+//#define PTE_PXN_BIT         53
+//#define PTE_UXN_BIT         54
+//#define PTE_AVAIL_BIT       55
 
-#define PTE_INDX_MASK       (~-(UINT64_C(1) << PTE_INDX_BITS))
-#define PTE_AP_MASK         (~-(UINT64_C(1) << PTE_AP_BITS))
-#define PTE_SH_MASK         (~-(UINT64_C(1) << PTE_SH_BITS))
-#define PTE_ADDR_MASK       (~-(UINT64_C(1) << PTE_ADDR_BITS))
-#define PTE_AVAIL_MASK      (~-(UINT64_C(1) << PTE_AVAIL_BITS))
+//#define PTE_INDX_BITS       3
+//#define PTE_AP_BITS         2
+//#define PTE_SH_BITS         2
+//#define PTE_ADDR_BITS       40
+//#define PTE_AVAIL_BITS      4
 
-#define PTE_PRESENT         (UINT64_C(1) << PTE_PRESENT)
-#define PTE_TABLE           (UINT64_C(1) << PTE_TABLE)
-#define PTE_INDX            (UINT64_C(1) << PTE_INDX)
-#define PTE_NS              (UINT64_C(1) << PTE_NS)
-#define PTE_AP              (UINT64_C(1) << PTE_AP)
-#define PTE_SH              (UINT64_C(1) << PTE_SH)
-#define PTE_AF              (UINT64_C(1) << PTE_AF)
-#define PTE_ADDR            (UINT64_C(1) << PTE_ADDR)
-#define PTE_PXN             (UINT64_C(1) << PTE_PXN)
-#define PTE_UXN             (UINT64_C(1) << PTE_UXN)
-#define PTE_AVAIL           (UINT64_C(1) << PTE_AVAIL)
+//#define PTE_INDX_MASK       (~-(UINT64_C(1) << PTE_INDX_BITS))
+//#define PTE_AP_MASK         (~-(UINT64_C(1) << PTE_AP_BITS))
+//#define PTE_SH_MASK         (~-(UINT64_C(1) << PTE_SH_BITS))
+//#define PTE_ADDR_MASK       (~-(UINT64_C(1) << PTE_ADDR_BITS))
+//#define PTE_AVAIL_MASK      (~-(UINT64_C(1) << PTE_AVAIL_BITS))
 
-#define PTE_PRESENT         (UINT64_C(1) << PTE_PRESENT)
-#define PTE_TABLE           (UINT64_C(1) << PTE_TABLE)
-#define PTE_INDX            (PTE_INDX_MASK << PTE_INDX_BIT)
-#define PTE_NS              (UINT64_C(1) << PTE_NS)
-#define PTE_AP              (UINT64_C(1) << PTE_AP)
-#define PTE_SH              (PTE_SH_MASK << PTE_SH_BIT)
-#define PTE_AF              (UINT64_C(1) << PTE_AF)
-#define PTE_ADDR            (PTE_ADDR_MASK << PTE_ADDR_BIT)
-#define PTE_PXN             (UINT64_C(1) << PTE_PXN)
-#define PTE_UXN             (UINT64_C(1) << PTE_UXN)
-#define PTE_AVAIL           (PTE_AVAIL_MASK << PTE_AVAIL_BIT)
+//#define PTE_PRESENT         (UINT64_C(1) << PTE_PRESENT_BIT)
+//#define PTE_TABLE           (UINT64_C(1) << PTE_TABLE_BIT)
+//#define PTE_INDX            (UINT64_C(1) << PTE_INDX_BIT)
+//#define PTE_NS              (UINT64_C(1) << PTE_NS_BIT)
+//#define PTE_AP              (UINT64_C(1) << PTE_AP_BIT)
+//#define PTE_SH              (UINT64_C(1) << PTE_SH_BIT)
+//#define PTE_AF              (UINT64_C(1) << PTE_AF_BIT)
+//#define PTE_ADDR            (UINT64_C(1) << PTE_ADDR_BIT)
+//#define PTE_PXN             (UINT64_C(1) << PTE_PXN_BIT)
+//#define PTE_UXN             (UINT64_C(1) << PTE_UXN_BIT)
+//#define PTE_AVAIL           (UINT64_C(1) << PTE_AVAIL_BIT)
+
+#define PTE_ACCESSED        PTE_AF
 
 #endif
 
@@ -123,6 +117,11 @@ typedef uint64_t size64_t;
 struct phys_alloc_t {
     uint64_t base;
     uint64_t size;
+
+    constexpr uint64_t end() const noexcept
+    {
+        return base + size;
+    }
 };
 
 class page_factory_t {
@@ -261,6 +260,11 @@ bool paging_access_virtual_memory(uint64_t vaddr, void *data,
 struct iovec_t {
     uint64_t base;
     uint64_t size;
+
+    constexpr uint64_t end() const noexcept
+    {
+        return base + size;
+    }
 };
 
 size_t paging_iovec(iovec_t **ret, uint64_t vaddr,

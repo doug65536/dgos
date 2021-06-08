@@ -1,10 +1,12 @@
 #include "bootinfo.h"
-#include "bios_data.h"
+//#include "bios_data.h"
 #include "main.h"
 #include "callout.h"
 #include "export.h"
 #include "mm.h"
 #include "printk.h"
+
+HIDDEN void *zero_page;
 
 #ifdef _ASAN_ENABLED
 _constructor(ctor_asan_init) static void bootinfo_init()
@@ -40,7 +42,7 @@ uintptr_t bootinfo_parameter(bootparam_t param)
     auto data = kernel_params;
 
     if (uintptr_t(data) < 0x1000)
-        data = (kernel_params_t*)(zero_page + (uintptr_t)data);
+        data = (kernel_params_t*)((char*)zero_page + (uintptr_t)data);
 
     assert((bool)*data);
 
@@ -118,7 +120,7 @@ void bootinfo_drop_initrd()
     auto data = kernel_params;
 
     if (uintptr_t(data) < 0x1000)
-        data = (kernel_params_t*)(zero_page + (uintptr_t)data);
+        data = (kernel_params_t*)((char*)zero_page + (uintptr_t)data);
 
     data->initrd_st = 0;
     data->initrd_sz = 0;

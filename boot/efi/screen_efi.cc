@@ -33,7 +33,7 @@ _constructor(ctor_console) static void conout_init()
 //                &efi_text_output_handles);
 
 //    if (unlikely(EFI_ERROR(status)))
-//        PANIC(TSTR "Unable to query text output handle");
+//        PANIC("Unable to query text output handle");
 
 //    status = efi_systab->BootServices->HandleProtocol(
 //                efi_text_output_handles[0],
@@ -41,13 +41,16 @@ _constructor(ctor_console) static void conout_init()
 //            (VOID**)&efi_simple_text_output);
 
 //    if (unlikely(EFI_ERROR(status)))
-//        PANIC(TSTR "Unable to query text output interface");
+//        PANIC("Unable to query text output interface");
 
 //    efi_simple_text_output->SetMode(efi_simple_text_output, 0);
 }
 
 void scroll_screen(uint8_t attr)
 {
+    if (unlikely(!screen_enabled))
+        return;
+
     if (unlikely(!efi_simple_text_output))
         return;
 
@@ -59,6 +62,11 @@ void scroll_screen(uint8_t attr)
 void print_at(int col, int row, uint8_t attr,
               size_t length, tchar const *text)
 {
+    if (unlikely(!screen_enabled)) {
+        DEBUG("screen: %" TFMT "\n", text);
+        return;
+    }
+
     if (unlikely(!efi_simple_text_output))
         return;
 

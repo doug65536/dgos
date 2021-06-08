@@ -1,6 +1,4 @@
 .
-../boot/include
-arch/x86_64
 arch
 lib
 config
@@ -13,12 +11,11 @@ extern/include
 lib/sys
 lib/cc
 syscall
-../
-../m4
 device
-../emu/bochs
-../toolchain
-unittest
-../user
-../emu/qemu
+arch/x86_64
 ../user/libutf
+../boot/include
+../
+../scripts
+arch/aarch64/cpu
+arch/aarch64

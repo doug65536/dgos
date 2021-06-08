@@ -4,8 +4,8 @@
 struct __exception_jmp_buf_t;
 
 struct __exception_jmp_buf_t {
-    void *rip;
-    void *rsp;
+    void *ip;
+    void *sp;
     uintptr_t rbx;
     uintptr_t rbp;
     uintptr_t r12;
@@ -16,10 +16,10 @@ struct __exception_jmp_buf_t {
 };
 
 extern "C" _returns_twice
-int __setjmp(__exception_jmp_buf_t *__ctx);
+intptr_t __setjmp(__exception_jmp_buf_t *__ctx);
 
 extern "C" _noreturn
-void __longjmp(__exception_jmp_buf_t *__ctx, int value);
+void __longjmp(__exception_jmp_buf_t *__ctx, intptr_t value);
 
 extern "C" _noreturn
-void __exception_longjmp_unwind(__exception_jmp_buf_t *__ctx, int value);
+void __exception_longjmp_unwind(__exception_jmp_buf_t *__ctx, intptr_t value);

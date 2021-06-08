@@ -30,6 +30,8 @@
 
 #define USB_AUDIO_EP_DESCTYPE_ENDPOINT  (uint8_t(usb_desctype_t::ENDPOINT)|0x20)
 
+__BEGIN_ANONYMOUS
+
 class usb_audio_dev_t {
 
 };
@@ -158,3 +160,5 @@ char const *usb_audio_class_drv_t::name() const
 {
     return "usb_audio";
 }
+
+__END_ANONYMOUS

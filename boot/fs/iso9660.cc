@@ -3,7 +3,6 @@
 #include "diskio.h"
 #include "paging.h"
 #include "string.h"
-//#include "cpu.h"
 #include "fs.h"
 #include "elf64.h"
 #include "likely.h"
@@ -305,17 +304,17 @@ static void *iso9660_joliet_search(void const *candidate,
     return nullptr;
 }
 
-static uint32_t find_file_by_name(char const *pathname,
+static uint32_t find_file_by_name(tchar const *pathname,
                                   size_t pathname_len,
                                   uint64_t dir_lba,
                                   uint32_t dir_size,
                                   uint32_t *file_size)
 {
-    char const *pathname_end = pathname + pathname_len;
+    tchar const *pathname_end = pathname + pathname_len;
 
     // Loop through the path
     while (pathname_len) {
-        char const *filename_end = (char*)memchr(pathname, '/', pathname_len);
+        tchar const *filename_end = (tchar*)memchr(pathname, '/', pathname_len);
         filename_end = filename_end ? filename_end : pathname_end;
         size_t filename_len = filename_end - pathname;
 
@@ -402,7 +401,7 @@ static int8_t iso9660_sector_iterator_begin(
     return disk_read_lba(uint64_t(sector), cluster, 11, 1);
 }
 
-static int iso9660_boot_open(char const *pathname)
+static int iso9660_boot_open(tchar const *pathname)
 {
     uint32_t cluster;
     uint32_t file_size;
@@ -563,7 +562,7 @@ void iso9660_boot_partition(uint32_t pvd_lba)
                           (iso9660_serial >> 56)) ^ (uint8_t)c;
     }
 
-    fs_api.name = "direct_iso9660";
+    fs_api.name = TSTR "direct_iso9660";
     fs_api.boot_open = iso9660_boot_open;
     fs_api.boot_filesize = iso9660_boot_filesize;
     fs_api.boot_close = iso9660_boot_close;

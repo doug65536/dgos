@@ -1,6 +1,6 @@
 #include "exception.h"
 #include "assert.h"
-#include "cpu/halt.h"
+#include "halt.h"
 
 __BEGIN_NAMESPACE_STD
 

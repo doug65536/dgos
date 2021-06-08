@@ -1,5 +1,6 @@
 #include "eainstrument.h"
-#include "arch/x86_64/cpu/asm_constants.h"
+//#include "arch/x86_64/cpu/asm_constants.h"
+#include "arch/x86_64/cpu/thread_info.ofs.h"
 #include "arch/x86_64/cpu/control_regs.h"
 #include "likely.h"
 
@@ -21,6 +22,7 @@ int eainst_flush_ready;
 _no_instrument
 static uintptr_t eainst_lock_acquire()
 {
+#ifdef __x86_64__
     uintptr_t flags;
     __asm__ __volatile__ (
         "pushfq\n\t"
@@ -29,17 +31,24 @@ static uintptr_t eainst_lock_acquire()
         : [flags] "=r" (flags)
     );
     return flags;
+#else
+#error Unimplemented architecture
+#endif
 }
 
 _no_instrument
 static void eainst_lock_release(uintptr_t flags)
 {
+#ifdef __x86_64__
     __asm__ __volatile__ (
         "pushq %q[flags]\n\t"
         "popfq\n\t"
         :
         : [flags] "r" (flags)
     );
+#else
+#error Unimplemented architecture
+#endif
 }
 
 struct eainst_scoped_irq_dis {
@@ -57,6 +66,7 @@ struct eainst_scoped_irq_dis {
 _no_instrument
 static uintptr_t eainst_get_current_thread(uint64_t* tsc)
 {
+#ifdef __x86_64__
     intptr_t ids;
     __asm__ __volatile__ (
 #if EAINST_SERIALIZING
@@ -95,13 +105,16 @@ static uintptr_t eainst_get_current_thread(uint64_t* tsc)
         "orq %%rcx,%[ids]\n\t"
 
         : [ids] "=&a" (ids)
-        : [cur_thread_ofs] "n" (CPU_INFO_CURTHREAD_OFS)
-        , [thread_id_ofs] "n" (THREAD_THREAD_ID_OFS)
+        : [cur_thread_ofs] "n" (CPU_INFO_CUR_THREAD_OFS)
+        , [thread_id_ofs] "n" (THREAD_INFO_THREAD_ID_OFS)
         , [apic_id_ofs] "n" (CPU_INFO_APIC_ID_OFS)
         , [tsc_ptr] "D" (tsc)
         : "memory", "rdx", "rcx"
     );
     return ids;
+#else
+#error Unimplemented architecture
+#endif
 }
 
 // This gets tweaked
@@ -152,13 +165,13 @@ static inline void eainst_acquire_output_lock()
 {
     while (atomic_ld_acq(&trace_output_lock.count) != 0 ||
            atomic_cmpxchg(&trace_output_lock.count, 0, 1) != 0)
-        __builtin_ia32_pause();
+        pause();
 }
 
 _no_instrument
 static inline bool eainst_try_output_lock()
 {
-    for (size_t tries = 1000; tries > 0; --tries, __builtin_ia32_pause()) {
+    for (size_t tries = 1000; tries > 0; --tries, pause()) {
         if (likely(atomic_ld_acq(&trace_output_lock.count) == 0))
             if (likely(atomic_cmpxchg(&trace_output_lock.count, 0, 1) == 0))
                 return true;
@@ -315,7 +328,7 @@ static void eainst_acquire_early_trace_lock()
 {
     while (atomic_ld_acq(&early_trace_lock.count) != 0 ||
            atomic_cmpxchg(&early_trace_lock.count, 0, 1) != 0)
-        __builtin_ia32_pause();
+        pause();
 }
 
 _no_instrument

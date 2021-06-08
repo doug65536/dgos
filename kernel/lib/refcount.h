@@ -1,8 +1,7 @@
 #pragma once
 #include "assert.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "utility.h"
-#include "cpu/atomic.h"
 
 template<typename T, typename C = ext::atomic_int>
 class refcounted;
@@ -10,32 +9,32 @@ class refcounted;
 template<typename T>
 class refptr final {
 public:
-    refptr()
+    constexpr refptr()
         : ptr(nullptr)
     {
     }
 
-    refptr(T* rhs)
+    constexpr refptr(T* rhs)
         : ptr(rhs)
     {
         if (uintptr_t(rhs) > 0x7F)
             rhs->addref();
     }
 
-    refptr(refptr const& rhs)
+    constexpr refptr(refptr const& rhs)
         : ptr(rhs.ptr)
     {
         if (uintptr_t(rhs.ptr) > 0x7F)
             rhs.ptr->addref();
     }
 
-    refptr(refptr&& rhs)
+    constexpr refptr(refptr&& rhs)
         : ptr(rhs.ptr)
     {
         rhs.ptr = nullptr;
     }
 
-    refptr& operator=(refptr const& rhs)
+    constexpr refptr& operator=(refptr const& rhs)
     {
         T* old = ptr;
 
@@ -50,7 +49,7 @@ public:
         return *this;
     }
 
-    refptr& operator=(refptr&& rhs)
+    constexpr refptr& operator=(refptr&& rhs)
     {
         if (&rhs != this) {
             T* old = ptr;
@@ -64,7 +63,7 @@ public:
         return *this;
     }
 
-    refptr& operator=(T *rhs)
+    constexpr refptr& operator=(T *rhs)
     {
         T *old = ptr;
 

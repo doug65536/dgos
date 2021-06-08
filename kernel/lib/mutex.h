@@ -73,7 +73,8 @@ public:
     typedef spinlock_t mutex_type;
 
     constexpr spinlock()
-        : m(0)
+        : magic(expected_magic)
+        , m(0)
     {
     }
 
@@ -88,6 +89,9 @@ public:
     spinlock_t& native_handle();
 
 private:
+    // " spinlk "
+    static constexpr uint64_t expected_magic = 0x206b6c6e69707320;
+    uint64_t magic;
     spinlock_t m;
 };
 
@@ -96,7 +100,8 @@ public:
     typedef rwspinlock_t mutex_type;
 
     constexpr shared_spinlock()
-        : m(0)
+        : magic(expected_magic)
+        , m(0)
     {
     }
 
@@ -110,6 +115,9 @@ public:
     mutex_type& native_handle();
 
 private:
+    // " shrslk "
+    static constexpr uint64_t expected_magic = 0x206b6c7372687320;
+    uint64_t magic;
     rwspinlock_t m;
 };
 
@@ -119,7 +127,8 @@ public:
     typedef ticketlock_t mutex_type;
 
     constexpr ticketlock()
-        : m{}
+        : magic(expected_magic)
+        , m{}
     {
     }
 
@@ -132,6 +141,9 @@ public:
     ticketlock_t& native_handle();
 
 private:
+    // " tcktlk "
+    static constexpr uint64_t expected_magic = 0x206b6c746b637420;
+    uint64_t magic;
     ticketlock_t m;
 };
 
@@ -140,7 +152,8 @@ private:
 class KERNEL_API mcslock : public base_lock<mcslock> {
 public:
     constexpr mcslock()
-        : m(nullptr)
+        : magic(expected_magic)
+        , m(nullptr)
     {
     }
 
@@ -158,6 +171,9 @@ public:
     }
 
 private:
+    // " mcslck "
+    static constexpr uint64_t expected_magic = 0x206b636c73636d20;
+    uint64_t magic;
     mcs_queue_ent_t * volatile m;
 };
 
@@ -298,6 +314,9 @@ public:
     }
 
 private:
+    // " mutex  "
+    static constexpr uint64_t expected_magic = 0x2020786574756d20;
+    uint64_t magic;
     mutex_t m;
 };
 
@@ -335,6 +354,9 @@ public:
     }
 
 private:
+    // " shrmtx "
+    static constexpr uint64_t expected_magic = 0x2078746d72687320;
+    uint64_t magic;
     mutex_type m;
 };
 
@@ -343,15 +365,17 @@ class KERNEL_API unique_lock
 {
 public:
     _hot
-    explicit unique_lock(T& m) noexcept
-        : m(&m)
+    constexpr explicit unique_lock(T& m) noexcept
+        : magic(expected_magic)
+        , m(&m)
         , locked(false)
     {
         lock();
     }
 
-    explicit unique_lock(T& lock, defer_lock_t) noexcept
-        : m(&lock)
+    constexpr explicit unique_lock(T& lock, defer_lock_t) noexcept
+        : magic(expected_magic)
+        , m(&lock)
         , locked(false)
     {
     }
@@ -360,10 +384,16 @@ public:
     ~unique_lock() noexcept
     {
         unlock();
+
+        magic = 0;
+
+        // Prevent elision of clearing magic
+        __asm__("":::"memory");
     }
 
     void lock() noexcept
     {
+        assert(magic == expected_magic);
         assert(!locked);
         m->lock();
         locked = true;
@@ -371,6 +401,7 @@ public:
 
     void lock() volatile noexcept
     {
+        assert(magic == expected_magic);
         assert(!locked);
         m->lock();
         locked = true;
@@ -378,6 +409,7 @@ public:
 
     bool try_lock() noexcept
     {
+        assert(magic == expected_magic);
         assert(!locked);
         locked = m->try_lock();
         return locked;
@@ -385,6 +417,7 @@ public:
 
     void unlock() noexcept
     {
+        assert(magic == expected_magic);
         if (locked) {
             locked = false;
             m->unlock();
@@ -393,6 +426,7 @@ public:
 
     void unlock() volatile noexcept
     {
+        assert(magic == expected_magic);
         if (locked) {
             locked = false;
             m->unlock();
@@ -401,6 +435,7 @@ public:
 
     void lock_noirq() noexcept
     {
+        assert(magic == expected_magic);
         assert(!locked);
         m->lock_noirq();
         locked = true;
@@ -408,6 +443,7 @@ public:
 
     void unlock_noirq() noexcept
     {
+        assert(magic == expected_magic);
         if (locked) {
             locked = false;
             m->unlock_noirq();
@@ -416,32 +452,41 @@ public:
 
     void release() noexcept
     {
+        assert(magic == expected_magic);
         locked = false;
         m = nullptr;
     }
 
     void swap(unique_lock& rhs) noexcept
     {
+        assert(magic == expected_magic);
+        assert(rhs.magic == expected_magic);
         ext::swap(rhs.m, m);
         ext::swap(rhs.locked, locked);
     }
 
     _always_inline typename T::mutex_type& native_handle() noexcept
     {
+        assert(magic == expected_magic);
         return m->native_handle();
     }
 
     _always_inline bool is_locked() const noexcept
     {
+        assert(magic == expected_magic);
         return locked;
     }
 
     _always_inline bool is_locked() volatile const noexcept
     {
+        assert(magic == expected_magic);
         return locked;
     }
 
 private:
+    // " uniqlk "
+    static constexpr uint64_t expected_magic = 0x206b6c71696e7520;
+    uint64_t magic;
     T* m;
     bool locked;
 };
@@ -576,20 +621,26 @@ public:
 
     _always_inline typename ext::mcslock::mutex_type& native_handle() noexcept
     {
+        assert(magic == expected_magic);
         return m->native_handle();
     }
 
     _always_inline mcs_queue_ent_t &wait_node()
     {
+        assert(magic == expected_magic);
         return node;
     }
 
     _always_inline bool is_locked() const noexcept
     {
+        assert(magic == expected_magic);
         return locked;
     }
 
 private:
+    // " mcsulk "
+    static constexpr uint64_t expected_magic = 0x206b6c7573636d20;
+    uint64_t magic;
     ext::mcslock *m;
     mcs_queue_ent_t node;
     bool locked;
@@ -600,15 +651,17 @@ class KERNEL_API shared_lock
 {
 public:
     _hot
-    shared_lock(T& m)
-        : m(&m)
+    constexpr shared_lock(T& m)
+        : magic(expected_magic)
+        , m(&m)
         , locked(false)
     {
         lock();
     }
 
-    shared_lock(T& lock, defer_lock_t)
-        : m(&lock)
+    constexpr shared_lock(T& lock, defer_lock_t)
+        : magic(expected_magic)
+        , m(&lock)
         , locked(false)
     {
     }
@@ -616,11 +669,17 @@ public:
     _hot
     ~shared_lock()
     {
+        assert(magic == expected_magic);
         unlock();
+
+        // Prevent elision of clearing magic
+        magic = 0;
+        __asm__("":::"memory");
     }
 
     void lock()
     {
+        assert(magic == expected_magic);
         assert(!locked);
         m->lock_shared();
         locked = true;
@@ -628,6 +687,7 @@ public:
 
     void unlock()
     {
+        assert(magic == expected_magic);
         if (locked) {
             locked = false;
             m->unlock_shared();
@@ -636,22 +696,28 @@ public:
 
     typename T::mutex_type& native_handle()
     {
+        assert(magic == expected_magic);
         return m->native_handle();
     }
 
     void release()
     {
+        assert(magic == expected_magic);
         locked = false;
         m = nullptr;
     }
 
     void swap(unique_lock<T>& rhs)
     {
+        assert(magic == expected_magic);
         ext::swap(rhs.m, m);
         ext::swap(rhs.locked, locked);
     }
 
 private:
+    // " shrdlk "
+    static constexpr uint64_t expected_magic = 0x206b6c6472687320;
+    uint64_t magic;
     T* m;
     bool locked;
 };
@@ -709,6 +775,9 @@ public:
                 : ext::cv_status::timeout;
     }
 
+    // " condvr "
+    static constexpr uint64_t expected_magic = 0x206b6c6472687320;
+    uint64_t magic;
     condition_var_t m;
 };
 __END_NAMESPACE_STD

@@ -36,3 +36,4 @@
 // Maximum size of an extended attribute name list
 #define XATTR_LIST_MAX 65536
 
+#define CHAR_BIT __CHAR_BIT__

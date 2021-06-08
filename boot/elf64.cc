@@ -132,8 +132,7 @@ tchar const *cpu_choose_kernel()
     return TSTR "boot/dgos-kernel-generic";
 }
 
-static kernel_params_t *prompt_kernel_param(
-        void *phys_mem_table, void *ap_entry_ptr, int phys_mem_table_size)
+static kernel_params_t *prompt_kernel_param(void *ap_entry_ptr)
 {
     kernel_params_t *params = new (ext::nothrow) kernel_params_t();
 
@@ -142,8 +141,6 @@ static kernel_params_t *prompt_kernel_param(
     params->size = sizeof(*params);
 
     params->ap_entry = uintptr_t((void(*)())ap_entry_ptr);
-    params->phys_mem_table = uint64_t(phys_mem_table);
-    params->phys_mem_table_size = phys_mem_table_size;
     params->boot_drv_serial = boot_serial();
 
     params->acpi_rsdt = boottbl_find_acpi_rsdp();
@@ -187,9 +184,13 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 
     memcpy(ap_entry_ptr, ___smp_st, smp_sz);
 
+#ifndef __efi
     // Identity map the real mode bootloader stack area for long mode entry
-    paging_map_physical( 0x20000, 0x20000, 0x10000,
+    paging_map_physical(uint64_t(___initial_stack_limit),
+                        uint64_t(___initial_stack_limit),
+                        ___initial_stack - ___initial_stack_limit,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
+#endif
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
@@ -203,9 +204,6 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     paging_map_physical(uint64_t(heap_st), uint64_t(heap_st),
                         uint64_t(heap_en) - uint64_t(heap_st),
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
-
-    size_t phys_mem_table_size = 0;
-    void *phys_mem_table = physmap_get(&phys_mem_table_size);
     //
     // Build physical memory table
 
@@ -222,17 +220,20 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     PRINT("Physical mapping, base=%" PRIx64 ", size=%" PRIx64 "\n",
           physmap_addr, top_addr);
 
-//    // Very carefully iterate through only allocated
-//    // memory and system memory (and check for MTRR vs page table UB)
-//    for (size_t i = 0; i < phys_mem_table_size; ++i) {
-
-//    }
-
     paging_map_physical(0, physmap_addr, top_addr,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
-    kernel_params_t *params = prompt_kernel_param(
-                phys_mem_table, ap_entry_ptr, phys_mem_table_size);
+    physmap_align_normal();
+
+    //physmap_split_large();
+
+    size_t phys_mem_table_size = 0;
+
+    kernel_params_t *params = prompt_kernel_param(ap_entry_ptr);
+
+    void *phys_mem_table = physmap_get(&phys_mem_table_size);
+    params->phys_mem_table = uint64_t(uintptr_t(phys_mem_table));
+    params->phys_mem_table_size = phys_mem_table_size;
 
     params->initrd_st = initrd_base;
     params->initrd_sz = initrd_size;
@@ -419,19 +420,11 @@ elf64_loadaddr_t elf64_load(tchar const *filename)
 {
     cpu_init();
 
-    uint64_t pge_page_flags = 0;
-    if (likely(cpu_has_global_pages()))
-        pge_page_flags |= PTE_GLOBAL;
-
-    uint64_t nx_page_flags = 0;
-    if (likely(nx_available))
-        nx_page_flags = PTE_NX;
-
     tchar const *initrd_pathname = TSTR "boot/initrd-light";
 
     message_bar_draw(10, 7, 70, initrd_pathname);
 
-    int initrd_fd = boot_open(TSTR "boot/initrd");
+    int initrd_fd = boot_open(initrd_pathname);
 
     if (unlikely(initrd_fd < 0))
         PANIC("Unable to open initrd");
@@ -530,26 +523,26 @@ elf64_loadaddr_t elf64_load(tchar const *filename)
 
         // If it is not readable, writable or executable, ignore
         if (likely((blk->p_flags & (PF_R | PF_W | PF_X)) != 0)) {
-            ELF64_TRACE("hdr[%zu]: vaddr=0x%" PRIx64
-                        ", filesz=0x%" PRIx64
-                        ", memsz=0x%" PRIx64 "\n",
-                       i, blk->p_vaddr, blk->p_filesz, blk->p_memsz);
-
+            // If no memory size, then nothing to do!
             if (blk->p_memsz == 0)
                 continue;
 
-            // Global if possible
-            ctx->page_flags = pge_page_flags;
+            ELF64_TRACE("hdr[%zu]"
+                        ": fileofs=0x%" PRIx64
+                        ", filesz=0x%" PRIx64
+                        ", vaddr=0x%" PRIx64
+                        ", memsz=0x%" PRIx64,
+                        i, blk->p_offset,
+                        blk->p_filesz,
+                        blk->p_vaddr,
+                        blk->p_memsz);
 
-            // Pages present
-            ctx->page_flags |= PTE_PRESENT;
+            bool is_r = blk->p_flags & PF_R;
+            bool is_w = blk->p_flags & PF_W;
+            bool is_x = blk->p_flags & PF_X;
+            arch_set_page_flags(ctx, (intptr_t)blk->p_vaddr,
+                                is_r, is_w, is_x);
 
-            // If not executable, mark as no execute
-            ctx->page_flags |= nx_page_flags & -((blk->p_flags & PF_X) == 0);
-
-            // Writable
-            if ((blk->p_flags & PF_W) != 0)
-                ctx->page_flags |= PTE_WRITABLE;
 
             load_kernel_chunk(blk, file, ctx);
         }
@@ -577,9 +570,9 @@ elf64_loadaddr_t elf64_load(tchar const *filename)
 
     ELF64_TRACE("Entering kernel");
 
-    return {file_hdr.e_entry + base_adj, new_base};
+    message_bar_draw(10, 7, 70, TSTR "Entering kernel");
 
-//    enter_kernel(file_hdr.e_entry + base_adj, new_base);
+    return {file_hdr.e_entry + base_adj, new_base};
 }
 
 extern "C" _noreturn
@@ -608,10 +601,11 @@ void elf64_boot()
 {
     tchar const *kernel_name = cpu_choose_kernel();
 
-    PRINT("Boot device: %s", boot_name());
+    PRINT("Boot device: %" TFMT, boot_name());
 
-    PRINT("loading kernel: %s", kernel_name);
+    PRINT("loading kernel: %" TFMT, kernel_name);
     elf64_loadaddr_t loadaddr = elf64_load(kernel_name);
 
-    enter_kernel(loadaddr.entry, loadaddr.base);
+    if (loadaddr.entry)
+        enter_kernel(loadaddr.entry, loadaddr.base);
 }

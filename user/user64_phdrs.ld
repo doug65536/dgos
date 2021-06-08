@@ -14,7 +14,8 @@ SECTIONS {
 
 	PROVIDE_HIDDEN(__image_start = .);
 
-	.rodata ALIGN(16) : {
+	. = ALIGN(16);
+	.rodata : {
 		PROVIDE_HIDDEN(__rodata_st = .);
 		*(.rodata)
 		*(.rodata.*)
@@ -33,7 +34,8 @@ SECTIONS {
 		*(.eh_frame)
 	} :read
 
-	.rela.got ALIGN(8) : {
+	. = ALIGN(8);
+	.rela.got : {
 		*(.rela.got)
 	} :read
 
@@ -54,7 +56,8 @@ SECTIONS {
 	} :read
 
 	/* Align for transition from r-- to r-x permission */
-	.text ALIGN(4096) : {
+	. = ALIGN(4096);
+	.text : {
 		PROVIDE_HIDDEN(__text_start = .);
 		*(.text)
 		*(.text.*)
@@ -75,7 +78,8 @@ SECTIONS {
 	} :exec
 
 	/* Align for transition from r-x to rw- permission */
-	.data ALIGN(4096) : {
+	. = ALIGN(4096);
+	.data : {
 		PROVIDE_HIDDEN(___data_st = .);
 		*(.data)
 		*(.data.*)
@@ -83,7 +87,8 @@ SECTIONS {
 	} :data
 
 	/* 64-bit align */
-	.init_array ALIGN(8) : {
+	. = ALIGN(8);
+	.init_array : {
 		PROVIDE_HIDDEN(__init_array_start = .);
 		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
 		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
@@ -96,6 +101,7 @@ SECTIONS {
 	} :data
 
 	/* 64-bit align */
+	. = ALIGN(8);
 	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(__fini_array_start = .);
 		KEEP(*(.fini_array))

@@ -4,6 +4,7 @@ ldsym global "sym/boot1-elf.sym"
 ldsym global "sym/bootfat-elf.sym"
 
 lb 0x7c00
+lb cpu_debug_break
 lb relocated_boot1_entry
 lb run_kernel
 c

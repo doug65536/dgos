@@ -40,21 +40,6 @@ bool cpu_has_long_mode()
     return has > 0;
 }
 
-bool cpu_has_no_execute()
-{
-    static int has;
-
-    if (has)
-        return has > 0;
-
-    cpuid_t cpuinfo;
-    has = (cpuid(&cpuinfo, 0x80000001U, 0) &&
-            (cpuinfo.edx & (1<<20)))
-            ? 1 : -1;
-
-    return has > 0;
-}
-
 bool cpu_has_global_pages()
 {
     static int has;

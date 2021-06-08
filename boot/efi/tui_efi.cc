@@ -154,7 +154,7 @@ _constructor(ctor_console) static void conin_init()
                 efi_timer_callback, nullptr, &efi_timer_event);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Could not create timer event");
+        PANIC("Could not create timer event");
 
     // Set timer tick period to 59.4ms
     status = efi_systab->BootServices->SetTimer(
@@ -162,7 +162,7 @@ _constructor(ctor_console) static void conin_init()
                 TimerPeriodic, 549000);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Could not set timer");
+        PANIC("Could not set timer");
 }
 
 __END_ANONYMOUS
@@ -215,14 +215,14 @@ bool wait_input(uint32_t ms_timeout)
                 nullptr, nullptr, &efi_timeout_event);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Could not create timeout event");
+        PANIC("Could not create timeout event");
 
     // Set the timer to fire at the passed timeout (in 100ns units)
     status = efi_systab->BootServices->SetTimer(
                 efi_timeout_event, TimerRelative, ms_timeout * 10000);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Could not set timeout timer");
+        PANIC("Could not set timeout timer");
 
     // Array of events to be waited
     EFI_EVENT events[] = {
@@ -236,13 +236,13 @@ bool wait_input(uint32_t ms_timeout)
                 countof(events), events, &index);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Could not wait for events");
+        PANIC("Could not wait for events");
 
     // Close the timeout event
     status = efi_systab->BootServices->CloseEvent(efi_timeout_event);
 
     if (unlikely(EFI_ERROR(status)))
-        PANIC(TSTR "Could not close timeout event");
+        PANIC("Could not close timeout event");
 
     return index < 2;
 }

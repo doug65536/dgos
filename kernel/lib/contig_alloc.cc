@@ -3,12 +3,12 @@
 #include "engunit.h"
 
 #include "inttypes.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "mmu.h"
 
 #define DEBUG_LINEAR_SANITY     0
 #define DEBUG_ADDR_ALLOC        1
-#define DEBUG_ADDR_EARLY        0
+#define DEBUG_ADDR_EARLY        1
 
 //
 // Linear address allocator
@@ -96,6 +96,8 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 {
     linaddr_t addr;
 
+    assert(!(size & PAGE_MASK));
+
     if (likely(ready)) {
         scoped_lock lock(free_addr_lock);
 
@@ -129,19 +131,25 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 
         assert(bool(node_by_size));
         assert(bool(node_by_addr));
+        assert(node_by_size.value().first == node_by_addr.value().second);
+        assert(node_by_addr.value().first == node_by_size.value().second);
 
         ext::pair<tree_t::iterator, bool> chk;
 
         if (by_size.first > size) {
             // Insert remainder by size
-            node_by_size.value() = { by_size.first - size,
-                    by_size.second + size };
+            node_by_size.value() = {
+                    by_size.first - size,
+                    by_size.second + size
+            };
             chk = free_addr_by_size.insert(ext::move(node_by_size));
             assert(chk.second);
 
             // Insert remainder by address
-            node_by_addr.value() = {by_size.second + size,
-                    by_size.first - size};
+            node_by_addr.value() = {
+                    by_size.second + size,
+                    by_size.first - size
+            };
             chk = free_addr_by_addr.insert(ext::move(node_by_addr));
             assert(chk.second);
         }
@@ -185,7 +193,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
  *   A-----B  X: The range we are taking                               *
  *   C-----D  Y: The existing range                                    *
  *
- * Query finds [ ranges.lower_bound(A), ranges.upper_bound(B) )
+ * Query finds [ ranges.lower_bound(A), ranges.lower_bound(B) )
  *
  * For each one use this table to determine outcome against the first
  *

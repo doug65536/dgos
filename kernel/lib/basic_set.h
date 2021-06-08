@@ -1176,8 +1176,8 @@ public:
     {
     }
 
-    explicit __basic_tree(_Compare const& __cmp,
-                          __node_allocator_t&& __other_alloc)
+    constexpr explicit __basic_tree(_Compare const& __cmp,
+                                    __node_allocator_t&& __other_alloc)
         : __root(nullptr)
         , __first(nullptr)
         , __last(nullptr)

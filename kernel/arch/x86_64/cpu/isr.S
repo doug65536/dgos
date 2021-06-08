@@ -1,5 +1,7 @@
 
 #include "asm_constants.h"
+#include "cpu_info.ofs.h"
+#include "thread_info.ofs.h"
 #include "control_regs_constants.h"
 #include "../cfi_helpers.h"
 #include "interrupts.h"
@@ -497,93 +499,78 @@ isr_common:
     ///  r15 accumulates segment registers
 
     pushq %rbx
-    .cfi_offset rbx,-9*8
-
-    movq %cr3,%rbx
-
     pushq %r15
-    .cfi_offset r15,-10*8
-
-    movl %ds,%r15d
-
     pushq %r14
-    .cfi_offset r14,-11*8
-
-    movl %es,%r14d
-
     pushq %r13
+    .cfi_offset rbx,-9*8
+    .cfi_offset r15,-10*8
+    .cfi_offset r14,-11*8
     .cfi_offset r13,-12*8
 
+    movq %cr3,%rbx
+    movl %ds,%r15d
+    movl %es,%r14d
     movl %fs,%r13d
 
     pushq %r12
+    pushq %r11
+    pushq %r10
+    pushq %rax
     .cfi_offset r12,-13*8
+    .cfi_offset r11,-14*8
+    .cfi_offset r10,-15*8
+    .cfi_offset rax,-16*8
+
+    cld
 
     movl %gs,%r12d
+    shll $ 16,%r14d
+    shlq $ 32,%r13
 
     // Make sure access to user pages is blocked
     insn_fixup
     clac
 
-    pushq %r11
-    .cfi_offset r11,-14*8
-
-    shll $ 16,%r14d
-
-    pushq %r10
-    .cfi_offset r10,-15*8
-
-    shlq $ 32,%r13
-
-    pushq %rax
-    .cfi_offset rax,-16*8
-
-    cld
-
     pushq %r9
+    pushq %r8
+    pushq %rcx
+    pushq %rdx
     .cfi_offset r9,-17*8
+    .cfi_offset r8,-18*8
+    .cfi_offset rcx,-19*8
+    .cfi_offset rdx,-20*8
 
     shlq $ 48,%r12
 
-    pushq %r8
-    .cfi_offset r8,-18*8
-
     // Combine r12-r15 into r15
     orl %r14d,%r15d
+    orq %r12,%r13
 
-    pushq %rcx
-    .cfi_offset rcx,-19*8
+    orq %r13,%r15
 
     /// Register usage:
     ///  r15 now has all segment registers, rbx has cr3
 
-    orq %r12,%r13
-
-    pushq %rdx
-    .cfi_offset rdx,-20*8
-
-    orq %r13,%r15
-
     pushq %rsi
-    .cfi_offset rsi,-21*8
-
-    // Avoid giant instruction below
-    movl $ 1 << ISR_CTX_CTX_FLAGS_USERGS_QWBIT,%esi
-
     pushq %rdi
+    .cfi_offset rsi,-21*8
     .cfi_offset rdi,-22*8
-
-    // Get cs into edi for RPL checks
-    movl frame_cs(%rbp),%edi
-
-    /// Register usage:
-    ///  Finished with rbx, r15 now has all segment registers
 
     // Save CR3
     pushq %rbx
 
     // Save segments
     pushq %r15
+
+    // Avoid giant instruction below
+    mov frame_intr(%rbp),%rbx
+
+    // Get cs into edi for RPL checks
+    movl frame_cs(%rbp),%edi
+
+    /// Register usage:
+    ///  rbx now holds frame_intr
+    ///  r15 now has all segment registers
 
     // Guaranteed to swap if came from user mode
     // Note that maybe_swap detour clobbers rax,rdx,rcx
@@ -594,7 +581,8 @@ isr_common:
 
 .Lneed_swap:
     // set flag bit indicating non-kernel gs context
-    orl %esi,frame_intr(%rbp)
+    orq $ 1 << ISR_CTX_CTX_FLAGS_USERGS_QWBIT,%rbx
+    mov %rbx,frame_intr(%rbp)
     swapgs
 .Lno_swap:
 
@@ -618,19 +606,17 @@ isr_common:
 
 .Lfrom_kernel:
 
+    movzbl frame_intr(%rbp),%ebx
+
     // Push FPU context pointer field, initially null
     pushq $ 0
 
     /// Register usage:
-    ///  Hold isr_context_t pointer in r12
     ///  Hold interrupt number in ebx
-
-    movq %rsp,%r12
-    movzbl frame_intr(%rbp),%ebx
 
     lea isr_lookup(%rip),%rax
     movl %ebx,%edi
-    movq %r12,%rsi
+    movq %rsp,%rsi
     add $ -8,%rsp
     indirect_call_mem rcx,"(%rax,%rbx,8)"
 
@@ -709,52 +695,23 @@ isr_common:
 
     .cfi_remember_state
 
-    // mov is usually at least 2x faster than pop
+    // mov is sometimes faster than pop
 
     mov 0*8(%rsp),%rdi
-    .cfi_same_value rdi
-
     mov 1*8(%rsp),%rsi
-    .cfi_same_value rsi
-
     mov 2*8(%rsp),%rdx
-    .cfi_same_value rdx
-
     mov 3*8(%rsp),%rcx
-    .cfi_same_value rcx
-
     mov 4*8(%rsp),%r8
-    .cfi_same_value r8
-
     mov 5*8(%rsp),%r9
-    .cfi_same_value r9
-
     mov 6*8(%rsp),%rax
-    .cfi_same_value rax
-
     mov 7*8(%rsp),%r10
-    .cfi_same_value r10
-
     mov 8*8(%rsp),%r11
-    .cfi_same_value r11
-
     mov 9*8(%rsp),%r12
-    .cfi_same_value r12
-
     mov 10*8(%rsp),%r13
-    .cfi_same_value r13
-
     mov 11*8(%rsp),%r14
-    .cfi_same_value r14
-
     mov 12*8(%rsp),%r15
-    .cfi_same_value r15
-
     mov 13*8(%rsp),%rbx
-    .cfi_same_value rbx
-
     mov 14*8(%rsp),%rbp
-    .cfi_same_value rbp
 
     // Discard stuff moved from stack, plus the error code and intr number
     add_rsp_cfi 17*8
@@ -1216,7 +1173,7 @@ soft_rdgsbase_r14:
     .cfi_startproc
 
     // Read xsave stack pointer from thread
-    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
+    movq THREAD_INFO_FPUSAVE_PTR_OFS(%rdi),%rsi
     subq sse_context_size(%rip),%rsi
 
     // Set all bits of edx:eax
@@ -1229,7 +1186,7 @@ soft_rdgsbase_r14:
     \insn (%rsi)
 
     // Update xsave stack pointer in thread
-    movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
+    movq %rsi,THREAD_INFO_FPUSAVE_PTR_OFS(%rdi)
     movq %rsi,%rax
     ret
 
@@ -1241,7 +1198,7 @@ soft_rdgsbase_r14:
 .macro xrstor_ctx insn
     .cfi_startproc
 
-    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
+    movq THREAD_INFO_FPUSAVE_PTR_OFS(%rdi),%rsi
 
     // Set all bits of edx:eax
     movl $ -1,%eax
@@ -1253,7 +1210,7 @@ soft_rdgsbase_r14:
     \insn (%rsi)
 
     addq sse_context_size(%rip),%rsi
-    movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
+    movq %rsi,THREAD_INFO_FPUSAVE_PTR_OFS(%rdi)
     movq %rsi,%rax
 
     ret
@@ -1429,19 +1386,12 @@ exception_isr_handler:
 .global thread_entry
 .balign 16
 thread_entry:
-    .cfi_startproc
+    .cfi_startproc simple
 
     // No need to preserve anything, the caller doesn't exist
 
     // Stop the stack trace
-    .cfi_undefined rip
-    .cfi_undefined rsp
-    .cfi_undefined rbp
-    .cfi_undefined rbx
-    .cfi_undefined r12
-    .cfi_undefined r13
-    .cfi_undefined r14
-    .cfi_undefined r15
+    no_caller_cfi
 
     // Store parameters so they can be recovered by unwind
     mov %rdi,%r12
@@ -2415,13 +2365,6 @@ sys_sigreturn_impl_32:
     .cfi_offset rflags,-3*8
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
-    .cfi_same_value rax
-    .cfi_same_value rbx
-    .cfi_same_value rcx
-    .cfi_same_value rdx
-    .cfi_same_value rsi
-    .cfi_same_value rdi
-    .cfi_same_value rbp
 
     xorl %r9d,%r9d
     xorl %r8d,%r8d

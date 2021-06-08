@@ -1,7 +1,11 @@
 .
 utils
 include
-bios
+!bios
 efi
 ../user/libutf
-
+!efi/x86_64
+!x86
+x86_bios
+efi/aarch64
+aarch64

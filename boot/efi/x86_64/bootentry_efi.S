@@ -9,9 +9,10 @@
 .section .entry, "ax", @progbits
 .global bootefi_entry
 bootefi_entry:
-    .cfi_startproc
+    .cfi_startproc simple
+    .cfi_def_cfa rsp,0
     .cfi_undefined rip
-    .cfi_undefined rsp
+    .cfi_undefined rbp
     .cfi_undefined rbx
     .cfi_undefined r12
     .cfi_undefined r13

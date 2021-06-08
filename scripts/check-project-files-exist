@@ -6,10 +6,18 @@ if [[ -n $1 ]]; then
 fi
 
 while read f; do
+	filesdir=${f%/*}/
 	echo ---- $f
 	while read s; do
-		if ! [[ -e ${f%/*}/$s ]]; then
-			echo ${f%/*}/$s
+		if ! [[ -e $filesdir/$s ]]; then
+			basename=${s##*/}
+			suggest=$(find "$filesdir" -type f -name "$basename")
+
+			if [[ $suggest =~ [a-zA-Z0-9_-] ]]; then
+				echo "$filesdir$s" "(maybe $suggest"")"
+			else
+				echo ${f%/*}/$s
+			fi
 		fi
 	done < $f
 done < <(find "$dir" -type f -name '*.files')

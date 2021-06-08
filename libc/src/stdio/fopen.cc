@@ -35,7 +35,7 @@
 /// 	file does not exist: create new
 /// 
 
-FILE *fopen(const char * restrict filename, const char * restrict mode)
+FILE *fopen(char const * restrict filename, char const * restrict mode)
 {
     int flags = 0;
     mode_t open_mode = 0;    // fixme

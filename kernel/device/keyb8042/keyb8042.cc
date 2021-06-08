@@ -5,7 +5,7 @@
 
 #include "irq.h"
 #include "cpu/ioport.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "printk.h"
 #include "time.h"
 #include "string.h"
@@ -133,7 +133,7 @@ private:
 
     static char const passthru_lookup[];
 
-    int set_layout_name(const char *name) override final;
+    int set_layout_name(char const *name) override final;
     int get_modifiers() override final;
     int set_indicators(int indicators) override final;
 

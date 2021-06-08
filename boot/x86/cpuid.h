@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 
+__BEGIN_DECLS
+
 struct cpuid_t {
     uint32_t eax;
     uint32_t ebx;
@@ -8,8 +10,10 @@ struct cpuid_t {
     uint32_t ecx;
 };
 
-extern "C" bool cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
-extern "C" _pure bool cpu_has_long_mode();
-extern "C" _pure bool cpu_has_no_execute();
-extern "C" _pure bool cpu_has_global_pages();
-extern "C" _pure bool cpu_has_bmi();
+bool cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
+bool cpu_has_long_mode();
+bool cpu_has_global_pages();
+bool cpu_has_bmi();
+bool cpu_has_upto_avx2();
+
+__END_DECLS

@@ -38,6 +38,8 @@ init_ret:
 0:  hlt
     jmp 0b
 
+.section .lowdata
+
 .global boot_drive
 boot_drive:
     .byte 0

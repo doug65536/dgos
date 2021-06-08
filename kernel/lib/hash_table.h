@@ -31,6 +31,8 @@ public:
     bool rehash(uint8_t new_log2);
     T *lookup(void *key);
     bool del(void *key);
+
+    _use_result
     bool insert(T *item);
     void clear();
 

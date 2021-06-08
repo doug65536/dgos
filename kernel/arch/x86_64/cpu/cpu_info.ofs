@@ -1,0 +1,17 @@
+type: cpu_info_t
+self
+cur_thread
+apic_id
+syscall_flags
+in_irq
+pf_count
+syscall_ctx
+locks_held
+csw_deferred
+after_csw_fn
+after_csw_vp
+tss_ptr
+storage
+
+code:
+#include "cpu/cpu_info.h"

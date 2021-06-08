@@ -8,10 +8,14 @@
 __attribute__((__noreturn__))
 static void pthread_bootstrap(int tid, void *(fn)(void*), void *arg)
 {
-#ifdef __x86_64__
+#if defined(__x86_64__)
     __asm__ ( ".cfi_undefined rip\n" );
-#else
+#elif defined(__i386__)
     __asm__ ( ".cfi_undefined eip\n" );
+#elif defined(__aarch64__)
+    __asm__ ( ".cfi_undefined 32\n" );
+#else
+#error Unknown processor
 #endif
 
     __pthread_set_tid(tid);

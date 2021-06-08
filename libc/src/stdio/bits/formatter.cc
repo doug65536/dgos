@@ -818,7 +818,7 @@ long formatter(
     return chars_written;
 }
 
-int __emit_stream_chars(const char *p, intptr_t n, void *ctx)
+int __emit_stream_chars(char const *p, intptr_t n, void *ctx)
 {
     FILE *stream = (FILE*)ctx;
 

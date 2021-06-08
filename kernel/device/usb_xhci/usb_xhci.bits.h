@@ -1645,7 +1645,7 @@
 // (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_BIT       18
 
-// (RW1CS) Warn port reset change (1=changed)
+// (RW1CS) Warm port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_BIT       19
 
 // (RW1CS) Overcurrent change (1=changed)
@@ -1712,7 +1712,7 @@
 // (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_BITS      1
 
-// (RW1CS) Warn port reset change (1=changed)
+// (RW1CS) Warm port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_BITS      1
 
 // (RW1CS) Overcurrent change (1=changed)
@@ -1778,7 +1778,7 @@
 // (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_MASK      ((1U << USBXHCI_PORTSC_PEC_BITS)-1)
 
-// (RW1CS) Warn port reset change (1=changed)
+// (RW1CS) Warm port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_MASK      ((1U << USBXHCI_PORTSC_WRC_BITS)-1)
 
 // (RW1CS) Overcurrent change (1=changed)
@@ -1855,7 +1855,7 @@
 #define USBXHCI_PORTSC_PEC \
     (USBXHCI_PORTSC_PEC_MASK << USBXHCI_PORTSC_PEC_BIT)
 
-// (RW1CS) Warn port reset change (1=changed)
+// (RW1CS) Warm port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC \
     (USBXHCI_PORTSC_WRC_MASK << USBXHCI_PORTSC_WRC_BIT)
 
@@ -1933,7 +1933,7 @@
 // (RW1CS) Port enabled/disabled change (1=changed)
 #define USBXHCI_PORTSC_PEC_n(n)      ((n) << USBXHCI_PORTSC_PEC_BIT)
 
-// (RW1CS) Warn port reset change (1=changed)
+// (RW1CS) Warm port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_n(n)      ((n) << USBXHCI_PORTSC_WRC_BIT)
 
 // (RW1CS) Overcurrent change (1=changed)
@@ -2011,7 +2011,7 @@
 #define USBXHCI_PORTSC_PEC_GET(n) \
     (((n) >> USBXHCI_PORTSC_PEC_BIT) & USBXHCI_PORTSC_PEC_MASK)
 
-// (RW1CS) Warn port reset change (1=changed)
+// (RW1CS) Warm port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_GET(n) \
     (((n) >> USBXHCI_PORTSC_WRC_BIT) & USBXHCI_PORTSC_WRC_MASK)
 
@@ -2100,7 +2100,7 @@
 #define USBXHCI_PORTSC_PEC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_PEC) | USBXHCI_PORTSC_PEC_n((n)))
 
-// (RW1CS) Warn port reset change (1=changed)
+// (RW1CS) Warm port reset change (1=changed)
 #define USBXHCI_PORTSC_WRC_SET(r,n) \
     ((r) = ((r) & ~USBXHCI_PORTSC_WRC) | USBXHCI_PORTSC_WRC_n((n)))
 

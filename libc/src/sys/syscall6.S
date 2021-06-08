@@ -8,12 +8,14 @@
 syscall6:
 	.cfi_startproc
 
-#ifdef __x86_64__
+#if defined(__x86_64__)
 
 	mov 8(%rsp),%eax
 	mov %rcx,%r10
+	syscall
+	ret
 
-#else
+#elif defined(__i386__)
 
 	mov 4+8*6(%esp),%eax
 
@@ -23,10 +25,20 @@ syscall6:
 	movq 4+8*2(%esp),%xmm2
 	movq 4+8*1(%esp),%xmm1
 	movq 4+8*0(%esp),%xmm0
+	syscall
+	ret
+
+#elif defined(__aarch64__)
+
+	mov w8,w6
+	svc #0
+	ret
+
+#else
+
+#error Unimplemented CPU
 
 #endif
 
-	syscall
-	ret
 
 	.cfi_endproc

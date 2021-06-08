@@ -52,4 +52,10 @@ struct dir_iterator_t {
     size_t sector_index;
 };
 
-extern "C" void fat32_boot_partition(uint64_t partition_lba);
+__BEGIN_DECLS
+
+void fat32_use_fs(uint64_t partition_lba);
+void fat32_boot_partition(uint64_t partition_lba);
+
+__END_DECLS
+

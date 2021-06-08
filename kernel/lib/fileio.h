@@ -69,19 +69,19 @@
 #define F_WRLCK 3
 
 struct flock {
-    // Type of lock; F_RDLCK, F_WRLCK, F_UNLCK. 
+    // Type of lock; F_RDLCK, F_WRLCK, F_UNLCK.
     short l_type;
-    
-    // Flag for starting offset. 
+
+    // Flag for starting offset.
     short l_whence;
-    
-    // 4 bytes of asinine padding here because 
+
+    // 4 bytes of asinine padding here because
     // original author apparently "knew" off_t was 32 bits
-    
-    // Relative offset in bytes. 
+
+    // Relative offset in bytes.
     off_t l_start;
-    
-    // Size; if 0 then until EOF. 
+
+    // Size; if 0 then until EOF.
     off_t l_len;
 
     pid_t l_pid;
@@ -89,16 +89,18 @@ struct flock {
 
 struct path_t;
 
+__BEGIN_DECLS
+
 bool file_ref_filetab(int id);
 
 KERNEL_API int file_creatat(int dirid, char const *path, mode_t mode);
-KERNEL_API int file_openat(int dirid, char const* path, 
+KERNEL_API int file_openat(int dirid, char const* path,
                            int flags, mode_t mode = 0);
 KERNEL_API int file_close(int id);
 KERNEL_API ssize_t file_read(int id, void *buf, size_t bytes);
 KERNEL_API ssize_t file_write(int id, void const *buf, size_t bytes);
 KERNEL_API ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs);
-KERNEL_API ssize_t file_pwrite(int id, void const *buf, 
+KERNEL_API ssize_t file_pwrite(int id, void const *buf,
                                size_t bytes, off_t ofs);
 KERNEL_API off_t file_seek(int id, off_t ofs, int whence);
 KERNEL_API int file_ftruncate(int id, off_t size);
@@ -123,6 +125,8 @@ KERNEL_API int file_fchmod(int id, mode_t mode);
 KERNEL_API int file_chown(int id, int uid, int gid);
 
 KERNEL_API int file_fstatfs(int id, fs_statvfs_t *buf);
+
+__END_DECLS
 
 #define AT_FDCWD -100
 

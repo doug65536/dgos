@@ -16,7 +16,7 @@ PCI_DRIVER_BY_CLASS(
 #include "string.h"
 #include "time.h"
 #include "printk.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "threadsync.h"
 #include "bswap.h"
 #include "unique_ptr.h"

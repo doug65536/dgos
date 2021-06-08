@@ -11,7 +11,7 @@ class unit;
 
 class unit_ctx {
 public:
-    void fail(unit *test, const char *file, int line);
+    void fail(unit *test, char const *file, int line);
     void skip(unit *test);
 
     size_t failure_count() const
@@ -40,7 +40,7 @@ public:
          bool init_enabled);
 
     _noinline
-    void fail(const char *file, int line);
+    void fail(char const *file, int line);
 
     void fail(char const *message,
         char const *file = __builtin_FILE(),
@@ -221,13 +221,13 @@ void unit::ge(T const& expect, U const& value,
 }
 
 extern template void unit::eq(int const&, int const&,
-    const char *file, int line);
+    char const *file, int line);
 extern template void unit::eq(uint32_t const&, uint32_t const&,
-    const char *file, int line);
+    char const *file, int line);
 extern template void unit::eq(bool const&, bool const&,
-    const char *file, int line);
+    char const *file, int line);
 extern template void unit::eq(size_t const&, size_t const&,
-    const char *file, int line);
+    char const *file, int line);
 
 #define UNITTEST_CONCAT2(a,b) a##b
 #define UNITTEST_CONCAT(a,b) UNITTEST_CONCAT2(a, b)

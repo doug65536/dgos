@@ -99,13 +99,32 @@ extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
 #define PTE_EX_FILEMAP      (1UL << PTE_EX_FILEMAP_BIT)
 #define PTE_EX_DEMAND       (1UL << PTE_EX_DEMAND_BIT)
 
+//
 // PAT configuration
+
+// +-+-+-+
+// |P|P|P| <- from PTE
+// |A|C|W|
+// |T|D|T| Type
+// +-+-+-+-------------------------------
+// |0|0|0| WB (fully cached)
+// |0|0|1| WT (no write caching)
+// |0|1|0| UCW (can be made WC by MTRR)
+// |0|1|1| UC (strictly uncacheable)
+// |1|0|0| WC (only do burst accesses)
+// |1|0|1| WP (read only)
+// |1|1|0| (unused) WB
+// |1|1|1| (unused) WB
+// +-+-+-+-------------------------------
+
 #define PAT_IDX_WB  0
 #define PAT_IDX_WT  1
 #define PAT_IDX_UCW 2
 #define PAT_IDX_UC  3
 #define PAT_IDX_WC  4
 #define PAT_IDX_WP  5
+#define PAT_IDX_R0  6
+#define PAT_IDX_R1  7
 
 #define PAT_CFG \
     (CPU_MSR_IA32_PAT_n(PAT_IDX_WB, CPU_MSR_IA32_PAT_WB) | \
@@ -113,7 +132,9 @@ extern "C" isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx);
     CPU_MSR_IA32_PAT_n(PAT_IDX_UCW, CPU_MSR_IA32_PAT_UCW) | \
     CPU_MSR_IA32_PAT_n(PAT_IDX_UC, CPU_MSR_IA32_PAT_UC) | \
     CPU_MSR_IA32_PAT_n(PAT_IDX_WC, CPU_MSR_IA32_PAT_WC) | \
-    CPU_MSR_IA32_PAT_n(PAT_IDX_WP, CPU_MSR_IA32_PAT_WP))
+    CPU_MSR_IA32_PAT_n(PAT_IDX_WP, CPU_MSR_IA32_PAT_WP) | \
+    CPU_MSR_IA32_PAT_n(PAT_IDX_R0, CPU_MSR_IA32_PAT_WB) | \
+    CPU_MSR_IA32_PAT_n(PAT_IDX_R1, CPU_MSR_IA32_PAT_WB))
 
 #define PTE_PDEPAT_n(idx) \
     ((PTE_PDEPAT & -!!(idx & 4)) | \
@@ -232,72 +253,6 @@ typedef uintptr_t pte_t;
 #define PTE_EX_LOCKED       (1UL << PTE_EX_LOCKED_BIT)
 #define PTE_EX_DEVICE       (1UL << PTE_EX_DEVICE_BIT)
 #define PTE_EX_WAIT         (1UL << PTE_EX_WAIT_BIT)
-
-// PAT configuration
-#define PAT_IDX_WB  0
-#define PAT_IDX_WT  1
-#define PAT_IDX_UCW 2
-#define PAT_IDX_UC  3
-#define PAT_IDX_WC  4
-#define PAT_IDX_WP  5
-
-#define PAT_CFG \
-    (CPU_MSR_IA32_PAT_n(PAT_IDX_WB, CPU_MSR_IA32_PAT_WB) | \
-    CPU_MSR_IA32_PAT_n(PAT_IDX_WT, CPU_MSR_IA32_PAT_WT) | \
-    CPU_MSR_IA32_PAT_n(PAT_IDX_UCW, CPU_MSR_IA32_PAT_UCW) | \
-    CPU_MSR_IA32_PAT_n(PAT_IDX_UC, CPU_MSR_IA32_PAT_UC) | \
-    CPU_MSR_IA32_PAT_n(PAT_IDX_WC, CPU_MSR_IA32_PAT_WC) | \
-    CPU_MSR_IA32_PAT_n(PAT_IDX_WP, CPU_MSR_IA32_PAT_WP))
-
-#define PTE_PDEPAT_n(idx) \
-    ((PTE_PDEPAT & -!!(idx & 4)) | \
-    (PTE_PCD & -!!(idx & 2)) | \
-    (PTE_PWT & -!!(idx & 1)))
-
-#define PTE_PTEPAT_n(idx) \
-    ((PTE_PTEPAT & -!!(idx & 4U)) | \
-    (PTE_PCD & -!!(idx & 2U)) | \
-    (PTE_PWT & -!!(idx & 1U)))
-
-// Page table entries don't have a structure, they
-// are a bunch of bitfields. Use uint64_t and the
-// constants above
-typedef uintptr_t pte_t;
-
-//
-// Recursive page table mapping
-
-// Recursive mapping index calculation
-#define PT_ENTRY(i0,i1,i2,i3) \
-    ((((((((i0)<<9)+(i1))<<9)+(i2))<<9)+(i3))<<9)
-
-// The number of pte_t entries at each level
-#define PT3_ENTRIES     (0x1000000000UL)
-#define PT2_ENTRIES     (0x8000000UL)
-#define PT1_ENTRIES     (0x40000UL)
-#define PT0_ENTRIES     (0x200UL)
-
-#define PT_RECURSE      UINT64_C(256)
-#define PT_BEGIN        (PT_RECURSE << 39)
-
-// Indices of start of page tables for each level
-#define PT3_INDEX       (PT_ENTRY(PT_RECURSE,0,0,0))
-#define PT2_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,0,0))
-#define PT1_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,0))
-#define PT0_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,PT_RECURSE))
-
-// Canonicalize the given address
-#define CANONICALIZE(n) uintptr_t(intptr_t(n << 16) >> 16)
-
-#define PT3_ADDR        (CANONICALIZE(PT3_INDEX*sizeof(pte_t)))
-#define PT2_ADDR        (CANONICALIZE(PT2_INDEX*sizeof(pte_t)))
-#define PT1_ADDR        (CANONICALIZE(PT1_INDEX*sizeof(pte_t)))
-#define PT0_ADDR        (CANONICALIZE(PT0_INDEX*sizeof(pte_t)))
-
-#define PT3_PTR         ((pte_t*)PT3_ADDR)
-#define PT2_PTR         ((pte_t*)PT2_ADDR)
-#define PT1_PTR         ((pte_t*)PT1_ADDR)
-#define PT0_PTR         ((pte_t*)PT0_ADDR)
 
 static inline constexpr size_t round_up(size_t n)
 {

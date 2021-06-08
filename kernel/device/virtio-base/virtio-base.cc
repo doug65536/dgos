@@ -1,6 +1,6 @@
 #include "virtio-base.h"
 #include "likely.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "inttypes.h"
 #include "time.h"
 #include "numeric_limits.h"

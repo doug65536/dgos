@@ -170,7 +170,7 @@ int const_time_memcmp(void const *lhs, void const *rhs, size_t count)
 char *strstr(char const *str, char const *substr)
 {
     // If substr is empty string, return str
-    if (*substr == 0)
+    if (unlikely(*substr == 0))
         return (char*)str;
 
     size_t slen = strlen(str);

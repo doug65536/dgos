@@ -302,7 +302,7 @@ bool pci_config_pio::copy(pci_addr_t addr, void *dest,
 
 size_t pci_config_pio::pioofs(pci_addr_t addr, size_t offset)
 {
-    return (1 << 31) |
+    return (1U << 31) |
             (addr.bus() << 16) |
             (addr.slot() << 11) |
             (addr.func() << 8) |
@@ -642,7 +642,7 @@ int pci_init(void)
                ", class=%#.2x"
                ", subclass=%#.2x"
                ", progif=%#.2x\n",
-               pci_describe_device(pci_iter),
+               pci_describe_device_iter(pci_iter),
                pci_iter.bus,
                pci_iter.slot,
                pci_iter.func,
@@ -707,7 +707,7 @@ int pci_init(void)
     printk("Autoconfiguring PCI BARs\n");
 
     for (pci_dev_iterator_t& pci_iter : pci_cache.iters) {
-        char const *description = pci_describe_device(pci_iter);
+        char const *description = pci_describe_device_iter(pci_iter);
 
         printk("Probing %d:%d:%d (%s)\n",
                pci_iter.bus, pci_iter.slot, pci_iter.func,
@@ -862,8 +862,8 @@ static int pci_enum_capabilities_match(
 }
 
 int pci_enum_capabilities(int start, pci_addr_t addr,
-                                 int (*callback)(uint8_t, int, uintptr_t),
-                                 uintptr_t context)
+                          int (*callback)(uint8_t, int, uintptr_t),
+                          uintptr_t context)
 {
     int ofs;
 
@@ -1617,7 +1617,7 @@ pci_dev_iterator_t::~pci_dev_iterator_t()
 
 }
 
-char const *pci_describe_device(pci_dev_iterator_t const& pci_iter)
+char const *pci_describe_device_iter(pci_dev_iterator_t const& pci_iter)
 {
     return pci_describe_device(pci_iter.config.dev_class,
                                pci_iter.config.subclass,

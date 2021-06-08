@@ -9,6 +9,8 @@
 #include "elf64.h"
 #include "halt.h"
 #include "fs.h"
+#include "x86/cpu_x86.h"
+#include "gdt_sel_pxe.h"
 
 // iPXE is loading a real mode segment and crashing when doing PM call
 #define PXE_USE_PROTECTED_MODE  0
@@ -25,10 +27,10 @@
 uint8_t pxe_server_ip[4];
 uint8_t pxe_gateway_ip[4];
 
-#if PXE_USE_PROTECTED_MODE
-_section(".lowdata")
-uint32_t pxe_entry_farp32[2];
-#endif
+//#if PXE_USE_PROTECTED_MODE
+//_section(".lowdata")
+//uint32_t pxe_entry_farp32[2];
+//#endif
 
 _section(".lowdata")
 uint16_t pxe_entry_farp16[2];  // [ off16, seg16 ] 16-bit far pointer
@@ -157,45 +159,53 @@ static bool pxe_set_api(bangpxe_t *bp)
     }
 
 #if PXE_USE_PROTECTED_MODE
+    //
     // Initialize 16-bit protected mode GDT entries
+
     gdt[GDT_SEL_PXE_STACK >> 3].set_base(bp->Stack.ofs)
             .set_limit(bp->Stack.size-1)
-            .set_access(true, 0, false, false, true)
-            .set_flags(false, false);
+            .set_access_rwdata(0)
+            .set_flags_16bit();
+
     gdt[GDT_SEL_PXE_UD >> 3].set_base(bp->UNDIData.ofs)
             .set_limit(bp->UNDIData.size-1)
-            .set_access(true, 0, false, false, true)
-            .set_flags(false, false);
+            .set_access_rwdata(0)
+            .set_flags_16bit();
+
     gdt[GDT_SEL_PXE_UC >> 3].set_base(bp->UNDICode.ofs)
             .set_limit(bp->UNDICode.size-1)
-            .set_access(true, 0, true, false, false)
-            .set_flags(false, false);
+            .set_access_code(0)
+            .set_flags_16bit();
+
     gdt[GDT_SEL_PXE_UCW >> 3].set_base(bp->UNDICodeWrite.ofs)
             .set_limit(bp->UNDICodeWrite.size-1)
-            .set_access(true, 0, false, false, true)
-            .set_flags(false, false);
+            .set_access_rwdata(0)//.access(true, 0, true, false, true)
+            .set_flags_16bit();
+
     gdt[GDT_SEL_PXE_BD >> 3].set_base(bp->BC_Data.ofs)
             .set_limit(bp->BC_Data.size-1)
-            .set_access(true, 0, false, false, true)
-            .set_flags(false, false);
+            .set_access_rwdata(0)
+            .set_flags_16bit();
+
     gdt[GDT_SEL_PXE_BC >> 3].set_base(bp->BC_Code.ofs)
             .set_limit(bp->BC_Code.size-1)
             .set_access(true, 0, true, false, false)
-            .set_flags(false, false);
+            .set_flags_16bit();
+
     gdt[GDT_SEL_PXE_BCW >> 3].set_base(bp->BC_CodeWrite.ofs)
             .set_limit(bp->BC_CodeWrite.size-1)
-            .set_access(true, 0, false, false, true)
-            .set_flags(false, false);
+            .set_access_rwdata(0)//.set_access(true, 0, true, false, true)
+            .set_flags_16bit();
 
-    gdt[GDT_SEL_PXE_ENTRY >> 3].set_base(bp->EntryPointESP_seg << 4)
+    gdt[GDT_SEL_PXE_ENTRY >> 3].set_base(bp->EntryPointSP_seg << 4)
             .set_limit(0xFFFF)
             .set_access(true, 0, true, false, true)
-            .set_flags(false, false);
+            .set_flags_16bit();
 
     gdt[GDT_SEL_PXE_TEMP >> 3].set_base(bp->EntryPointSP_seg << 4)
             .set_limit(0xFFFF)
-            .set_access(true, 0, true, false, true)
-            .set_flags(false, false);
+            .set_access(true, 0, false, false, true)
+            .set_flags_16bit();
 
 //    pep->bc_code_seg = GDT_SEL_PXE_BC;
 //    pep->bc_data_seg = GDT_SEL_PXE_BD;
@@ -219,13 +229,13 @@ static bool pxe_set_api(bangpxe_t *bp)
     bp->StatusCallout_ofs = -1;
     bp->StatusCallout_seg = -1;
 
-    bang_pxe_ptr[0] = uintptr_t(bp) - bp->UNDICode.ofs;
-    bang_pxe_ptr[1] = GDT_SEL_PXE_UC;
+    bang_pxe_farp16[0] = uintptr_t(bp) - bp->UNDICode.ofs;
+    bang_pxe_farp16[1] = GDT_SEL_PXE_UC;
 
     pxe_call = pxe_call_bangpxe_pm;
 
-    pxe_entry_farp32[0] = bp->EntryPointESP_ofs;
-    pxe_entry_farp32[1] = bp->EntryPointESP_seg;
+    pxe_entry_farp16[0] = bp->EntryPointSP_ofs;
+    pxe_entry_farp16[1] = bp->EntryPointSP_seg;
 
     PRINT("Using protected mode PXE API entry point at %x:%x",
         pxe_entry_farp16[1], pxe_entry_farp16[0]);
@@ -233,8 +243,8 @@ static bool pxe_set_api(bangpxe_t *bp)
     pxe_call = pxe_call_bangpxe_rm;
 
     // 16-bit far pointer, seg:off little endian
-    pxe_entry_farp16[0] = bp->EntryPointIP_ofs;
-    pxe_entry_farp16[1] = bp->EntryPointIP_seg;
+    pxe_entry_farp16[0] = bp->EntryPointSP_ofs;
+    pxe_entry_farp16[1] = bp->EntryPointSP_seg;
 
     PRINT("Using real mode PXE API entry point at %x:%x",
         pxe_entry_farp16[1], pxe_entry_farp16[0]);

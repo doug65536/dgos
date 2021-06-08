@@ -12,7 +12,7 @@ struct print_info_t {
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
 /// or, a pointer to an unterminated string and a length
-static int __emit_string_chars(const char *p, intptr_t n, void *ctx)
+static int __emit_string_chars(char const *p, intptr_t n, void *ctx)
 {
     print_info_t *info = reinterpret_cast<print_info_t*>(ctx);
 
@@ -48,7 +48,7 @@ static int __emit_string_chars(const char *p, intptr_t n, void *ctx)
     return n;
 }
 
-int vsnprintf(char *buffer, size_t buffer_sz, const char *format, va_list ap)
+int vsnprintf(char *buffer, size_t buffer_sz, char const *format, va_list ap)
 {
     print_info_t info{buffer, buffer_sz, 0};
 

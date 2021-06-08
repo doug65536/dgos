@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <zlib.h>
+#include <errno.h>
 
 #define C_ASSERT(expr) static_assert((expr), #expr)
 
@@ -297,8 +298,10 @@ surface_t *surface_from_png(char const *path)
     // Allocate read buffer
     // fixme, was unique_ptr
     uint8_t *buf = new uint8_t[PNG_BUFSIZE];
-    if (unlikely(!buf))
+    if (unlikely(!buf)) {
+        errno = ENOMEM;
         return nullptr;
+    }
 
     uint8_t * const read_buf = buf;
     uint8_t * const decomp_buf = buf + (PNG_BUFSIZE >> 1);
@@ -314,7 +317,8 @@ surface_t *surface_from_png(char const *path)
     inf.zalloc = zlib_malloc;
     inf.zfree = zlib_free;
 
-    inflateInit2(&inf, 15);
+    if (unlikely(inflateInit2(&inf, 15) != Z_OK))
+        return nullptr;
 
     // Read header
     if (unlikely(sizeof(png_sig) != read(fd, buf, sizeof(png_sig))))
@@ -341,7 +345,7 @@ surface_t *surface_from_png(char const *path)
     for (int done = 0; !done; ) {
         png_chunk_hdr_t hdr;
 
-        if (sizeof(hdr) != read(fd, &hdr, sizeof(hdr)))
+        if (unlikely(sizeof(hdr) != read(fd, &hdr, sizeof(hdr))))
             return nullptr;
 
         PNG_TRACE("Encountered %4.4s chunk\n", hdr.type);
@@ -360,7 +364,8 @@ surface_t *surface_from_png(char const *path)
             ihdr.width = htonl(ihdr.width);
             ihdr.height = htonl(ihdr.height);
 
-            lseek(fd, sizeof(png_crc_t), SEEK_CUR);
+            if (unlikely(lseek(fd, sizeof(png_crc_t), SEEK_CUR) < 0))
+                return nullptr;
 
             // Only method 0 is defined
             if (unlikely(ihdr.compr_method != 0))
@@ -386,10 +391,14 @@ surface_t *surface_from_png(char const *path)
                                           PNG_IHDR_COLORTYPE_C)) +
                     !!(ihdr.color_type & PNG_IHDR_COLORTYPE_A)) *
                     (ihdr.bit_depth >> 3);
+
             state.scanline_bytes = state.pixel_bytes * ihdr.width;
 
             img = new (ihdr.width, ihdr.height)
                     surface_t(ihdr.width, ihdr.height);
+
+            if (unlikely(!img))
+                return nullptr;
 
             img->width = ihdr.width;
             img->height = ihdr.height;
@@ -439,6 +448,7 @@ surface_t *surface_from_png(char const *path)
                     // Slide input buffer
                     if (inf.avail_in > 0)
                         memmove(read_buf, inf.next_in, inf.avail_in);
+
                     input_level = inf.avail_in;
 
                     decomp_level += inf.total_out;
@@ -448,7 +458,7 @@ surface_t *surface_from_png(char const *path)
                 consumed = png_process_idata(
                             &state, decomp_buf, decomp_level);
 
-                if (consumed == ~0U)
+                if (unlikely(consumed == ~0U))
                     return nullptr;
 
                 decomp_level -= consumed;
@@ -458,7 +468,8 @@ surface_t *surface_from_png(char const *path)
                 }
             }
 
-            lseek(fd, sizeof(png_crc_t), SEEK_CUR);
+            if (unlikely(lseek(fd, sizeof(png_crc_t), SEEK_CUR) < 0))
+                return nullptr;
 
             break;
 
@@ -471,7 +482,9 @@ surface_t *surface_from_png(char const *path)
         case PNG_OTHER:
         default:
             PNG_TRACE("Ignoring %4.4s chunk\n", hdr.type);
-            lseek(fd, hdr.len + sizeof(png_crc_t), SEEK_CUR);
+            if (unlikely(lseek(fd, hdr.len + sizeof(png_crc_t), SEEK_CUR) < 0))
+                return nullptr;
+
             break;
         }
     }

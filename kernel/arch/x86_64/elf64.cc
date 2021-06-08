@@ -937,19 +937,19 @@ errno_t module_t::apply_relocs()
 
             // === TLS ===
 
-//            case R_X86_64_DTPMOD64:
-//                ELF64_TRACE("DTPMOD64, value=%#zx, operand=%#zx"
-//                            ", *operand=%#zx\n",
-//                            value, uintptr_t(operand),
-//                            *(uintptr_t*)operand);
-//                continue;
+            case R_X86_64_DTPMOD64:
+                ELF64_TRACE("DTPMOD64, value=%#zx, operand=%#zx"
+                            ", *operand=%#zx\n",
+                            value, uintptr_t(operand),
+                            *(uintptr_t*)operand);
+                continue;
 
-//            case R_X86_64_DTPOFF64:
-//                ELF64_TRACE("DTPMOD64, value=%#zx, operand=%#zx"
-//                            ", *operand=%#zx\n",
-//                            value, uintptr_t(operand),
-//                            *(uintptr_t*)operand);
-//                continue;
+            case R_X86_64_DTPOFF64:
+                ELF64_TRACE("DTPMOD64, value=%#zx, operand=%#zx"
+                            ", *operand=%#zx\n",
+                            value, uintptr_t(operand),
+                            *(uintptr_t*)operand);
+                continue;
 
             // === No operation ===
 

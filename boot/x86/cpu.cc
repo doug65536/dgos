@@ -1,12 +1,11 @@
+#include "arch_paging.h"
 #include "cpu_x86.h"
 #include "paging.h"
 #include "gdt_sel.h"
 #include "screen.h"
-#include "cpuid.h"
+#include "arch_cpu.h"
 
-extern gdt_entry_t gdt[];
-
-table_register_64_t idtr_64;
+extern table_register_64_t idtr_64;
 
 table_register_t idtr_16 _used = {
     0,
@@ -14,7 +13,7 @@ table_register_t idtr_16 _used = {
     0
 };
 
-idt_entry_64_t idt[32];
+idt_entry_64_t idt_64[32];
 
 static _always_inline uintptr_t cpu_cr4_change_bits(
         uintptr_t clear, uintptr_t set)
@@ -77,10 +76,26 @@ static _always_inline uint64_t cpu_xcr_change_bits(
 //#define XCR0_PKRU               (1<<XCR0_PKRU_BIT)
 
 _section(".smp.data") bool nx_available;
-uint32_t gp_available;
+bool gp_available;
 
 void cpu_init()
 {
-    nx_available = cpu_has_no_execute();
-    gp_available = cpu_has_global_pages() ? CPU_CR4_PGE : 0;
+    nx_available = arch_has_no_execute();
+    gp_available = arch_has_global_pages();
 }
+
+bool cpu_has_no_execute()
+{
+    static int has;
+
+    if (has)
+        return has > 0;
+
+    cpuid_t cpuinfo;
+    has = (cpuid(&cpuinfo, 0x80000001U, 0) &&
+            (cpuinfo.edx & (1<<20)))
+            ? 1 : -1;
+
+    return has > 0;
+}
+

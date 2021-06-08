@@ -447,3 +447,11 @@ int __clone(void (*bootstrap)(int tid, void *(*fn)(void*), void *arg),
             void *(*fn)(void *arg), void *arg);
 
 void __pthread_set_tid(pthread_t tid);
+
+#if defined(__x86_64__)
+#define __pause() __builtin_ia32_pause()
+#elif defined(__aarch64__)
+static inline void __pause() { __asm__ __volatile__ ("yield"); }
+#else
+static inline void __pause() { }
+#endif

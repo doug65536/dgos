@@ -14,6 +14,8 @@ static _always_inline _no_instrument void pause()
 {
 #if defined(__i386__) || defined(__x86_64__)
     __builtin_ia32_pause();
+#elif defined(__aarch64__)
+    __asm__("yield");
 #endif
 }
 

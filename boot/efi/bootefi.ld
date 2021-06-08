@@ -3,10 +3,13 @@ ENTRY(bootefi_entry)
 SECTIONS {
 	. = SIZEOF_HEADERS;
 	. = ALIGN(__section_alignment__);
-	.text __image_base__ +
+
+	. = __image_base__ +
 			(__section_alignment__ < 0x1000
 			? .
-			: __section_alignment__ ) : {
+			: __section_alignment__ );
+
+	.text : {
 		__text_st = .;
 
 		KEEP(*(.entry))
@@ -15,7 +18,13 @@ SECTIONS {
 		*(.text.unlikely)
 	}
 
-	.rela.plt : ALIGN(64) {
+	. = ALIGN(64);
+
+	/DISCARD/ : { *(.eh_frame); }
+
+	. = ALIGN(64);
+
+	.rela.plt : {
 		PROVIDE_HIDDEN(___rela_entry_st = .);
 		*(.rela.entry)
 		PROVIDE_HIDDEN(___rela_entry_en = .);
@@ -29,23 +38,31 @@ SECTIONS {
 		PROVIDE_HIDDEN (__rela_iplt_en = .);
 	}
 
-	.plt.got : ALIGN(64) {
+	. = ALIGN(64);
+
+	.plt.got : {
 		PROVIDE_HIDDEN(___plt_got = .);
 		*(.plt.got)
 	}
 
-	.plt.bnd : ALIGN(64) {
+	. = ALIGN(64);
+
+	.plt.bnd : {
 		PROVIDE_HIDDEN(___plt_bnd = .);
 		*(.plt.bnd)
 	}
 
-	.plt : ALIGN(64) {
+	. = ALIGN(64);
+
+	.plt : {
 		PROVIDE_HIDDEN(___plt = .);
 		*(.plt)
 		*(.iplt)
 	}
 
-	.edata ALIGN(4K) : {
+	. = ALIGN(16K);
+
+	.edata : {
 		*(.edata)
 
 		. = ALIGN(16);
@@ -74,47 +91,47 @@ SECTIONS {
 		*(.rodata.*)
 	}
 
-	.smp ALIGN(4K) : {
-		/* Gather all trampoline-critical code and data into this section */
-		/* It will protect data from being lost when exiting boot services */
-		/* This section is copied to a 4KB aligned heap block */
-		___smp_st = ABSOLUTE(.);
-		KEEP(*(.smp.entry))
-		KEEP(*(.smp.text))
-		. = ALIGN(64);
-		KEEP(*(.smp.data))
-		___smp_en = ABSOLUTE(.);
-	}
+	. = ALIGN(16K);
 
-	.reloc ALIGN(4K) : { *(.reloc) }
+	.reloc : { *(.reloc) }
 
-	.hash : ALIGN(64) {
+	. = ALIGN(64);
+
+	.hash : {
 		PROVIDE_HIDDEN(___hash_st = .);
 		*(.hash);
 		PROVIDE_HIDDEN(___hash_en = .);
 	}
 
-	.dynsym : ALIGN(64) {
+	. = ALIGN(64);
+
+	.dynsym : {
 		PROVIDE_HIDDEN(___dynsym_st = .);
 		*(.dynsym);
 		*(.dynsym*);
 		PROVIDE_HIDDEN(___dynsym_en = .);
 	}
 
-	.dynstr : ALIGN(64) {
+	. = ALIGN(64);
+
+	.dynstr : {
 		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
 		*(.dynstr*);
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	}
 
-	.got : ALIGN(64) {
+	. = ALIGN(64);
+
+	.got : {
 		PROVIDE_HIDDEN(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got.plt)
 		*(.got)
 	}
 
-	.rela.dyn : ALIGN(64) {
+	. = ALIGN(64);
+
+	.rela.dyn : {
 		PROVIDE_HIDDEN(___rela_dyn = .);
 		*(.rela.init)
 		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
@@ -133,22 +150,44 @@ SECTIONS {
 		*(.rela.ifunc)
 	}
 
-	.dynamic : ALIGN(4096) {
+	. = ALIGN(64);
+
+	.dynamic : {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);
 	}
 
-	.got : ALIGN(64) {
+	. = ALIGN(16K);
+
+	.smp : {
+		/* Gather all trampoline-critical code and data into this section */
+		/* It will protect data from being lost when exiting boot services */
+		/* This section is copied to a 4KB aligned heap block */
+		___smp_st = ABSOLUTE(.);
+		KEEP(*(.smp.entry))
+		KEEP(*(.smp.text))
+		. = ALIGN(64);
+		KEEP(*(.smp.data))
+		___smp_en = ABSOLUTE(.);
+	}
+
+	. = ALIGN(16k);
+
+	.got : {
 		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
 		*(.got.plt)
 		*(.got*)
 	}
 
-	.data ALIGN(4K) : {
+	. = ALIGN(64);
+
+	.data : {
 		*(.data)
 		*(.data.*)
 	}
+
+	. = ALIGN(64);
 
 	.bss : {
 		___bss_st = .;
@@ -163,6 +202,8 @@ SECTIONS {
 		. += 8;
 		___bss_en = .;
 	}
+
+	. = ALIGN(64);
 
 	/DISCARD/       : { *(.comment)       }
 /*	.debug          (NOLOAD) : { *(.debug)         }

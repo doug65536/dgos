@@ -1,3 +1,4 @@
+include/sys/math_targets.h
 libc.cflags
 libc.cxxflags
 cxx/abi/cxa_allocate_exception.cc
@@ -70,6 +71,7 @@ src/aio/aio_read.cc
 src/aio/aio_return.cc
 src/aio/aio_suspend.cc
 src/aio/aio_write.cc
+src/aio/lio_listio.cc
 src/pthread/__clone.cc
 src/pthread/__futex.cc
 
@@ -115,6 +117,7 @@ src/stdlib/abort.cc
 src/stdlib/abs.cc
 src/stdlib/calloc.cc
 src/stdlib/free.cc
+src/stdlib/itoa.cc
 src/stdlib/malloc.cc
 src/stdlib/realloc.cc
 src/stdlib/malloc_arena.cc
@@ -122,6 +125,7 @@ src/stdlib/malloc_arena.h
 src/stdlib/new.cc
 src/string/__bytebitmap.cc
 src/string/__bytebitmap.h
+src/string/mblen.cc
 src/sys/indirect-thunk.S
 src/sys/ioctl/ioctl.cc
 src/sys/time/clock_gettime.cc

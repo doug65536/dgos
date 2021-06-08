@@ -159,7 +159,7 @@ void unittest::unit_ctx::skip(unittest::unit *test)
     ++skipped;
 }
 
-unittest::unit::unit(const char *name, const char *test_file,
+unittest::unit::unit(char const *name, char const *test_file,
                      int test_line, bool init_enabled)
     : is_enabled(init_enabled)
     , name(name)
@@ -178,7 +178,7 @@ void unittest::unit::fail(char const *file, int line)
     ctx->fail(this, file, line);
 }
 
-void unittest::unit::fail(const char *message, const char *file, int line)
+void unittest::unit::fail(char const *message, char const *file, int line)
 {
     printk("Test failed: %s %s(%d): %s\n", name, file, line, message);
     ctx->fail(this, file, line);
@@ -190,23 +190,23 @@ void unittest::unit::set_ctx(unit_ctx *ctx)
 }
 
 template void unittest::unit::eq(int const&, int const&,
-    const char *file, int line);
+    char const *file, int line);
 
 template void unittest::unit::eq(uint32_t const&, uint32_t const&,
-    const char *file, int line);
+    char const *file, int line);
 
 template void unittest::unit::eq(bool const&, bool const&,
-    const char *file, int line);
+    char const *file, int line);
 
 template void unittest::unit::eq(size_t const&, size_t const&,
-    const char *file, int line);
+    char const *file, int line);
 
-const char *unittest::unit::get_name() const
+char const *unittest::unit::get_name() const
 {
     return name;
 }
 
-const char *unittest::unit::get_file() const
+char const *unittest::unit::get_file() const
 {
     return test_file;
 }
@@ -255,8 +255,8 @@ intptr_t unittest::unit::thread_fn(void *arg)
     return 0;
 }
 
-void unittest::unit::eq_str(const char *expect,
-    const char *value, const char *file, int line)
+void unittest::unit::eq_str(char const *expect,
+    char const *value, char const *file, int line)
 {
     if (unlikely(strcmp(expect, value))) {
         dbgout << name << " expected \"" << expect << '"' <<

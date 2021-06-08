@@ -28,7 +28,7 @@ struct idt_entry_64_t {
 
 C_ASSERT(sizeof(idt_entry_64_t) == 16);
 
-extern "C" idt_entry_64_t idt[];
+extern "C" idt_entry_64_t idt_64[];
 
 // Buffer large enough for worst case flags description
 #define CPU_MAX_FLAGS_DESCRIPTION    58

@@ -116,7 +116,7 @@ static blk_hdr_t *malloc_coalesce(blk_hdr_t *blk, blk_hdr_t *next)
         next->make_invalid();
 
         // Enforce that malloc rover is always pointing to a block header
-        if (first_free == next)
+        if (unlikely(first_free == next))
             first_free = blk;
 
         next = next_blk(blk);

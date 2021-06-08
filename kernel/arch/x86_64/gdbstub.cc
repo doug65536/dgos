@@ -15,9 +15,9 @@
 #include "cpu/thread_impl.h"
 #include "thread.h"
 #include "cpu/apic.h"
-#include "cpu/halt.h"
+#include "halt.h"
 #include "cpu/interrupts.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "cpu/except.h"
 #include "cpu/control_regs.h"
 

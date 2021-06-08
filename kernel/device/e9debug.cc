@@ -5,7 +5,7 @@
 #include "serial-uart.h"
 #include "callout.h"
 #include "string.h"
-#include "cpu/spinlock.h"
+#include "spinlock.h"
 #include "bootinfo.h"
 
 #include "cpu/cpuid.h"
@@ -18,7 +18,7 @@ static bool use_port_e9;
 
 static char vt102_reset[] = "\x1B" "c";
 
-_constructor(ctor_ctors_ran) static void e9debug_serial_ready(void*)
+_constructor(ctor_cpu_init_cpus_done) static void e9debug_serial_ready(void*)
 {
     // HACK! Enable bochs debugger hardware
     outw(0x8A00, 0x8A00);

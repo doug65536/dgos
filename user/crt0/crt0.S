@@ -7,6 +7,7 @@
 _start:
 	.cfi_startproc
 
+// ============================================================================
 #ifdef __x86_64__
     // Can't return, terminate stack traces here
     .cfi_undefined rip
@@ -30,7 +31,6 @@ _start:
 
 	// r14 = envp = argv + (argc + 1)
     lea 8(%r13,%r12,8),%r14
-
 
     // Scan through the envp array until the nullptr is encountered
     // Finish the loop pointing to the item after the nullptr
@@ -64,6 +64,7 @@ _start:
     movq %rax,(%rdx)
 .Lrela_iplt_skip:
     addq $ 24,%rbx
+    jmp .Lrela_iplt_next
 .Lrela_iplt_done:
 
     lea __init_array_start(%rip),%rbx
@@ -100,7 +101,8 @@ _start:
     call exit
 	jmp .Lexit_returned
 
-#else
+// ============================================================================
+#elif defined(__i386__)
 
     // Can't return, terminate stack traces here
     .cfi_undefined eip
@@ -239,6 +241,107 @@ __call_fns:
 .Ldone_init:
     ret
 
+// ============================================================================
+#elif defined(__aarch64__)
+    // Terminate stack trace
+    no_caller_cfi
+
+    // On entry:
+    //  x0=tid
+    //  x1=argc
+    //  x2=argv
+    //  x3=envp
+
+    // Store tid into TLS immediately
+    mrs x5,tpidr_el0
+    add x5,x5,:tprel_hi12:__tid, lsl 12
+    add x5,x5,:tprel_lo12_nc:__tid
+    str x0,[x5]
+
+    // eventually:
+    //  x20=argc
+    //  x21=argv
+    //  x22=envp
+    //  x23=auxv
+
+    mov x20,x1
+    mov x21,x2
+    mov x22,x3
+
+    // initial w0 is set by loader to argc
+    // initial x1 is set by loader to argv
+    // initial x2 is set by loader to envp
+
+    // Scan through the envp array until the nullptr is encountered
+    // Finish the loop pointing to the item after the nullptr
+    mov x23,x3
+.Lcheck_envp:
+    ldr x4,[x23]
+    add x23,x23,8
+    cmp x4,0
+    b.ne .Lcheck_envp
+
+    // x23 = auxv
+
+    // Resolve .rela.iplt (x24=rbx)
+    adr x24,__rela_iplt_start
+
+    .Lrela_iplt_next:
+    adr x0,__rela_iplt_end
+    cmp x24,x0
+    b.eq .Lrela_iplt_done
+
+    // Only apply STT_GNU_IFUNC (0x25)
+    ldr x1,[x24, 8]
+    cmp x1,0x25
+    b.ne .Lrela_iplt_skip
+
+    // Call the resolver
+    ldr x0,[x24, 16]
+    blr x0
+
+    // Read PLT vector pointer from relocation record
+    ldr x1,[x24]
+    // Update the PLT with the resolver return value
+    str x0,[x1]
+.Lrela_iplt_skip:
+    add x24,x24,24
+    b .Lrela_iplt_next
+.Lrela_iplt_done:
+
+    adr x24,__init_array_start
+.Lnext_init:
+    adr x0,__init_array_end
+    cmp x0,x24
+    b.eq .Ldone_init
+    ldr x0,[x24]
+    cmp x0,0
+    b.eq .Ldone_init
+    blr x0
+    add x24,x24,8
+    b .Lnext_init
+.Ldone_init:
+
+    // Save stack pointer
+    mov x24,sp
+
+    // Pass argc, argv, envp, auxv to main
+    mov x0,x20
+    mov x1,x21
+    mov x2,x22
+    mov x3,x23
+    bl main
+
+    mov sp,x24
+
+    // Save program exit code
+    mov x20,x0
+.Lexit_returned:
+    mov x0,x20
+    bl exit
+    b .Lexit_returned
+
 #endif
+// ============================================================================
 
     .cfi_endproc

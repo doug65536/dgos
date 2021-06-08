@@ -37,7 +37,11 @@ typedef int64_t off_t;
 #define _malloc                 __attribute__((__malloc__))
 #define _alloc_size(...)        __attribute__((__alloc_size__(__VA_ARGS__)))
 #define _alloc_align(pi)        __attribute__((__alloc_align__(pi)))
+#ifdef __x86_64__
 #define _ms_struct              __attribute__((__ms_struct__))
+#else
+#define _ms_struct
+#endif
 #define _unused                 __attribute__((__unused__))
 #define _use_result             __attribute__((__warn_unused_result__))
 #define _leaf                   __attribute__((__leaf__))
@@ -65,23 +69,43 @@ typedef int64_t off_t;
 #define _hot                    __attribute__((__hot__))
 #define _cold                   __attribute__((__cold__))
 
+#define _access(...)            __attribute__((__access__(__VA_ARGS__)))
+
 #define _assume(expr) \
     do { \
         if (!(expr)) \
             __builtin_unreachable(); \
     } while (0)
 
+#ifndef __efi
+#define _no_tstr_printf_format(m,n)     __attribute__((__format__(__printf__, m, n)))
+#else
+#define _no_tstr_printf_format(m,n)
+#endif
+
 #define CONCATENATE4(a, b) a##b
 #define CONCATENATE3(a, b) CONCATENATE4(a, b)
 #define CONCATENATE2(a, b) CONCATENATE3(a, b)
 #define CONCATENATE(a, b) CONCATENATE2(a, b)
 
+typedef char16_t twide;
+
+#if __SIZEOF_WCHAR_T__ == 2
+typedef uint16_t widecodepoint_t;
+#elif __SIZEOF_WCHAR_T__ == 4
+typedef uint32_t widecodepoint_t;
+#else
+#error No idea what is going on with wchar_t
+#endif
+
 #ifdef __efi
-typedef char16_t tchar;
+typedef twide tchar;
 #define TSTR u""
+#define TFMT "ls"
 #else
 typedef char tchar;
 #define TSTR ""
+#define TFMT "s"
 #endif
 
 #define countof(arr) (sizeof((arr))/sizeof(*(arr)))

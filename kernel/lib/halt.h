@@ -1,6 +1,6 @@
 #pragma once
 #include "types.h"
-#include "control_regs.h"
+#include "cpu/control_regs.h"
 
 __BEGIN_DECLS
 

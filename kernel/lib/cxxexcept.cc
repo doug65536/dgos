@@ -12,7 +12,7 @@
 #include "thread.h"
 #include "string.h"
 #include "mutex.h"
-#include "cpu/atomic.h"
+#include "atomic.h"
 #include "uleb.h"
 
 #define DEBUG_CXXEXCEPT 1
@@ -28,7 +28,7 @@ static constexpr uint64_t our_exception_class = 0x474e5543432b2b00;
 extern "C" void register_eh_frame();
 
 // Register EH frames as soon as we have a working heap
-void init_eh_frames(void*)
+static void init_eh_frames(void*)
 {
     register_eh_frame();
 }
@@ -496,7 +496,7 @@ extern "C" int __exception_stop_fn(
     __exception_jmp_buf_t *jmpbuf = (__exception_jmp_buf_t*)arg;
     _Unwind_Ptr cfa = _Unwind_GetCFA(ctx);
 
-    if (cfa < (_Unwind_Ptr)jmpbuf->rsp)
+    if (cfa < (_Unwind_Ptr)jmpbuf->sp)
         return _URC_NO_REASON;
 
     // Found it
@@ -524,7 +524,7 @@ bool std::type_info::before(const std::type_info &__rhs) const
     return __type_name < __rhs.__type_name;
 }
 
-const char *std::type_info::name() const
+char const *std::type_info::name() const
 {
     return __type_name;
 }
