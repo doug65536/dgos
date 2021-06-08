@@ -2,7 +2,9 @@
 #include "types.h"
 #include "likely.h"
 
-extern "C" _noinline int __assert_failed(tchar const *expr, tchar const *msg,
+__BEGIN_DECLS
+
+_noinline int __assert_failed(tchar const *expr, tchar const *msg,
         tchar const *file, int_fast32_t line);
 
 #ifndef NDEBUG
@@ -21,3 +23,5 @@ extern "C" _noinline int __assert_failed(tchar const *expr, tchar const *msg,
 #define C_ASSERT(e) static_assert(e, #e)
 
 _noinline void cpu_debug_break();
+
+__END_DECLS
