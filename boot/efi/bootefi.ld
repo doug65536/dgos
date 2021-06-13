@@ -1,27 +1,19 @@
 ENTRY(bootefi_entry)
 
-MEMORY {
-	ram (rwxai) : org = 0x400000, len = 0x400000
-}
-
 SECTIONS {
-	. = ABSOLUTE(0x400000);
-	
-	.victim : { . += 16; }
+	/DISCARD/ : { *(.eh_frame); }
+	/DISCARD/ : { *(.eh_frame_hdr); }
+
+	. = ABSOLUTE(0x100000000);
 
 	.text : {
 		__text_st = .;
 
 		KEEP(*(.entry))
 		*(.text)
-		*(.text.*)
+		*(SORT(.text.*))
 		*(.text.unlikely)
-	} >ram AT >ram
-
-	. = ALIGN(64);
-
-	/DISCARD/ : { *(.eh_frame); }
-	/DISCARD/ : { *(.eh_frame_hdr); }
+	}
 
 	. = ALIGN(64);
 
@@ -75,15 +67,15 @@ SECTIONS {
 		__init_array_end = .;
 
 		__init_array_early_start = .;
-		KEEP(*(.init_array))
-		KEEP(*(.ctors))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors)))
 		__init_array_early_end = .;
 
 		. = ALIGN(16);
 		___dtors_st = .;
 		KEEP(*(SORT_BY_INIT_PRIORITY(.dtors.*)))
-		KEEP(*(.dtors))
-		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.dtors)))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array)))
 		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
 		___dtors_en = .;
 
@@ -111,7 +103,7 @@ SECTIONS {
 	.dynsym : {
 		PROVIDE_HIDDEN(___dynsym_st = .);
 		*(.dynsym);
-		*(.dynsym*);
+		*(SORT(.dynsym.*));
 		PROVIDE_HIDDEN(___dynsym_en = .);
 	}
 
@@ -120,7 +112,7 @@ SECTIONS {
 	.dynstr : {
 		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
-		*(.dynstr*);
+		*(SORT(.dynstr.*));
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	}
 
