@@ -1,13 +1,13 @@
 ENTRY(bootefi_entry)
 
-SECTIONS {
-	. = SIZEOF_HEADERS;
-	. = ALIGN(__section_alignment__);
+MEMORY {
+	ram (rwxai) : org = 0x400000, len = 0x400000
+}
 
-	. = __image_base__ +
-			(__section_alignment__ < 0x1000
-			? .
-			: __section_alignment__ );
+SECTIONS {
+	. = ABSOLUTE(0x400000);
+	
+	.victim : { . += 16; }
 
 	.text : {
 		__text_st = .;
@@ -16,11 +16,12 @@ SECTIONS {
 		*(.text)
 		*(.text.*)
 		*(.text.unlikely)
-	}
+	} >ram AT >ram
 
 	. = ALIGN(64);
 
 	/DISCARD/ : { *(.eh_frame); }
+	/DISCARD/ : { *(.eh_frame_hdr); }
 
 	. = ALIGN(64);
 
@@ -64,7 +65,9 @@ SECTIONS {
 
 	.edata : {
 		*(.edata)
+	}
 
+	.rodata : {
 		. = ALIGN(16);
 		__init_array_start = .;
 		KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)))
