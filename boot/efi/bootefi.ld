@@ -3,8 +3,11 @@ ENTRY(bootefi_entry)
 SECTIONS {
 	/DISCARD/ : { *(.eh_frame); }
 	/DISCARD/ : { *(.eh_frame_hdr); }
+	/DISCARD/       : { *(.comment)       }
 
-	. = ABSOLUTE(0x100000000);
+	. = __ImageBase;
+	
+	.broken : { . += 16; } =0
 
 	.text : {
 		__text_st = .;
@@ -14,45 +17,7 @@ SECTIONS {
 		*(SORT(.text.*))
 		*(.text.unlikely)
 	}
-
-	. = ALIGN(64);
-
-	.rela.plt : {
-		PROVIDE_HIDDEN(___rela_entry_st = .);
-		*(.rela.entry)
-		PROVIDE_HIDDEN(___rela_entry_en = .);
-
-		PROVIDE_HIDDEN(___rela_plt_st = .);
-		*(.rela.plt)
-		PROVIDE_HIDDEN(___rela_plt_en = .);
-
-		PROVIDE_HIDDEN (__rela_iplt_st = .);
-		*(.rela.iplt)
-		PROVIDE_HIDDEN (__rela_iplt_en = .);
-	}
-
-	. = ALIGN(64);
-
-	.plt.got : {
-		PROVIDE_HIDDEN(___plt_got = .);
-		*(.plt.got)
-	}
-
-	. = ALIGN(64);
-
-	.plt.bnd : {
-		PROVIDE_HIDDEN(___plt_bnd = .);
-		*(.plt.bnd)
-	}
-
-	. = ALIGN(64);
-
-	.plt : {
-		PROVIDE_HIDDEN(___plt = .);
-		*(.plt)
-		*(.iplt)
-	}
-
+	
 	. = ALIGN(16K);
 
 	.edata : {
@@ -90,69 +55,6 @@ SECTIONS {
 
 	.reloc : { *(.reloc) }
 
-	. = ALIGN(64);
-
-	.hash : {
-		PROVIDE_HIDDEN(___hash_st = .);
-		*(.hash);
-		PROVIDE_HIDDEN(___hash_en = .);
-	}
-
-	. = ALIGN(64);
-
-	.dynsym : {
-		PROVIDE_HIDDEN(___dynsym_st = .);
-		*(.dynsym);
-		*(SORT(.dynsym.*));
-		PROVIDE_HIDDEN(___dynsym_en = .);
-	}
-
-	. = ALIGN(64);
-
-	.dynstr : {
-		PROVIDE_HIDDEN(___dynstr_st = .);
-		*(.dynstr);
-		*(SORT(.dynstr.*));
-		PROVIDE_HIDDEN(___dynstr_en = .);
-	}
-
-	. = ALIGN(64);
-
-	.got : {
-		PROVIDE_HIDDEN(_GLOBAL_OFFSET_TABLE_ = .);
-		*(.got.plt)
-		*(.got)
-	}
-
-	. = ALIGN(64);
-
-	.rela.dyn : {
-		PROVIDE_HIDDEN(___rela_dyn = .);
-		*(.rela.init)
-		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
-		*(.rela.fini)
-		*(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
-		*(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
-		*(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
-		*(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
-		*(.rela.ctors)
-		*(.rela.dtors)
-		*(.rela.got)
-		*(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
-		*(.rela.ldata .rela.ldata.* .rela.gnu.linkonce.l.*)
-		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
-		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
-		*(.rela.ifunc)
-	}
-
-	. = ALIGN(64);
-
-	.dynamic : {
-		PROVIDE_HIDDEN(___dynamic_st = .);
-		*(.dynamic);
-		PROVIDE_HIDDEN(___dynamic_en = .);
-	}
-
 	. = ALIGN(16K);
 
 	.smp : {
@@ -168,14 +70,6 @@ SECTIONS {
 	}
 
 	. = ALIGN(16k);
-
-	.got : {
-		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
-		*(.got.plt)
-		*(.got*)
-	}
-
-	. = ALIGN(64);
 
 	.data : {
 		*(.data)
@@ -200,7 +94,6 @@ SECTIONS {
 
 	. = ALIGN(64);
 
-	/DISCARD/       : { *(.comment)       }
 /*	.debug          (NOLOAD) : { *(.debug)         }
 	.debug_info		(NOLOAD) : { *(.debug_info)    }
 	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  }
