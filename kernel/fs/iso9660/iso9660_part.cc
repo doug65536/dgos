@@ -9,13 +9,13 @@ __BEGIN_ANONYMOUS
 //struct part_dev_t;
 
 struct iso9660_part_factory_t : public part_factory_t {
-    constexpr iso9660_part_factory_t();
+    iso9660_part_factory_t();
     ext::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
 static ext::vector<part_dev_t*> partitions;
 
-constexpr iso9660_part_factory_t::iso9660_part_factory_t()
+iso9660_part_factory_t::iso9660_part_factory_t()
     : part_factory_t("iso9660")
 {
     part_register_factory(this);

@@ -12,7 +12,7 @@ void register_text_display_device(
         char const *name, text_dev_factory_t *factory);
 
 struct text_dev_factory_t {
-    constexpr text_dev_factory_t(char const *name)
+    text_dev_factory_t(char const *name)
         : name(name)
         , next_factory(nullptr)
     {

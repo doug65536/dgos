@@ -21,7 +21,7 @@ PCI_DRIVER_BY_CLASS(
 
 class vga_factory_t : public text_dev_factory_t, public zero_init_t {
 public:
-    constexpr vga_factory_t()
+    vga_factory_t()
         : text_dev_factory_t("vga")
     {
     }

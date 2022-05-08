@@ -31,13 +31,13 @@ struct partition_tbl_ent_t {
 } _packed;
 
 struct mbr_part_factory_t : public part_factory_t {
-    constexpr mbr_part_factory_t();
+    mbr_part_factory_t();
     ext::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
 static ext::vector<part_dev_t*> partitions;
 
-constexpr mbr_part_factory_t::mbr_part_factory_t()
+mbr_part_factory_t::mbr_part_factory_t()
     : part_factory_t("mbr")
 {
     part_register_factory(this);

@@ -654,7 +654,7 @@ struct part_dev_t {
 };
 
 struct part_factory_t {
-    explicit constexpr part_factory_t(char const * factory_name)
+    constexpr part_factory_t(char const * factory_name)
         : name(factory_name)
     {
     }
