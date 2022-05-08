@@ -34,14 +34,13 @@ diff -Nur orig-src/binutils-2.35/config.sub src/binutils-2.35/config.sub
 diff -Nur orig-src/binutils-2.35/gas/configure.tgt src/binutils-2.35/gas/configure.tgt
 --- orig-binutils-2.35/gas/configure.tgt	2020-09-24 23:03:43.459550975 -0400
 +++ binutils-2.35/gas/configure.tgt	2020-09-24 23:13:15.201135771 -0400
-@@ -219,6 +219,7 @@
+@@ -224,5 +226,6 @@
+   i386-*-beospe*)			fmt=coff em=pe ;;
+   i386-*-beos*)				fmt=elf ;;
++  i386-*-dgos*)				fmt=elf ;;
    i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
    i386-*-elf*)				fmt=elf ;;
    i386-*-fuchsia*)			fmt=elf ;;
-+  i386-*-dgos*)			fmt=elf ;;
-   i386-*-bsd*)				fmt=aout em=386bsd ;;
-   i386-*-netbsdpe*)			fmt=coff em=pe ;;
-   i386-*-netbsd*-gnu* | \
 diff -Nur orig-src/binutils-2.35/ld/configure.tgt src/binutils-2.35/ld/configure.tgt
 --- orig-binutils-2.35/ld/configure.tgt	2020-09-24 23:03:43.355551682 -0400
 +++ binutils-2.35/ld/configure.tgt	2020-09-24 23:20:26.472380429 -0400
@@ -56,24 +55,33 @@ diff -Nur orig-src/binutils-2.35/ld/configure.tgt src/binutils-2.35/ld/configure
  i[3-7]86-*-bsd)		targ_emul=i386bsd
  			targ_extra_ofiles=
  			;;
-@@ -354,7 +358,7 @@
+@@ -359,7 +359,7 @@
  i[3-7]86-*-elfiamcu)   targ_emul=elf_iamcu
  			targ_extra_emuls=elf_i386
  			;;
--i[3-7]86-*-elf* | i[3-7]86-*-rtems*)
-+i[3-7]86-*-elf* | i[3-7]86-*-rtems* | i[3-7]86-*-dgos*)
+-i[3-7]86-*-elf* | i[3-7]86-*-rtems* | i[3-7]86-*-genode*)
++i[3-7]86-*-elf* | i[3-7]86-*-rtems* | i[3-7]86-*-genode* | i[3-7]86-*-dgos*)
  			targ_emul=elf_i386
  			targ_extra_emuls=elf_iamcu
  			;;
-@@ -954,7 +958,7 @@
- 					sed -e 's/netbsd/netbsdelf/'`;;
- 			esac
+@@ -984,7 +984,7 @@
+ 			    sed -e 's/x86_64/i386/' -e 's/aout//'`
  			;;
--x86_64-*-elf* | x86_64-*-rtems* | x86_64-*-fuchsia*)
-+x86_64-*-elf* | x86_64-*-rtems* | x86_64-*-fuchsia* | x86_64-*-dgos*)
+-x86_64-*-elf* | x86_64-*-rtems* | x86_64-*-fuchsia* | x86_64-*-genode*)
++x86_64-*-elf* | x86_64-*-rtems* | x86_64-*-fuchsia* | x86_64-*-genode* | x86_64-*-dgos*)
  			targ_emul=elf_x86_64
  			targ_extra_emuls="elf_i386 elf_iamcu elf32_x86_64 elf_l1om elf_k1om"
  			targ_extra_libpath="elf_i386 elf_iamcu elf32_x86_64 elf_l1om elf_k1om"
+ 			tdir_elf_i386=`echo ${targ_alias} | sed -e 's/x86_64/i386/'`
+# diff -Nur orig-src/binutils-2.35/ld/emultempl/pep.em src/binutils-2.35/ld/emultempl/pep.em
+# --- orig-binutils-2.35/ld/emultempl/pep.em	1969-12-31 19:00:00.000000000 -0500
+# +++ binutils-2.35/ld/emultempl/pep.em	2020-09-24 23:22:50.328220182 -0400
+# @@ -12,5 +12,5 @@
+#      move_default_addr_high=1
+#      ;;
+#    *)
+#      move_default_addr_high=0;
+#      ;;
 diff -Nur orig-src/binutils-2.35/ld/emulparams/elf_i386_dgos.sh src/binutils-2.35/ld/emulparams/elf_i386_dgos.sh
 --- orig-binutils-2.35/ld/emulparams/elf_i386_dgos.sh	1969-12-31 19:00:00.000000000 -0500
 +++ binutils-2.35/ld/emulparams/elf_i386_dgos.sh	2020-09-24 23:22:50.328220182 -0400
@@ -91,7 +99,7 @@ diff -Nur orig-src/binutils-2.35/ld/emulparams/elf_x86_64_dgos.sh src/binutils-2
 diff -Nur orig-src/binutils-2.35/ld/Makefile.am src/binutils-2.35/ld/Makefile.am
 --- orig-binutils-2.35/ld/Makefile.am	2020-09-24 23:03:43.355551682 -0400
 +++ binutils-2.35/ld/Makefile.am	2020-09-24 23:38:55.266450150 -0400
-@@ -286,6 +286,7 @@
+@@ -284,6 +284,7 @@
  	eelf_i386_ldso.c \
  	eelf_i386_sol2.c \
  	eelf_i386_vxworks.c \
@@ -99,10 +107,11 @@ diff -Nur orig-src/binutils-2.35/ld/Makefile.am src/binutils-2.35/ld/Makefile.am
  	eelf_iamcu.c \
  	eelf_s390.c \
  	eh8300elf.c \
-@@ -451,7 +452,8 @@
+@@ -451,8 +452,9 @@
  	eelf_x86_64.c \
  	eelf_x86_64_cloudabi.c \
  	eelf_x86_64_fbsd.c \
+	eelf_x86_64_haiku.c \
  	eelf_x86_64_sol2.c \
 +	eelf_x86_64_dgos.c \
  	ehppa64linux.c \
@@ -115,8 +124,8 @@ diff -Nur orig-src/binutils-2.35/configure.ac src/binutils-2.35/configure.ac
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | *-*-gnu* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
        | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-dragonfly* \
--      | *-*-solaris2* | *-*-nto* | *-*-nacl*)
-+      | *-*-solaris2* | *-*-nto* | *-*-nacl* | *-*-dgos*)
+-      | *-*-solaris2* | *-*-nto* | *-*-nacl* | *-*-haiku*)
++      | *-*-solaris2* | *-*-nto* | *-*-nacl* | *-*-haiku* | *-*-dgos*)
          case "${target}" in
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;

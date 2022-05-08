@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set +x
+#set -x
 
 arches=x86_64-dgos
 quiet=0
@@ -36,9 +36,10 @@ function fullpath() {
 }
 
 function require_cmd() {
+	local cmd
 	for cmd in "$@"; do
-		if ! which "$cmd" > /dev/null; then
-			err "$1 is required"
+		if ! which "${cmd}" > /dev/null; then
+			err "${cmd} is required"
 		fi
 	done
 }
@@ -238,12 +239,13 @@ function help() {
 }
 
 # Parse arguments
-while getopts na:m:j:o:cxXp:qh? arg
+while getopts na:m:d:j:o:cxXp:qh? arg
 do
 	case $arg in
 	    n ) enablepatch=0 ;;
 		a ) arches="$OPTARG" ;;
 		m ) gnu_mirror="$OPTARG" ;;
+		d ) download_dir="$OPTARG" ;;
 		j ) parallel="-j$OPTARG" ;;
 		o ) outdir="$OPTARG" ;;
 		p ) prefixdir="$OPTARG" ;;
@@ -257,6 +259,7 @@ do
 	esac
 done
 
+log echo "Checking parameters"
 require_value "$arches" "Architecture list required, need -a <dir>"
 require_value "$outdir" "Output directory required, need -o <dir>"
 if [[ -z $extractonly ]]; then
@@ -290,18 +293,19 @@ then
 	log echo "$log_banner"
 fi
 
-CXX=${CXX:g++}
-CC=${CC:gcc}
-AS=${AS:as}
-AR=${AR:gcc-ar}
-RANLIB=${RANLIB:gcc-ranlib}
-NM=${NM:gcc-nm}
-WGET=${WGET:wget}
-TAR=${TAR:tar}
-TEE=${TEE:tee}
-TAIL=${TAIL:tail}
+CXX=${CXX:-g++}
+CC=${CC:-gcc}
+AS=${AS:-as}
+AR=${AR:-gcc-ar}
+RANLIB=${RANLIB:-gcc-ranlib}
+NM=${NM:-gcc-nm}
+WGET=${WGET:-wget}
+TAR=${TAR:-tar}
+TEE=${TEE:-tee}
+TAIL=${TAIL:-tail}
 
-require_cmd "$WGET" "$TAR" "$CXX" "$CC" "$AS" "$AR" "$RANLIB" "$NM" "$TEE" "$TAIL"
+require_cmd "$CXX" "$CC" "$AS" "$AR" "$RANLIB" \
+	"$NM" "$WGET" "$TAR" "$TEE" "$TAIL"
 
 # Set gccver, binver, etc...
 . "$scriptroot/build-crossgcc-versions"
@@ -324,6 +328,7 @@ mpcurl="$gnu_mirror/mpc/$mpctar"
 mpfurl="$gnu_mirror/mpfr/$mpftar"
 
 archives="$outdir/archives"
+[[ -n $download_dir ]] && archives=$("${REALPATH:-realpath}" "$download_dir")
 mkdir -p "$archives" || exit
 download_file "$gccurl" "$archives"
 download_file "$binurl" "$archives"
@@ -377,7 +382,7 @@ bin_config="--target=$arches \
 --enable-multiarch"
 
 if [[ $arches =~ "x86" ]]; then
-	bin_config+=" --enable-targets=x86_64-dgos,x86_64-pe,elf32-x86-64"
+	bin_config+=" --enable-targets=x86_64-dgos,x86_64-pe"
 fi
 
 gdb_config="--target=$arches \
