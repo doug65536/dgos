@@ -1,7 +1,7 @@
 QEMU := qemu-system-x86_64
 
 QEMU_MONITOR := \
-	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server=on,wait=off,telnet=on
 
 QEMU_DEBUGCON := \
 	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
@@ -9,7 +9,7 @@ QEMU_DEBUGCON := \
 	-device isa-debugcon,chardev=qemu-debug-out
 
 QEMU_SERIAL := \
-	-chardev socket,id=qemu-serial-socket,host=localhost,port=7778,server,nowait \
+	-chardev socket,id=qemu-serial-socket,host=localhost,port=7778,server=on,wait=off \
 	-serial chardev:qemu-serial-socket
 
 QEMU_CPU := host,migratable=false,host-cache-info=true
