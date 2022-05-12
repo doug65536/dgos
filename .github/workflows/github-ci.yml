@@ -46,6 +46,11 @@ jobs:
 
     - uses: actions/upload-artifact@v2
       with:
+        name: build.log
+        path: cibuild/toolchain_build/build.log
+
+    - uses: actions/upload-artifact@v2
+      with:
         name: toolchain
         path: cibuild/toolchain_install
 
