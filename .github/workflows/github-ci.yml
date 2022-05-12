@@ -45,6 +45,7 @@ jobs:
       run: export PATH="$PWD/cibuild/toolchain_install/bin:$PATH" && cd cibuild && make disks -j$(nproc)
 
     - uses: actions/upload-artifact@v2
+      if: always()
       with:
         name: build.log
         path: cibuild/toolchain_build/build.log
