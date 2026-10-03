@@ -88,6 +88,8 @@ static constexpr const size_t HEAP_MAX_ARENAS =
       sizeof(size_t) -                          // arena_count
       sizeof(heap_ext_arena_t*) -               // last_ext_arena
       sizeof(mutex_t) -                         // heap_lock
+      sizeof(void**) -                          // reserve
+      sizeof(size_t) * 2 -                      // reserve_count/capacity
       sizeof(uint32_t)) /                       // id
       sizeof(heap_page_t)) - 1;                 // arenas
 
@@ -157,6 +159,7 @@ private:
 };
 
 C_ASSERT(sizeof(heap_t) <= PAGESIZE);
+C_ASSERT(sizeof(heapimpl_t) <= PAGESIZE);
 
 static uint32_t next_heap_id;
 
