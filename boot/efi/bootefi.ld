@@ -5,9 +5,8 @@ SECTIONS {
 	/DISCARD/ : { *(.eh_frame_hdr); }
 	/DISCARD/       : { *(.comment)       }
 
-	. = __ImageBase;
-	
-	.broken : { . += 16; } =0
+	/* First section goes after the PE headers, on a section alignment */
+	. = __ImageBase + 0x1000;
 
 	.text : {
 		__text_st = .;

@@ -140,7 +140,11 @@ BOOTLOADER_EFI_FLAGS = \
 	$(NO_RTTI_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	$(FREESTANDING_FLAGS) \
-	-D__DGOS_BOOTLOADER__
+	-D__DGOS_BOOTLOADER__ \
+	-fplt
+
+# -fplt must come after COMPILER_FLAGS (which has -fno-plt): the PE linker
+# has no GOT, so calls through GOTPCREL slots jump into function code bytes
 
 #$(RETPOLINE_FLAGS)
 

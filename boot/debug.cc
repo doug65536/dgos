@@ -18,8 +18,9 @@ static void e9out(char const *data, size_t len)
 #if !defined(__aarch64__)
     if (use_serial) {
         if (!serial_ready) {
-            arch_serial_init(1);
+            // Set first, init may log, which would recurse back in here
             serial_ready = true;
+            arch_serial_init(1);
         }
 
         if (serial_logger_t::instance)
