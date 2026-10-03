@@ -2,6 +2,7 @@
 
 #include <sys/cdefs.h>
 #define __need_size_t
+#define __need_wchar_t
 #include <stddef.h>
 #include <sys/wait.h>
 

@@ -224,6 +224,52 @@ function process_tarball() {
 	log "$action" "$base" "$ext" "$config" "$target" "${@:5}" || exit
 }
 
+# Binutils/gcc/gdb refuse to regenerate with any autotools version other
+# than the one they were generated with. Release tarballs ship pre-generated
+# configure scripts, so build the exact versions locally if not available.
+function build_autotool() {
+	local name="$1"
+	local ver="$2"
+	local dir="$3"
+	local url="$gnu_mirror/$name/$name-$ver.tar.xz"
+	local tool_archives="$dir/archives"
+	local tool_src="$dir/src"
+
+	mkdir -p "$tool_archives" "$tool_src" || exit
+	download_file "$url" "$tool_archives" || exit
+	if ! [[ -d $tool_src/$name-$ver ]]; then
+		log "$TAR" -C "$tool_src" -xf "$tool_archives/$name-$ver.tar.xz" ||
+			exit
+	fi
+	mkdir -p "$dir/build/$name-$ver" || exit
+	pushd "$dir/build/$name-$ver" > /dev/null || exit
+	log echo "Building $name $ver in $dir"
+	log "$tool_src/$name-$ver/configure" --prefix="$dir/install" || exit
+	log make "$parallel" || exit
+	log make install || exit
+	popd > /dev/null || exit
+}
+
+function ensure_autotools() {
+	local dir
+	dir="$(fullpath "$outdir")/autotools"
+	local bindir="$dir/install/bin"
+
+	if ! [[ -x $bindir/autoconf ]] ||
+		! "$bindir/autoconf" --version | head -n1 | grep -q "$autoconfver$"
+	then
+		build_autotool autoconf "$autoconfver" "$dir"
+	fi
+
+	if ! [[ -x $bindir/automake ]] ||
+		! "$bindir/automake" --version | head -n1 | grep -q "$automakever$"
+	then
+		PATH="$bindir:$PATH" build_autotool automake "$automakever" "$dir"
+	fi
+
+	export PATH="$bindir:$PATH"
+}
+
 function help() {
 	echo ' -a <arch list>   architectures to build (space separated list)'
 	echo ' -n               no patch'
@@ -337,6 +383,8 @@ download_file "$gmpurl" "$archives"
 download_file "$mpcurl" "$archives"
 download_file "$mpfurl" "$archives"
 
+ensure_autotools
+
 log echo Extracting tarballs...
 
 toolre='/([^/-]+)-[^/]+$'
@@ -387,7 +435,7 @@ fi
 
 gdb_config="--target=$arches \
 --disable-nls \
---with-python \
+--with-python=python3 \
 --with-expat \
 --with-system-readline \
 --with-system-zlib \

@@ -4,6 +4,9 @@ gdbver=12.1
 gmpver=6.2.1
 mpcver=1.2.1
 mpfver=4.1.0
+# Exact autotools versions that binutils/gcc/gdb sources require
+autoconfver=2.69
+automakever=1.15.1
 
 declare -A automakes=(
     ["binutils_0"]="./bfd"
