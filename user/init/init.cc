@@ -804,11 +804,23 @@ private:
         uint64_t best_clos = ~0ULL;
         size_t i;
 
+        // Failed opens are much cheaper than real ones, so count them
+        size_t open_failures = 0;
+        size_t first_failure = 0;
+        int first_errno = 0;
+
         uint64_t st = __builtin_ia32_rdtsc();
         for (i = 0; i < 1000000; ++i) {
             uint64_t sto = __builtin_ia32_rdtsc();
             int fd = openat(AT_FDCWD, path, O_RDONLY);
             uint64_t eno = __builtin_ia32_rdtsc();
+
+            if (fd < 0) {
+                if (!open_failures++) {
+                    first_failure = i;
+                    first_errno = errno;
+                }
+            }
 
             uint64_t stc = __builtin_ia32_rdtsc();
             // Close it even if -1 like a sloppy program would
@@ -831,6 +843,8 @@ private:
         en -= st;
 
         printf("Open close %zu files, each=%" PRIu64 ", perf:\n", i, en / i);
+        printf("open failures: %zu (first at %zu, errno=%d)\n",
+               open_failures, first_failure, first_errno);
         printf("open: min=%" PRIu64 " mean=%" PRIu64 " max=%" PRIu64 "\n",
                best_open, sum_open / i, worst_open);
         printf("clos: min=%" PRIu64 " mean=%" PRIu64 " max=%" PRIu64 "\n",
