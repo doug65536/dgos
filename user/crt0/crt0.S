@@ -83,6 +83,10 @@ _start:
     // Unprioritized constructors (plain .init_array, .ctors) are linked into
     // a separate range after the prioritized ones. Run them last, like the
     // default priority ought to be
+    // Only the project linker scripts define this range. With the default
+    // linker script they are undefined, resolve to 0 and the range is empty
+    .weak __init_array_early_start
+    .weak __init_array_early_end
     lea __init_array_early_start(%rip),%rbx
 .Lnext_early_init:
     leaq __init_array_early_end(%rip),%rax
