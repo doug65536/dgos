@@ -855,9 +855,6 @@ static void test_perf_open_close(size_t parallelism)
     for (size_t i = 0; i < parallelism; ++i)
         threads[i].start();
 
-    for (size_t i = 0; i < parallelism; ++i)
-        threads[i].start();
-
     // Destructors join them one by one
     delete[] threads;
 }
