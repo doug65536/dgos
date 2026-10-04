@@ -173,7 +173,18 @@ intptr_t process_t::start_clone(clone_data_t const& data)
         void *buf_rsp = buf->sp;
         lock.unlock();
 
-        arch_jump_to_user(uintptr_t((void*)data.bootstrap), uintptr_t(data.sp),
+        uintptr_t user_sp = uintptr_t(data.sp);
+
+#ifdef __x86_64__
+        // The bootstrap function is entered by a jump, not by a call, but it
+        // is a normal C function, so it expects rsp % 16 == 8 on entry, as if
+        // a return address had been pushed. Without that, aligned SSE stores
+        // to stack slots (movaps) take #GP on real hardware (but not in TCG)
+        if (use64)
+            user_sp -= sizeof(uint64_t);
+#endif
+
+        arch_jump_to_user(uintptr_t((void*)data.bootstrap), user_sp,
                    uintptr_t(buf_rsp), use64,
                    tid, uintptr_t(data.fn), uintptr_t(data.arg));
     }
