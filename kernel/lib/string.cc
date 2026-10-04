@@ -250,8 +250,8 @@ void *memset(void *dest, int c, size_t n)
 #ifdef USE_REP_STRING
 void clear64(void *dest, size_t n)
 {
-    memset(dest, 0, n);
-    //memset_stosq(dest, 0, n);
+    // n is a count of 64 bit words, not bytes
+    memset_stosq(dest, 0, n);
 }
 #else
 // GCC erroneously disables __builtin_ia32_movnti64
