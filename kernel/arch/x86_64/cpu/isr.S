@@ -1318,7 +1318,7 @@ protection_barrier_to_user_verw:
 
 // on entry, rbp=frame,
 // ebx=intr, edi=intr,
-// r12=ctx, esi=ctx
+// esi=ctx (r12 is not ctx on entry, it is clobbered scratch)
 .balign 16
 .hidden exception_isr_handler
 .global exception_isr_handler
@@ -1350,6 +1350,10 @@ exception_isr_handler:
 
     // Align
     add $ -8,%rsp
+
+    // Hold isr_context_t pointer in r12 (call preserved)
+    // The entry code does not set this up, and only passes it in rsi
+    movq %rsi,%r12
 
     call intr_has_handler
     testl %eax,%eax
