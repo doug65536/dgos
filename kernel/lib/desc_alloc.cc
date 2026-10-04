@@ -23,9 +23,9 @@ int desc_alloc_t::alloc()
     // Mark it taken
     mask |= uint64_t(1) << bitlvl1;
 
-    // If this one became full clear bit in level0
+    // If this one became full set bit in level0
     if (mask == ~int64_t(0))
-        level0 &= ~(uint64_t(1) << bitlvl0);
+        level0 |= uint64_t(1) << bitlvl0;
 
     return (bitlvl0 << 6) + bitlvl1;
 }
@@ -79,9 +79,9 @@ bool desc_alloc_t::take_locked(int fd, scoped_lock_t& lock)
     // Mark it taken
     mask |= set;
 
-    // If this one became full clear bit in level0
+    // If this one became full set bit in level0
     if (unlikely(mask == ~int64_t(0)))
-        level0 &= ~(uint64_t(1) << bitlvl0);
+        level0 |= uint64_t(1) << bitlvl0;
 
     return true;
 }
