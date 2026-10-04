@@ -80,6 +80,22 @@ _start:
     jmp .Lnext_init
 .Ldone_init:
 
+    // Unprioritized constructors (plain .init_array, .ctors) are linked into
+    // a separate range after the prioritized ones. Run them last, like the
+    // default priority ought to be
+    lea __init_array_early_start(%rip),%rbx
+.Lnext_early_init:
+    leaq __init_array_early_end(%rip),%rax
+    cmpq %rax,%rbx
+    je .Ldone_early_init
+    movq (%rbx),%rax
+    testq %rax,%rax
+    jz .Ldone_early_init
+    indirect_call rax
+    addq $ 8,%rbx
+    jmp .Lnext_early_init
+.Ldone_early_init:
+
     // Save stack pointer and absolutely guarantee alignment
 	mov %rsp,%rbx
 	and $ -16,%rsp
