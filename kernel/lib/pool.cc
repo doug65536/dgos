@@ -15,12 +15,12 @@ static uint32_t pool_round_up(uint32_t n, int8_t log2m)
     return (n + ((1U<<log2m)-1)) & (~0U << log2m);
 }
 
-bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
+bool pool_base_t::create(uint32_t item_sz, uint32_t capacity)
 {
     // Round item size up to multiple of cache line
-    item_size = pool_round_up(item_size, POOL_LOG2_ALIGN);
+    item_sz = pool_round_up(item_sz, POOL_LOG2_ALIGN);
 
-    size_t size = item_size * capacity;
+    size_t size = size_t(item_sz) * capacity;
 
     void *pool_mem = mmap(nullptr, size, PROT_READ | PROT_WRITE,
                           MAP_POPULATE);
@@ -31,7 +31,7 @@ bool pool_base_t::create(uint32_t item_size, uint32_t capacity)
     items = (char*)pool_mem;
     item_count = 0;
     item_capacity = capacity;
-    item_size = item_size;
+    item_size = item_sz;
     first_free = -1U;
 
     return true;
