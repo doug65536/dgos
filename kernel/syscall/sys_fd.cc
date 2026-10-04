@@ -156,12 +156,24 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
     return err(sz);
 }
 
+// Forget a descriptor and make its number available again
+// The file table id has to be read before this
+static void release_fd(int fd)
+{
+    process_t *p = fast_cur_process();
+
+    p->ids.ids[fd].set(-1, 0);
+    p->ids.desc_alloc.free(fd);
+}
+
 int sys_close(int fd)
 {
     int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
+
+    release_fd(fd);
 
     int status = file_close(id);
     if (likely(status == 0))
@@ -277,6 +289,11 @@ int sys_readdir_r(int fd, dirent_t *buf)
 int sys_closedir(int fd)
 {
     int id = id_from_fd(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+
+    release_fd(fd);
 
     return -file_closedir(id);
 }
