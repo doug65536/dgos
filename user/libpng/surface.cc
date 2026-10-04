@@ -623,8 +623,8 @@ vga_font_t::bit8_to_pixels_transparent_resolve()
 
 void vga_font_t::resolver()
 {
-    bit8_to_pixels_resolve();
-    bit8_to_pixels_transparent_resolve();
+    bit8_to_pixels = bit8_to_pixels_resolve();
+    bit8_to_pixels_transparent = bit8_to_pixels_transparent_resolve();
 }
 
 //void vga_console_ring_t::render(fb_info_t *fb, int dx, int dy, int dw, int dh)
