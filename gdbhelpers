@@ -76,6 +76,12 @@ define walkstack
 			loop_break
 		end
 		x /1i $retaddr
+		# Stacks grow down, so the caller frame must be at a higher address
+		# New threads start with rbp pointing to itself, that is the end
+		if $nextframe <= $addr
+			echo End of frame chain\n
+			loop_break
+		end
 		set $addr=$nextframe
 	end
 end
