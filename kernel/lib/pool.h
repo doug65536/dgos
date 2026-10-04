@@ -74,7 +74,9 @@ public:
     void free(T* item)
     {
         if (item) {
-            size_t index = item - reinterpret_cast<T*>(items);
+            // Slots are item_size apart (rounded up), not sizeof(T)
+            size_t index = (reinterpret_cast<char*>(item) - items) /
+                    item_size;
             assert(index < item_capacity);
             item->~T();
 
