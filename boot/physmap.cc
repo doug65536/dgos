@@ -544,7 +544,13 @@ phys_alloc_t alloc_high()
 {
     DEBUG("Taking high page");
 
-    for (size_t i = physalloc_count; i > 0; --i) {
+    // A 32 bit bootloader can't address memory above 4GB, the caller
+    // would truncate the address and scribble on unrelated memory
+    size_t limit = sizeof(void*) < sizeof(uint64_t)
+            ? physalloc_64bit_st
+            : physalloc_count;
+
+    for (size_t i = limit; i > 0; --i) {
         physmem_range_t &range = physalloc_ranges[i-1];
 
         if (range.type != PHYSMEM_TYPE_NORMAL)
