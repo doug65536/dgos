@@ -159,6 +159,10 @@ hybdisk.img: \
 		&& \
 		printf 'label: gpt\n$(HYB_PART_LBA),,U,*' | $(SFDISK) "$@" \
 		&& \
+		printf "Converting MBR to hybrid GPT protective MBR\n" \
+		&& \
+		"$(SGDISK)" -A 1:set:2 -h 1 "$@" \
+		&& \
 		printf "Copying boot code into MBR\n" \
 		&& \
 		"$(DD)" \
@@ -178,10 +182,6 @@ hybdisk.img: \
 			skip=510 \
 			count=2 \
 			conv=notrunc \
-		&& \
-		printf "Converting MBR to hybrid GPT protective MBR\n" \
-		&& \
-		"$(SGDISK)" -A 1:set:2 -h 1 "$@" \
 		&& \
 		printf "Copying partition into disk image\n" \
 		&& \
