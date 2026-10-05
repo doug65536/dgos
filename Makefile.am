@@ -2804,6 +2804,31 @@ kernel-test-kvm: test-smp-efi-hd-hyb-ahci-vga-kvm
 
 .PHONY: kernel-test-kvm
 
+# Run every storage controller with every boot type under kvm,
+# continue past failures and summarize at the end
+TEST_ALL_KVM_TARGETS = $(foreach bt,$(QL_BT),$(foreach sc,$(QL_SC),\
+	test-smp-$(bt)-hd-hyb-$(sc)-gl-kvm))
+
+test-all-kvm:
+	@failed=""; \
+	for t in $(TEST_ALL_KVM_TARGETS); do \
+		case "$$t" in *-none-*) continue;; esac; \
+		if $(MAKE) $$t; then \
+			echo "PASS: $$t"; \
+		else \
+			echo "FAIL: $$t"; \
+			failed="$$failed $$t"; \
+		fi; \
+	done; \
+	if test -n "$$failed"; then \
+		echo "Failed tests:"; \
+		for t in $$failed; do echo "  $$t"; done; \
+		exit 1; \
+	fi; \
+	echo "All kvm tests passed"
+
+.PHONY: test-all-kvm
+
 run-all: $(QEMU_LAUNCHERS)
 
 .PHONY: run
