@@ -10,7 +10,7 @@
 #include "fs/devfs.h"
 #include "user_mem.h"
 
-#define DEBUG_FILEHANDLE 1
+#define DEBUG_FILEHANDLE 0
 #if DEBUG_FILEHANDLE
 #define FILEHANDLE_TRACE(...) printdbg("filehandle: " __VA_ARGS__)
 #else
