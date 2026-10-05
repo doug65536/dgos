@@ -566,7 +566,8 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
 void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
                                   void *rcvd_data, size_t rcvd_size)
 {
-    sendrecv(sent_data, sent_size, rcvd_data, rcvd_size);
+    (void)sendrecv(sent_data, sent_size, rcvd_data, rcvd_size,
+                   int64_t(INT64_MAX));
 }
 
 bool virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
@@ -588,7 +589,8 @@ void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
                                   void *rcvd_data, size_t rcvd_size,
                                   virtio_iocp_t *iocp)
 {
-    sendrecv(sent_data, sent_size, rcvd_data, rcvd_size, iocp);
+    (void)sendrecv(sent_data, sent_size, rcvd_data, rcvd_size, iocp,
+                   uint64_t(INT64_MAX));
 }
 
 bool virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
