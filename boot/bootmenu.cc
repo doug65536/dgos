@@ -229,7 +229,7 @@ static void apply_bootmenu_fw_cfg(
         int file_sz = read_fw_cfg_value(name, value, sizeof(value));
 
         if (file_sz < 0)
-            return;
+            continue;
 
         assert(size_t(file_sz) < sizeof(value) - 1);
         value[file_sz] = 0;
