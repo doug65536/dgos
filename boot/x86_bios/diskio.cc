@@ -206,6 +206,7 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
         assert(read_count <= 0xFFFF);
 
         pkt.block_count = read_count;
+        pkt.lba = lba;
 
         bios_regs_t regs;
         regs.eax = 0x4200;
