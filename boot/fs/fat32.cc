@@ -767,6 +767,7 @@ static int fat32_boot_open(tchar const *filename)
     PRINT("Storing file size: %" PRIu32, file_size);
 
     // Stash start cluster until cluster chain gets preloaded
+    file_handles[file].start_cluster = cluster;
     file_handles[file].cluster = cluster;
     file_handles[file].file_size = file_size;
 

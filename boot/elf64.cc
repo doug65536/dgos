@@ -561,6 +561,9 @@ elf64_loadaddr_t elf64_load(tchar const *filename)
     assert(initrd_fd == -1);
     initrd_fd = boot_open(initrd_pathname);
 
+    if (unlikely(initrd_fd < 0))
+        PANIC("Unable to reopen initrd");
+
     load_initrd(initrd_fd, initrd_size, ctx);
     boot_close(initrd_fd);
 
