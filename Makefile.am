@@ -2487,14 +2487,8 @@ QEMU_BOOTMEDIA_pxe_efi = \
 QEMU_VIDEO = $(QEMU_VIDEO_$(1)) $(QEMU_DISPLAY_$(1))
 QEMU_VIDEO_vga = -vga std
 QEMU_VIDEO_gl = \
-	-global driver=virtio-vga,property=disable-legacy,value=on \
-	-global driver=virtio-vga,property=disable-modern,value=off \
-	-global driver=virtio-vga,property=x-disable-pcie,value=off \
-	-global driver=virtio-vga,property=modern-pio-notify,value=on \
-	-global driver=virtio-vga,property=max_outputs,value=16 \
-	-global driver=virtio-vga,property=x-pcie-extcap-init,value=on \
-	-global driver=virtio-vga,property=virgl,value=on \
-	-vga virtio
+	-vga none \
+	-device virtio-vga-gl,max_outputs=16
 
 # Connect to debug log
 monitor-debug-output: $(DUMPDIR)/qemu-debug-out
