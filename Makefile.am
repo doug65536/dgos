@@ -2348,6 +2348,7 @@ QEMU_SOUND =
 
 QEMU_DEBUG = -no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset$(QEMU_EXTRA_D)
 QEMU_TEST = -no-reboot -d unimp,guest_errors
+QEMU_TESTRUN = -action shutdown=poweroff -fw_cfg name=opt/com.doug16k.dgos.bootmenu.testrun_port,string=com1
 
 QEMU_COMMON = \
 	-m $(QEMU_RAM) \
@@ -2369,8 +2370,8 @@ QEMU_RT_trace = -s -fw_cfg name=opt/com.doug16k.dgos.kernel_type,string=T
 QEMU_RT_tracedbg = -S $(QEMU_RT_trace)
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
-QEMU_RT_test = -s $(QEMU_TEST)
-QEMU_RT_testdbg = -s -S $(QEMU_TEST)
+QEMU_RT_test = -s $(QEMU_TEST) $(QEMU_TESTRUN)
+QEMU_RT_testdbg = -s -S $(QEMU_TEST) $(QEMU_TESTRUN)
 
 QEMU_DRV_COMMON = \
 	id=bootdrv,if=none,format=raw,werror=report,rerror=report

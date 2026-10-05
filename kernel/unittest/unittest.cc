@@ -114,7 +114,6 @@ static intptr_t test_run_thread(void *)
 
     if (bootinfo_parameter(bootparam_t::testrun_port)) {
         printdbg("Powering off\n");
-        failure_count = 1;
 
         if (failure_count == 0) {
             arch_poweroff();
