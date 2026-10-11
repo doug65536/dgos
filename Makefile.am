@@ -1727,12 +1727,12 @@ libc_tests: $(LIBC_TESTS) sysroot/lib/libc.a
 		-o libc_tests \
 		$(LIBC_TESTS) \
 		-static -nostdlib -g -fno-builtin \
-		$(ALL_STDLIB_INSTALLED) -lgcc
+		sysroot/lib/libc.a -lgcc
 
 test_compile: libc_tests
 
 test: test_compile
-	libc_tests
+	./libc_tests
 
 .PHONY: test_compile test
 
