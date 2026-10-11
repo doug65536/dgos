@@ -179,7 +179,7 @@ private:
     unsigned desc_free_count = 0;
 
     //uint16_t volatile *notify_ptr = nullptr;
-    pci_bar_accessor_t notify_accessor;
+    pci_bar_accessor_t *notify_accessor = nullptr;
     pci_bar_register_t notify_reg;
 
     uint8_t log2_queue_size = 0;

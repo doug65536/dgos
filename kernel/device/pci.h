@@ -793,6 +793,33 @@ public:
     }
 
     pci_bar_accessor_t(pci_bar_accessor_t const&) = delete;
+    pci_bar_accessor_t& operator=(pci_bar_accessor_t const&) = delete;
+
+    pci_bar_accessor_t(pci_bar_accessor_t&& rhs)
+        : mmio_base(rhs.mmio_base)
+        , mmio_size(rhs.mmio_size)
+        , port_base(rhs.port_base)
+    {
+        rhs.mmio_base = 0;
+        rhs.mmio_size = 0;
+        rhs.port_base = 0;
+    }
+
+    pci_bar_accessor_t& operator=(pci_bar_accessor_t&& rhs)
+    {
+        if (this != &rhs) {
+            if (mmio_size)
+                munmap((void*)mmio_base, mmio_size);
+            mmio_base = rhs.mmio_base;
+            mmio_size = rhs.mmio_size;
+            port_base = rhs.port_base;
+            rhs.mmio_base = 0;
+            rhs.mmio_size = 0;
+            rhs.port_base = 0;
+        }
+        return *this;
+    }
+
     ~pci_bar_accessor_t();
 
     void wr_8(pci_bar_register_t reg, uint8_t val);

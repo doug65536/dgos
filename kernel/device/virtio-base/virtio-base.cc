@@ -320,7 +320,7 @@ bool virtio_virtqueue_t::init(
 {
     this->queue_idx = queue_idx;
 
-    this->notify_accessor = notify_accessor;
+    this->notify_accessor = &notify_accessor;
 
     atomic_st_rel(&common_cfg->queue_select, queue_idx);
 
@@ -560,7 +560,7 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
     // to have seen, then write the notify MMIO to kick virtio and make
     // it look at the ring
     if (int16_t((uint16_t)avail_head - (uint16_t)avail_ftr->used_event) > 0)
-        notify_accessor.wr_16(notify_reg, queue_idx);
+        notify_accessor->wr_16(notify_reg, queue_idx);
 }
 
 void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,

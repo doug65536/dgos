@@ -657,7 +657,7 @@ bool virtio_gpu_dev_t::issue_get_display_info()
     VIRTIO_GPU_TRACE("Issuing get display info...\n");
 
     cmd_queue->sendrecv(&get_display_info, sizeof(get_display_info),
-                        &display_info_resp, sizeof(display_info_resp));
+                        &display_info_resp, sizeof(display_info_resp), &iocp);
 
     if (unlikely(!iocp.wait_until(ext::chrono::steady_clock::now() +
                                   ext::chrono::seconds(5)))) {
