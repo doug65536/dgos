@@ -209,7 +209,7 @@ static void apply_bootmenu_fw_cfg(
         tui_list_t<tui_menu_item_t>& boot_menu_items,
         vbe_mode_list_t const& vbe_modes)
 {
-    char name[48];
+    char name[48] = {};
     char value[16];
     constexpr tui_str_t prefix{TSTR "opt/com.doug16k.dgos.bootmenu."};
     size_pair_t prefix_sizes = tchar_to_utf8(name, sizeof(name),
@@ -223,8 +223,10 @@ static void apply_bootmenu_fw_cfg(
         tui_menu_item_t& menu_item = boot_menu_items.items[i];
         tui_str_t& menu_item_name = menu_item.name;
 
-        tchar_to_utf8(name + prefix_len, prefix_remain,
-                      menu_item_name.str, menu_item_name.len);
+        size_pair_t name_sizes = tchar_to_utf8(
+                    name + prefix_len, prefix_remain - 1,
+                    menu_item_name.str, menu_item_name.len);
+        name[prefix_len + name_sizes.output_produced] = 0;
 
         int file_sz = read_fw_cfg_value(name, value, sizeof(value));
 
@@ -257,10 +259,15 @@ static void apply_bootmenu_fw_cfg(
     for (size_t i = 0; i < autodisplay_items.count; ++i) {
         autodisplay_field_t const& field = autodisplay_items.items[i];
 
-        tchar_to_utf8(name + prefix_len, prefix_remain,
-                      field.name, field.name.len);
+        size_pair_t field_sizes = tchar_to_utf8(
+                    name + prefix_len, prefix_remain - 1,
+                    field.name, field.name.len);
+        name[prefix_len + field_sizes.output_produced] = 0;
 
-        uint32_t file_sz = read_fw_cfg_value(name, value, sizeof(value));
+        int32_t file_sz = read_fw_cfg_value(name, value, sizeof(value));
+
+        if (file_sz < 0)
+            continue;
 
         // ASCII to decimal
         int n = 0;
