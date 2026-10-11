@@ -73,7 +73,7 @@ static _always_inline bool compare(char const *expect, char const *actual)
     return !strcmp(expect, actual);
 }
 
-template<typename TE, typename TA, size_t sz>
+template<typename TE, typename TA>
 bool compare(TE expect, TA actual)
 {
     return expect == actual;
@@ -89,7 +89,7 @@ void are_eq(TE const& expect,
             char const* file, int line)
 {
     bool passed = compare(expect, actual);
-    if (passed) {
+    if (!passed) {
         report_failure("Expected ", expect_expr, 
                        ", got ", actual_expr, 
                        ": ", description,

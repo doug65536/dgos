@@ -4,7 +4,7 @@
 TEST_CASE(test_memset) {
     char buf[64];
 
-    for (size_t ofs = 0; ofs < 64 - 8; --ofs) {
+    for (size_t ofs = 0; ofs < 64 - 8; ++ofs) {
         for (size_t i = 0; i < sizeof(buf); ++i)
             buf[i] = 0;
 

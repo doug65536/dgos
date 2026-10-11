@@ -1,6 +1,5 @@
 #include "testassert.h"
 #include <stdio.h>
-#include <vector>
 #include <sys/syscall.h>
 
 static bool case_failed;
@@ -29,11 +28,29 @@ int main()
 extern void (*__init_array_start[])();
 extern void (*__init_array_end[])();
 
-extern void (*__init_array_early_start[])();
-extern void (*__init_array_early_end[])();
+extern void (*__init_array_early_start[])() __attribute__((weak));
+extern void (*__init_array_early_end[])() __attribute__((weak));
+
+extern "C" {
+extern char const __rela_iplt_start[] __attribute__((weak));
+extern char const __rela_iplt_end[] __attribute__((weak));
+}
 
 extern "C" void _start()
 {
+    // Static binary: apply IRELATIVE relocations for ifunc'd functions
+    struct rela_t {
+        uintptr_t offset;
+        uintptr_t info;
+        intptr_t addend;
+    };
+
+    for (rela_t const *r = (rela_t const *)__rela_iplt_start;
+         r < (rela_t const *)__rela_iplt_end; ++r) {
+        auto resolver = (uintptr_t (*)())r->addend;
+        *(uintptr_t*)r->offset = resolver();
+    }
+
     size_t n = __init_array_early_end - __init_array_early_start;
 
     for (size_t i = 0; i < n; ++i)
