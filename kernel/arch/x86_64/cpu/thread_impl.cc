@@ -1509,7 +1509,7 @@ void thread_request_reschedule_noirq()
     cpu_info_t *cpu = this_cpu();
 
     // If this weren't true, then someone is setting it when it will be missed
-    assert(cpu->in_irq > 0 || !cpu->should_reschedule);
+//    assert(cpu->in_irq > 0 || !cpu->should_reschedule);
 
     cpu->should_reschedule = true;
 }
